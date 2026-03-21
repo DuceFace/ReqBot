@@ -83,11 +83,7 @@ Return ONLY a valid JSON array. No markdown code fences. No text before or after
 If there are no actionable requirements in the text, return an empty array: []
 
 Each element must be a JSON object with exactly these keys:
-- "description": A single precise sentence summarizing what must be done. Preserve the exact subject, verb, and object of the obligation. Keep all technical terms, control identifiers, system names, numerical thresholds, and acronyms exactly as they appear in the source. Do NOT generalize or paraphrase. Maximum 120 words.
-  GOOD: "Systems must enforce multi-factor authentication using PIV cards for all privileged access to CUI systems."
-  GOOD: "Organizations must review and update system account lists within 24 hours of personnel termination per AC-2(3)."
-  BAD: "Organizations must implement authentication controls." (too vague — lost PIV, MFA, CUI, and privileged access specifics)
-  BAD: "Ensure proper security measures are in place." (meaningless — no subject, no object, no specifics)
+- "source_quote": (REQUIRED) The exact verbatim quote from the text that establishes this requirement (under 500 characters). Copy the text word-for-word — do not paraphrase or summarize. If you cannot find an exact verbatim quote for a requirement, do NOT include that requirement in the output.
 - "source_ref": The document-specific locator for this requirement (e.g., "AC-4", "Section 5.2.1", "Para 3.4.1") or "" if none is visible in the text. This is a traceability label, not a semantic tag — copy it exactly as written, do not infer or construct it.
 - "domain_tags": An array of 1-3 tags from this list ONLY: access-control, authentication-and-identity, audit-and-logging, configuration-management, contingency-and-recovery, data-protection-and-encryption, incident-response, maintenance, media-protection, network-security, personnel-security, physical-security, privacy, risk-management, security-assessment, supply-chain-security, system-integrity, training-and-awareness. If unsure, choose the single most relevant tag.
 - "requirement_type": One of these (with definitions):
@@ -96,7 +92,11 @@ Each element must be a JSON object with exactly these keys:
   * "procedural-control" — a process, procedure, or practice humans must follow
   * "assessment" — a requirement to evaluate, test, audit, or monitor
   * "guidance" — a recommendation that is not strictly mandatory
-- "source_quote": The exact quote from the text that establishes this requirement (under 500 characters)
+- "description": A single precise sentence summarizing what must be done. Preserve the exact subject, verb, and object of the obligation. Keep all technical terms, control identifiers, system names, numerical thresholds, and acronyms exactly as they appear in the source. Do NOT generalize or paraphrase. Maximum 120 words. May be "" if the source_quote is self-explanatory.
+  GOOD: "Systems must enforce multi-factor authentication using PIV cards for all privileged access to CUI systems."
+  GOOD: "Organizations must review and update system account lists within 24 hours of personnel termination per AC-2(3)."
+  BAD: "Organizations must implement authentication controls." (too vague — lost PIV, MFA, CUI, and privileged access specifics)
+  BAD: "Ensure proper security measures are in place." (meaningless — no subject, no object, no specifics)
 {source_ref_hints}
 Text:
 {chunk_text}"""
@@ -305,8 +305,8 @@ def validate_requirement(req: dict) -> dict | None:
     source_quote = req.get("source_quote", "").strip()
     req_type = req.get("requirement_type", "").strip().lower()
 
-    # Must have a description
-    if not description:
+    # Must have verbatim evidence — requirements without source_quote are fabricated
+    if not source_quote:
         return None
 
     # Validate and filter domain tags

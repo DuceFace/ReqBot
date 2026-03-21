@@ -86,3 +86,4 @@ not just the solution you have in mind.
 
 If you're unsure whether a contribution is welcome, open an issue first or email
 **[EMAIL]** before investing time.
+

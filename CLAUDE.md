@@ -125,17 +125,40 @@ reqbot reindex
 
 ---
 
-## Teammates
+## Teammates & Code Review Workflow
 
 Tyler has Gemini Pro and ChatGPT Pro access as code review teammates.
-- Get Gemini review after completing each subphase before proceeding
-- They've caught real bugs in past phases — use them
+**Codex** has a local clone of the repo (`ReqBot-review` workspace) and can do PR-based reviews.
+
+### Git Workflow (use this for all Phase 12+ work)
+
+1. Create a feature branch before making changes:
+   `git checkout -b <descriptive-name>` (e.g., `phase12-source-quote-gate`)
+2. Make changes and commit on that branch with clear messages describing what and why
+3. Push the branch: `git push origin <branch-name>`
+4. Open a PR: `git push` then use GitHub UI or `hub pull-request`
+5. Tyler tells Codex: `review PR #<number>` or `review branch <name> against main`
+6. Address Codex feedback with additional commits to the same branch
+7. Merge to main when Tyler is satisfied — do NOT merge yourself unless explicitly told to
+
+**Do not commit directly to `main` for feature work.** Main is for merge commits only.
+
+### Commit Message Style
+- Bad: "updated files", "fixed bug"
+- Good: "fix Step D typed_count metric to exclude empty-string requirement_type"
+- Good: "add source_quote validation gate — reject requirements without verbatim text"
+
+### Version Control Rules
+- JSONL pipeline output never goes in the repo (lives in ~/documents/processed/)
+- raw_pdfs/, Backups/, build/linux-x86_64/, dist/ are gitignored
+- build/*.sh scripts ARE tracked (they're source, not artifacts)
+- No new pip dependencies without discussion (targets air-gapped environments)
 
 ---
 
 ## What to Read Next
 
-- **For the current task (Phase 11):** `docs/PHASE11_REQUIREMENTS.md`
+- **For the current task (Phase 12):** `docs/PHASE12_REQUIREMENTS.md`
 - **To understand a command:** `README.md` CLI reference section
 - **To understand how modules connect:** `ARCHITECTURE.md`
 - **To add a command or pipeline step:** `CONTRIBUTING.md`

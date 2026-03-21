@@ -132,16 +132,22 @@ Tyler has Gemini Pro and ChatGPT Pro access as code review teammates.
 
 ### Git Workflow (use this for all Phase 12+ work)
 
-1. Create a feature branch before making changes:
-   `git checkout -b <descriptive-name>` (e.g., `phase12-source-quote-gate`)
-2. Make changes and commit on that branch with clear messages describing what and why
-3. Push the branch: `git push origin <branch-name>`
-4. Open a PR on GitHub (Tyler clicks "Compare & pull request" after branch is pushed)
-5. Tyler tells Codex: `review PR #<number>` or `review branch <name> against main`
-6. Address Codex feedback with additional commits to the same branch
-7. Merge to main when Tyler is satisfied — do NOT merge yourself unless explicitly told to
+1. **Plan** — align on scope in chat before touching code
+2. **Branch** — `git checkout -b <descriptive-name>` before any changes
+3. **Code + test** — commit to the branch in small logical units; test against live Qdrant/Ollama
+4. **Push** — `git push origin <branch-name>`
+5. **Open PR** — Tyler clicks "Compare & pull request" on GitHub
+6. **Codex review** — Tyler tells Codex `review PR #<number>`; Codex reads the diff directly
+7. **Address feedback** — fix on the same branch, push again; re-review if needed
+8. **Merge** — Tyler merges; do NOT merge yourself unless explicitly told to
 
-**Do not commit directly to `main` for feature work.** Main is for merge commits only.
+**Core policy: if it changes the GitHub repo → branch + PR. If it's outside the repo → update directly.**
+
+This means:
+- All code changes → branch + PR, no exceptions
+- CLAUDE.md and repo docs changed alongside code → include in the same PR
+- CLAUDE.md standalone status updates (phase completions etc.) → still branch + PR
+- memory.md (lives outside repo at ~/.claude/) → update directly, no PR needed
 
 ### Commit Message Style
 - Bad: "updated files", "fixed bug"

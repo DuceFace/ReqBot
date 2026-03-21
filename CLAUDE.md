@@ -136,7 +136,7 @@ Tyler has Gemini Pro and ChatGPT Pro access as code review teammates.
    `git checkout -b <descriptive-name>` (e.g., `phase12-source-quote-gate`)
 2. Make changes and commit on that branch with clear messages describing what and why
 3. Push the branch: `git push origin <branch-name>`
-4. Open a PR: `git push` then use GitHub UI or `hub pull-request`
+4. Open a PR on GitHub (Tyler clicks "Compare & pull request" after branch is pushed)
 5. Tyler tells Codex: `review PR #<number>` or `review branch <name> against main`
 6. Address Codex feedback with additional commits to the same branch
 7. Merge to main when Tyler is satisfied — do NOT merge yourself unless explicitly told to

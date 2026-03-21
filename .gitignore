@@ -8,9 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -210,8 +208,5 @@ __marimo__/
 raw_pdfs/
 Backups/
 build/linux-x86_64/
+dist/
 archive/*.log
-
-# Un-ignore build scripts (overrides build/ rule above)
-!build/*.sh
-!build/reqbot-install.sh

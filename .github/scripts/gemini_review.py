@@ -1,11 +1,17 @@
 """
 Gemini PR reviewer — called by .github/workflows/gemini_reviewer.yml.
-Reads diff.txt, sends to Gemini with ReqBot-specific context, writes review.txt.
+Reads diff.txt, sends to Gemini with ReqBot-specific context, then
+posts or updates a single review comment on the PR.
 """
 
+import json
 import os
+import subprocess
 import sys
+
 from google import genai
+
+MARKER = "<!-- gemini-review -->"
 
 PROMPT_CONTEXT = """
 You are a senior Python engineer reviewing a Pull Request on ReqBot, a local-AI compliance research pipeline.
@@ -53,19 +59,76 @@ Provide concise, actionable feedback in Markdown. Flag bugs as **Bug**, regressi
 and improvements as **Suggestion**. If the change looks clean, say so explicitly.
 """
 
-diff = open("diff.txt").read()
-if not diff.strip():
-    print("No diff found — skipping review.")
-    sys.exit(0)
 
-client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+def get_review(diff: str) -> str:
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=PROMPT_CONTEXT + "\nHere is the diff:\n" + diff,
+    )
+    return response.text
 
-response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=PROMPT_CONTEXT + "\nHere is the diff:\n" + diff,
-)
 
-with open("review.txt", "w") as f:
-    f.write(response.text)
+def find_existing_comment(repo: str, pr_number: str) -> str | None:
+    result = subprocess.run(
+        [
+            "gh", "api",
+            f"repos/{repo}/issues/{pr_number}/comments",
+            "--jq",
+            f'[.[] | select(.body | startswith("{MARKER}"))] | first | .id',
+        ],
+        capture_output=True,
+        text=True,
+    )
+    comment_id = result.stdout.strip()
+    return comment_id if comment_id and comment_id != "null" else None
 
-print("Review written to review.txt")
+
+def post_comment(repo: str, pr_number: str, body: str) -> None:
+    subprocess.run(
+        ["gh", "pr", "comment", pr_number, "--body", body],
+        check=True,
+    )
+
+
+def update_comment(repo: str, comment_id: str, body: str) -> None:
+    payload = json.dumps({"body": body})
+    subprocess.run(
+        [
+            "gh", "api",
+            f"repos/{repo}/issues/comments/{comment_id}",
+            "-X", "PATCH",
+            "--input", "-",
+        ],
+        input=payload,
+        text=True,
+        check=True,
+    )
+
+
+def main() -> None:
+    diff = open("diff.txt").read()
+    if not diff.strip():
+        print("No diff found — skipping review.")
+        sys.exit(0)
+
+    pr_number = os.environ["PR_NUMBER"]
+    repo = os.environ["GITHUB_REPOSITORY"]
+
+    print("Generating Gemini review...")
+    review_text = get_review(diff)
+    full_body = f"{MARKER}\n{review_text}"
+
+    comment_id = find_existing_comment(repo, pr_number)
+    if comment_id:
+        print(f"Updating existing review comment {comment_id}...")
+        update_comment(repo, comment_id, full_body)
+    else:
+        print("Posting new review comment...")
+        post_comment(repo, pr_number, full_body)
+
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()

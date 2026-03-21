@@ -1,7 +1,9 @@
 name: Gemini PR Review
 
+# pull_request_target runs workflow code from main (base branch), not the PR branch.
+# This ensures GEMINI_API_KEY is never handed to untrusted PR code.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
 
 jobs:
@@ -12,7 +14,8 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout Code
+      # Checks out main (base branch) — gemini_review.py is always the trusted version
+      - name: Checkout base branch
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -23,19 +26,18 @@ jobs:
       - name: Install Dependencies
         run: pip install google-genai
 
+      # Fetch the PR diff as data only — no PR code is executed
       - name: Get PR diff
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: gh pr diff $PR_NUMBER > diff.txt
 
+      # Run trusted script from main with diff as input
       - name: Run Gemini Review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python .github/scripts/gemini_review.py
-
-      - name: Post Review Comment
-        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh pr comment $PR_NUMBER -F review.txt
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python .github/scripts/gemini_review.py

@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ReqBot — project-specific
+raw_pdfs/
+Backups/
+build/linux-x86_64/
+archive/*.log
+
+# Un-ignore build scripts (overrides build/ rule above)
+!build/*.sh
+!build/reqbot-install.sh

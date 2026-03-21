@@ -1,0 +1,16 @@
+# ReqBot — Python dependencies
+# Install: pip3 install --break-system-packages -r requirements.txt
+#
+# These are the versions verified working on the dev/prod system.
+# System Python (no venv) — Debian/Ubuntu.
+
+pymupdf==1.27.1
+pdfplumber==0.11.9
+fastembed==0.7.4
+qdrant-client==1.17.0
+ollama==0.6.1
+requests==2.32.5
+
+# Optional — remote synthesis only (reqbot init → enable remote synthesis)
+# anthropic>=0.40.0
+# openai>=1.50.0

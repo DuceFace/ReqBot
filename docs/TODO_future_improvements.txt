@@ -1,0 +1,105 @@
+GRC Pipeline - Future Improvements
+================================================================
+Last updated: 2026-03-07
+Reviews incorporated: ChatGPT, Claude, Gemini
+
+================================================================
+COMPLETED
+================================================================
+
+P1. HYBRID SEARCH: DENSE + SPARSE VECTORS ✅ DONE
+   grc_requirements now uses dense (nomic-embed-text, 768-dim cosine) +
+   sparse (BM25 via fastembed) vectors. ask.py uses RRF fusion.
+   grcai reindex uses atomic alias swap.
+
+P2. QUERY REWRITING / PRE-RETRIEVAL OPTIMIZATION ✅ DONE
+   ask.py pre-processes queries via 8b LLM before embedding:
+   expands query, extracts control IDs for boosting, auto-detects domain tags.
+   Graceful fallback to original query if LLM call fails.
+
+P3. PRE-SCAN CHUNKS FOR CANDIDATE SOURCE_REFS ✅ DONE
+   llm_extract_requirements.py regex-scans each chunk before LLM call.
+   Patterns: NIST/STIG control IDs (AC-3(4)), Section refs, Para refs,
+   numbered hierarchies. Injected as non-coercive hints in prompt.
+   Key: uses (?!\w) not \b to correctly capture trailing parentheses.
+
+P4. DUAL INDEX: RAW CONTEXT ALONGSIDE REQUIREMENTS ✅ DONE
+   embed_context_index.py indexes Step B chunks into grc_context collection.
+   ask.py --context does O(1) UUID lookup (no second vector search).
+   Windowed context extraction centered on source_quote (300 chars each side).
+   ingest --index and batch auto-run context indexing.
+
+P5. LAYOUT-AWARE CHUNKING FOR TABLES ✅ DONE
+   extract_pdf_to_text.py --layout-mode pdfplumber: vertical crop sweep
+   preserves reading order; tables wrapped in <<<TABLE_START>>>/<<<TABLE_END>>>
+   sentinels. chunk_text.py --table-aware: splits pushed past table ends,
+   overlap snap prevents table-tail artifacts. PyMuPDF remains default.
+
+================================================================
+ACTIVE BACKLOG (good ideas, not blocking)
+================================================================
+
+1. RETRY/BACKOFF ON OLLAMA CALLS ✅ DONE
+   call_ollama() now retries up to 3 times with exponential backoff (2s, 4s, 8s)
+   before raising. This prevents transient Ollama hiccups from being permanently
+   cached as failures by the prompt_hash cache (backlog #2). Made mandatory by
+   the cache implementation — a cached ERROR record skips a chunk forever.
+
+2. PROMPT_HASH CACHING IN STEP C ✅ DONE
+   llm_extract_requirements.py loads cached_hashes from existing raw_responses.jsonl
+   before the run. Chunks whose prompt_hash is already present are skipped (O(1) set
+   lookup). Output files open in append mode on resume, write mode on fresh start.
+   Summary log reports processed vs skipped counts.
+
+3. CONCURRENCY (2-4 WORKERS) IN STEP C
+   Parallelize LLM calls with a small worker pool. Caution: Ollama can
+   be unstable with concurrent requests on single GPU. Test carefully.
+   Could cut full-run time from 70 min to ~20 min.
+
+4. STREAMING WRITE IN STEP A
+   For very large PDFs (1000+ pages), write pages to JSONL incrementally
+   during extraction instead of buffering all in memory. Not needed for
+   current 500-page docs (~1.6MB text fits easily in RAM).
+
+5. LOG LOW-TEXT PAGES (OCR DETECTION)
+   In Step A, flag pages with very low character counts. These likely
+   contain scanned images and may need OCR in the future.
+
+6. FLAG TRUNCATED JSON RECOVERIES
+   When Strategy 3 (truncated array recovery) fires in Step C, add a
+   field like "recovered_truncated": true to affected requirements so
+   downstream steps can treat them with caution.
+
+7. VALIDATE PAGE_NUM CONTIGUITY IN STEP B
+   Check that page numbers are contiguous and start at 1. Missing or
+   duplicate page numbers could indicate upstream extraction issues.
+
+8. ASSERT OVERLAP < CHUNK_SIZE IN STEP B
+   Guard against infinite loop if overlap >= chunk_size.
+
+9. CHECK OLLAMA finish_reason / TOKEN METADATA
+   Ollama generate API returns metadata beyond just "response". Could
+   detect truncation more reliably by checking token count vs num_predict.
+
+10. REINDEX CONTEXT FOR EXISTING DOCUMENTS ✅ DONE
+    Bulk-ran embed_context_index.py against all *_chunks.jsonl files via:
+    find documents/processed -name "*_chunks.jsonl" -exec python3 embed_context_index.py {} \;
+    grc_context now has 4,042 points covering all 45 indexed documents.
+
+11. OSCAL OUTPUT FORMAT (BACKBURNER — NO IMMEDIATE NEED)
+    OSCAL (Open Security Controls Assessment Language) is the NIST-standardized
+    machine-readable format for compliance data. GRC platforms like Archer and
+    ServiceNow can ingest OSCAL natively.
+    Decision: BACKBURNER. Implement only if a concrete integration target
+    (Archer, ServiceNow, external handoff) emerges. Not applicable to
+    AFI/SOP/non-GRC documents.
+
+================================================================
+DECIDED AGAINST
+================================================================
+- Remove description field (keep both description + source_quote, they serve different purposes)
+- Deterministic requirement_id hashing (IDs get reassigned in Step D anyway)
+- Lower num_predict (already hitting truncation at 4096, don't make it worse)
+- Sort chunks by chunk_id (already in order from Step B)
+- OSCAL as default output format (backburner — implement only if concrete integration target exists)
+- Docling/Marker for layout parsing (too heavy; GPU dependency; pdfplumber covers the need)

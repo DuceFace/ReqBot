@@ -1,0 +1,88 @@
+# Contributing to ReqBot
+
+ReqBot accepts contributions from the community. Before you start, read this
+document — especially the CLA requirement.
+
+---
+
+## CLA Requirement (Non-Negotiable)
+
+Every contributor must sign the [Contributor License Agreement](CLA.md) before
+any code, documentation, or other contribution can be merged. No exceptions.
+
+The CLA assigns copyright of your contributions to the project maintainer. This
+is required to preserve dual licensing (AGPL v3 + commercial). Without sole
+copyright ownership, the project cannot offer commercial licenses.
+
+**What this means for you:**
+
+- You still retain a perpetual license to your own work (Section 3 of the CLA).
+- You cannot revoke your contribution after it is merged.
+- Your employer may need to approve the CLA if your work contract assigns IP to
+  them. Resolve this before submitting.
+
+**How to sign:** Follow the instructions at the bottom of [CLA.md](CLA.md).
+Include the signed block in your first merge request, or email it in advance.
+
+---
+
+## How to Contribute
+
+### Reporting Bugs
+
+Open a GitLab issue. Include:
+
+- What you did (command, input, config)
+- What you expected
+- What actually happened (paste error output)
+- ReqBot version (`reqbot --version`), OS, Python version
+
+### Suggesting Features
+
+Open an issue tagged `feature-request`. Describe the problem you want solved,
+not just the solution you have in mind.
+
+### Submitting Code
+
+1. **Sign the CLA** if you haven't already.
+2. Fork the repository and create a feature branch off `main`.
+3. Make your changes. Keep commits small and messages descriptive.
+4. Test your changes — at minimum, confirm the pipeline still runs end-to-end.
+5. Open a merge request against `main`.
+
+### What Makes a Good Merge Request
+
+- **One concern per MR.** Don't bundle unrelated fixes.
+- **Descriptive title and body.** What changed, why, how to test.
+- **No unnecessary reformatting.** If you didn't change the logic, don't
+  reformat the file.
+- **Working code.** MRs that break the pipeline won't be reviewed.
+
+---
+
+## Code Standards
+
+- Python 3.12+. No type-checking enforcement yet, but type hints are welcome.
+- No new dependencies without discussion. ReqBot runs in air-gapped environments;
+  every dependency is a liability.
+- JSONL is the system of record. Qdrant is a rebuildable index. Design
+  accordingly.
+- Scripts should be independently runnable with `--help`. Follow the existing
+  pattern.
+
+---
+
+## What Won't Be Accepted
+
+- Contributions without a signed CLA.
+- Changes that require an internet connection at runtime (beyond Ollama/Qdrant
+  on the local network).
+- "Refactors" with no functional change and no clear justification.
+- AI-generated code dumps with no evidence of testing or understanding.
+
+---
+
+## Questions
+
+If you're unsure whether a contribution is welcome, open an issue first or email
+**[EMAIL]** before investing time.

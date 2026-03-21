@@ -58,7 +58,7 @@ If source_quote is required at ingest, the fallback is vestigial and masks bugs.
 - [x] Remove `source_quote or description` fallback from `build_embedding_text()`
 - [x] Update PROMPT_TEMPLATE: source_quote is now required; description is still requested but not required
 - [x] Update result display in `ask.py` / `reqbot.py`: show source_quote as primary text when description is absent
-- [ ] Test on 2-3 documents before full re-run
+- [x] Test on 2-3 documents before full re-run
 
 ---
 

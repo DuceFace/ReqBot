@@ -14,16 +14,18 @@ GPT-4o is optional and off by default.
 
 ---
 
-## Current Phase: 11 — Core Quality Overhaul
+## Current Phase: 12 — Verbatim-First Pipeline Overhaul
 
-**Plan:** `docs/PHASE11_REQUIREMENTS.md`
+**Plan:** `docs/PHASE12_REQUIREMENTS.md`
+
+### Phase 11 — Core Quality Overhaul (COMPLETE 2026-03-21)
 
 | Subphase | Status | Description |
 |----------|--------|-------------|
 | 11.1 — Project Hygiene | DONE 2026-03-19 | CLAUDE.md created, docs/ dir, ARCHITECTURE/CONTRIBUTING updated |
 | 11.2 — Retrieval Fixes | DONE 2026-03-19 | Auto-tag hard filter removed; min_score=0.02 threshold (config/CLI/shell); full input validation across all shell commands |
 | 11.3a — Embed source_quote | DONE 2026-03-19 | source_quote-first embedding; whitespace/empty guards; batch_size validation; reindex complete |
-| 11.3b — Extraction Prompt | **NEXT** | Rewrite Step C prompt + examples; fix requirement_type fallback; full corpus re-ingestion |
+| 11.3b — Extraction Prompt | DONE 2026-03-21 | Prompt rewrite with GOOD/BAD examples; requirement_type fallback "" not "guidance"; typed_count fix; IP filter in source_ref hints; chunked file hashing; full corpus re-ingestion complete |
 
 **Rule:** One subphase at a time. Complete → Gemini review → proceed.
 

@@ -1129,7 +1129,9 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             rep = g["representative"]
             entry: dict = {
                 "source_ref": ref,
-                "description": rep.get("description") or rep.get("source_quote", ""),
+                "description": rep.get("description", ""),
+                "source_quote": rep.get("source_quote", ""),
+                "primary_text": rep.get("description") or rep.get("source_quote", ""),
                 "confidence": rep.get("confidence"),
                 "sources": [
                     {

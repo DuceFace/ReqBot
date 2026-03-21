@@ -49,27 +49,20 @@ def load_jsonl(path: Path) -> list[dict]:
     return records
 
 
-def build_embedding_text(req: dict) -> str:
+def build_embedding_text(req: dict) -> str | None:
     """Build deterministic embedding text from a requirement record.
 
-    Embeds source_quote (verbatim document text) as the primary text.
-    Appends source_ref for BM25 control-ID matching.
-    source_quote is required at ingest time (Step C gate); an empty value
-    here indicates a data integrity issue upstream.
+    Returns None if source_quote is empty — callers must skip that record.
+    source_quote is required at ingest; an empty value indicates a data
+    integrity violation that should have been caught at Step C or Step D.
     """
     source_quote = (req.get("source_quote") or "").strip()
-    source_ref = (req.get("source_ref") or "").strip()
-
     if not source_quote:
-        log.warning(
-            "Empty source_quote for requirement_id=%s — requirement should have been rejected at Step C",
-            req.get("requirement_id", "?"),
-        )
-
+        return None
+    source_ref = (req.get("source_ref") or "").strip()
     text = source_quote
     if source_ref:
         text += f"\nRef: {source_ref}"
-
     return text
 
 
@@ -191,8 +184,26 @@ def run(
     total_skipped = 0
 
     for batch_start in range(0, len(requirements), batch_size):
-        batch = requirements[batch_start:batch_start + batch_size]
-        texts = [build_embedding_text(req) for req in batch]
+        raw_batch = requirements[batch_start:batch_start + batch_size]
+
+        # Reject records without source_quote before embedding — they violate the
+        # Phase 12.1 contract and must not enter Qdrant as "Ref: ..." only.
+        batch = []
+        texts = []
+        for req in raw_batch:
+            text = build_embedding_text(req)
+            if text is None:
+                log.warning(
+                    "Skipping requirement %s — empty source_quote (data integrity violation, should have been rejected at Step C/D)",
+                    req.get("requirement_id", "?"),
+                )
+                total_skipped += 1
+            else:
+                batch.append(req)
+                texts.append(text)
+
+        if not batch:
+            continue
 
         try:
             dense_embeddings = embed_batch(texts, ollama_client)

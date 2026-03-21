@@ -53,11 +53,11 @@ If source_quote is required at ingest, the fallback is vestigial and masks bugs.
 
 ### Deliverables
 
-- [ ] Read `llm_extract_requirements.py:validate_requirement()` and `embed_and_index.py:build_embedding_text()` fully
-- [ ] Flip validation gate: require source_quote, make description optional
-- [ ] Remove `source_quote or description` fallback from `build_embedding_text()`
-- [ ] Update PROMPT_TEMPLATE: source_quote is now required; description is still requested but not required
-- [ ] Update result display in `ask.py` / `reqbot.py`: show source_quote as primary text when description is absent
+- [x] Read `llm_extract_requirements.py:validate_requirement()` and `embed_and_index.py:build_embedding_text()` fully
+- [x] Flip validation gate: require source_quote, make description optional
+- [x] Remove `source_quote or description` fallback from `build_embedding_text()`
+- [x] Update PROMPT_TEMPLATE: source_quote is now required; description is still requested but not required
+- [x] Update result display in `ask.py` / `reqbot.py`: show source_quote as primary text when description is absent
 - [ ] Test on 2-3 documents before full re-run
 
 ---
@@ -155,10 +155,43 @@ Winner selection in `deduplicate_requirements()` uses `len(domain_tags) * 10 + l
 
 ---
 
+---
+
+## Phase 12.4 — Deferred Bug Fixes (from Phase 11.3b review)
+
+These are correctness/quality bugs identified during Phase 11 review. They do not
+block Phase 12.1-12.3 and can be addressed as a standalone cleanup subphase.
+
+### JSON Recovery Strategy 3 — rfind correctness risk (`llm_extract_requirements.py`)
+Strategy 3 in `extract_json_array()` uses `rfind("}")` to find the boundary of the
+last complete object in a truncated LLM response. A `}` inside a string value could
+be mistaken for an object boundary. Fix: extend Strategy 2's bracket-stack approach
+to handle the truncated-array case, or use `ijson` for streaming parse.
+
+### IP/version string pollution in `scan_source_refs` (`llm_extract_requirements.py`)
+The dragnet regex `\b\d+\.\d+(?:\.\d+)+\b` captures IP addresses and version strings,
+consuming hint slots from the 20-slot cap. Fix: filter candidates before appending —
+skip strings where all dot-separated segments are ≤ 255 (likely IP) or match common
+version patterns.
+
+### Deduplication scoring (`parse_and_normalize.py`)
+Winner selection uses `len(domain_tags) * 10 + len(source_quote)`. More tags ≠ better
+quality. Fix: weight confidence score heavily in winner selection; favor shorter,
+more precise source_quotes for equal confidence.
+
+### Deliverables
+
+- [ ] Fix Strategy 3 rfind truncation bug in `extract_json_array()`
+- [ ] Filter IP/version strings from `scan_source_refs()` hint candidates
+- [ ] Improve deduplication scoring to weight confidence and source_quote precision
+
+---
+
 ## Execution Order
 
 ```
 12.1 (flip gate) → test → Gemini review
 12.2 (two-pass) → test → Gemini review
 12.3 (query-time descriptions) → test → Gemini review
+12.4 (deferred bug fixes) → test → Gemini review
 ```

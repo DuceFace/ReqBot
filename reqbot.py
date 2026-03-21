@@ -613,7 +613,8 @@ def cmd_trace(args: argparse.Namespace) -> int:
     print("\nRequirement Trace")
     print("=================")
     _labeled("ID:", req_id)
-    _labeled("Description:", payload.get("description", ""))
+    if payload.get("description"):
+        _labeled("Description:", payload.get("description", ""))
 
     print("\nProvenance")
     print("----------")
@@ -748,8 +749,9 @@ def cmd_compare(args: argparse.Namespace) -> int:
                 page = p.get("page_start", "")
                 header = f"{doc_key} (Page {page})" if page else doc_key
                 print(f"## {header}\n")
-                print(f"{p.get('description', '')}\n")
-                if p.get("source_quote"):
+                primary = p.get("description") or p.get("source_quote", "")
+                print(f"{primary}\n")
+                if p.get("source_quote") and p.get("description"):
                     print(f"> {p['source_quote']}\n")
                 print("---\n")
         else:
@@ -762,7 +764,8 @@ def cmd_compare(args: argparse.Namespace) -> int:
                 subheader = (f"{doc_key} (Page {page})" if page else doc_key) + auth_tag
                 print(f"\n{subheader}")
                 print("-" * len(subheader))
-                for line in _tw.wrap(p.get("description", ""), width=76):
+                primary = p.get("description") or p.get("source_quote", "")
+                for line in _tw.wrap(primary, width=76):
                     print(f"  {line}")
             print(f"\n{len(doc_groups)} document(s) — 1 control ID")
             print()
@@ -864,7 +867,8 @@ def cmd_compare(args: argparse.Namespace) -> int:
                     page = p.get("page_start", "")
                     sub = f"**{doc_key}**" + (f" (Page {page})" if page else "")
                     print(f"### {sub}\n")
-                    print(f"{p.get('description', '')}\n")
+                    primary = p.get("description") or p.get("source_quote", "")
+                    print(f"{primary}\n")
                 print("---\n")
         else:
             print(f"\n{title}")
@@ -879,7 +883,8 @@ def cmd_compare(args: argparse.Namespace) -> int:
                     aw = _cfg.authority_weight(doc_key)
                     auth_tag = f"  [auth:{aw}/5]" if aw is not None else ""
                     print(f"\n  {doc_key}" + (f" (Page {page})" if page else "") + auth_tag)
-                    for line in _tw.wrap(p.get("description", ""), width=72):
+                    primary = p.get("description") or p.get("source_quote", "")
+                    for line in _tw.wrap(primary, width=72):
                         print(f"    {line}")
             print(f"\n{len(ref_groups)} control group(s) — {total_docs} source(s)")
             print()
@@ -1080,9 +1085,10 @@ def cmd_evidence(args: argparse.Namespace) -> int:
     for i, ref in enumerate(group_order, 1):
         g = groups[ref]
         rep = g["representative"]
+        _primary = rep.get("description") or rep.get("source_quote") or "(no text)"
         _evidence_lines.append(
             f"[{i}] Control: {ref}  |  Sources: {len(g['sources'])}\n"
-            f"    {rep.get('description', '(no description)')}"
+            f"    {_primary}"
         )
 
     _evidence_summary = "\n\n".join(_evidence_lines)
@@ -1123,7 +1129,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             rep = g["representative"]
             entry: dict = {
                 "source_ref": ref,
-                "description": rep.get("description", ""),
+                "description": rep.get("description") or rep.get("source_quote", ""),
                 "confidence": rep.get("confidence"),
                 "sources": [
                     {
@@ -1175,7 +1181,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             lines.append(f"## Requirement Group {i} — {ref}")
             lines.append("")
             lines.append("**Requirement:**")
-            lines.append(rep.get("description", ""))
+            lines.append(rep.get("description") or rep.get("source_quote", ""))
             lines.append("")
             lines.append("**Sources:**")
             lines.append("")

@@ -52,17 +52,21 @@ def load_jsonl(path: Path) -> list[dict]:
 def build_embedding_text(req: dict) -> str:
     """Build deterministic embedding text from a requirement record.
 
-    Leads with source_quote (verbatim document text) when present,
-    falling back to description. Appends source_ref for BM25 control-ID
-    matching. source_ref is appended only if non-empty.
+    Embeds source_quote (verbatim document text) as the primary text.
+    Appends source_ref for BM25 control-ID matching.
+    source_quote is required at ingest time (Step C gate); an empty value
+    here indicates a data integrity issue upstream.
     """
     source_quote = (req.get("source_quote") or "").strip()
-    description = (req.get("description") or "").strip()
     source_ref = (req.get("source_ref") or "").strip()
 
-    text = source_quote or description
-    if not text:
-        log.warning("Empty embedding text for requirement_id=%s", req.get("requirement_id", "?"))
+    if not source_quote:
+        log.warning(
+            "Empty source_quote for requirement_id=%s — requirement should have been rejected at Step C",
+            req.get("requirement_id", "?"),
+        )
+
+    text = source_quote
     if source_ref:
         text += f"\nRef: {source_ref}"
 

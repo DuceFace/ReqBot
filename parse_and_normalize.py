@@ -243,19 +243,20 @@ def run(
         req_type = req.get("requirement_type", "").strip().lower()
         chunk_id = req.get("chunk_id")
 
-        if not description:
-            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "empty_description", "raw": req})
+        if not source_quote:
+            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "empty_source_quote", "raw": req})
             continue
 
-        desc_lower = description.lower()
-        if desc_lower.startswith("not explicitly stated"):
-            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "not_actionable", "raw": req})
-            continue
-
-        if desc_lower.startswith("change ") and (" to " in desc_lower or " from " in desc_lower):
-            if len(description) < 100:
-                failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "errata_change_entry", "raw": req})
+        if description:
+            desc_lower = description.lower()
+            if desc_lower.startswith("not explicitly stated"):
+                failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "not_actionable", "raw": req})
                 continue
+
+            if desc_lower.startswith("change ") and (" to " in desc_lower or " from " in desc_lower):
+                if len(description) < 100:
+                    failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "errata_change_entry", "raw": req})
+                    continue
 
         raw_tags = req.get("domain_tags", [])
         if isinstance(raw_tags, str):

@@ -226,11 +226,12 @@ def format_evidence(results: list, context_map: dict | None = None) -> str:
         cite_parts = [x for x in [source, ref, page_info] if x]
         cite = ", ".join(cite_parts)
 
+        primary = p.get("description") or p.get("source_quote", "")
         entry = (
             f"[{i}] ({cite})\n"
             f"    Type: {p.get('requirement_type', 'unknown')}\n"
             f"    Tags: {', '.join(p.get('domain_tags', []))}\n"
-            f"    Description: {p.get('description', '')}\n"
+            f"    Requirement: {primary}\n"
             f"    Quote: {p.get('source_quote', '')}"
         )
         ctx = _context_text_for_hit(hit, context_map, window=300)
@@ -265,8 +266,9 @@ def print_results_table(results: list, context_map: dict | None = None) -> None:
             cite_parts = [x for x in [source, ref, page_info] if x]
             print(f"    Source: {', '.join(cite_parts)}")
         print(f"    Type: {p.get('requirement_type', 'unknown')} | Tags: {', '.join(p.get('domain_tags', []))}")
-        print(f"    {p.get('description', '')}")
-        if p.get("source_quote"):
+        primary = p.get("description") or p.get("source_quote", "")
+        print(f"    {primary}")
+        if p.get("source_quote") and p.get("description"):
             quote = p["source_quote"]
             if len(quote) > 120:
                 quote = quote[:120] + "..."

@@ -411,7 +411,7 @@ def run(
                         # Records without enrichment_model (pre-WP-2 cache) are treated
                         # as model-unknown and will be re-enriched.
                         cached_model = rec.get("enrichment_model")
-                        if cached_model is not None and cached_model != model:
+                        if cached_model != model:
                             skipped_model_mismatch += 1
                             continue
                         enriched_by_id[rid] = rec

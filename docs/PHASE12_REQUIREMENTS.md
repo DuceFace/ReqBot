@@ -109,24 +109,27 @@ If enrichment has not run, Step F embeds source_quote directly (already the prim
 
 ## Phase 12.3 — Query-Time Description Generation
 
-**Current:** Descriptions are generated at ingest time by the 8B extraction model.
+**Status: DEFERRED — superseded by Phase 13 WP-1**
 
-**Proposed:** Remove description from ingestion entirely. Generate concise summaries
-at query/evidence time using the synthesis model (qwen2.5:14b or claude-sonnet-4-6)
-from the source_quote directly.
+**Rationale for deferral (2026-03-22):**
+- Deliverable 3 (source_quote as primary display) was already implemented in Phase 12.1.
+- Deliverable 1 (opt-in description from Pass 2) is low-priority polish; the description field
+  exists and enrichment fills it — making it opt-in provides marginal value.
+- Deliverable 2 (per-result description generation in `ask.py`) adds N extra LLM calls at query
+  time. Phase 13 WP-1 improves extraction quality so descriptions that already exist in the
+  index are better — strictly better trade-off at no query-time cost.
+- Phase 13 WP-1 touches `llm_extract_requirements.py`; implementing 12.3 first would
+  result in double-touching the same file.
 
-**Benefits:**
-- Better summary quality (larger synthesis model vs 8B extraction model)
-- Descriptions are always fresh — no stale paraphrases in the index
-- Source of truth is always the verbatim text
-
-**Prerequisites:** Phase 12.2 complete.
+**If reconsidered:** Revisit after Phase 13 WP-3 eval baseline is established. Per-result
+description generation may be worth adding as a `--describe` flag to `ask.py` at that point,
+using the synthesis model on source_quote directly.
 
 ### Deliverables
 
-- [ ] Remove description generation from Pass 2 enrichment (or make it opt-in)
-- [ ] Add per-result description generation in `ask.py` result formatting (when --synthesize or --describe flag)
-- [ ] Update result display to show source_quote as the primary result text
+- [ ] ~~Remove description generation from Pass 2 enrichment (or make it opt-in)~~ — DEFERRED
+- [ ] ~~Add per-result description generation in `ask.py` result formatting~~ — DEFERRED
+- [x] Update result display to show source_quote as the primary result text — DONE in 12.1
 
 ---
 
@@ -195,5 +198,9 @@ more precise source_quotes for equal confidence.
   + grc_context document_id mismatch fix (ask --context broken) — PR #5
   + Strategy 3 rfind, IP filter, dedup scoring — PR #6
 12.2 (two-pass)           → DONE 2026-03-22 (PR #7) — tested on DODI 8551.01, NIST.SP.800-125, afman17-204
-12.3 (query-time descriptions) → NOT STARTED (reconsider scope before beginning)
+12.3 (query-time descriptions) → DEFERRED 2026-03-22 — superseded by Phase 13 WP-1
 ```
+
+**Phase 12 complete as of 2026-03-22.** Corpus re-ingestion with the two-pass pipeline is
+deferred until Phase 13 WP-1 (structured output decoding) is implemented, so the reindex
+is done on improved extraction output rather than the current prompted baseline.

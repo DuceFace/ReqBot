@@ -33,8 +33,8 @@ GPT-4o is optional and off by default.
 |----------|--------|-------------|
 | 12.1 — Validation Gate | DONE 2026-03-21 | source_quote required at Step C/D/embed; description optional; display falls back to source_quote |
 | 12.4 — Bug Fixes (pulled forward) | DONE 2026-03-22 | Strategy 3 rfind fix; IP filter in scan_source_refs; dedup scoring to confidence*1000-len(quote); grc_context document_id mismatch (PR #5, PR #6) |
-| 12.2 — Two-Pass Extraction | TESTING PENDING | Pass 1 prompt (source_quote+source_ref only); enrich_requirements.py (Pass 2); --skip-enrichment flag; merged PR #7 |
-| 12.3 — Query-Time Descriptions | NOT STARTED | Remove description from ingestion; generate at query/evidence time |
+| 12.2 — Two-Pass Extraction | DONE 2026-03-22 | Pass 1 prompt (source_quote+source_ref only); enrich_requirements.py (Pass 2); --skip-enrichment flag; tested on DODI/NIST/AFI; merged PR #7 |
+| 12.3 — Query-Time Descriptions | NOT STARTED | Remove description from ingestion; generate at query/evidence time; reconsider scope before beginning |
 
 **Rule:** One subphase at a time. Complete → Gemini review → proceed.
 

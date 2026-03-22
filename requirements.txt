@@ -11,6 +11,10 @@ qdrant-client==1.17.0
 ollama==0.6.1
 requests==2.32.5
 
+# WP-3 eval harness (eval/eval_harness.py)
+rapidfuzz>=3.0.0    # required — source_quote fuzzy matching
+# scipy>=1.7.0      # optional — bipartite Hungarian matching; greedy fallback if absent
+
 # Optional — remote synthesis only (reqbot init → enable remote synthesis)
 # anthropic>=0.40.0
 # openai>=1.50.0

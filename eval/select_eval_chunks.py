@@ -7,18 +7,23 @@ sample suitable for hand-correction.
 
 Output schema per record (R-3.3):
   {
-    "source_pdf":       str,   # e.g. "NIST.SP.800-53r5.pdf"
-    "stem":             str,   # e.g. "NIST.SP.800-53r5"
-    "chunk_id":         int,
-    "chunk_text":       str,
-    "page_start":       int,
-    "page_end":         int,
-    "document_class":   str,   # "nist_sp" | "dodi_dodm" | "afi_daf" | "unclassified"
-    "density_tier":     str,   # "zero" | "medium" | "high"
-    "density_count":    int,   # number of Step C requirements for this chunk
-    "gold_requirements": [],   # empty — populated by seed_gold_set.py
-    "corrector_notes":  ""
+    "source_pdf":        str,   # e.g. "NIST.SP.800-53r5.pdf"
+    "stem":              str,   # e.g. "NIST.SP.800-53r5"
+    "processed_run_dir": str,   # absolute path to the exact timestamped run dir — pinned
+    "chunk_id":          int,
+    "chunk_text":        str,
+    "page_start":        int,
+    "page_end":          int,
+    "document_class":    str,   # "nist_sp" | "dodi_dodm" | "afi_daf" | "unclassified"
+    "density_tier":      str,   # "zero" | "medium" | "high"
+    "density_count":     int,   # number of Step C requirements for this chunk
+    "gold_requirements": [],    # empty — populated by seed_gold_set.py
+    "corrector_notes":   ""
   }
+
+processed_run_dir is pinned at selection time so that seed_gold_set.py and
+eval_harness.py always load artifacts from the exact same processed run,
+even if the document is re-ingested later (P1 fix, Codex review).
 
 Usage:
     python3 eval/select_eval_chunks.py [--processed-dir ~/documents/processed] \
@@ -30,6 +35,7 @@ Run from the repo root.
 import argparse
 import json
 import logging
+import math
 import random
 import re
 import sys
@@ -42,6 +48,33 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Argparse validators (pattern from reqbot.py / ask.py)
+# ---------------------------------------------------------------------------
+
+def _positive_int(value: str) -> int:
+    """Argparse type: integer that must be > 0."""
+    try:
+        iv = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {value!r}")
+    if iv <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return iv
+
+
+def _non_negative_int(value: str) -> int:
+    """Argparse type: integer that must be >= 0."""
+    try:
+        iv = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {value!r}")
+    if iv < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    return iv
+
 
 # ---------------------------------------------------------------------------
 # Document class classification patterns
@@ -133,9 +166,21 @@ def load_density_counts(out_dir: Path, stem: str) -> dict[int, int]:
     return counts
 
 
-def load_chunks(chunks_path: Path, stem: str, density_counts: dict[int, int]) -> list[dict]:
-    """Read a *_chunks.jsonl and return annotated chunk records."""
+def load_chunks(
+    chunks_path: Path,
+    stem: str,
+    out_dir: Path,
+    density_counts: dict[int, int],
+) -> list[dict]:
+    """Read a *_chunks.jsonl and return annotated chunk records.
+
+    out_dir is stored as processed_run_dir so downstream scripts (seeder,
+    harness) can load artifacts from the exact same run rather than
+    re-discovering "most recent" (P1 fix, Codex review).
+    """
     records = []
+    processed_run_dir = str(out_dir.resolve())
+    doc_class = classify_document(stem)
     try:
         with open(chunks_path, encoding="utf-8") as fh:
             for line in fh:
@@ -150,10 +195,10 @@ def load_chunks(chunks_path: Path, stem: str, density_counts: dict[int, int]) ->
                 if cid is None:
                     continue
                 count = density_counts.get(int(cid), 0)
-                doc_class = classify_document(stem)
                 records.append({
                     "stem": stem,
                     "source_pdf": f"{stem}.pdf",
+                    "processed_run_dir": processed_run_dir,
                     "chunk_id": int(cid),
                     "chunk_text": chunk.get("text", ""),
                     "page_start": chunk.get("page_start", 1),
@@ -213,7 +258,8 @@ def stratified_sample(
             len(unclassified), len(stems), sorted(stems),
         )
 
-    per_class = target // len(target_classes)
+    # Ceiling division so 400/3 → 134 per class (399 floor would cap at 399)
+    per_class = math.ceil(target / len(target_classes))
     selected: list[dict] = []
 
     for cls in target_classes:
@@ -271,19 +317,19 @@ def main() -> None:
     )
     parser.add_argument(
         "--target",
-        type=int,
+        type=_positive_int,
         default=400,
         help="Target number of chunks to select (default: 400; R-3.1 range: 300–500)",
     )
     parser.add_argument(
         "--seed",
-        type=int,
+        type=_positive_int,
         default=42,
         help="Random seed for reproducible sampling (default: 42)",
     )
     parser.add_argument(
         "--min-chunk-len",
-        type=int,
+        type=_non_negative_int,
         default=200,
         help="Minimum chunk text length to include (default: 200 chars)",
     )
@@ -323,7 +369,7 @@ def main() -> None:
             log.debug("No chunks file for stem '%s' — skipping", stem)
             continue
         density_counts = load_density_counts(out_dir, stem)
-        chunks = load_chunks(chunks_path, stem, density_counts)
+        chunks = load_chunks(chunks_path, stem, out_dir, density_counts)
         # Filter short chunks (likely noise)
         chunks = [c for c in chunks if len(c["chunk_text"]) >= args.min_chunk_len]
         all_chunks.extend(chunks)

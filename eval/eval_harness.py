@@ -52,6 +52,21 @@ try:
 except ImportError:
     _SCIPY_AVAILABLE = False
 
+
+# ---------------------------------------------------------------------------
+# Argparse validators (pattern from reqbot.py / ask.py)
+# ---------------------------------------------------------------------------
+
+def _non_negative_float(value: str) -> float:
+    """Argparse type: float that must be >= 0."""
+    try:
+        fv = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid float value: {value!r}")
+    if fv < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative float")
+    return fv
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -267,7 +282,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--threshold",
-        type=float,
+        type=_non_negative_float,
         default=0.80,
         help="Fuzzy match similarity threshold for TP classification (default: 0.80)",
     )
@@ -324,7 +339,10 @@ def main() -> None:
 
     log.info("Loaded %d gold records from %s", len(gold_records), gold_path)
 
-    # Cache predictions per stem
+    # Cache predictions per stem.
+    # Use processed_run_dir pinned at selection time (P1 fix, Codex review) so
+    # re-ingest of a document does not silently change which predictions are compared
+    # against the gold set. Falls back to find_most_recent_dir for old gold records.
     pred_cache: dict[str, dict[int, list[dict]]] = {}
     missing_stems: set[str] = set()
 
@@ -339,7 +357,19 @@ def main() -> None:
         gold_reqs = rec.get("gold_requirements", [])
 
         if stem not in pred_cache:
-            out_dir = find_most_recent_dir(processed_dir, stem)
+            pinned_dir = rec.get("processed_run_dir")
+            if pinned_dir:
+                out_dir: Path | None = Path(pinned_dir)
+                if not out_dir.exists():
+                    log.warning(
+                        "Pinned processed_run_dir no longer exists for '%s': %s — "
+                        "falling back to most-recent discovery",
+                        stem, pinned_dir,
+                    )
+                    out_dir = find_most_recent_dir(processed_dir, stem)
+            else:
+                out_dir = find_most_recent_dir(processed_dir, stem)
+
             if out_dir is None:
                 missing_stems.add(stem)
                 pred_cache[stem] = {}

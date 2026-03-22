@@ -147,7 +147,10 @@ def main() -> None:
 
     log.info("Loaded %d gold chunk records from %s", len(gold_records), gold_path)
 
-    # Cache Step C output per stem (avoid re-reading the same file for each chunk)
+    # Cache Step C output per stem (avoid re-reading the same file for each chunk).
+    # Use processed_run_dir pinned at selection time (P1 fix, Codex review) so
+    # re-ingest of a document does not silently change what the seeder reads.
+    # Falls back to find_most_recent_dir only for gold records that predate the fix.
     step_c_cache: dict[str, dict[int, list[dict]]] = {}
     missing_stems: set[str] = set()
 
@@ -159,7 +162,19 @@ def main() -> None:
         chunk_id = rec.get("chunk_id")
 
         if stem not in step_c_cache:
-            out_dir = find_most_recent_dir(processed_dir, stem)
+            pinned_dir = rec.get("processed_run_dir")
+            if pinned_dir:
+                out_dir: Path | None = Path(pinned_dir)
+                if not out_dir.exists():
+                    log.warning(
+                        "Pinned processed_run_dir no longer exists for '%s': %s — "
+                        "falling back to most-recent discovery",
+                        stem, pinned_dir,
+                    )
+                    out_dir = find_most_recent_dir(processed_dir, stem)
+            else:
+                out_dir = find_most_recent_dir(processed_dir, stem)
+
             if out_dir is None:
                 missing_stems.add(stem)
                 step_c_cache[stem] = {}

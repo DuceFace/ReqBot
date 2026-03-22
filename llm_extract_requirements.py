@@ -61,6 +61,35 @@ VALID_REQUIREMENT_TYPES = [
     "guidance",
 ]
 
+PASS1_PROMPT_TEMPLATE = """You are a requirements extraction system for cybersecurity compliance documents.
+
+Your ONLY task: identify and extract ACTIONABLE REQUIREMENTS from the text below.
+A requirement is something an organization MUST DO — it expresses obligation, mandate, or necessity.
+
+Extract statements containing: shall, must, required to, ensure, implement, establish, maintain, enforce,
+or equivalent mandatory language (e.g., "is responsible for", "will", "are to") when used as a mandate.
+
+DO NOT extract:
+- Definitions or glossary entries
+- Document change logs or errata (e.g., "Change X to Y")
+- Tables of contents or section headings
+- Cross-references to other controls (e.g., "Related controls: AC-2, IA-1")
+- General background, context, or informational text
+
+Return ONLY a valid JSON array. No markdown code fences. No text before or after the array.
+If there are no actionable requirements, return an empty array: []
+
+Each element must be a JSON object with exactly these keys:
+- "source_quote": (REQUIRED) The exact verbatim quote from the text establishing this requirement
+  (under 500 characters). Copy word-for-word — do NOT paraphrase or summarize. If you cannot find
+  an exact verbatim quote for a requirement, do NOT include that requirement.
+- "source_ref": The document-specific locator for this requirement (e.g., "AC-4", "Section 5.2.1",
+  "Para 3.4.1") or "" if none is visible in the text. Copy it exactly as written — do not infer or construct.
+{source_ref_hints}
+Text:
+{chunk_text}"""
+
+
 PROMPT_TEMPLATE = """You are a requirements extraction system for cybersecurity and compliance documents.
 
 Your task: extract only ACTIONABLE REQUIREMENTS from the text below. A requirement is something an organization MUST DO — it implies obligation, mandate, or necessity.
@@ -371,6 +400,7 @@ def process_chunk(
     model: str,
     base_url: str,
     timeout: int,
+    prompt_template: str = PROMPT_TEMPLATE,
 ) -> tuple[dict, list[dict], dict | None]:
     """Process a single chunk through the LLM.
 
@@ -392,7 +422,7 @@ def process_chunk(
     else:
         source_ref_hints = ""
 
-    prompt = PROMPT_TEMPLATE.format(chunk_text=chunk_text, source_ref_hints=source_ref_hints)
+    prompt = prompt_template.format(chunk_text=chunk_text, source_ref_hints=source_ref_hints)
     prompt_hash = compute_prompt_hash(prompt)
     timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -462,6 +492,7 @@ def run(
     timeout: int = 120,
     max_chunks: int | None = None,
     start_chunk: int = 0,
+    pass1_only: bool = False,
 ) -> str:
     """Extract requirements from chunks JSONL using a local LLM.
 
@@ -476,10 +507,17 @@ def run(
         timeout:      Per-request timeout in seconds.
         max_chunks:   Process only first N chunks (for testing).
         start_chunk:  Start from this chunk_id (for resuming).
+        pass1_only:   Use PASS1_PROMPT_TEMPLATE (source_quote + source_ref only).
+                      Faster and higher-recall; description/tags/type left to Pass 2
+                      enrichment. Default False (full single-pass extraction).
 
     Returns:
         Path to the extracted_requirements.jsonl file that was written (str).
     """
+    template = PASS1_PROMPT_TEMPLATE if pass1_only else PROMPT_TEMPLATE
+    if pass1_only:
+        log.info("Using Pass 1 prompt (source_quote + source_ref only)")
+
     chunks_path = Path(chunks_jsonl).resolve()
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -553,7 +591,7 @@ def run(
                 + ", ".join(_refs) + "\n"
             ) if _refs else ""
             _prompt_hash = compute_prompt_hash(
-                PROMPT_TEMPLATE.format(chunk_text=chunk["text"], source_ref_hints=_hints)
+                template.format(chunk_text=chunk["text"], source_ref_hints=_hints)
             )
             if _prompt_hash in cached_hashes:
                 log.info("Chunk %d/%d (id=%d): skipping (cached)", i + 1, len(chunks), chunk_id)
@@ -561,7 +599,7 @@ def run(
                 continue
 
             chunk_start = time.time()
-            raw_record, valid_reqs, failure = process_chunk(chunk, model, ollama_url, timeout)
+            raw_record, valid_reqs, failure = process_chunk(chunk, model, ollama_url, timeout, template)
 
             append_jsonl(raw_record, raw_f)
 

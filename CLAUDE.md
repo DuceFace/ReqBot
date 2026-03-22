@@ -58,11 +58,15 @@ synthesis.py       ← LLM synthesis: local Ollama or remote Anthropic/OpenAI
 run_pipeline.py    ← Pipeline orchestrator, calls Steps A–E in sequence
 
 Pipeline steps (standalone scripts, no cross-imports):
-  extract_pdf_to_text.py   Step A: PDF → pages JSONL
-  chunk_text.py            Step B: pages → chunks JSONL
-  llm_extract_requirements.py  Step C: chunks → extracted requirements (LLM)
-  parse_and_normalize.py   Step D: normalize, validate, deduplicate
-  aggregate_and_export.py  Step E: stats aggregation
+  extract_pdf_to_text.py   Step A:   PDF → pages JSONL
+  chunk_text.py            Step B:   pages → chunks JSONL
+  llm_extract_requirements.py  Step C:   chunks → extracted requirements (LLM)
+                                         Pass 1 mode (default): source_quote + source_ref only
+                                         Full mode (--full-extraction): adds description/tags/type
+  parse_and_normalize.py   Step D:   normalize, validate, deduplicate
+  enrich_requirements.py   Step D.5: normalized → enriched (description/tags/type via LLM)
+                                         Optional; run_pipeline calls it by default (--skip-enrichment to skip)
+  aggregate_and_export.py  Step E:   stats aggregation
 
 Indexing:
   embed_and_index.py       Step F:  normalized JSONL → Qdrant grc_requirements

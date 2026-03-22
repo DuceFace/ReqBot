@@ -77,13 +77,26 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         log.error("Index into Qdrant failed: %s", e)
         return 1
 
-    # Also index raw chunks into grc_context for dual-retrieval
+    # Also index raw chunks into grc_context for dual-retrieval.
+    # Pass the PDF-hash document_id from the normalized requirements so that
+    # ask.py can resolve context chunks by the same ID used in requirements payloads.
     out_dir_path = Path(norm_path).parent
     chunk_files = list(out_dir_path.glob("*_chunks.jsonl"))
     if chunk_files:
+        # Extract the PDF-hash document_id written by parse_and_normalize
+        norm_doc_id: str | None = None
+        try:
+            with open(norm_path) as _nf:
+                first_line = _nf.readline()
+            if first_line:
+                norm_doc_id = json.loads(first_line).get("document_id")
+        except Exception as e:
+            log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", norm_path, e)
+
         try:
             _embed_ctx.run(
                 str(chunk_files[0]),
+                document_id=norm_doc_id,
                 qdrant_url=args.qdrant_url,
                 ollama_url=args.ollama_url,
             )
@@ -207,12 +220,24 @@ def cmd_batch(args: argparse.Namespace) -> int:
             failed.append(pdf_path.name)
             continue
 
-        # Also index raw chunks into grc_context for dual-retrieval (P4)
+        # Also index raw chunks into grc_context for dual-retrieval.
+        # Pass the PDF-hash document_id so ask.py can resolve context chunks
+        # by the same ID stored in requirements payloads.
         chunk_files = list(out_dir.glob("*_chunks.jsonl"))
         if chunk_files:
+            batch_doc_id: str | None = None
+            try:
+                with open(norm_path) as _nf:
+                    first_line = _nf.readline()
+                if first_line:
+                    batch_doc_id = json.loads(first_line).get("document_id")
+            except Exception as e:
+                log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", norm_path, e)
+
             try:
                 _embed_ctx.run(
                     str(chunk_files[0]),
+                    document_id=batch_doc_id,
                     qdrant_url=args.qdrant_url,
                     ollama_url=args.ollama_url,
                 )

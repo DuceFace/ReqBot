@@ -9,9 +9,10 @@ Writes:
   eval/gold_eval_chunks_curated.jsonl  — updated gold set (in-place by default)
 
 Behavior:
-  - Rows where review_status == "skip" are left unchanged in the JSONL.
-  - All other rows update gold_requirements from curated_requirements_json.
-  - corrector_notes is updated for all non-skip rows.
+  - Only rows where review_status == "done" are imported. Blank rows and any
+    other status (including "skip") are ignored, so a partial CSV cannot
+    silently revert JSONL edits on chunks you have not yet reviewed.
+  - corrector_notes is updated for all "done" rows.
   - Rows in the JSONL not present in the CSV are preserved unchanged.
   - Fails clearly on malformed JSON or invalid requirement schema.
 
@@ -215,21 +216,30 @@ def main() -> None:
                 sys.exit(1)
 
             for row_num, row in enumerate(reader, start=2):  # row 1 is header
+                # Only import rows explicitly marked "done". Blank and any other
+                # value are skipped so that a partial review CSV does not
+                # silently revert JSONL edits on unreviewed rows (P1).
                 status = (row.get("review_status") or "").strip().lower()
-                if status == "skip":
+                if status != "done":
                     n_skipped += 1
                     continue
 
                 source_pdf = (row.get("source_pdf") or "").strip()
 
-                # Excel sometimes converts integers to floats (e.g. "23" → "23.0")
+                # Excel serialises integers as floats (e.g. "23" → "23.0").
+                # Accept only values whose fractional part is exactly zero so
+                # that a corrupted value like "23.5" is rejected rather than
+                # silently targeting the wrong chunk (P2).
                 raw_chunk_id = (row.get("chunk_id") or "").strip()
                 try:
-                    chunk_id = int(float(raw_chunk_id))
+                    fv = float(raw_chunk_id)
+                    if fv != int(fv):
+                        raise ValueError(f"non-integer float {fv!r}")
+                    chunk_id = int(fv)
                 except (ValueError, TypeError):
                     msg = (
                         f"Row {row_num}: invalid chunk_id {raw_chunk_id!r} "
-                        f"(source_pdf={source_pdf!r})"
+                        f"(source_pdf={source_pdf!r}) — must be a whole number"
                     )
                     if args.strict:
                         log.error(msg)

@@ -95,6 +95,13 @@ Phase 13 is organized as five work packages (WP). Each has a validation gate. Pa
 
 3. **R-1.3:** Add 2–3 few-shot input/output examples to the Step C system prompt. Examples should include: (a) a prose-heavy NIST chunk, (b) a table-heavy DODI chunk, and (c) a chunk with no extractable requirements (expected output: empty array).
 
+   > **Cache invalidation note:** R-1.3 modifies `PASS1_PROMPT_TEMPLATE` in
+   > `llm_extract_requirements.py`. The prompt hash cache in Step C is keyed on the
+   > rendered prompt — any change to the template invalidates all prior cached extractions.
+   > Re-runs of Step C on previously processed documents will regenerate output from
+   > the new prompt. This is intentional and expected. Do not resume from old output
+   > directories after implementing R-1.3; start fresh runs for all re-ingestion.
+
 4. **R-1.4:** Retain the existing bracket salvage and truncated-array recovery logic as a fallback — do not remove it. Log when fallback is triggered so degradation is visible.
 
 **Validation gate:** Re-ingest the 3 worst-performing documents (highest parse failure rate from current `stats.json`). Compare parse failure rate before and after. Target: <2% parse failures on these documents.
@@ -113,7 +120,7 @@ Phase 13 is organized as five work packages (WP). Each has a validation gate. Pa
 
 #### Requirements
 
-1. **R-2.1:** Add `extraction_model` and `enrichment_model` fields to `config.json` schema. Both default to the current `default_model` value for backward compatibility.
+1. **R-2.1:** Add `extraction_model` and `enrichment_model` fields to `config.json` schema. Both default to the current `default_model` value for backward compatibility. In `config.py`, when loading a config that lacks these fields (e.g., any existing installation), fall back transparently to `default_model` — do not raise an error or require migration.
 
 2. **R-2.2:** Update `run_pipeline.py` to accept separate model arguments for Step C and Step D.5. The existing `--model` flag should continue to work as a convenience alias that sets both.
 
@@ -139,7 +146,7 @@ Phase 13 is organized as five work packages (WP). Each has a validation gate. Pa
 
 2. **R-3.2:** For each selected chunk, produce a hand-corrected extraction target: the JSON array of requirements that a perfect extractor would produce. Start from existing Step C output and correct errors — do not extract from scratch.
 
-3. **R-3.3:** Store the gold set as a standalone JSONL file with schema: `{chunk_id, chunk_text, page_start, page_end, source_pdf, document_class, gold_requirements: [...], corrector_notes}`.
+3. **R-3.3:** Store the gold set as a standalone JSONL file with schema: `{chunk_id, chunk_text, page_start, page_end, source_pdf, document_class, gold_requirements: [...], corrector_notes}`. Each object in `gold_requirements` must conform to the Step C extraction schema: `{source_quote, source_ref}` for Pass 1 targets (the fields Step C is responsible for extracting). Description, domain_tags, and requirement_type are enrichment fields and are out of scope for the gold eval.
 
 4. **R-3.4:** Build an eval harness script that takes a gold JSONL and a Step C output JSONL, joins on `chunk_id`, and reports: (a) requirement-level precision and recall (fuzzy match on `source_quote`), (b) `source_ref` accuracy, (c) false positive rate, (d) per-document-class breakdown.
 

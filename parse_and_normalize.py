@@ -140,12 +140,32 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
+def _dedup_score(req: dict) -> float:
+    """Score a requirement for winner selection during deduplication.
+
+    Higher score = preferred record. Formula:
+      confidence * 1000 - len(source_quote)
+
+    Confidence (0.0–1.0) dominates: a record with higher confidence always
+    wins over one with lower confidence. For equal confidence, a shorter
+    source_quote is preferred — it indicates a more precise verbatim capture
+    rather than a padded or over-long quote.
+
+    Tag count is intentionally excluded: the LLM can hallucinate tags, and
+    more tags does not imply a better extraction.
+    """
+    confidence = req.get("confidence", 0.0)
+    quote_len = len(req.get("source_quote", ""))
+    return confidence * 1000 - quote_len
+
+
 def deduplicate_requirements(requirements: list[dict]) -> list[dict]:
     """Remove duplicate requirements based on two keys:
     1. source_ref + normalized description (original)
     2. source_ref + normalized source_quote (catches near-identical quotes)
 
-    When duplicates exist, keep the one with more domain tags and longer source_quote.
+    When duplicates exist, keep the higher-confidence record; for equal
+    confidence, prefer the shorter (more precise) source_quote.
     """
     seen: dict[str, dict] = {}
     for req in requirements:
@@ -163,9 +183,7 @@ def deduplicate_requirements(requirements: list[dict]) -> list[dict]:
 
         if existing_key:
             existing = seen[existing_key]
-            new_score = len(req.get("domain_tags", [])) * 10 + len(req.get("source_quote", ""))
-            old_score = len(existing.get("domain_tags", [])) * 10 + len(existing.get("source_quote", ""))
-            if new_score > old_score:
+            if _dedup_score(req) > _dedup_score(existing):
                 seen[existing_key] = req
         else:
             seen[desc_key] = req

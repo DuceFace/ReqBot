@@ -14,9 +14,9 @@ GPT-4o is optional and off by default.
 
 ---
 
-## Current Phase: 12 — Verbatim-First Pipeline Overhaul
+## Current Phase: 13 — Extraction Model Optimization
 
-**Plan:** `docs/PHASE12_REQUIREMENTS.md`
+**Plan:** `docs/PHASE13_REQUIREMENTS.md`
 
 ### Phase 11 — Core Quality Overhaul (COMPLETE 2026-03-21)
 
@@ -27,16 +27,27 @@ GPT-4o is optional and off by default.
 | 11.3a — Embed source_quote | DONE 2026-03-19 | source_quote-first embedding; whitespace/empty guards; batch_size validation; reindex complete |
 | 11.3b — Extraction Prompt | DONE 2026-03-21 | Prompt rewrite with GOOD/BAD examples; requirement_type fallback "" not "guidance"; typed_count fix; IP filter in source_ref hints; chunked file hashing; full corpus re-ingestion complete |
 
-### Phase 12 — Verbatim-First Pipeline Overhaul (In Progress)
+### Phase 12 — Verbatim-First Pipeline Overhaul (COMPLETE 2026-03-22)
 
 | Subphase | Status | Description |
 |----------|--------|-------------|
 | 12.1 — Validation Gate | DONE 2026-03-21 | source_quote required at Step C/D/embed; description optional; display falls back to source_quote |
 | 12.4 — Bug Fixes (pulled forward) | DONE 2026-03-22 | Strategy 3 rfind fix; IP filter in scan_source_refs; dedup scoring to confidence*1000-len(quote); grc_context document_id mismatch (PR #5, PR #6) |
-| 12.2 — Two-Pass Extraction | TESTING PENDING | Pass 1 prompt (source_quote+source_ref only); enrich_requirements.py (Pass 2); --skip-enrichment flag; merged PR #7 |
-| 12.3 — Query-Time Descriptions | NOT STARTED | Remove description from ingestion; generate at query/evidence time |
+| 12.2 — Two-Pass Extraction | DONE 2026-03-22 | Pass 1 prompt (source_quote+source_ref only); enrich_requirements.py (Pass 2); --skip-enrichment flag; tested on DODI/NIST/AFI; merged PR #7 |
+| 12.3 — Query-Time Descriptions | DEFERRED | Superseded by Phase 13 WP-1; display deliverable done in 12.1; revisit after WP-3 eval baseline |
 
-**Rule:** One subphase at a time. Complete → Gemini review → proceed.
+### Phase 13 — Extraction Model Optimization (In Progress)
+
+| Work Package | Status | Description |
+|---|---|---|
+| WP-1: Structured Output Decoding | NOT STARTED | Add `format: "json"` to Step C; few-shot examples in Pass 1 prompt |
+| WP-2: Model Configuration Split | NOT STARTED | `extraction_model` / `enrichment_model` in config.json; parallel with WP-1 |
+| WP-3: Gold Evaluation Set | NOT STARTED | 300–500 hand-verified chunks; eval harness script; baseline metrics |
+| WP-4: Training Data Curation | NOT STARTED | SFT dataset from pipeline artifacts + gold corrections; only if WP-3 gate |
+| WP-5: Fine-Tuning + Integration | NOT STARTED | QLoRA Llama 3.1 8B; GGUF export; Ollama Modelfile; only if WP-4 gate |
+
+**Rule:** WP-1 and WP-2 may run in parallel. WP-3 follows WP-1. WP-4/5 only if WP-3 gate says tune.
+**Corpus re-ingest:** Deferred until WP-1 complete and accepted.
 
 ---
 
@@ -87,8 +98,9 @@ Docs (read these, don't read source to answer these questions):
   ARCHITECTURE.md          Module map, data flows, import graph, "what breaks if I change X"
   CONTRIBUTING.md          Naming rules, how to add commands/steps, logging, config, error handling
   INDEXED_DOCUMENTS.md     Live corpus inventory (45 docs, ~32k requirements)
-  docs/PHASE11_REQUIREMENTS.md  Current phase plan with checkboxes
-  docs/PHASE12_REQUIREMENTS.md  Next phase plan: verbatim-first pipeline overhaul
+  docs/PHASE11_REQUIREMENTS.md  Phase 11 plan (complete)
+  docs/PHASE12_REQUIREMENTS.md  Phase 12 plan (complete)
+  docs/PHASE13_REQUIREMENTS.md  Current phase plan: extraction model optimization
 ```
 
 ---
@@ -177,7 +189,7 @@ This means:
 
 ## What to Read Next
 
-- **For the current task (Phase 12):** `docs/PHASE12_REQUIREMENTS.md`
+- **For the current task (Phase 13):** `docs/PHASE13_REQUIREMENTS.md`
 - **To understand a command:** `README.md` CLI reference section
 - **To understand how modules connect:** `ARCHITECTURE.md`
 - **To add a command or pipeline step:** `CONTRIBUTING.md`

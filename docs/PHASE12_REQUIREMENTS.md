@@ -99,10 +99,10 @@ If enrichment has not run, Step F embeds source_quote directly (already the prim
 
 ### Deliverables
 
-- [ ] Design Pass 1 and Pass 2 schemas and data flow
-- [ ] Implement `enrich_requirements.py` (Pass 2 enrichment step)
-- [ ] Update `run_pipeline.py` to support `--skip-enrichment` flag
-- [ ] Update `reqbot.py` ingest/batch commands to reflect two-pass option
+- [x] Design Pass 1 and Pass 2 schemas and data flow
+- [x] Implement `enrich_requirements.py` (Pass 2 enrichment step)
+- [x] Update `run_pipeline.py` to support `--skip-enrichment` flag
+- [x] Update `reqbot.py` ingest/batch commands to reflect two-pass option
 - [ ] Test on 3 documents (one NIST, one DODI, one AFI) before full re-run
 
 ---

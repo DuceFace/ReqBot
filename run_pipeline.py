@@ -39,26 +39,32 @@ def run(
     timeout: int = 120,
     skip_to: str = "A",
     layout_mode: str = "pymupdf",
+    pass1_only: bool = True,
+    skip_enrichment: bool = False,
 ) -> str:
-    """Run the full extraction pipeline (Steps A-E) in-process.
+    """Run the full extraction pipeline (Steps A-E + optional enrichment) in-process.
 
     Callable interface for in-process use by reqbot.py.
     Standalone CLI usage is unchanged via main() / __main__.
 
     Args:
-        pdf_path:    Path to the input PDF file.
-        output_dir:  Directory to write all artifacts into.
-        model:       Ollama model name for Step C.
-        ollama_url:  Ollama API base URL.
-        chunk_size:  Target chunk size in characters.
-        overlap:     Overlap characters between chunks.
-        max_chunks:  Limit LLM processing to first N chunks.
-        timeout:     Per-request LLM timeout in seconds.
-        skip_to:     Skip to step ('A'-'E'). Requires prior artifacts.
-        layout_mode: PDF extraction backend ('pymupdf' or 'pdfplumber').
+        pdf_path:         Path to the input PDF file.
+        output_dir:       Directory to write all artifacts into.
+        model:            Ollama model name for Steps C and D.5.
+        ollama_url:       Ollama API base URL.
+        chunk_size:       Target chunk size in characters.
+        overlap:          Overlap characters between chunks.
+        max_chunks:       Limit LLM processing to first N chunks.
+        timeout:          Per-request LLM timeout in seconds.
+        skip_to:          Skip to step ('A'-'E'). Requires prior artifacts.
+        layout_mode:      PDF extraction backend ('pymupdf' or 'pdfplumber').
+        pass1_only:       Use Pass 1 prompt in Step C (source_quote + source_ref only).
+                          Default True — enrichment (Step D.5) fills in description/tags/type.
+        skip_enrichment:  Skip Step D.5 enrichment. Returns normalized JSONL path directly.
 
     Returns:
-        Path to the requirements_normalized.jsonl file (str).
+        Path to requirements_enriched.jsonl if enrichment ran, else
+        requirements_normalized.jsonl (str).
 
     Raises:
         RuntimeError: If any pipeline step fails.
@@ -112,13 +118,14 @@ def run(
 
     if "C" in steps_to_run:
         log.info("=" * 60)
-        log.info("Starting Step C (LLM Extraction)")
+        log.info("Starting Step C (LLM Extraction%s)", " — Pass 1 mode" if pass1_only else "")
         log.info("=" * 60)
         try:
             llm_extract_requirements.run(
                 str(chunks_path), str(out_dir),
                 model=model, ollama_url=ollama_url,
                 timeout=timeout, max_chunks=max_chunks,
+                pass1_only=pass1_only,
             )
         except RuntimeError:
             raise
@@ -136,12 +143,39 @@ def run(
         except Exception as e:
             raise RuntimeError(f"Step D failed: {e}") from e
 
+    # Step D.5: Enrich requirements with description, domain_tags, requirement_type.
+    # Only runs when Step D ran in this invocation (ensures fresh norm_path exists
+    # and prevents unexpected LLM work when skip_to skips past D, e.g. --skip-to E).
+    # Skipped if --skip-enrichment is set.
+    # If enrichment fails, the pipeline continues with the normalized JSONL.
+    index_path = norm_path
+    if "D" in steps_to_run and not skip_enrichment:
+        log.info("=" * 60)
+        log.info("Starting Step D.5 (Enrich — Pass 2)")
+        log.info("=" * 60)
+        try:
+            import enrich_requirements as _enrich_mod
+            enrich_result = _enrich_mod.run(
+                str(norm_path), str(out_dir),
+                model=model, ollama_url=ollama_url, timeout=timeout,
+            )
+            index_path = Path(enrich_result)
+        except Exception as e:
+            log.warning(
+                "Step D.5 enrichment failed (%s) — proceeding with normalized JSONL for indexing",
+                e,
+            )
+    elif skip_enrichment:
+        log.info("Step D.5 skipped (--skip-enrichment)")
+    else:
+        log.info("Step D.5 skipped (Step D did not run in this invocation)")
+
     if "E" in steps_to_run:
         log.info("=" * 60)
         log.info("Starting Step E (Aggregate)")
         log.info("=" * 60)
         try:
-            aggregate_and_export.run(str(norm_path), str(out_dir), source_pdf=pdf.name)
+            aggregate_and_export.run(str(index_path), str(out_dir), source_pdf=pdf.name)
         except Exception as e:
             raise RuntimeError(f"Step E failed: {e}") from e
 
@@ -151,7 +185,7 @@ def run(
     log.info("Artifacts in: %s", out_dir)
     log.info("=" * 60)
 
-    return str(norm_path)
+    return str(index_path)
 
 
 def main() -> None:
@@ -225,6 +259,19 @@ def main() -> None:
         default="pymupdf",
         help="PDF extraction backend for Step A (default: pymupdf). Use 'pdfplumber' for table-aware extraction.",
     )
+    parser.add_argument(
+        "--skip-enrichment",
+        action="store_true",
+        dest="skip_enrichment",
+        help="Skip Step D.5 enrichment (Pass 2). Index normalized JSONL directly without adding description/tags/type.",
+    )
+    parser.add_argument(
+        "--full-extraction",
+        action="store_true",
+        dest="full_extraction",
+        help="Use legacy single-pass Step C prompt (description+tags+type in one LLM call). "
+             "Default is Pass 1 mode (source_quote+source_ref only, enriched separately).",
+    )
     args = parser.parse_args()
 
     pdf_path = Path(args.pdf_path).resolve()
@@ -239,7 +286,7 @@ def main() -> None:
         out_dir = SCRIPTS_DIR.parent / "documents" / "processed" / f"{pdf_path.stem}_{timestamp}"
 
     try:
-        norm_path = run(
+        index_path = run(
             str(pdf_path),
             str(out_dir),
             model=args.model,
@@ -250,6 +297,8 @@ def main() -> None:
             timeout=args.timeout,
             skip_to=args.skip_to,
             layout_mode=args.layout_mode,
+            pass1_only=not args.full_extraction,
+            skip_enrichment=args.skip_enrichment,
         )
     except RuntimeError as e:
         log.error("%s", e)
@@ -262,24 +311,24 @@ def main() -> None:
         import embed_context_index as _embed_ctx
 
         try:
-            _embed.run(norm_path, ollama_url=args.ollama_url, qdrant_url=args.qdrant_url)
+            _embed.run(index_path, ollama_url=args.ollama_url, qdrant_url=args.qdrant_url)
         except Exception as e:
             log.warning("Qdrant indexing failed (%s) — pipeline artifacts are still available", e)
 
         # Also index raw chunks into grc_context.
-        # Use the PDF-hash document_id from the normalized JSONL so that
+        # Use the PDF-hash document_id from the indexed JSONL so that
         # ask --context can resolve chunks by the same ID as requirements payloads.
-        out_dir_path = Path(norm_path).parent
+        out_dir_path = Path(index_path).parent
         chunk_files = list(out_dir_path.glob("*_chunks.jsonl"))
         if chunk_files:
             norm_doc_id: str | None = None
             try:
-                with open(norm_path) as _nf:
+                with open(index_path) as _nf:
                     first_line = _nf.readline()
                 if first_line:
                     norm_doc_id = _json.loads(first_line).get("document_id")
             except Exception as e:
-                log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", norm_path, e)
+                log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", index_path, e)
 
             try:
                 _embed_ctx.run(

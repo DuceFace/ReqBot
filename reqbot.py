@@ -55,13 +55,14 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         out_dir = _cfg.processed_dir_path() / f"{pdf_path.stem}_{timestamp}"
 
     try:
-        norm_path = _run_pipeline.run(
+        index_path = _run_pipeline.run(
             str(pdf_path),
             str(out_dir),
             ollama_url=args.ollama_url,
             model=args.model or "llama3.1:8b-instruct-q4_K_M",
             max_chunks=args.max_chunks,
             layout_mode=args.layout_mode,
+            skip_enrichment=args.skip_enrichment,
         )
     except RuntimeError as e:
         log.error("%s", e)
@@ -70,28 +71,28 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     if not args.index:
         return 0
 
-    # Optionally chain indexing
+    # Optionally chain indexing (uses enriched JSONL if enrichment ran, else normalized)
     try:
-        _embed.run(norm_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url)
+        _embed.run(index_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url)
     except Exception as e:
         log.error("Index into Qdrant failed: %s", e)
         return 1
 
     # Also index raw chunks into grc_context for dual-retrieval.
-    # Pass the PDF-hash document_id from the normalized requirements so that
+    # Pass the PDF-hash document_id from the indexed JSONL so that
     # ask.py can resolve context chunks by the same ID used in requirements payloads.
-    out_dir_path = Path(norm_path).parent
+    out_dir_path = Path(index_path).parent
     chunk_files = list(out_dir_path.glob("*_chunks.jsonl"))
     if chunk_files:
         # Extract the PDF-hash document_id written by parse_and_normalize
         norm_doc_id: str | None = None
         try:
-            with open(norm_path) as _nf:
+            with open(index_path) as _nf:
                 first_line = _nf.readline()
             if first_line:
                 norm_doc_id = json.loads(first_line).get("document_id")
         except Exception as e:
-            log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", norm_path, e)
+            log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", index_path, e)
 
         try:
             _embed_ctx.run(
@@ -201,12 +202,13 @@ def cmd_batch(args: argparse.Namespace) -> int:
         out_dir = _cfg.processed_dir_path() / f"{pdf_path.stem}_{timestamp}"
 
         try:
-            norm_path = _run_pipeline.run(
+            index_path = _run_pipeline.run(
                 str(pdf_path),
                 str(out_dir),
                 ollama_url=args.ollama_url,
                 model=args.model or "llama3.1:8b-instruct-q4_K_M",
                 layout_mode=args.layout_mode,
+                skip_enrichment=args.skip_enrichment,
             )
         except RuntimeError as e:
             log.error("Pipeline FAILED for %s: %s", pdf_path.name, e)
@@ -214,7 +216,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
             continue
 
         try:
-            _embed.run(norm_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url)
+            _embed.run(index_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url)
         except Exception as e:
             log.warning("Indexing failed for %s: %s — pipeline artifacts still saved", pdf_path.name, e)
             failed.append(pdf_path.name)
@@ -227,12 +229,12 @@ def cmd_batch(args: argparse.Namespace) -> int:
         if chunk_files:
             batch_doc_id: str | None = None
             try:
-                with open(norm_path) as _nf:
+                with open(index_path) as _nf:
                     first_line = _nf.readline()
                 if first_line:
                     batch_doc_id = json.loads(first_line).get("document_id")
             except Exception as e:
-                log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", norm_path, e)
+                log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", index_path, e)
 
             try:
                 _embed_ctx.run(
@@ -1455,6 +1457,12 @@ def main() -> None:
         dest="layout_mode",
         help="PDF extraction backend (default: pymupdf)",
     )
+    p_ingest.add_argument(
+        "--skip-enrichment",
+        action="store_true",
+        dest="skip_enrichment",
+        help="Skip Pass 2 enrichment (description/tags/type). Index source_quote-only output directly.",
+    )
     p_ingest.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
     p_ingest.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")
 
@@ -1494,6 +1502,12 @@ def main() -> None:
         default="pymupdf",
         dest="layout_mode",
         help="PDF extraction backend (default: pymupdf)",
+    )
+    p_batch.add_argument(
+        "--skip-enrichment",
+        action="store_true",
+        dest="skip_enrichment",
+        help="Skip Pass 2 enrichment (description/tags/type). Index source_quote-only output directly.",
     )
     p_batch.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
     p_batch.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")

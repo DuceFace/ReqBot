@@ -210,3 +210,6 @@ Backups/
 build/linux-x86_64/
 dist/
 archive/*.log
+
+# WP-3 review scratch files (CSV is generated from JSONL; JSONL is source of truth)
+eval/gold_eval_chunks_review.csv

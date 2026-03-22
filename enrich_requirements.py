@@ -387,7 +387,11 @@ def run(
                 reqs.append(json.loads(line))
     log.info("Loaded %d requirements from %s", len(reqs), norm_path)
 
-    # Load existing enriched requirements keyed by requirement_id (resume cache)
+    # Load existing enriched requirements keyed by requirement_id (resume cache).
+    # Only treat a cached record as "done" if it has at least one non-empty enrichment
+    # field (description, domain_tags, or requirement_type). Records that failed on a
+    # prior run have all three empty (same as the original normalized record) and must
+    # be retried rather than silently skipped.
     enriched_by_id: dict[str, dict] = {}
     if enriched_path.exists():
         with open(enriched_path, "r", encoding="utf-8") as f:
@@ -397,16 +401,16 @@ def run(
                     try:
                         rec = json.loads(line)
                         rid = rec.get("requirement_id")
-                        if rid:
+                        if rid and (rec.get("description") or rec.get("domain_tags") or rec.get("requirement_type")):
                             enriched_by_id[rid] = rec
                     except json.JSONDecodeError:
                         pass
         log.info(
-            "Loaded %d already-enriched requirements from cache (%s)",
+            "Loaded %d successfully-enriched requirements from cache (%s)",
             len(enriched_by_id), enriched_path,
         )
 
-    # Requirements that still need enrichment (not yet in the enriched file)
+    # Requirements that still need enrichment (not yet successfully enriched)
     to_enrich = [req for req in reqs if req["requirement_id"] not in enriched_by_id]
 
     if max_reqs is not None:
@@ -469,8 +473,8 @@ def run(
                     enriched_by_id[req["requirement_id"]] = enriched_req
                     enriched_count += 1
                 else:
-                    # Keep original record unenriched; will retry on next run
-                    enriched_by_id[req["requirement_id"]] = req
+                    # Do NOT add to enriched_by_id — leave absent so the cache
+                    # check above treats it as unenriched on the next run.
                     failed_count += 1
                 log.info(
                     "Req %s (%d/%d): %s",
@@ -493,6 +497,17 @@ def run(
     log.info("Wrote %s", enriched_path)
 
     return str(enriched_path)
+
+
+def _positive_int(value: str) -> int:
+    """Argparse type: integer that must be > 0."""
+    try:
+        iv = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid integer value: '{value}'")
+    if iv <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return iv
 
 
 def main() -> None:
@@ -524,19 +539,19 @@ def main() -> None:
     )
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=_positive_int,
         default=120,
         help="Per-request LLM timeout in seconds (default: 120)",
     )
     parser.add_argument(
         "--batch-size",
-        type=int,
+        type=_positive_int,
         default=10,
         help="Requirements per LLM call (default: 10); falls back to individual on parse failure",
     )
     parser.add_argument(
         "--max-reqs",
-        type=int,
+        type=_positive_int,
         default=None,
         help="Limit enrichment to first N unenriched requirements (for testing)",
     )

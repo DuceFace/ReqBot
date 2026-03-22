@@ -144,10 +144,12 @@ def run(
             raise RuntimeError(f"Step D failed: {e}") from e
 
     # Step D.5: Enrich requirements with description, domain_tags, requirement_type.
-    # Runs after Step D. Skipped if --skip-enrichment is set.
+    # Only runs when Step D ran in this invocation (ensures fresh norm_path exists
+    # and prevents unexpected LLM work when skip_to skips past D, e.g. --skip-to E).
+    # Skipped if --skip-enrichment is set.
     # If enrichment fails, the pipeline continues with the normalized JSONL.
     index_path = norm_path
-    if not skip_enrichment:
+    if "D" in steps_to_run and not skip_enrichment:
         log.info("=" * 60)
         log.info("Starting Step D.5 (Enrich — Pass 2)")
         log.info("=" * 60)
@@ -163,8 +165,10 @@ def run(
                 "Step D.5 enrichment failed (%s) — proceeding with normalized JSONL for indexing",
                 e,
             )
-    else:
+    elif skip_enrichment:
         log.info("Step D.5 skipped (--skip-enrichment)")
+    else:
+        log.info("Step D.5 skipped (Step D did not run in this invocation)")
 
     if "E" in steps_to_run:
         log.info("=" * 60)

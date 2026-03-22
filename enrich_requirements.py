@@ -388,12 +388,13 @@ def run(
     log.info("Loaded %d requirements from %s", len(reqs), norm_path)
 
     # Load existing enriched requirements keyed by requirement_id (resume cache).
-    # Only treat a cached record as "done" if it has at least one non-empty enrichment
-    # field (description, domain_tags, or requirement_type). Records that failed on a
-    # prior run have all three empty (same as the original normalized record) and must
-    # be retried rather than silently skipped.
+    # Only treat a cached record as "done" if:
+    #   1. It has at least one non-empty enrichment field (failed runs must be retried), AND
+    #   2. It was enriched by the same model currently in use (R-2.2 fix).
+    # Switching --enrichment-model must not silently preserve the old model's output.
     enriched_by_id: dict[str, dict] = {}
     if enriched_path.exists():
+        skipped_model_mismatch = 0
         with open(enriched_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
@@ -401,10 +402,26 @@ def run(
                     try:
                         rec = json.loads(line)
                         rid = rec.get("requirement_id")
-                        if rid and (rec.get("description") or rec.get("domain_tags") or rec.get("requirement_type")):
-                            enriched_by_id[rid] = rec
+                        if not rid:
+                            continue
+                        has_enrichment = rec.get("description") or rec.get("domain_tags") or rec.get("requirement_type")
+                        if not has_enrichment:
+                            continue
+                        # If enrichment_model is recorded, require it to match.
+                        # Records without enrichment_model (pre-WP-2 cache) are treated
+                        # as model-unknown and will be re-enriched.
+                        cached_model = rec.get("enrichment_model")
+                        if cached_model != model:
+                            skipped_model_mismatch += 1
+                            continue
+                        enriched_by_id[rid] = rec
                     except json.JSONDecodeError:
                         pass
+        if skipped_model_mismatch:
+            log.info(
+                "Skipped %d cached enrichments from a different model — will re-enrich with %s",
+                skipped_model_mismatch, model,
+            )
         log.info(
             "Loaded %d successfully-enriched requirements from cache (%s)",
             len(enriched_by_id), enriched_path,
@@ -450,7 +467,7 @@ def run(
         if batch_results is not None:
             # Batch succeeded
             for req, enrichment in zip(batch, batch_results):
-                enriched_req = {**req, **enrichment}
+                enriched_req = {**req, **enrichment, "enrichment_model": model}
                 enriched_by_id[req["requirement_id"]] = enriched_req
                 enriched_count += 1
             processed += len(batch)
@@ -469,7 +486,7 @@ def run(
                 result = _enrich_single(req, model, ollama_url, timeout)
                 processed += 1
                 if result is not None:
-                    enriched_req = {**req, **result}
+                    enriched_req = {**req, **result, "enrichment_model": model}
                     enriched_by_id[req["requirement_id"]] = enriched_req
                     enriched_count += 1
                 else:

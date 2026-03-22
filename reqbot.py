@@ -54,12 +54,21 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         timestamp = _dt.now().strftime("%Y%m%d_%H%M%S")
         out_dir = _cfg.processed_dir_path() / f"{pdf_path.stem}_{timestamp}"
 
+    # --model is a convenience alias; individual flags take precedence when --model not given
+    if args.model:
+        extraction_model = args.model
+        enrichment_model = args.model
+    else:
+        extraction_model = args.extraction_model or _cfg.extraction_model
+        enrichment_model = args.enrichment_model or _cfg.enrichment_model
+
     try:
         index_path = _run_pipeline.run(
             str(pdf_path),
             str(out_dir),
             ollama_url=args.ollama_url,
-            model=args.model or "llama3.1:8b-instruct-q4_K_M",
+            extraction_model=extraction_model,
+            enrichment_model=enrichment_model,
             max_chunks=args.max_chunks,
             layout_mode=args.layout_mode,
             skip_enrichment=args.skip_enrichment,
@@ -190,6 +199,14 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
     log.info("Found %d PDF(s) to process in %s", len(pdfs), pdf_dir)
 
+    # Resolve models once for the whole batch (same alias logic as cmd_ingest)
+    if args.model:
+        batch_extraction_model = args.model
+        batch_enrichment_model = args.model
+    else:
+        batch_extraction_model = args.extraction_model or _cfg.extraction_model
+        batch_enrichment_model = args.enrichment_model or _cfg.enrichment_model
+
     succeeded = []
     failed = []
 
@@ -206,7 +223,8 @@ def cmd_batch(args: argparse.Namespace) -> int:
                 str(pdf_path),
                 str(out_dir),
                 ollama_url=args.ollama_url,
-                model=args.model or "llama3.1:8b-instruct-q4_K_M",
+                extraction_model=batch_extraction_model,
+                enrichment_model=batch_enrichment_model,
                 layout_mode=args.layout_mode,
                 skip_enrichment=args.skip_enrichment,
             )
@@ -1324,9 +1342,19 @@ def cmd_init(args: argparse.Namespace) -> int:
                 break
 
         # Models — warn if not present on the server
-        default_model = _prompt("Default extraction model", _cfg.default_model)
+        default_model = _prompt("Default model (fallback for all pipeline stages)", _cfg.default_model)
         if available_models and default_model not in available_models:
             print(f"  [!] Warning: '{default_model}' not found on Ollama server.")
+            print(f"      Available: {', '.join(available_models)}")
+
+        extraction_model = _prompt("Step C extraction model (default: same as above)", _cfg.extraction_model)
+        if available_models and extraction_model not in available_models:
+            print(f"  [!] Warning: '{extraction_model}' not found on Ollama server.")
+            print(f"      Available: {', '.join(available_models)}")
+
+        enrichment_model = _prompt("Step D.5 enrichment model (default: same as above)", _cfg.enrichment_model)
+        if available_models and enrichment_model not in available_models:
+            print(f"  [!] Warning: '{enrichment_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 
         synthesis_model = _prompt("Synthesis model", _cfg.synthesis_model)
@@ -1409,6 +1437,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         "ollama_url": ollama_url,
         "qdrant_url": qdrant_url,
         "default_model": default_model,
+        "extraction_model": extraction_model,
+        "enrichment_model": enrichment_model,
         "synthesis_model": synthesis_model,
         "top_k": top_k,
         "min_score": min_score,
@@ -1447,7 +1477,18 @@ def main() -> None:
     p_ingest = subparsers.add_parser("ingest", help="Run extraction pipeline on a PDF")
     p_ingest.add_argument("pdf", type=str, help="Path to the PDF file")
     p_ingest.add_argument("--output-dir", type=str, help="Output directory")
-    p_ingest.add_argument("--model", type=str, help="Ollama model for extraction")
+    p_ingest.add_argument(
+        "--extraction-model", type=str, default=None, dest="extraction_model",
+        help="Ollama model for Step C extraction (default: from config)",
+    )
+    p_ingest.add_argument(
+        "--enrichment-model", type=str, default=None, dest="enrichment_model",
+        help="Ollama model for Step D.5 enrichment (default: from config)",
+    )
+    p_ingest.add_argument(
+        "--model", type=str, default=None,
+        help="Convenience alias: sets both --extraction-model and --enrichment-model",
+    )
     p_ingest.add_argument("--max-chunks", type=int, help="Limit chunks for testing")
     p_ingest.add_argument("--index", action="store_true", help="Also index into Qdrant after extraction")
     p_ingest.add_argument(
@@ -1495,7 +1536,18 @@ def main() -> None:
     # batch
     p_batch = subparsers.add_parser("batch", help="Run pipeline on all PDFs in a directory")
     p_batch.add_argument("pdf_dir", type=str, help="Directory containing PDF files")
-    p_batch.add_argument("--model", type=str, help="Ollama model for extraction")
+    p_batch.add_argument(
+        "--extraction-model", type=str, default=None, dest="extraction_model",
+        help="Ollama model for Step C extraction (default: from config)",
+    )
+    p_batch.add_argument(
+        "--enrichment-model", type=str, default=None, dest="enrichment_model",
+        help="Ollama model for Step D.5 enrichment (default: from config)",
+    )
+    p_batch.add_argument(
+        "--model", type=str, default=None,
+        help="Convenience alias: sets both --extraction-model and --enrichment-model",
+    )
     p_batch.add_argument(
         "--layout-mode",
         choices=["pymupdf", "pdfplumber"],

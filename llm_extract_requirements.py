@@ -564,20 +564,31 @@ def run(
 
     cached_hashes: set[str] = set()
     if raw_path.exists():
+        skipped_model_mismatch = 0
         with open(raw_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
                     try:
                         rec = json.loads(line)
+                        # Only accept cache entries produced by the same model (R-2.2 fix).
+                        # Switching --extraction-model must not reuse prior model's output.
+                        if rec.get("model") != model:
+                            skipped_model_mismatch += 1
+                            continue
                         if ph := rec.get("prompt_hash"):
                             cached_hashes.add(ph)
                     except json.JSONDecodeError:
                         pass
+        if skipped_model_mismatch:
+            log.info(
+                "Skipped %d cached entries from a different model — will re-process with %s",
+                skipped_model_mismatch, model,
+            )
         if cached_hashes:
             log.info(
-                "Loaded %d cached prompt hashes — already-processed chunks will be skipped",
-                len(cached_hashes),
+                "Loaded %d cached prompt hashes (model=%s) — matching chunks will be skipped",
+                len(cached_hashes), model,
             )
 
     log.info("Processing %d chunks with model=%s, ollama=%s", len(chunks), model, ollama_url)

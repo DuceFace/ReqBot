@@ -10,7 +10,7 @@
 | Work Package | Status | Notes |
 |---|---|---|
 | WP-1: Structured Output Decoding | IN PROGRESS | `format: "json"` + few-shot examples in Step C |
-| WP-2: Model Configuration Split | NOT STARTED | `extraction_model` / `enrichment_model` in config; parallel with WP-1 |
+| WP-2: Model Configuration Split | IN PROGRESS | `extraction_model` / `enrichment_model` in config; parallel with WP-1 |
 | WP-3: Gold Evaluation Set | NOT STARTED | Prerequisite: WP-1 complete (eval baseline must reflect structured output) |
 | WP-4: Training Data Curation | NOT STARTED | Only if WP-3 gate says precision/recall gap remains |
 | WP-5: Fine-Tuning and Integration | NOT STARTED | Only if WP-4 gate passed |

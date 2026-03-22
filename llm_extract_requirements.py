@@ -85,6 +85,22 @@ Each element must be a JSON object with exactly these keys:
   an exact verbatim quote for a requirement, do NOT include that requirement.
 - "source_ref": The document-specific locator for this requirement (e.g., "AC-4", "Section 5.2.1",
   "Para 3.4.1") or "" if none is visible in the text. Copy it exactly as written — do not infer or construct.
+
+--- EXAMPLES ---
+
+Example 1 — NIST prose (requirements present):
+Text: "AC-3 ACCESS ENFORCEMENT\nControl: The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies.\nSupplemental Guidance: Access control policies (e.g., identity-based policies, role-based policies, attribute-based policies) and access enforcement mechanisms are employed by organizations to control access between active entities or subjects and passive entities or objects in information systems."
+Output: [{"source_quote": "The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies.", "source_ref": "AC-3"}]
+
+Example 2 — DoD policy table (multiple requirements):
+Text: "3.2 POLICY\n3.2.1 All DoD information systems shall implement multi-factor authentication for all privileged user accounts.\n3.2.2 Password complexity requirements shall conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters.\n3.2.3 See Table 3.2-1 for password requirements by account type (informational)."
+Output: [{"source_quote": "All DoD information systems shall implement multi-factor authentication for all privileged user accounts.", "source_ref": "3.2.1"}, {"source_quote": "Password complexity requirements shall conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters.", "source_ref": "3.2.2"}]
+
+Example 3 — References section (no requirements):
+Text: "1. REFERENCES\na. DoD Instruction 8500.01, Cybersecurity, March 14, 2014, as amended.\nb. NIST Special Publication 800-53, Security and Privacy Controls for Federal Information Systems and Organizations, Revision 5, September 2020.\nc. Committee on National Security Systems Instruction No. 1253."
+Output: []
+
+--- END EXAMPLES ---
 {source_ref_hints}
 Text:
 {chunk_text}"""
@@ -224,6 +240,7 @@ def call_ollama(
         "model": model,
         "prompt": prompt,
         "stream": False,
+        "format": "json",  # R-1.1: constrain output to valid JSON (grammar-guided sampling)
         "options": {
             "temperature": 0.1,
             "num_predict": 4096,
@@ -306,6 +323,11 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
             try:
                 result = json.loads(candidate)
                 if isinstance(result, list):
+                    log.warning(
+                        "JSON parse fallback (Strategy 2): extracted array from "
+                        "non-bare response (%d chars prefix before '[')",
+                        start_idx,
+                    )
                     return result
             except json.JSONDecodeError:
                 pass

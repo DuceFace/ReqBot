@@ -31,7 +31,8 @@ def run(
     pdf_path: str,
     output_dir: str,
     *,
-    model: str = "llama3.1:8b-instruct-q4_K_M",
+    extraction_model: str = "llama3.1:8b-instruct-q4_K_M",
+    enrichment_model: str = "llama3.1:8b-instruct-q4_K_M",
     ollama_url: str = "http://192.168.90.100:11434",
     chunk_size: int = 3000,
     overlap: int = 200,
@@ -48,19 +49,20 @@ def run(
     Standalone CLI usage is unchanged via main() / __main__.
 
     Args:
-        pdf_path:         Path to the input PDF file.
-        output_dir:       Directory to write all artifacts into.
-        model:            Ollama model name for Steps C and D.5.
-        ollama_url:       Ollama API base URL.
-        chunk_size:       Target chunk size in characters.
-        overlap:          Overlap characters between chunks.
-        max_chunks:       Limit LLM processing to first N chunks.
-        timeout:          Per-request LLM timeout in seconds.
-        skip_to:          Skip to step ('A'-'E'). Requires prior artifacts.
-        layout_mode:      PDF extraction backend ('pymupdf' or 'pdfplumber').
-        pass1_only:       Use Pass 1 prompt in Step C (source_quote + source_ref only).
-                          Default True — enrichment (Step D.5) fills in description/tags/type.
-        skip_enrichment:  Skip Step D.5 enrichment. Returns normalized JSONL path directly.
+        pdf_path:          Path to the input PDF file.
+        output_dir:        Directory to write all artifacts into.
+        extraction_model:  Ollama model for Step C (LLM extraction). (R-2.2)
+        enrichment_model:  Ollama model for Step D.5 (enrichment). (R-2.2)
+        ollama_url:        Ollama API base URL.
+        chunk_size:        Target chunk size in characters.
+        overlap:           Overlap characters between chunks.
+        max_chunks:        Limit LLM processing to first N chunks.
+        timeout:           Per-request LLM timeout in seconds.
+        skip_to:           Skip to step ('A'-'E'). Requires prior artifacts.
+        layout_mode:       PDF extraction backend ('pymupdf' or 'pdfplumber').
+        pass1_only:        Use Pass 1 prompt in Step C (source_quote + source_ref only).
+                           Default True — enrichment (Step D.5) fills in description/tags/type.
+        skip_enrichment:   Skip Step D.5 enrichment. Returns normalized JSONL path directly.
 
     Returns:
         Path to requirements_enriched.jsonl if enrichment ran, else
@@ -119,11 +121,12 @@ def run(
     if "C" in steps_to_run:
         log.info("=" * 60)
         log.info("Starting Step C (LLM Extraction%s)", " — Pass 1 mode" if pass1_only else "")
+        log.info("Step C — extraction model: %s", extraction_model)
         log.info("=" * 60)
         try:
             llm_extract_requirements.run(
                 str(chunks_path), str(out_dir),
-                model=model, ollama_url=ollama_url,
+                model=extraction_model, ollama_url=ollama_url,
                 timeout=timeout, max_chunks=max_chunks,
                 pass1_only=pass1_only,
             )
@@ -152,12 +155,13 @@ def run(
     if "D" in steps_to_run and not skip_enrichment:
         log.info("=" * 60)
         log.info("Starting Step D.5 (Enrich — Pass 2)")
+        log.info("Step D.5 — enrichment model: %s", enrichment_model)
         log.info("=" * 60)
         try:
             import enrich_requirements as _enrich_mod
             enrich_result = _enrich_mod.run(
                 str(norm_path), str(out_dir),
-                model=model, ollama_url=ollama_url, timeout=timeout,
+                model=enrichment_model, ollama_url=ollama_url, timeout=timeout,
             )
             index_path = Path(enrich_result)
         except Exception as e:
@@ -200,10 +204,24 @@ def main() -> None:
         help="Output directory for all artifacts. Default: documents/processed/<pdf_stem>_<timestamp>/",
     )
     parser.add_argument(
-        "--model",
+        "--extraction-model",
         type=str,
         default="llama3.1:8b-instruct-q4_K_M",
-        help="Ollama model name (default: llama3.1:8b-instruct-q4_K_M)",
+        dest="extraction_model",
+        help="Ollama model for Step C extraction (default: llama3.1:8b-instruct-q4_K_M)",
+    )
+    parser.add_argument(
+        "--enrichment-model",
+        type=str,
+        default="llama3.1:8b-instruct-q4_K_M",
+        dest="enrichment_model",
+        help="Ollama model for Step D.5 enrichment (default: llama3.1:8b-instruct-q4_K_M)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Convenience alias: sets both --extraction-model and --enrichment-model",
     )
     parser.add_argument(
         "--ollama-url",
@@ -285,11 +303,20 @@ def main() -> None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         out_dir = SCRIPTS_DIR.parent / "documents" / "processed" / f"{pdf_path.stem}_{timestamp}"
 
+    # --model is a convenience alias; individual flags take precedence when --model not given
+    if args.model:
+        extraction_model = args.model
+        enrichment_model = args.model
+    else:
+        extraction_model = args.extraction_model
+        enrichment_model = args.enrichment_model
+
     try:
         index_path = run(
             str(pdf_path),
             str(out_dir),
-            model=args.model,
+            extraction_model=extraction_model,
+            enrichment_model=enrichment_model,
             ollama_url=args.ollama_url,
             chunk_size=args.chunk_size,
             overlap=args.overlap,

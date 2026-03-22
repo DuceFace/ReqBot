@@ -41,7 +41,7 @@ GPT-4o is optional and off by default.
 | Work Package | Status | Description |
 |---|---|---|
 | WP-1: Structured Output Decoding | IN PROGRESS | Add `format: "json"` to Step C; few-shot examples in Pass 1 prompt |
-| WP-2: Model Configuration Split | NOT STARTED | `extraction_model` / `enrichment_model` in config.json; parallel with WP-1 |
+| WP-2: Model Configuration Split | IN PROGRESS | `extraction_model` / `enrichment_model` in config.json; parallel with WP-1 |
 | WP-3: Gold Evaluation Set | NOT STARTED | 300–500 hand-verified chunks; eval harness script; baseline metrics |
 | WP-4: Training Data Curation | NOT STARTED | SFT dataset from pipeline artifacts + gold corrections; only if WP-3 gate |
 | WP-5: Fine-Tuning + Integration | NOT STARTED | QLoRA Llama 3.1 8B; GGUF export; Ollama Modelfile; only if WP-4 gate |

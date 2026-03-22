@@ -27,6 +27,15 @@ GPT-4o is optional and off by default.
 | 11.3a — Embed source_quote | DONE 2026-03-19 | source_quote-first embedding; whitespace/empty guards; batch_size validation; reindex complete |
 | 11.3b — Extraction Prompt | DONE 2026-03-21 | Prompt rewrite with GOOD/BAD examples; requirement_type fallback "" not "guidance"; typed_count fix; IP filter in source_ref hints; chunked file hashing; full corpus re-ingestion complete |
 
+### Phase 12 — Verbatim-First Pipeline Overhaul (In Progress)
+
+| Subphase | Status | Description |
+|----------|--------|-------------|
+| 12.1 — Validation Gate | DONE 2026-03-21 | source_quote required at Step C/D/embed; description optional; display falls back to source_quote |
+| 12.4 — Bug Fixes (pulled forward) | DONE 2026-03-22 | Strategy 3 rfind fix; IP filter in scan_source_refs; dedup scoring to confidence*1000-len(quote); grc_context document_id mismatch (PR #5, PR #6) |
+| 12.2 — Two-Pass Extraction | TESTING PENDING | Pass 1 prompt (source_quote+source_ref only); enrich_requirements.py (Pass 2); --skip-enrichment flag; merged PR #7 |
+| 12.3 — Query-Time Descriptions | NOT STARTED | Remove description from ingestion; generate at query/evidence time |
+
 **Rule:** One subphase at a time. Complete → Gemini review → proceed.
 
 ---

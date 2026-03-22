@@ -194,6 +194,6 @@ more precise source_quotes for equal confidence.
 12.4 (deferred bug fixes) → DONE 2026-03-22  [pulled forward per Codex review]
   + grc_context document_id mismatch fix (ask --context broken) — PR #5
   + Strategy 3 rfind, IP filter, dedup scoring — PR #6
-12.2 (two-pass)           → NEXT
-12.3 (query-time descriptions) → after 12.2
+12.2 (two-pass)           → CODE MERGED 2026-03-22 (PR #7) — 3-doc test pending
+12.3 (query-time descriptions) → after 12.2 testing complete
 ```

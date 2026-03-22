@@ -40,14 +40,14 @@ GPT-4o is optional and off by default.
 
 | Work Package | Status | Description |
 |---|---|---|
-| WP-1: Structured Output Decoding | IN PROGRESS | Add `format: "json"` to Step C; few-shot examples in Pass 1 prompt |
-| WP-2: Model Configuration Split | IN PROGRESS | `extraction_model` / `enrichment_model` in config.json; parallel with WP-1 |
+| WP-1: Structured Output Decoding | DONE 2026-03-22 | `format: "json"` to Step C; 3 few-shot examples in Pass 1 prompt; Strategy 2 fallback logged |
+| WP-2: Model Configuration Split | DONE 2026-03-22 | `extraction_model` / `enrichment_model` in config/pipeline/CLI; cache scoped by model |
 | WP-3: Gold Evaluation Set | NOT STARTED | 300–500 hand-verified chunks; eval harness script; baseline metrics |
 | WP-4: Training Data Curation | NOT STARTED | SFT dataset from pipeline artifacts + gold corrections; only if WP-3 gate |
 | WP-5: Fine-Tuning + Integration | NOT STARTED | QLoRA Llama 3.1 8B; GGUF export; Ollama Modelfile; only if WP-4 gate |
 
-**Rule:** WP-1 and WP-2 may run in parallel. WP-3 follows WP-1. WP-4/5 only if WP-3 gate says tune.
-**Corpus re-ingest:** Deferred until WP-1 complete and accepted.
+**Rule:** WP-3 follows WP-1. WP-4/5 only if WP-3 gate says tune.
+**Corpus re-ingest:** Now unblocked — WP-1 complete. Run overnight before WP-3 eval baseline.
 
 ---
 

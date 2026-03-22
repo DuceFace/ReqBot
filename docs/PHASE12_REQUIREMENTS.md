@@ -181,17 +181,19 @@ more precise source_quotes for equal confidence.
 
 ### Deliverables
 
-- [ ] Fix Strategy 3 rfind truncation bug in `extract_json_array()`
-- [ ] Filter IP/version strings from `scan_source_refs()` hint candidates
-- [ ] Improve deduplication scoring to weight confidence and source_quote precision
+- [x] Fix Strategy 3 rfind truncation bug in `extract_json_array()`
+- [x] Filter IP/version strings from `scan_source_refs()` hint candidates
+- [x] Improve deduplication scoring to weight confidence and source_quote precision
 
 ---
 
 ## Execution Order
 
 ```
-12.1 (flip gate) → test → Gemini review
-12.2 (two-pass) → test → Gemini review
-12.3 (query-time descriptions) → test → Gemini review
-12.4 (deferred bug fixes) → test → Gemini review
+12.1 (flip gate)          → DONE 2026-03-21
+12.4 (deferred bug fixes) → DONE 2026-03-22  [pulled forward per Codex review]
+  + grc_context document_id mismatch fix (ask --context broken) — PR #5
+  + Strategy 3 rfind, IP filter, dedup scoring — PR #6
+12.2 (two-pass)           → NEXT
+12.3 (query-time descriptions) → after 12.2
 ```

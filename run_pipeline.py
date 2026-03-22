@@ -178,6 +178,12 @@ def main() -> None:
         help="Ollama API base URL",
     )
     parser.add_argument(
+        "--qdrant-url",
+        type=str,
+        default="http://192.168.30.153:6333",
+        help="Qdrant API base URL (used with --index; default: http://192.168.30.153:6333)",
+    )
+    parser.add_argument(
         "--chunk-size",
         type=int,
         default=3000,
@@ -251,11 +257,41 @@ def main() -> None:
 
     # Step F: Embed and index into Qdrant (optional)
     if args.index:
+        import json as _json
         import embed_and_index as _embed
+        import embed_context_index as _embed_ctx
+
         try:
-            _embed.run(norm_path)
+            _embed.run(norm_path, ollama_url=args.ollama_url, qdrant_url=args.qdrant_url)
         except Exception as e:
             log.warning("Qdrant indexing failed (%s) — pipeline artifacts are still available", e)
+
+        # Also index raw chunks into grc_context.
+        # Use the PDF-hash document_id from the normalized JSONL so that
+        # ask --context can resolve chunks by the same ID as requirements payloads.
+        out_dir_path = Path(norm_path).parent
+        chunk_files = list(out_dir_path.glob("*_chunks.jsonl"))
+        if chunk_files:
+            norm_doc_id: str | None = None
+            try:
+                with open(norm_path) as _nf:
+                    first_line = _nf.readline()
+                if first_line:
+                    norm_doc_id = _json.loads(first_line).get("document_id")
+            except Exception as e:
+                log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", norm_path, e)
+
+            try:
+                _embed_ctx.run(
+                    str(chunk_files[0]),
+                    document_id=norm_doc_id,
+                    ollama_url=args.ollama_url,
+                    qdrant_url=args.qdrant_url,
+                )
+            except Exception as e:
+                log.warning("Context indexing failed (%s) — requirements index is still available", e)
+        else:
+            log.warning("No chunks.jsonl found in %s — skipping context index", out_dir_path)
 
 
 if __name__ == "__main__":

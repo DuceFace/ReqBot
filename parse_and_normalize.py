@@ -161,22 +161,31 @@ def _dedup_score(req: dict) -> float:
 
 def deduplicate_requirements(requirements: list[dict]) -> list[dict]:
     """Remove duplicate requirements based on two keys:
-    1. source_ref + normalized description (original)
+    1. source_ref + normalized description (only when description is non-empty)
     2. source_ref + normalized source_quote (catches near-identical quotes)
 
     When duplicates exist, keep the higher-confidence record; for equal
     confidence, prefer the shorter (more precise) source_quote.
+
+    Note: desc_key is skipped when description is empty. In Pass 1 mode all
+    descriptions are empty, so using desc_key would collapse distinct requirements
+    that share a source_ref into a single record, dropping valid extractions.
     """
     seen: dict[str, dict] = {}
     for req in requirements:
-        # Two dedupe keys: description-based and quote-based
-        desc_key = f"{req.get('source_ref', '')}::desc::{normalize_text(req['description'])}"
+        source_ref = req.get("source_ref", "")
+        description = normalize_text(req.get("description", ""))
         quote = normalize_text(req.get("source_quote", ""))
-        quote_key = f"{req.get('source_ref', '')}::quote::{quote}" if quote else None
+
+        # Only build desc_key when description is non-empty; an empty description
+        # is not a meaningful dedupe signal and would cause false collisions in
+        # Pass 1 mode where all descriptions are intentionally absent.
+        desc_key = f"{source_ref}::desc::{description}" if description else None
+        quote_key = f"{source_ref}::quote::{quote}" if quote else None
 
         # Check if either key was seen
         existing_key = None
-        if desc_key in seen:
+        if desc_key and desc_key in seen:
             existing_key = desc_key
         elif quote_key and quote_key in seen:
             existing_key = quote_key
@@ -186,7 +195,8 @@ def deduplicate_requirements(requirements: list[dict]) -> list[dict]:
             if _dedup_score(req) > _dedup_score(existing):
                 seen[existing_key] = req
         else:
-            seen[desc_key] = req
+            if desc_key:
+                seen[desc_key] = req
             if quote_key:
                 seen[quote_key] = req
     # Deduplicate the values (a req may be stored under both keys)

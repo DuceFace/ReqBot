@@ -11,7 +11,7 @@
 |---|---|---|
 | WP-1: Structured Output Decoding | DONE 2026-03-22 | `format: "json"` + few-shot examples in Step C |
 | WP-2: Model Configuration Split | DONE 2026-03-22 | `extraction_model` / `enrichment_model` in config; cache scoped by model |
-| WP-3: Gold Evaluation Set | NOT STARTED | Prerequisite: WP-1 complete (eval baseline must reflect structured output) |
+| WP-3: Gold Evaluation Set | TOOLING DONE 2026-03-22 | eval/ scripts merged; manual curation (R-3.2) and baseline eval (R-3.5) pending |
 | WP-4: Training Data Curation | NOT STARTED | Only if WP-3 gate says precision/recall gap remains |
 | WP-5: Fine-Tuning and Integration | NOT STARTED | Only if WP-4 gate passed |
 

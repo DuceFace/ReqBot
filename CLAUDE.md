@@ -42,12 +42,13 @@ GPT-4o is optional and off by default.
 |---|---|---|
 | WP-1: Structured Output Decoding | DONE 2026-03-22 | `format: "json"` to Step C; 3 few-shot examples in Pass 1 prompt; Strategy 2 fallback logged |
 | WP-2: Model Configuration Split | DONE 2026-03-22 | `extraction_model` / `enrichment_model` in config/pipeline/CLI; cache scoped by model |
-| WP-3: Gold Evaluation Set | NOT STARTED | 300–500 hand-verified chunks; eval harness script; baseline metrics |
+| WP-3: Gold Evaluation Set | TOOLING DONE 2026-03-22 | eval/ scripts merged (select, seed, harness); manual curation + baseline eval pending |
 | WP-4: Training Data Curation | NOT STARTED | SFT dataset from pipeline artifacts + gold corrections; only if WP-3 gate |
 | WP-5: Fine-Tuning + Integration | NOT STARTED | QLoRA Llama 3.1 8B; GGUF export; Ollama Modelfile; only if WP-4 gate |
 
 **Rule:** WP-3 follows WP-1. WP-4/5 only if WP-3 gate says tune.
-**Corpus re-ingest:** Now unblocked — WP-1 complete. Run overnight before WP-3 eval baseline.
+**Corpus re-ingest:** Unblocked — WP-1 complete. Run overnight before WP-3 eval baseline.
+**WP-3 next steps:** (1) run `python3 eval/select_eval_chunks.py` to generate gold set; (2) run `python3 eval/seed_gold_set.py` to seed from Step C output; (3) Tyler hand-corrects `eval/gold_eval_chunks_seeded.jsonl`; (4) run `python3 eval/eval_harness.py` to record baseline metrics in `eval/results/`.
 
 ---
 

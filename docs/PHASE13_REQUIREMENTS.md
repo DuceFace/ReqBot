@@ -172,7 +172,16 @@ Phase 13 is organized as five work packages (WP). Each has a validation gate. Pa
 
 3. **R-4.3:** Overlay gold set corrections: for `chunk_ids` present in the gold eval set, replace the pipeline-generated target with the hand-corrected target.
 
-4. **R-4.4:** Apply quality filters: exclude training pairs where the pipeline confidence score is below 0.3, or where the chunk text is <200 characters (likely fragment noise).
+4. **R-4.4:** Apply quality filters using metrics derivable directly from Step C output (do not join to normalized JSONL — that would violate R-4.2). Exclude training pairs where:
+   - The chunk text is <200 characters (likely fragment noise), OR
+   - `source_quote` is empty or <20 characters (fragment; validation gate should have caught this, but guard anyway), OR
+   - `source_ref` is empty (no document location context — lower-confidence extraction)
+
+   > **Note:** The Step D `confidence` field is not available in `*_extracted_requirements.jsonl`
+   > and cannot be used here. The Step D confidence formula also deducts for empty `domain_tags`
+   > and `description`, which are always empty in Pass 1 mode — the threshold of 0.3 would never
+   > trigger for Pass 1 data regardless. The proxy filters above capture the same intent using
+   > fields that are actually present in Step C output.
 
 5. **R-4.5:** Output in Alpaca/ShareGPT JSON format compatible with Unsloth and axolotl. Include a held-out 10% validation split (stratified by document class).
 

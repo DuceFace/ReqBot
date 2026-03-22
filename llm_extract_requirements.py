@@ -128,17 +128,39 @@ _SOURCE_REF_PATTERNS = [
 _MAX_HINT_REFS = 20  # cap to avoid bloating the prompt
 
 
+def _is_ip_address(candidate: str) -> bool:
+    """Return True if candidate looks like an IPv4 address.
+
+    Filters out IP addresses that the dragnet numeric pattern captures but
+    that are useless as source_ref hints (e.g. 192.168.1.1 in network docs).
+    Checks for exactly 4 dot-separated segments each in [0, 255].
+    """
+    parts = candidate.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        return all(0 <= int(p) <= 255 for p in parts)
+    except ValueError:
+        return False
+
+
 def scan_source_refs(text: str) -> list[str]:
     """Regex-scan chunk text for candidate source references.
 
     Returns a deduplicated, sorted list of up to _MAX_HINT_REFS candidate
     ref strings found in the text. These are injected into the LLM prompt
     as hints to improve source_ref accuracy on the extracted requirements.
+
+    IPv4 addresses that match the dragnet numeric pattern are filtered out
+    to avoid wasting hint slots on noise in network-heavy documents.
     """
     candidates: set[str] = set()
     for pattern in _SOURCE_REF_PATTERNS:
         for match in pattern.finditer(text):
-            candidates.add(match.group().strip())
+            candidate = match.group().strip()
+            if _is_ip_address(candidate):
+                continue
+            candidates.add(candidate)
             if len(candidates) >= _MAX_HINT_REFS:
                 break
         if len(candidates) >= _MAX_HINT_REFS:
@@ -259,25 +281,39 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
             except json.JSONDecodeError:
                 pass
 
-    # Strategy 3: Handle truncated JSON arrays (LLM hit token limit)
-    # Find the last complete JSON object boundary and close the array
-    if start_idx is not None and start_idx != -1:
-        array_content = text[start_idx:]
-        # Find the last "}," or "}" that ends a complete object
-        last_obj_end = None
-        for pattern in ["},", "}\n"]:
-            idx = array_content.rfind(pattern)
-            if idx != -1:
-                candidate_end = idx + 1  # include the }
-                if last_obj_end is None or candidate_end > last_obj_end:
-                    last_obj_end = candidate_end
-        # Also try just "}" at end of a line
-        idx = array_content.rfind("}")
-        if idx != -1 and (last_obj_end is None or idx > last_obj_end):
-            last_obj_end = idx + 1
+    # Strategy 3: Handle truncated JSON arrays (LLM hit token limit).
+    # Walk forward from the opening '[' with full string-literal awareness to find
+    # the last complete top-level object boundary. This avoids the rfind("}") approach
+    # which has no awareness of '}' characters inside quoted string values.
+    if start_idx != -1:
+        s3_depth = 0
+        s3_in_string = False
+        s3_escape_next = False
+        last_obj_end = None  # index in `text` of last '}' that returned depth to 1
+
+        for i in range(start_idx, len(text)):
+            ch = text[i]
+            if s3_escape_next:
+                s3_escape_next = False
+                continue
+            if ch == "\\":
+                s3_escape_next = True
+                continue
+            if ch == '"':
+                s3_in_string = not s3_in_string
+                continue
+            if s3_in_string:
+                continue
+            if ch in ("[", "{"):
+                s3_depth += 1
+            elif ch in ("]", "}"):
+                s3_depth -= 1
+                if ch == "}" and s3_depth == 1:
+                    # Just closed a top-level object within the array
+                    last_obj_end = i
 
         if last_obj_end is not None:
-            truncated = array_content[:last_obj_end] + "]"
+            truncated = text[start_idx:last_obj_end + 1] + "]"
             try:
                 result = json.loads(truncated)
                 if isinstance(result, list):

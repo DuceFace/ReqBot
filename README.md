@@ -1,179 +1,298 @@
 # ReqBot
 
-Compliance Requirements Intelligence Engine — extracts, indexes, and queries cybersecurity requirements from regulatory PDFs using a local LLM (Ollama) and Qdrant hybrid vector search.
+ReqBot is a local-first compliance requirements intelligence engine. It extracts cybersecurity requirements from regulatory PDFs, stores the pipeline artifacts as JSONL, indexes the results into Qdrant, and provides a CLI and interactive shell for search, comparison, and evidence mapping.
 
-**Current corpus:** 45 documents, ~32,000 requirements indexed.
-See [INDEXED_DOCUMENTS.md](INDEXED_DOCUMENTS.md) for the full document inventory.
+Everything is designed to run on local infrastructure with Ollama + Qdrant. JSONL is the system of record; Qdrant is a rebuildable index.
 
-## Prerequisites
+**Current corpus:** 45 documents, about 32,000 indexed requirements. See [INDEXED_DOCUMENTS.md](INDEXED_DOCUMENTS.md) for the current inventory.
 
-- Python 3.12+ (system Python — no venv required)
-- Ollama running with the following models pulled:
-  - `llama3.1:8b-instruct-q4_K_M` — extraction + query rewriting
-  - `nomic-embed-text` — dense embeddings
-  - `qwen2.5:14b` — synthesis answers
-- Qdrant instance (local or remote)
-- Install deps: `pip3 install --break-system-packages -r requirements.txt`
+## What It Does
+
+- Extracts requirement statements from PDFs with a two-pass pipeline.
+- Uses structured JSON output in Step C to reduce parse failures.
+- Separates extraction and enrichment models so each stage can be tuned independently.
+- Supports hybrid retrieval over requirements plus optional raw chunk context lookup.
+- Rebuilds Qdrant from existing JSONL without re-running extraction.
+
+## Requirements
+
+- Python 3.12+
+- Ollama
+- Qdrant
+- Install dependencies:
+
+```bash
+pip3 install --break-system-packages -r requirements.txt
+```
+
+Recommended Ollama models:
+
+- `llama3.1:8b-instruct-q4_K_M` - Step C extraction and query rewriting
+- `nomic-embed-text` - dense embeddings
+- `qwen2.5:14b` - synthesis answers
 
 ## Setup
 
+Initialize config once:
+
 ```bash
-# First-time configuration
 reqbot init
 ```
 
-This prompts for your Ollama and Qdrant URLs and writes `~/.config/reqbot/config.json`.
+This writes `~/.config/reqbot/config.json`.
 
 ## Quick Start
 
 ```bash
-# Launch the interactive shell
+# Interactive shell
 reqbot
 
-# Single-command mode
+# Query indexed requirements
 reqbot ask "What are the access control requirements?"
 reqbot ask "encryption at rest" --synthesize --context
+
+# Inspect corpus / system state
 reqbot docs
 reqbot status
+
+# Ingest a PDF and index it
+reqbot ingest path/to/doc.pdf --index
 ```
 
-## CLI Reference
+## Core Commands
 
-### `ask` — Query indexed requirements
+### `ask`
+
+Search indexed requirements and optionally synthesize an answer.
 
 ```bash
 reqbot ask "question" [options]
-
-  --synthesize          Generate an LLM answer (default: retrieve-only)
-  --context             Enrich results with surrounding raw chunk text (grc_context)
-  --top-k N             Number of results (default: 20)
-  --min-score F         Minimum relevance score threshold (default: 0.02)
-  --model M             LLM for synthesis (default: qwen2.5:14b)
-  --domain-tag T        Filter by domain tag (repeatable)
-  --requirement-type T  Filter by requirement type (repeatable)
-  --document-id D       Filter by document (repeatable)
-  --json                Output as JSON
 ```
 
-### `ingest` — Extract and optionally index a PDF
+Common options:
+
+- `--synthesize` - generate an LLM answer instead of retrieval-only output
+- `--context` - attach surrounding raw chunk text from `grc_context`
+- `--top-k N` - number of results
+- `--min-score F` - minimum RRF score threshold
+- `--model M` - synthesis model
+- `--domain-tag T` - filter by domain tag, repeatable
+- `--requirement-type T` - filter by requirement type, repeatable
+- `--document-id D` - filter by document, repeatable
+- `--json` - emit JSON
+- `--no-rewrite` - disable query rewriting
+- `--rewrite-model M` - model for query rewriting
+
+### `ingest`
+
+Run the extraction pipeline on a single PDF.
 
 ```bash
 reqbot ingest <pdf> [options]
-
-  --index               Also embed and index into Qdrant after extraction
-  --layout-mode         PDF backend: pymupdf (default) or pdfplumber (table-aware)
-  --output-dir          Output directory (default: documents/processed/<stem>_<timestamp>/)
-  --model               Ollama extraction model (default: llama3.1:8b-instruct-q4_K_M)
-  --max-chunks N        Limit to first N chunks (for testing)
 ```
 
-### `batch` — Process an entire directory of PDFs
+Important options:
+
+- `--index` - also embed and index into Qdrant after extraction
+- `--layout-mode {pymupdf,pdfplumber}` - PDF extraction backend
+- `--output-dir DIR` - write artifacts to a specific directory
+- `--extraction-model M` - Step C model
+- `--enrichment-model M` - Step D.5 model
+- `--model M` - convenience alias that sets both extraction and enrichment models
+- `--skip-enrichment` - skip Pass 2 enrichment and index Pass 1 output directly
+- `--max-chunks N` - limit Step C processing for testing
+
+### `batch`
+
+Run the pipeline on every PDF in a directory.
 
 ```bash
-reqbot batch <pdf_dir> [--model M] [--layout-mode MODE]
+reqbot batch <pdf_dir> [options]
 ```
 
-Runs Steps A–E for every PDF in the directory. Run `reqbot reindex` after to embed and index.
+Supports the same model and enrichment flags as `ingest`.
 
-### `reindex` — Rebuild Qdrant from all existing JSONL (no re-extraction)
+### `reindex`
+
+Rebuild Qdrant from the most recent processed JSONL for each document.
 
 ```bash
 reqbot reindex
 ```
 
-Rebuilds from the most recent run per document. Uses atomic alias swap — live collection is untouched until all files succeed.
+This does not re-run extraction. It rebuilds from existing artifacts and uses an atomic alias swap.
 
-### `index` — Index an existing normalized JSONL
+### `index`
+
+Embed and index an existing normalized JSONL file.
 
 ```bash
 reqbot index <requirements_normalized.jsonl> [--recreate] [--batch-size N]
 ```
 
-### `index-context` — Index raw chunks into grc_context collection
+### `index-context`
+
+Embed and index Step B chunk text into the `grc_context` collection.
 
 ```bash
 reqbot index-context <chunks.jsonl> [--document-id ID] [--source-pdf NAME] [--recreate]
 ```
 
-### `compare` — Compare requirements across two documents
+### `compare`
+
+Compare requirements across two indexed documents.
 
 ```bash
 reqbot compare <doc_id_1> <doc_id_2> "topic"
 ```
 
-### `evidence` — Evidence mapping for a control or topic
+### `evidence`
+
+Generate evidence mappings for a topic or control.
 
 ```bash
 reqbot evidence "topic or control" [--domain-tag T] [--requirement-type T]
 ```
 
-### `docs` — List indexed documents
+### `docs`
+
+List indexed documents and requirement counts.
 
 ```bash
 reqbot docs
 ```
 
-Shows every indexed document with requirement count, extraction mode, and run date.
+### `status`
 
-### `status` — System health check
+Run a system health check.
 
 ```bash
 reqbot status
 ```
 
----
+## Pipeline Overview
 
-## Pipeline Steps
+ReqBot uses a two-pass extraction pipeline by default.
 
 | Step | Script | Input | Output | LLM? |
-|------|--------|-------|--------|------|
+|---|---|---|---|---|
 | A | `extract_pdf_to_text.py` | PDF | `*_pages.jsonl` | No |
-| B | `chunk_text.py` | pages.jsonl | `*_chunks.jsonl` | No |
-| C | `llm_extract_requirements.py` | chunks.jsonl | `*_extracted_requirements.jsonl` | Yes |
-| D | `parse_and_normalize.py` | extracted_requirements.jsonl | `*_requirements_normalized.jsonl` | No |
-| E | `aggregate_and_export.py` | requirements_normalized.jsonl | `*_final_output.json`, `*_stats.json` | No |
-| F | `embed_and_index.py` | requirements_normalized.jsonl | Qdrant `grc_requirements` | No |
-| F2 | `embed_context_index.py` | chunks.jsonl | Qdrant `grc_context` | No |
+| B | `chunk_text.py` | pages JSONL | `*_chunks.jsonl` | No |
+| C | `llm_extract_requirements.py` | chunks JSONL | `*_extracted_requirements.jsonl` | Yes |
+| D | `parse_and_normalize.py` | extracted requirements JSONL | `*_requirements_normalized.jsonl` | No |
+| D.5 | `enrich_requirements.py` | normalized JSONL | `*_requirements_enriched.jsonl` | Yes |
+| E | `aggregate_and_export.py` | normalized or enriched JSONL | `*_final_output.json`, `*_stats.json` | No |
+| F | `embed_and_index.py` | normalized or enriched JSONL | Qdrant `grc_requirements` | No |
+| F2 | `embed_context_index.py` | chunks JSONL | Qdrant `grc_context` | No |
 
-Steps F and F2 run automatically when `--index` is passed to `ingest`.
+Default behavior:
 
-## Layout-Aware Extraction (pdfplumber mode)
+- Step C runs in Pass 1 mode and extracts `source_quote` + `source_ref`.
+- Step D validates and deduplicates.
+- Step D.5 enriches with `description`, `domain_tags`, and `requirement_type`.
+- `reqbot ingest --index` indexes both requirements and chunk context after the pipeline completes.
 
-For documents with structured tables (e.g. DODIs, DoDMs), use `--layout-mode pdfplumber`:
+Advanced/legacy behavior:
 
-- Tables are detected, extracted as pipe-delimited rows, and wrapped in sentinel markers
-- Chunker avoids splitting mid-table
-- Falls back to PyMuPDF per-page if pdfplumber fails
+- `--skip-enrichment` keeps the pipeline in Pass 1 only.
+- standalone `run_pipeline.py --full-extraction` uses the older single-pass extraction path.
+
+## Layout-Aware Extraction
+
+Use `pdfplumber` mode for table-heavy documents such as DODIs and DoDMs:
 
 ```bash
 reqbot ingest "DODI 5200.01_vol2.pdf" --index --layout-mode pdfplumber
 ```
 
+This mode:
+
+- extracts tables as structured rows
+- preserves table boundaries during chunking
+- falls back per page if table extraction fails
+
+For prose-heavy NIST, AFI, and DAF documents, `pymupdf` remains the default.
+
 ## Qdrant Collections
 
 | Collection | Contents | Used By |
 |---|---|---|
-| `grc_requirements` | Extracted, normalized requirement statements | `ask` retrieval |
-| `grc_context` | Raw surrounding chunk text (Step B output) | `ask --context` enrichment |
+| `grc_requirements` | extracted requirements | `ask`, `compare`, `evidence` |
+| `grc_context` | raw chunk text from Step B | `ask --context` |
 
-Both use hybrid dense (768-dim cosine, nomic-embed-text) + sparse (BM25) vectors with RRF fusion.
-JSONL is the system of record — Qdrant is a rebuildable index.
+Both collections use hybrid dense + sparse retrieval with reciprocal rank fusion.
 
 ## Configuration
 
-Config is stored at `~/.config/reqbot/config.json` (written by `reqbot init`).
-Environment variables override config: `REQBOT_OLLAMA_URL`, `REQBOT_QDRANT_URL`, `REQBOT_TOP_K`, `REQBOT_MIN_SCORE`.
+Config lives at:
+
+```text
+~/.config/reqbot/config.json
+```
+
+Important fields:
+
+- `ollama_url`
+- `qdrant_url`
+- `default_model`
+- `extraction_model`
+- `enrichment_model`
+- `synthesis_model`
+- `top_k`
+- `min_score`
+
+Supported environment overrides:
+
+- `REQBOT_OLLAMA_URL`
+- `REQBOT_QDRANT_URL`
+- `REQBOT_DEFAULT_MODEL`
+- `REQBOT_EXTRACTION_MODEL`
+- `REQBOT_ENRICHMENT_MODEL`
+- `REQBOT_SYNTHESIS_MODEL`
+- `REQBOT_TOP_K`
+- `REQBOT_MIN_SCORE`
 
 ## Output Artifacts
 
+Typical processed output includes:
+
+```text
+*_pages.jsonl                    # Step A
+*_chunks.jsonl                   # Step B
+*_raw_responses.jsonl            # Raw Step C model responses
+*_extracted_requirements.jsonl   # Parsed Step C output
+*_parse_failures.jsonl           # Step C parse failures
+*_requirements_normalized.jsonl  # Step D validated + deduplicated records
+*_normalization_failures.jsonl   # Step D validation failures
+*_requirements_enriched.jsonl    # Step D.5 enriched records
+*_final_output.json              # Step E aggregate export
+*_stats.json                     # Step E metrics
 ```
-*_pages.jsonl                    # Raw page text (Step A)
-*_chunks.jsonl                   # Text chunks with page refs (Step B)
-*_raw_responses.jsonl            # Raw LLM responses (Step C)
-*_extracted_requirements.jsonl   # Parsed requirements (Step C)
-*_parse_failures.jsonl           # LLM responses that couldn't be parsed (Step C)
-*_requirements_normalized.jsonl  # Validated + deduplicated (Step D)
-*_normalization_failures.jsonl   # Requirements that failed validation (Step D)
-*_final_output.json              # Complete output with metadata (Step E)
-*_stats.json                     # Pipeline metrics (Step E)
+
+These artifacts are the durable source of record. If Qdrant needs to be rebuilt, use `reqbot reindex`.
+
+## Standalone Pipeline Usage
+
+For debugging or reruns, you can call the orchestrator directly:
+
+```bash
+python3 run_pipeline.py <pdf_path> [options]
 ```
+
+Useful flags:
+
+- `--skip-to {A,B,C,D,E}` - resume from an existing output directory
+- `--skip-enrichment` - stop after Step D
+- `--full-extraction` - use the legacy single-pass Step C prompt
+- `--extraction-model M`
+- `--enrichment-model M`
+- `--model M` - set both
+
+## Project Docs
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) - module map and data flows
+- [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
+- [INDEXED_DOCUMENTS.md](INDEXED_DOCUMENTS.md) - current corpus inventory
+- [CLAUDE.md](CLAUDE.md) - project phase status and agent workflow
+- [docs/PHASE13_REQUIREMENTS.md](docs/PHASE13_REQUIREMENTS.md) - Phase 13 extraction optimization plan
+- [docs/PHASE14_REQUIREMENTS.md](docs/PHASE14_REQUIREMENTS.md) - Phase 14 structure-aware chunking plan

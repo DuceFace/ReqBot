@@ -14,9 +14,10 @@ GPT-4o is optional and off by default.
 
 ---
 
-## Current Phase: 13 — Extraction Model Optimization
+## Current Phase: 14 — Structure-Aware Chunking
 
-**Plan:** `docs/PHASE13_REQUIREMENTS.md`
+**Plan:** `docs/PHASE14_REQUIREMENTS.md`
+**Previous phase plan:** `docs/PHASE13_REQUIREMENTS.md`
 
 ### Phase 11 — Core Quality Overhaul (COMPLETE 2026-03-21)
 
@@ -36,19 +37,30 @@ GPT-4o is optional and off by default.
 | 12.2 — Two-Pass Extraction | DONE 2026-03-22 | Pass 1 prompt (source_quote+source_ref only); enrich_requirements.py (Pass 2); --skip-enrichment flag; tested on DODI/NIST/AFI; merged PR #7 |
 | 12.3 — Query-Time Descriptions | DEFERRED | Superseded by Phase 13 WP-1; display deliverable done in 12.1; revisit after WP-3 eval baseline |
 
-### Phase 13 — Extraction Model Optimization (In Progress)
+### Phase 13 — Extraction Model Optimization (COMPLETE 2026-03-22, WP-3 paused)
 
 | Work Package | Status | Description |
 |---|---|---|
 | WP-1: Structured Output Decoding | DONE 2026-03-22 | `format: "json"` to Step C; 3 few-shot examples in Pass 1 prompt; Strategy 2 fallback logged |
 | WP-2: Model Configuration Split | DONE 2026-03-22 | `extraction_model` / `enrichment_model` in config/pipeline/CLI; cache scoped by model |
-| WP-3: Gold Evaluation Set | TOOLING DONE 2026-03-22 | eval/ scripts merged (select, seed, harness); manual curation + baseline eval pending |
-| WP-4: Training Data Curation | NOT STARTED | SFT dataset from pipeline artifacts + gold corrections; only if WP-3 gate |
-| WP-5: Fine-Tuning + Integration | NOT STARTED | QLoRA Llama 3.1 8B; GGUF export; Ollama Modelfile; only if WP-4 gate |
+| WP-3: Gold Evaluation Set | PAUSED | Tooling done (eval/ CSV export/import scripts); seeded 402-chunk gold set committed; curation paused — WP-3.3 review revealed upstream chunking defects. Resumes after Phase 14 artifacts regenerated. |
+| WP-4: Training Data Curation | BLOCKED | Blocked on WP-3, which is blocked on Phase 14 |
+| WP-5: Fine-Tuning + Integration | BLOCKED | Blocked on WP-4 |
 
-**Rule:** WP-3 follows WP-1. WP-4/5 only if WP-3 gate says tune.
-**Corpus re-ingest:** Unblocked — WP-1 complete. Run overnight before WP-3 eval baseline.
-**WP-3 next steps:** (1) run `python3 eval/select_eval_chunks.py` to generate gold set; (2) run `python3 eval/seed_gold_set.py` to seed from Step C output; (3) Tyler hand-corrects `eval/gold_eval_chunks_seeded.jsonl`; (4) run `python3 eval/eval_harness.py` to record baseline metrics in `eval/results/`.
+**WP-3 gold set state:** 402 chunks selected and seeded. CSV review workflow in place (`eval/export_gold_review_csv.py` → Excel → `eval/import_gold_review_csv.py`). Curation paused because seeded artifacts reflect the broken fixed-size chunker; curating them now grades chunk damage, not extraction quality. Resume after Phase 14 re-ingest.
+
+### Phase 14 — Structure-Aware Chunking (In Progress)
+
+| Work Package | Status | Description |
+|---|---|---|
+| WP-14.1: Section Header Parser | NOT STARTED | New `section_parser.py`; regex-based; 3 doc classes (NIST SP, AFI/DAF, DODI/DoDM); 80% target; clean graceful failure required |
+| WP-14.2: Structure-Aware Chunker | NOT STARTED | Rewrite `chunk_text.py`; paragraph-boundary atomic unit; breadcrumb prepended to chunk text |
+| WP-14.3: Schema + Normalization | NOT STARTED | Propagate `section_path`/`parent_ref`/`parent_context`/`child_refs` through Steps C→D→D.5→E; schema v2.0 |
+| WP-14.4: Full Re-ingest | NOT STARTED | 45-doc re-ingest; record baseline dir names in `docs/phase14_baseline_dirs.txt` before running |
+
+**Two decisions required before WP-14.1 starts (see Section 2.5 of plan):**
+1. **Decision A — Layout mode:** Run `extract_pdf_to_text.py` with both `--layout-mode pymupdf` and `--layout-mode pdfplumber` on `NIST.SP.800-53r5.pdf`; compare 10 control catalog pages; decide whether to standardize on pdfplumber everywhere.
+2. **Decision B — Paragraph boundary heuristic:** Must specify before WP-14.2 (candidate: double `\n\n`, or pdfplumber y-coordinate gap if Decision A = pdfplumber-everywhere).
 
 ---
 
@@ -101,7 +113,8 @@ Docs (read these, don't read source to answer these questions):
   INDEXED_DOCUMENTS.md     Live corpus inventory (45 docs, ~32k requirements)
   docs/PHASE11_REQUIREMENTS.md  Phase 11 plan (complete)
   docs/PHASE12_REQUIREMENTS.md  Phase 12 plan (complete)
-  docs/PHASE13_REQUIREMENTS.md  Current phase plan: extraction model optimization
+  docs/PHASE13_REQUIREMENTS.md  Phase 13 plan (complete; WP-3 paused)
+  docs/PHASE14_REQUIREMENTS.md  Current phase plan: structure-aware chunking
 ```
 
 ---
@@ -190,7 +203,8 @@ This means:
 
 ## What to Read Next
 
-- **For the current task (Phase 13):** `docs/PHASE13_REQUIREMENTS.md`
+- **For the current task (Phase 14):** `docs/PHASE14_REQUIREMENTS.md`
+- **For Phase 13 history:** `docs/PHASE13_REQUIREMENTS.md`
 - **To understand a command:** `README.md` CLI reference section
 - **To understand how modules connect:** `ARCHITECTURE.md`
 - **To add a command or pipeline step:** `CONTRIBUTING.md`

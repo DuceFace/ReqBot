@@ -87,8 +87,14 @@ class DocResult:
 
     # Docling chunks
     docling_chunk_count: int = 0
-    docling_chunk_samples: list = field(default_factory=list)  # list of dicts
+    toc_chunk_count: int = 0                              # ToC garbage chunks filtered out
+    docling_chunk_samples: list = field(default_factory=list)  # list of dicts (non-ToC only)
     docling_avg_chars: float = 0.0
+
+    # Parent-child reconstruction test
+    parent_child_groups: int = 0       # number of parent headings with 2+ children
+    parent_child_example: dict = field(default_factory=dict)
+    chunk_heading_dist: dict = field(default_factory=dict)  # {"0": N, "1": N, "2+": N}
 
     # Existing Step B chunks
     existing_chunk_count: int = 0
@@ -251,10 +257,31 @@ def _inspect_chunks(result: DocResult, doc) -> None:
     if not chunks:
         return
 
-    total_chars = sum(len(getattr(c, "text", "") or "") for c in chunks)
-    result.docling_avg_chars = round(total_chars / len(chunks), 0)
+    # Separate ToC chunks from content chunks
+    content_chunks = []
+    for c in chunks:
+        text = getattr(c, "text", "") or ""
+        if _is_toc_chunk(text):
+            result.toc_chunk_count += 1
+        else:
+            content_chunks.append(c)
 
-    for c in chunks[:5]:
+    if result.toc_chunk_count:
+        result.notes.append(
+            f"ToC filter: {result.toc_chunk_count} of {result.docling_chunk_count} chunks "
+            f"flagged as Table of Contents noise and excluded from samples"
+        )
+
+    # Stats based on all chunks (ToC excluded from avg to avoid skew)
+    if content_chunks:
+        total_chars = sum(len(getattr(c, "text", "") or "") for c in content_chunks)
+        result.docling_avg_chars = round(total_chars / len(content_chunks), 0)
+    else:
+        total_chars = sum(len(getattr(c, "text", "") or "") for c in chunks)
+        result.docling_avg_chars = round(total_chars / len(chunks), 0)
+
+    # Collect samples from content chunks (skip ToC garbage)
+    for c in content_chunks[:5]:
         text = getattr(c, "text", "") or ""
         meta = getattr(c, "meta", None)
         headings = []
@@ -268,6 +295,11 @@ def _inspect_chunks(result: DocResult, doc) -> None:
         # Bridge sample: map to Phase 14 schema shape
         if len(result.bridge_samples) < 3:
             result.bridge_samples.append(_bridge_chunk(c, len(result.bridge_samples)))
+
+    # Parent-child reconstruction test: run on ALL content chunks
+    result.parent_child_groups, result.parent_child_example, result.chunk_heading_dist = (
+        _find_parent_child_groups(content_chunks)
+    )
 
 
 def _bridge_chunk(chunk, idx: int) -> dict:
@@ -364,6 +396,93 @@ def _extract_section_ref(heading: str) -> str:
     return ""
 
 
+# Regex for lines that look like ToC entries: lots of dots, or line ending
+# with a bare page number.
+_TOC_LINE_RE = re.compile(r'\.{5,}|\s+\d{1,4}\s*$')
+
+
+def _is_toc_chunk(text: str) -> bool:
+    """
+    Heuristic: returns True if the chunk looks like a Table of Contents page.
+    A chunk is flagged as ToC if >40% of its non-empty lines match the ToC pattern
+    (series of dots, or line ending with a page number).
+    """
+    lines = [l for l in text.strip().splitlines() if l.strip()]
+    if not lines:
+        return False
+    toc_lines = sum(1 for l in lines if _TOC_LINE_RE.search(l))
+    return (toc_lines / len(lines)) > 0.4
+
+
+def _find_parent_child_groups(chunks) -> tuple[int, dict, dict]:
+    """
+    Scan all Docling chunks for parent-child heading ancestry relationships.
+
+    A parent-child group exists when multiple chunks share the same topmost
+    heading but differ in their deeper headings (i.e., the parent section has
+    multiple sub-paragraph children that Docling kept separate).
+
+    Also returns a heading-depth distribution so callers can detect the case
+    where HybridChunker only provides the immediate heading (not full ancestry).
+
+    Returns:
+        (group_count, best_example, heading_dist)
+        - group_count: number of parent headings with 2+ children
+        - best_example: dict describing the group with the most children
+        - heading_dist: {"0": N, "1": N, "2+": N} counts of heading list lengths
+    """
+    parent_groups: dict[str, list] = {}
+    depth_counts = {"0": 0, "1": 0, "2+": 0}
+
+    for c in chunks:
+        meta = getattr(c, "meta", None)
+        headings = list(getattr(meta, "headings", []) or []) if meta else []
+
+        # Track heading depth distribution
+        n = len(headings)
+        if n == 0:
+            depth_counts["0"] += 1
+        elif n == 1:
+            depth_counts["1"] += 1
+        else:
+            depth_counts["2+"] += 1
+
+        if len(headings) >= 2:
+            parent_key = headings[0]
+            if parent_key not in parent_groups:
+                parent_groups[parent_key] = []
+            parent_groups[parent_key].append({
+                "child_heading": headings[-1].strip() if len(headings) > 1 else None,
+                "full_ancestry": [h.strip() for h in headings],
+                "text_preview": truncate(getattr(c, "text", "") or "", 150),
+            })
+
+    # Only groups with 2+ children demonstrate actual parent-child linkage
+    multi_child = {k: v for k, v in parent_groups.items() if len(v) >= 2}
+    if not multi_child:
+        return 0, {}, depth_counts
+
+    best_key = max(multi_child, key=lambda k: len(multi_child[k]))
+    example = {
+        "parent_heading": best_key,
+        "child_count": len(multi_child[best_key]),
+        "children_sample": multi_child[best_key][:3],
+    }
+    return len(multi_child), example, depth_counts
+
+
+def _refs_are_real(bridge_samples: list) -> bool:
+    """
+    Returns True if at least one bridge sample has a section_ref_path where
+    all elements are non-empty strings.  [""] is falsy evidence — do not count it.
+    """
+    for s in bridge_samples:
+        refs = s.get("section_ref_path", [])
+        if refs and all(r.strip() for r in refs):
+            return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Comparison
 # ---------------------------------------------------------------------------
@@ -423,22 +542,54 @@ def judge(result: DocResult) -> None:
     else:
         result.chunk_verdict = "partial"
 
-    # Parent context: do Docling chunks carry heading metadata?
-    chunks_with_headings = sum(
-        1 for c in result.docling_chunk_samples if c.get("headings")
-    )
-    if chunks_with_headings >= 3:
-        result.parent_context_verdict = "pass"
-    elif chunks_with_headings >= 1:
+    # Parent-child context: grade on heading ancestry enabling parent-child grouping.
+    # NOTE: parent_context (clause body text) is always null in the bridge prototype;
+    # we cannot grade it "pass" just because headings are present.  A "partial" grade
+    # means ancestry metadata is present and enables parent-child linkage; deriving the
+    # full parent clause body still requires implementation work.
+    if result.parent_child_groups >= 2:
         result.parent_context_verdict = "partial"
+        result.notes.append(
+            f"parent_context_verdict=partial: {result.parent_child_groups} parent-child groups "
+            f"found via heading ancestry — linkage is derivable; parent clause body text "
+            f"(parent_context field) is not yet extracted in bridge prototype"
+        )
+    elif result.parent_child_groups == 1:
+        result.parent_context_verdict = "partial"
+        result.notes.append(
+            "parent_context_verdict=partial: 1 parent-child group found; "
+            "parent clause body text not yet extracted"
+        )
     else:
         result.parent_context_verdict = "fail"
+        # Distinguish: "no headings at all" vs "headings present but only immediate heading"
+        # The latter means HybridChunker is giving leaf headings only, not full ancestry.
+        only_one = result.chunk_heading_dist.get("1", 0)
+        has_two_plus = result.chunk_heading_dist.get("2+", 0)
+        if only_one > 0 and has_two_plus == 0:
+            result.notes.append(
+                f"parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading "
+                f"per chunk (not full ancestry path) — {only_one} chunks carry exactly 1 heading, "
+                f"0 carry 2+. Full ancestry requires traversal of the Docling document model "
+                f"(doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity "
+                f"that must be estimated before recommending Outcome A."
+            )
+        else:
+            result.notes.append(
+                "parent_context_verdict=fail: no multi-level heading groups found; "
+                "parent-child linkage cannot be demonstrated from this run"
+            )
 
-    # Bridge: did we produce schema-shaped output?
-    if result.bridge_samples and result.bridge_samples[0].get("section_ref_path"):
+    # Bridge: did we produce schema-shaped output with real (non-empty) section refs?
+    # [""] is truthy but is not evidence of canonical ref derivation — explicitly reject it.
+    if result.bridge_samples and _refs_are_real(result.bridge_samples):
         result.bridge_verdict = "pass"
     elif result.bridge_samples:
         result.bridge_verdict = "partial"
+        result.notes.append(
+            "bridge_verdict=partial: bridge samples produced but section_ref_path "
+            "contains only empty strings (headings present without numbered prefixes)"
+        )
     else:
         result.bridge_verdict = "fail"
 
@@ -509,8 +660,10 @@ def write_report(results: list[DocResult], out_dir: Path) -> Path:
         a("")
         a(f"| Metric | Existing Step B | Docling HybridChunker |")
         a(f"|---|---|---|")
-        a(f"| Chunk count | {r.existing_chunk_count} | {r.docling_chunk_count} |")
-        a(f"| Avg chars/chunk | {r.existing_avg_chars:.0f} | {r.docling_avg_chars:.0f} |")
+        a(f"| Chunk count (total) | {r.existing_chunk_count} | {r.docling_chunk_count} |")
+        a(f"| ToC chunks filtered | — | {r.toc_chunk_count} |")
+        a(f"| Content chunks | — | {r.docling_chunk_count - r.toc_chunk_count} |")
+        a(f"| Avg chars/chunk (content) | {r.existing_avg_chars:.0f} | {r.docling_avg_chars:.0f} |")
         a("")
 
         # Structure
@@ -559,10 +712,36 @@ def write_report(results: list[DocResult], out_dir: Path) -> Path:
             a("```")
             a("")
 
+        # Parent-child reconstruction test
+        a("### Parent-Child Reconstruction Test")
+        a("")
+        a(f"**Verdict: {r.parent_context_verdict}**")
+        a(f"**Parent-child groups (2+ children sharing ancestry): {r.parent_child_groups}**")
+        dist = r.chunk_heading_dist
+        a(f"**Chunk heading depth distribution:** "
+          f"no heading: {dist.get('0',0)}, "
+          f"1 heading (immediate only): {dist.get('1',0)}, "
+          f"2+ headings (full ancestry): {dist.get('2+',0)}")
+        a("")
+        if r.parent_child_example:
+            ex = r.parent_child_example
+            a(f"Best example — parent heading: `{ex.get('parent_heading', '?')}`  "
+              f"({ex.get('child_count', 0)} children)")
+            a("")
+            for i, child in enumerate(ex.get("children_sample", [])):
+                a(f"  Child {i+1}: ancestry = {child.get('full_ancestry', [])}")
+                a(f"  Preview: {child.get('text_preview', '')[:120]}")
+                a("")
+        else:
+            a("No multi-level heading groups found — parent-child linkage not demonstrated.")
+            a("")
+        a("> NOTE: `parent_context` (parent clause body text) is always null in this bridge "
+          "prototype. The parent-child verdict grades ancestry metadata only.")
+        a("")
+
         # Bridge
         a("### Bridge Prototype (Phase 14 Schema Shape)")
         a("")
-        a(f"**Parent context verdict: {r.parent_context_verdict}**")
         a(f"**Bridge verdict: {r.bridge_verdict}**")
         a("")
         for i, b in enumerate(r.bridge_samples):
@@ -645,8 +824,12 @@ def save_artifacts(result: DocResult, out_dir: Path) -> None:
         "heading_samples": result.heading_samples,
         "table_samples": result.table_samples,
         "docling_chunk_count": result.docling_chunk_count,
+        "toc_chunk_count": result.toc_chunk_count,
         "docling_avg_chars": result.docling_avg_chars,
         "docling_chunk_samples": result.docling_chunk_samples,
+        "parent_child_groups": result.parent_child_groups,
+        "parent_child_example": result.parent_child_example,
+        "chunk_heading_dist": result.chunk_heading_dist,
         "existing_chunk_count": result.existing_chunk_count,
         "existing_avg_chars": result.existing_avg_chars,
         "existing_chunk_samples": result.existing_chunk_samples,
@@ -666,6 +849,16 @@ def save_artifacts(result: DocResult, out_dir: Path) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+def _positive_int(value: str) -> int:
+    try:
+        ivalue = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an integer")
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f"--max-pages must be a positive integer, got {ivalue}")
+    return ivalue
+
+
 def main():
     parser = argparse.ArgumentParser(description="Docling spike evaluation for Phase 14")
     parser.add_argument(
@@ -676,9 +869,9 @@ def main():
     )
     parser.add_argument(
         "--max-pages",
-        type=int,
+        type=_positive_int,
         default=None,
-        help="Limit PDF to first N pages (faster for testing)"
+        help="Limit PDF to first N pages (must be > 0; faster for testing)"
     )
     parser.add_argument(
         "--out-dir",

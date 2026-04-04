@@ -3,7 +3,7 @@
   "doc_class": "afi_daf",
   "docling_ok": true,
   "docling_error": "",
-  "convert_seconds": 73.5,
+  "convert_seconds": 73.1,
   "total_items": 237,
   "heading_items": 29,
   "table_items": 3,
@@ -97,7 +97,8 @@
     "|   5 | Review and coordinate tentative AFJQS/AFQTP                      |    | X   | X   | X   |\n|-----|------------------------------------------------------------------|----|-----|-----|-----|\n|   6 | Prepare final AFJQS/ AFQTP                                       |    |     | X   |     |\n|   7 | Approve final AFJQS/ AFQTP and if applicable, sign AF673         | X  |     |     |     |\n|   8 | …"
   ],
   "docling_chunk_count": 69,
-  "docling_avg_chars": 663.0,
+  "toc_chunk_count": 10,
+  "docling_avg_chars": 682.0,
   "docling_chunk_samples": [
     {
       "text_preview": "BY ORDER OF THE SECRETARY OF THE AIR FORCE\nAIR FORCE MANUAL 17-204\n26 FEBRUARY 2020\nCyberspace\nAIR FORCE ON-THE-JOB TRAINING PRODUCTS FOR CYBER SUPPORT ENLISTED SPECIALTY TRAINING",
@@ -133,6 +134,13 @@
       ]
     }
   ],
+  "parent_child_groups": 0,
+  "parent_child_example": {},
+  "chunk_heading_dist": {
+    "0": 1,
+    "1": 58,
+    "2+": 0
+  },
   "existing_chunk_count": 16,
   "existing_avg_chars": 2837.0,
   "existing_chunk_samples": [
@@ -200,10 +208,13 @@
   ],
   "structure_verdict": "pass",
   "chunk_verdict": "pass",
-  "parent_context_verdict": "pass",
+  "parent_context_verdict": "fail",
   "bridge_verdict": "partial",
-  "overall_verdict": "PASS",
+  "overall_verdict": "PARTIAL PASS",
   "notes": [
-    "Existing Step B: 16 chunks, avg 2837 chars, ~88% end without sentence terminator (rough mid-split proxy)"
+    "Existing Step B: 16 chunks, avg 2837 chars, ~88% end without sentence terminator (rough mid-split proxy)",
+    "ToC filter: 10 of 69 chunks flagged as Table of Contents noise and excluded from samples",
+    "parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading per chunk (not full ancestry path) — 58 chunks carry exactly 1 heading, 0 carry 2+. Full ancestry requires traversal of the Docling document model (doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity that must be estimated before recommending Outcome A.",
+    "bridge_verdict=partial: bridge samples produced but section_ref_path contains only empty strings (headings present without numbered prefixes)"
   ]
 }

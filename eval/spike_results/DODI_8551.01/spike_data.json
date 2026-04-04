@@ -3,7 +3,7 @@
   "doc_class": "dodi_dodm",
   "docling_ok": true,
   "docling_error": "",
-  "convert_seconds": 22.7,
+  "convert_seconds": 22.8,
   "total_items": 164,
   "heading_items": 24,
   "table_items": 3,
@@ -97,7 +97,8 @@
     "| TERM                              | DEFINITION                                                                                                                                                                                                                                                                                   |\n|-----------------------------------|--------------------------------------…"
   ],
   "docling_chunk_count": 53,
-  "docling_avg_chars": 547.0,
+  "toc_chunk_count": 19,
+  "docling_avg_chars": 680.0,
   "docling_chunk_samples": [
     {
       "text_preview": "Originating Component:\nOffice of the DoD Chief Information Officer\nEffective:\nMay 31, 2023\nReleasability:\nCleared for public release.  Available on the Directives Division Website at https://www.esd.whs.mil/DD/.\nReissues and Cancels:\nDoD Instruction 8551.01, 'Ports, Protocols, and Services Management (PPSM),' May 28, 2014\nApproved by:\nJohn B. Sherman, DoD Chief Information Officer\nPurpose: In acco…",
@@ -114,27 +115,34 @@
       ]
     },
     {
-      "text_preview": "SECTION 1: GENERAL ISSUANCE INFORMATION .............................................................................. 3 = 1.1. Applicability. .................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION",
-      "char_count": 303,
+      "text_preview": "- a.  This issuance:\n- (1)  Applies to OSD, the Military Departments (including the Coast Guard at all times, including when it is a Service in the Department of Homeland Security by agreement with that Department), the Office of the Chairman of the Joint Chiefs of Staff (CJCS) and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense (OIG DoD), the …",
+      "char_count": 936,
       "headings": [
-        "TABLE OF CONTENTS"
+        "1.1.  APPLICABILITY."
       ]
     },
     {
-      "text_preview": ".............................................................................. 3 = 1.2. Policy. ............................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION",
-      "char_count": 268,
+      "text_preview": "- b.  Nothing in this issuance will infringe on the OIG DoD's statutory independence and authority as articulated in the Inspector General Act of 1978, as amended, in the Appendix of Title 5, United States Code, referred to in this issuance as the 'Inspector General Act.'  In the event of any conflict between this issuance and the OIG DoD's statutory independence and authority, the Inspector Gener…",
+      "char_count": 424,
       "headings": [
-        "TABLE OF CONTENTS"
+        "1.1.  APPLICABILITY."
       ]
     },
     {
-      "text_preview": ".............................................................................. 3 = SECTION 2: RESPONSIBILITIES ......................................................................................................... 4. SECTION 1: GENERAL ISSUANCE INFORMATION",
-      "char_count": 261,
+      "text_preview": "All PPS used throughout planned, newly developed, acquired, and existing DODIN (whether used internal or external to the enclave); DoD information technology; organic cloud computing; and managed data services must:\n- a.  Be limited to only PPS required to conduct official business or needed to address quality of life issues authorized by the competent authority.\n- b.  Be declared, including their…",
+      "char_count": 733,
       "headings": [
-        "TABLE OF CONTENTS"
+        "1.2.  POLICY."
       ]
     }
   ],
+  "parent_child_groups": 0,
+  "parent_child_example": {},
+  "chunk_heading_dist": {
+    "0": 0,
+    "1": 34,
+    "2+": 0
+  },
   "existing_chunk_count": 10,
   "existing_avg_chars": 2915.0,
   "existing_chunk_samples": [
@@ -189,27 +197,29 @@
     },
     {
       "chunk_id": 2,
-      "page_start": 2,
-      "page_end": 2,
-      "text": "[TABLE OF CONTENTS]\n\n\nSECTION 1: GENERAL ISSUANCE INFORMATION .............................................................................. 3 = 1.1. Applicability. .................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION",
-      "raw_text": "SECTION 1: GENERAL ISSUANCE INFORMATION .............................................................................. 3 = 1.1. Applicability. .................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION",
-      "breadcrumb": "TABLE OF CONTENTS",
+      "page_start": 3,
+      "page_end": 3,
+      "text": "[1.1.  APPLICABILITY.]\n\n- a.  This issuance:\n- (1)  Applies to OSD, the Military Departments (including the Coast Guard at all times, including when it is a Service in the Department of Homeland Security by agreement with that Department), the Office of the Chairman of the Joint Chiefs of Staff (CJCS) and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense (OIG DoD), the Defense Agencies, the DoD Field Activities, and all other organizational entities within the DoD (referred to collectively in this issuance as the 'DoD Components.')\n- (2)  Doe…",
+      "raw_text": "- a.  This issuance:\n- (1)  Applies to OSD, the Military Departments (including the Coast Guard at all times, including when it is a Service in the Department of Homeland Security by agreement with that Department), the Office of the Chairman of the Joint Chiefs of Staff (CJCS) and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense (OIG DoD), the …",
+      "breadcrumb": "1.1.  APPLICABILITY.",
       "section_ref_path": [
-        ""
+        "1.1"
       ],
       "section_title_path": [
-        "TABLE OF CONTENTS"
+        "1.1.  APPLICABILITY."
       ],
-      "parent_header_text": "TABLE OF CONTENTS",
+      "parent_header_text": "1.1.  APPLICABILITY.",
       "parent_context": null
     }
   ],
   "structure_verdict": "pass",
   "chunk_verdict": "pass",
-  "parent_context_verdict": "pass",
+  "parent_context_verdict": "fail",
   "bridge_verdict": "pass",
   "overall_verdict": "PASS",
   "notes": [
-    "Existing Step B: 10 chunks, avg 2915 chars, ~90% end without sentence terminator (rough mid-split proxy)"
+    "Existing Step B: 10 chunks, avg 2915 chars, ~90% end without sentence terminator (rough mid-split proxy)",
+    "ToC filter: 19 of 53 chunks flagged as Table of Contents noise and excluded from samples",
+    "parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading per chunk (not full ancestry path) — 34 chunks carry exactly 1 heading, 0 carry 2+. Full ancestry requires traversal of the Docling document model (doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity that must be estimated before recommending Outcome A."
   ]
 }

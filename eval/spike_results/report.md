@@ -9,30 +9,32 @@
 
 | Document | Class | Overall | Structure | Chunks | Parent Context | Bridge |
 |---|---|---|---|---|---|---|
-| NIST.SP.800-128 | nist_sp | **PASS** | pass | pass | pass | pass |
-| DODI 8551.01 | dodi_dodm | **PASS** | pass | pass | pass | pass |
-| afman17-204 | afi_daf | **PASS** | pass | pass | pass | partial |
+| NIST.SP.800-128 | nist_sp | **PARTIAL PASS** | pass | pass | fail | partial |
+| DODI 8551.01 | dodi_dodm | **PASS** | pass | pass | fail | pass |
+| afman17-204 | afi_daf | **PARTIAL PASS** | pass | pass | fail | partial |
 
 ---
 
 ## NIST.SP.800-128 (nist_sp)
 
-**Conversion time:** 80.2s
-**Overall verdict:** PASS
+**Conversion time:** 158.1s
+**Overall verdict:** PARTIAL PASS
 
 ### Step B Comparison
 
 | Metric | Existing Step B | Docling HybridChunker |
 |---|---|---|
-| Chunk count | 103 | 213 |
-| Avg chars/chunk | 2969 | 749 |
+| Chunk count (total) | 103 | 364 |
+| ToC chunks filtered | — | 25 |
+| Content chunks | — | 339 |
+| Avg chars/chunk (content) | 2969 | 739 |
 
 ### Structure Quality
 
-- Total document items: 606
-- Heading items detected: 82
-- Table items detected: 8
-- Text/paragraph items: 486
+- Total document items: 1020
+- Heading items detected: 145
+- Table items detected: 33
+- Text/paragraph items: 782
 - Max heading depth: 3
 - **Verdict: pass**
 
@@ -63,7 +65,7 @@
 
 ### Table Extraction
 
-Tables detected: 8
+Tables detected: 33
 
 **Table 1 preview:**
 ```
@@ -136,10 +138,19 @@ All comments are subject to release under the Freedom of Information Act (FOIA).
 _______________________________________________________________________________________________
 ```
 
+### Parent-Child Reconstruction Test
+
+**Verdict: fail**
+**Parent-child groups (2+ children sharing ancestry): 0**
+**Chunk heading depth distribution:** no heading: 0, 1 heading (immediate only): 339, 2+ headings (full ancestry): 0
+
+No multi-level heading groups found — parent-child linkage not demonstrated.
+
+> NOTE: `parent_context` (parent clause body text) is always null in this bridge prototype. The parent-child verdict grades ancestry metadata only.
+
 ### Bridge Prototype (Phase 14 Schema Shape)
 
-**Parent context verdict: pass**
-**Bridge verdict: pass**
+**Bridge verdict: partial**
 
 **Bridge chunk 1:**
 ```json
@@ -244,20 +255,25 @@ an integral part of an organization’s overall configuration management. The…
 ### Notes
 
 - Existing Step B: 103 chunks, avg 2969 chars, ~93% end without sentence terminator (rough mid-split proxy)
+- ToC filter: 25 of 364 chunks flagged as Table of Contents noise and excluded from samples
+- parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading per chunk (not full ancestry path) — 339 chunks carry exactly 1 heading, 0 carry 2+. Full ancestry requires traversal of the Docling document model (doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity that must be estimated before recommending Outcome A.
+- bridge_verdict=partial: bridge samples produced but section_ref_path contains only empty strings (headings present without numbered prefixes)
 
 ---
 
 ## DODI 8551.01 (dodi_dodm)
 
-**Conversion time:** 22.7s
+**Conversion time:** 22.8s
 **Overall verdict:** PASS
 
 ### Step B Comparison
 
 | Metric | Existing Step B | Docling HybridChunker |
 |---|---|---|
-| Chunk count | 10 | 53 |
-| Avg chars/chunk | 2915 | 547 |
+| Chunk count (total) | 10 | 53 |
+| ToC chunks filtered | — | 19 |
+| Content chunks | — | 34 |
+| Avg chars/chunk (content) | 2915 | 680 |
 
 ### Structure Quality
 
@@ -346,27 +362,39 @@ Purpose: In acco…
 - Prescribes PPS management (PPSM) support requirements for configuration management, continuous monito…
 ```
 
-**Chunk 3** (303 chars)
-  Headings: TABLE OF CONTENTS
+**Chunk 3** (936 chars)
+  Headings: 1.1.  APPLICABILITY.
 ```
-SECTION 1: GENERAL ISSUANCE INFORMATION .............................................................................. 3 = 1.1. Applicability. .................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION
-```
-
-**Chunk 4** (268 chars)
-  Headings: TABLE OF CONTENTS
-```
-.............................................................................. 3 = 1.2. Policy. ............................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION
+- a.  This issuance:
+- (1)  Applies to OSD, the Military Departments (including the Coast Guard at all times, including when it is a Service in the Department of Homeland Security by agreement with that Department), the Office of the Chairman of the Joint Chiefs of Staff (CJCS) and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense (OIG DoD), the …
 ```
 
-**Chunk 5** (261 chars)
-  Headings: TABLE OF CONTENTS
+**Chunk 4** (424 chars)
+  Headings: 1.1.  APPLICABILITY.
 ```
-.............................................................................. 3 = SECTION 2: RESPONSIBILITIES ......................................................................................................... 4. SECTION 1: GENERAL ISSUANCE INFORMATION
+- b.  Nothing in this issuance will infringe on the OIG DoD's statutory independence and authority as articulated in the Inspector General Act of 1978, as amended, in the Appendix of Title 5, United States Code, referred to in this issuance as the 'Inspector General Act.'  In the event of any conflict between this issuance and the OIG DoD's statutory independence and authority, the Inspector Gener…
 ```
+
+**Chunk 5** (733 chars)
+  Headings: 1.2.  POLICY.
+```
+All PPS used throughout planned, newly developed, acquired, and existing DODIN (whether used internal or external to the enclave); DoD information technology; organic cloud computing; and managed data services must:
+- a.  Be limited to only PPS required to conduct official business or needed to address quality of life issues authorized by the competent authority.
+- b.  Be declared, including their…
+```
+
+### Parent-Child Reconstruction Test
+
+**Verdict: fail**
+**Parent-child groups (2+ children sharing ancestry): 0**
+**Chunk heading depth distribution:** no heading: 0, 1 heading (immediate only): 34, 2+ headings (full ancestry): 0
+
+No multi-level heading groups found — parent-child linkage not demonstrated.
+
+> NOTE: `parent_context` (parent clause body text) is always null in this bridge prototype. The parent-child verdict grades ancestry metadata only.
 
 ### Bridge Prototype (Phase 14 Schema Shape)
 
-**Parent context verdict: pass**
 **Bridge verdict: pass**
 
 **Bridge chunk 1:**
@@ -413,18 +441,18 @@ SECTION 1: GENERAL ISSUANCE INFORMATION ........................................
 ```json
 {
   "chunk_id": 2,
-  "page_start": 2,
-  "page_end": 2,
-  "text": "[TABLE OF CONTENTS]\n\n\nSECTION 1: GENERAL ISSUANCE INFORMATION .............................................................................. 3 = 1.1. Applicability. .................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION",
-  "raw_text": "SECTION 1: GENERAL ISSUANCE INFORMATION .............................................................................. 3 = 1.1. Applicability. .................................................................................................................... 3. SECTION 1: GENERAL ISSUANCE INFORMATION",
-  "breadcrumb": "TABLE OF CONTENTS",
+  "page_start": 3,
+  "page_end": 3,
+  "text": "[1.1.  APPLICABILITY.]\n\n- a.  This issuance:\n- (1)  Applies to OSD, the Military Departments (including the Coast Guard at all times, including when it is a Service in the Department of Homeland Security by agreement with that Department), the Office of the Chairman of the Joint Chiefs of Staff (CJCS) and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense (OIG DoD), the Defense Agencies, the DoD Field Activities, and all other organizational entities within the DoD (referred to collectively in this issuance as the 'DoD Components.')\n- (2)  Doe…",
+  "raw_text": "- a.  This issuance:\n- (1)  Applies to OSD, the Military Departments (including the Coast Guard at all times, including when it is a Service in the Department of Homeland Security by agreement with that Department), the Office of the Chairman of the Joint Chiefs of Staff (CJCS) and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense (OIG DoD), the …",
+  "breadcrumb": "1.1.  APPLICABILITY.",
   "section_ref_path": [
-    ""
+    "1.1"
   ],
   "section_title_path": [
-    "TABLE OF CONTENTS"
+    "1.1.  APPLICABILITY."
   ],
-  "parent_header_text": "TABLE OF CONTENTS",
+  "parent_header_text": "1.1.  APPLICABILITY.",
   "parent_context": null
 }
 ```
@@ -463,20 +491,24 @@ a. Be…
 ### Notes
 
 - Existing Step B: 10 chunks, avg 2915 chars, ~90% end without sentence terminator (rough mid-split proxy)
+- ToC filter: 19 of 53 chunks flagged as Table of Contents noise and excluded from samples
+- parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading per chunk (not full ancestry path) — 34 chunks carry exactly 1 heading, 0 carry 2+. Full ancestry requires traversal of the Docling document model (doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity that must be estimated before recommending Outcome A.
 
 ---
 
 ## afman17-204 (afi_daf)
 
-**Conversion time:** 73.5s
-**Overall verdict:** PASS
+**Conversion time:** 73.1s
+**Overall verdict:** PARTIAL PASS
 
 ### Step B Comparison
 
 | Metric | Existing Step B | Docling HybridChunker |
 |---|---|---|
-| Chunk count | 16 | 69 |
-| Avg chars/chunk | 2837 | 663 |
+| Chunk count (total) | 16 | 69 |
+| ToC chunks filtered | — | 10 |
+| Content chunks | — | 59 |
+| Avg chars/chunk (content) | 2837 | 682 |
 
 ### Structure Quality
 
@@ -600,9 +632,18 @@ This document has been substantially revised from an AFI to an AFMAN and must be
 9
 ```
 
+### Parent-Child Reconstruction Test
+
+**Verdict: fail**
+**Parent-child groups (2+ children sharing ancestry): 0**
+**Chunk heading depth distribution:** no heading: 1, 1 heading (immediate only): 58, 2+ headings (full ancestry): 0
+
+No multi-level heading groups found — parent-child linkage not demonstrated.
+
+> NOTE: `parent_context` (parent clause body text) is always null in this bridge prototype. The parent-child verdict grades ancestry metadata only.
+
 ### Bridge Prototype (Phase 14 Schema Shape)
 
-**Parent context verdict: pass**
 **Bridge verdict: partial**
 
 **Bridge chunk 1:**
@@ -712,16 +753,19 @@ functional relationships, and responsibilities that form the foundation for the 
 ### Notes
 
 - Existing Step B: 16 chunks, avg 2837 chars, ~88% end without sentence terminator (rough mid-split proxy)
+- ToC filter: 10 of 69 chunks flagged as Table of Contents noise and excluded from samples
+- parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading per chunk (not full ancestry path) — 58 chunks carry exactly 1 heading, 0 carry 2+. Full ancestry requires traversal of the Docling document model (doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity that must be estimated before recommending Outcome A.
+- bridge_verdict=partial: bridge samples produced but section_ref_path contains only empty strings (headings present without numbered prefixes)
 
 ---
 
 ## Recommendation
 
-Results across 3 document classes: 3 PASS / 0 PARTIAL PASS / 0 FAIL
+Results across 3 document classes: 1 PASS / 2 PARTIAL PASS / 0 FAIL
 
-**Preliminary recommendation: Outcome A or B (adopt or hybrid)**
+**Preliminary recommendation: Outcome B (hybrid)**
 
-Docling shows material improvement. Recommend proceeding with integration.
-Verify whether canonical section ID derivation is tractable before committing fully.
+Docling provides structural improvement on most doc classes but needs
+deterministic post-processing for canonical section ID derivation.
 
 *Human review required — scores above are heuristic. Read the samples.*

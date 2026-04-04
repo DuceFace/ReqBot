@@ -94,27 +94,19 @@ These decisions should be locked before WP-14.1 or WP-14.2 code is written.
 
 ### 5.1 Decision A - Layout Mode Strategy
 
-Decide whether the pipeline should:
+**RESOLVED — MOOT 2026-04-04**
 
-- standardize on `pdfplumber` for all document classes, or
-- keep a per-class extraction split and normalize both outputs into a common structure layer
-
-Required check:
-
-- compare `pymupdf` vs `pdfplumber` output on a high-risk multi-column NIST document such as `NIST.SP.800-53r5.pdf`
-- confirm whether `pdfplumber` output is coherent enough to be a universal default
+Docling replaces `extract_pdf_to_text.py` as the primary parsing backend for structure-aware chunking. The pymupdf vs pdfplumber comparison is no longer required. Docling handles layout detection internally across all document classes.
 
 ### 5.2 Decision B - Paragraph Boundary Rule
 
-Choose one primary paragraph-boundary strategy:
+**RESOLVED — MOOT 2026-04-04**
 
-- blank-line based
-- layout-gap based
-- hybrid
-
-This decision must be explicit because the chunker behavior depends on it.
+Docling `HybridChunker` handles paragraph boundary detection internally. The blank-line vs layout-gap decision is no longer required. Custom boundary logic was the fallback plan; it is not needed under Outcome B.
 
 ### 5.3 Decision C - Parent Context Scope
+
+**STILL REQUIRED before WP-14.1/14.2 implementation begins.**
 
 Lock the definition of parent context before implementation. It should not drift package by package.
 
@@ -128,89 +120,84 @@ If the parent clause body cannot be isolated cleanly, fall back to the immediate
 
 ## 6. Work Packages
 
-### 6.1 WP-14.1: Section Parser
+### 6.1 WP-14.1: Docling Integration + Ancestry Traversal
 
-**Goal:** deterministically parse structural hierarchy from Step A page text.
+**Goal:** replace `extract_pdf_to_text.py` + regex section parser with Docling as the primary structural parsing backend, and build a deterministic ancestry map from the Docling document model.
 
-**Primary output:** a structured section map for each document.
+**Implementation approach:** Outcome B (hybrid) confirmed by Docling spike 2026-04-04.
+
+**Primary output:** a structured section ancestry map per document, consumable by WP-14.2.
 
 #### Requirements
 
-1. Parse document-class-specific section patterns for:
-   - NIST SP
-   - AFI/DAFI/DAFPAM/DAFMAN
-   - DODI/DoDM
+1. Use `docling.document_converter.DocumentConverter` to parse each PDF. Replace the current Step A text extraction for the structure-aware path.
 
-2. Maintain a header stack while scanning text.
+2. Traverse `doc.body` (the Docling document model) to build full heading ancestry per item. Do NOT rely solely on `chunk.meta.headings` — the HybridChunker provides only the immediate heading per chunk, not the full path from document root.
 
-3. Emit two distinct ancestry fields:
-   - `section_ref_path`: canonical structural identifiers used for joins and derivations
-   - `section_title_path`: human-readable section titles or full header labels for display
+3. Emit two distinct ancestry fields per structural section:
+   - `section_ref_path`: canonical structural identifiers used for joins and derivations. Derive from numbered heading prefixes (e.g. `1.1.` → `"1.1"`). For prose-titled sections without a numbering prefix, derive a slug or leave empty and log.
+   - `section_title_path`: human-readable section titles or full header labels for display.
 
-4. Handle resets such as:
-   - appendices
-   - enclosures
-   - glossary/definition sections
-   - page headers/footers
-   - table of contents pages
+4. Handle noise:
+   - Table of Contents pages: filter chunks where >40% of lines are dotted-line or bare page-number entries.
+   - Page headers/footers: rely on Docling's layout detection to exclude running headers.
+   - Appendices, enclosures, glossaries: treat as structural resets; log section boundary.
 
 5. Fail cleanly:
-   - if parsing fails, emit empty ancestry fields
+   - if ancestry traversal fails for a region, emit empty `section_ref_path` and `section_title_path`
    - preserve raw text
-   - log the unparseable pattern with document and page context
+   - do not emit a partial breadcrumb — partial is silent corruption
 
-6. Produce an inspectable artifact before the chunker consumes it.
+6. Produce an inspectable ancestry artifact before WP-14.2 consumes it.
 
 #### Validation Gate
 
-Run the parser on one representative document per major class and confirm:
+Run on one representative document per major class and confirm:
 
-- hierarchy is correct for at least 80 percent of tested sections
-- reset events do not corrupt later stack state
+- heading hierarchy depth matches expected document structure
+- numbered sections produce non-empty `section_ref_path`
+- ToC chunks are filtered before sampling
 - failure mode emits empty ancestry rather than a wrong breadcrumb
 
 ---
 
-### 6.2 WP-14.2: Structure-Aware Chunker
+### 6.2 WP-14.2: Docling-Based Structure-Aware Chunker
 
-**Goal:** replace the fixed-size chunker with paragraph-aware chunking that preserves structure metadata.
+**Goal:** replace the fixed-size chunker (`chunk_text.py`) with Docling `HybridChunker` as the chunking backend, augmented with ToC filtering and breadcrumb injection from the WP-14.1 ancestry map.
 
 **Primary output:** improved `*_chunks.jsonl`.
 
 #### Requirements
 
-1. Paragraphs are the atomic unit. Never split mid-paragraph.
+1. Use `docling.chunking.HybridChunker` as the primary chunking backend. It respects paragraph boundaries and keeps tables intact.
 
-2. Character budget is a maximum, not a target.
+2. Apply the ToC chunk filter from WP-14.1 before emitting chunks. ToC chunks must not enter `*_chunks.jsonl`.
 
-3. Each chunk record must preserve raw source body separately from prompt-visible breadcrumb context.
+3. Each chunk record must preserve raw source body separately from prompt-visible breadcrumb context:
 
-Recommended schema split:
-
-- `raw_text`: original chunk body used for source verification
-- `breadcrumb`: formatted hierarchy context block
-- `text`: full prompt-facing text passed to Step C, composed as `breadcrumb + raw_text`
-
-If the current schema requires `text` to remain the main field, `raw_text` must still be added explicitly so verbatim review can anchor against unmodified body text.
+   - `raw_text`: original chunk body used for source verification
+   - `breadcrumb`: formatted hierarchy context block derived from WP-14.1 ancestry traversal
+   - `text`: full prompt-facing text passed to Step C, composed as `breadcrumb + raw_text`
 
 4. Each chunk must carry:
    - `section_ref_path`
    - `section_title_path`
    - `parent_header_text`
-   - `parent_context`
+   - `parent_context` (per Decision C definition — lock before implementation)
 
-5. Table-aware chunking must continue to work. Tables must not be split mid-table.
+5. Tables must not be split mid-table. Docling HybridChunker handles this; verify it holds in practice.
 
-6. Overlap should remain configurable, but its semantics must be re-evaluated after paragraph-aware chunking lands. Do not assume the current overlap behavior is still desirable.
+6. Overlap: re-evaluate after paragraph-aware chunking lands. Do not carry over the current fixed-size overlap behavior without validating it is still useful.
 
 #### Validation Gate
 
 For representative documents:
 
 - zero mid-paragraph splits
-- breadcrumb/context present where parser succeeded
-- raw body remains recoverable
-- chunk-count inflation is explained if material
+- breadcrumb present where ancestry traversal succeeded
+- raw body remains recoverable from `raw_text`
+- ToC chunks absent from output JSONL
+- chunk-count inflation documented and explained
 
 ---
 

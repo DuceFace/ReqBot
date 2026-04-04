@@ -176,6 +176,19 @@ Run on one representative document per major class and confirm:
 
 ### 6.2 WP-14.2: Docling-Based Structure-Aware Chunker
 
+**Status: DONE 2026-04-04 — `run_structure_aware()` shipped in `chunk_text.py`; `--layout-mode docling` added to `run_pipeline.py`.**
+
+Validation gate results (--max-pages 25–30):
+- NIST SP 800-128: PASS — 125 chunks, 17 ToC filtered, 100% breadcrumb coverage, 47/125 items with depth≥2 ancestry, 0 ToC lines in output
+- DODI 8551.01: PASS — 35 chunks, 18 ToC filtered, 100% breadcrumb coverage, 23/35 items with depth≥2 ancestry, 0 ToC lines in output
+- afman17-204: PASS — 60 chunks, 8 ToC filtered, 98% breadcrumb (1 cover-page chunk with no heading context — correct degradation), 28/60 with depth≥2, 0 ToC lines in output
+
+Decision C: accepted as-is. WP-14.2 inherits the WP-14.1 recommended default (600 chars). No adjustment needed.
+
+Known: the 1 AFI chunk without breadcrumb is the document cover page — it precedes any heading in the document. Empty breadcrumb is the correct graceful-degradation behavior for pre-heading content.
+
+---
+
 **Goal:** replace the fixed-size chunker (`chunk_text.py`) with Docling `HybridChunker` as the chunking backend, augmented with ToC filtering and breadcrumb injection from the WP-14.1 ancestry map.
 
 **Primary output:** improved `*_chunks.jsonl`.

@@ -135,8 +135,8 @@ If the parent clause body cannot be isolated cleanly, fall back to the immediate
 2. Traverse `doc.body` (the Docling document model) to build full heading ancestry per item. Do NOT rely solely on `chunk.meta.headings` — the HybridChunker provides only the immediate heading per chunk, not the full path from document root.
 
 3. Emit two distinct ancestry fields per structural section:
-   - `section_ref_path`: canonical structural identifiers used for joins and derivations. Derive from numbered heading prefixes (e.g. `1.1.` → `"1.1"`). For prose-titled sections without a numbering prefix, derive a slug or leave empty and log.
-   - `section_title_path`: human-readable section titles or full header labels for display.
+   - `section_ref_path`: canonical structural identifiers used for joins and derivations. Derive from numbered heading prefixes (e.g. `1.1.` → `"1.1"`). For prose-titled sections without a numbering prefix, leave empty and log — do not derive a slug. Slugs are not stable across re-ingests or document versions and are not safe as join keys.
+   - `section_title_path`: human-readable section titles or full header labels for display. Prose titles belong here, not in `section_ref_path`.
 
 4. Handle noise:
    - Table of Contents pages: filter chunks where >40% of lines are dotted-line or bare page-number entries.

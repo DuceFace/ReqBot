@@ -259,6 +259,8 @@ Verify on representative documents:
 
 2. Re-run ingestion on the full corpus using the same extraction and enrichment models as the current baseline.
 
+   **Step C cache note:** the Step C cache is keyed on a hash of prompt content and chunk `text`. WP-14.2 breadcrumb injection changes the `text` field of every chunk, so all Step C cache entries will self-invalidate automatically — no manual cache clearing is required. Full re-processing of Step C is expected and intentional.
+
 3. Rebuild indexes from the regenerated artifacts.
 
 4. Compare old vs new:

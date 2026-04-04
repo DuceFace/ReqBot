@@ -1493,10 +1493,10 @@ def main() -> None:
     p_ingest.add_argument("--index", action="store_true", help="Also index into Qdrant after extraction")
     p_ingest.add_argument(
         "--layout-mode",
-        choices=["pymupdf", "pdfplumber"],
+        choices=["pymupdf", "pdfplumber", "docling"],
         default="pymupdf",
         dest="layout_mode",
-        help="PDF extraction backend (default: pymupdf)",
+        help="PDF extraction backend (default: pymupdf). Use 'docling' for structure-aware chunking (Phase 14).",
     )
     p_ingest.add_argument(
         "--skip-enrichment",
@@ -1550,10 +1550,10 @@ def main() -> None:
     )
     p_batch.add_argument(
         "--layout-mode",
-        choices=["pymupdf", "pdfplumber"],
+        choices=["pymupdf", "pdfplumber", "docling"],
         default="pymupdf",
         dest="layout_mode",
-        help="PDF extraction backend (default: pymupdf)",
+        help="PDF extraction backend (default: pymupdf). Use 'docling' for structure-aware chunking (Phase 14).",
     )
     p_batch.add_argument(
         "--skip-enrichment",

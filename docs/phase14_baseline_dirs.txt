@@ -1,0 +1,55 @@
+# Phase 14 Baseline Artifact Snapshot
+# Recorded before WP-14.4 re-ingest
+# Format: directory | doc_stem | req_count | source_file
+#
+# Total directories: 48
+# Total requirements: 29433
+#
+CJCSI 6510.02G_20260319_235409 | CJCSI 6510.02G | 89 | CJCSI 6510.02G_requirements_normalized.jsonl
+CJCSI6510_01F_20260319_235609 | CJCSI6510_01F | 837 | CJCSI6510_01F_requirements_normalized.jsonl
+CNSSI_No1253_20260320_001341 | CNSSI_No1253 | 1471 | CNSSI_No1253_requirements_normalized.jsonl
+DODI 5200.01_20260320_003455 | DODI 5200.01 | 78 | DODI 5200.01_requirements_normalized.jsonl
+DODI 5200.01_vol1_20260320_003630 | DODI 5200.01_vol1 | 538 | DODI 5200.01_vol1_requirements_normalized.jsonl
+DODI 5200.01_vol2_20260320_004709 | DODI 5200.01_vol2 | 530 | DODI 5200.01_vol2_requirements_normalized.jsonl
+DODI 5200.01_vol3_20260320_005735 | DODI 5200.01_vol3 | 989 | DODI 5200.01_vol3_requirements_normalized.jsonl
+DODI 5200.44_20260320_011732 | DODI 5200.44 | 123 | DODI 5200.44_requirements_normalized.jsonl
+DODI 5200.48_20260320_012003 | DODI 5200.48 | 247 | DODI 5200.48_requirements_normalized.jsonl
+DODI 8410.03_20260320_012556 | DODI 8410.03 | 181 | DODI 8410.03_requirements_normalized.jsonl
+DODI 8500.01_20260320_012923 | DODI 8500.01 | 446 | DODI 8500.01_requirements_normalized.jsonl
+DODI 8510.01_20260320_013841 | DODI 8510.01 | 282 | DODI 8510.01_requirements_normalized.jsonl
+DODI 8520.02_20260320_014339 | DODI 8520.02 | 313 | DODI 8520.02_requirements_normalized.jsonl
+DODI 8530.01_20260306_001417 | DODI 8530.01 | 299 | DODI 8530.01_requirements_normalized.jsonl
+DODI 8551.01_20260320_015011 | DODI 8551.01 | 77 | DODI 8551.01_requirements_normalized.jsonl
+DODI 8551.01_20260322_171740 | DODI 8551.01 | 80 | DODI 8551.01_requirements_enriched.jsonl
+DODM 8140.03_20260320_015141 | DODM 8140.03 | 167 | DODM 8140.03_requirements_normalized.jsonl
+NIST.SP.800-125_20260320_015459 | NIST.SP.800-125 | 210 | NIST.SP.800-125_requirements_normalized.jsonl
+NIST.SP.800-125_20260322_172019 | NIST.SP.800-125 | 75 | NIST.SP.800-125_requirements_enriched.jsonl
+NIST.SP.800-128_20260320_015840 | NIST.SP.800-128 | 517 | NIST.SP.800-128_requirements_normalized.jsonl
+NIST.SP.800-137_20260320_020854 | NIST.SP.800-137 | 468 | NIST.SP.800-137_requirements_normalized.jsonl
+NIST.SP.800-161r1_20260320_021730 | NIST.SP.800-161r1 | 2233 | NIST.SP.800-161r1_requirements_normalized.jsonl
+NIST.SP.800-171r3_20260320_025640 | NIST.SP.800-171r3 | 771 | NIST.SP.800-171r3_requirements_normalized.jsonl
+NIST.SP.800-30r1_20260320_031043 | NIST.SP.800-30r1 | 643 | NIST.SP.800-30r1_requirements_normalized.jsonl
+NIST.SP.800-37r2_20260320_032251 | NIST.SP.800-37r2 | 1059 | NIST.SP.800-37r2_requirements_normalized.jsonl
+NIST.SP.800-53Ar5_20260320_034608 | NIST.SP.800-53Ar5 | 5679 | NIST.SP.800-53Ar5_requirements_normalized.jsonl
+NIST.SP.800-53r5_20260320_053605 | NIST.SP.800-53r5 | 3303 | NIST.SP.800-53r5_requirements_normalized.jsonl
+NIST.SP.800-61r3_20260320_063614 | NIST.SP.800-61r3 | 248 | NIST.SP.800-61r3_requirements_normalized.jsonl
+NIST.SP.800-63-4_20260320_064051 | NIST.SP.800-63-4 | 382 | NIST.SP.800-63-4_requirements_normalized.jsonl
+NIST.SP.800-63a-4_20260320_064802 | NIST.SP.800-63a-4 | 668 | NIST.SP.800-63a-4_requirements_normalized.jsonl
+NIST.SP.800-63b-4_20260320_070007 | NIST.SP.800-63b-4 | 769 | NIST.SP.800-63b-4_requirements_normalized.jsonl
+NIST.SP.800-63c-4_20260320_071513 | NIST.SP.800-63c-4 | 833 | NIST.SP.800-63c-4_requirements_normalized.jsonl
+NIST.SP.800-92_20260320_073220 | NIST.SP.800-92 | 433 | NIST.SP.800-92_requirements_normalized.jsonl
+afi10-2402_20260320_074004 | afi10-2402 | 409 | afi10-2402_requirements_normalized.jsonl
+afi13-550_20260320_074816 | afi13-550 | 224 | afi13-550_requirements_normalized.jsonl
+afi17-101_20260320_075304 | afi17-101 | 317 | afi17-101_requirements_normalized.jsonl
+afi17-130_20260320_075921 | afi17-130 | 134 | afi17-130_requirements_normalized.jsonl
+afi17-203_20260320_080157 | afi17-203 | 145 | afi17-203_requirements_normalized.jsonl
+afi90-802_20260320_080453 | afi90-802 | 226 | afi90-802_requirements_normalized.jsonl
+afman17-204_20260320_080913 | afman17-204 | 128 | afman17-204_requirements_normalized.jsonl
+afman17-204_20260322_172408 | afman17-204 | 113 | afman17-204_requirements_enriched.jsonl
+afman17-2101_20260320_081138 | afman17-2101 | 193 | afman17-2101_requirements_normalized.jsonl
+afpd_17-1_20260320_081540 | afpd_17-1 | 123 | afpd_17-1_requirements_normalized.jsonl
+dafman17-1203_20260320_081813 | dafman17-1203 | 532 | dafman17-1203_requirements_normalized.jsonl
+dafman17-1301_20260320_082859 | dafman17-1301 | 525 | dafman17-1301_requirements_normalized.jsonl
+dafman17-1304_20260320_083926 | dafman17-1304 | 487 | dafman17-1304_requirements_normalized.jsonl
+dafman17-1305_20260320_084850 | dafman17-1305 | 335 | dafman17-1305_requirements_normalized.jsonl
+dafpam90-803_20260320_085618 | dafpam90-803 | 504 | dafpam90-803_requirements_normalized.jsonl

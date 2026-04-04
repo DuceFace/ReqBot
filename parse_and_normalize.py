@@ -155,17 +155,21 @@ def build_chunk_hierarchy_map(chunks: list[dict]) -> dict[int, dict]:
 def build_section_children_map(chunks: list[dict]) -> dict[str, list[str]]:
     """Build a mapping from each section ref to its direct child section refs.
 
-    Scans all chunk section_ref_path values and groups the last element
-    (the chunk's own section) by its immediate parent (the second-to-last
-    element).  Only chunks with WP-14.2 numbered section_ref_path contribute;
-    legacy chunks with empty paths are silently skipped.
+    Walks every consecutive pair in each chunk's section_ref_path so that
+    intermediate sections with no body chunk (heading-only, dropped by WP-14.2
+    HybridChunker) are still represented.  For example, a chunk with path
+    ["1", "1.1", "1.1.1"] contributes both "1" → "1.1" and "1.1" → "1.1.1",
+    even if no chunk carries path ["1", "1.1"] directly.
+
+    Only chunks with WP-14.2 numbered section_ref_path contribute; legacy
+    chunks with empty paths are silently skipped.
     """
     parent_to_children: dict[str, set[str]] = {}
     for chunk in chunks:
         path = chunk.get("section_ref_path") or []
-        if len(path) >= 2:
-            parent_ref = path[-2]
-            child_ref = path[-1]
+        for i in range(1, len(path)):
+            parent_ref = path[i - 1]
+            child_ref = path[i]
             parent_to_children.setdefault(parent_ref, set()).add(child_ref)
     return {k: sorted(v) for k, v in parent_to_children.items()}
 

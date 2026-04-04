@@ -81,6 +81,12 @@ def build_payload(req: dict) -> dict:
         "page_end": req.get("page_end"),
         "confidence": req.get("confidence", 0.0),
         "chunk_id": req.get("chunk_id"),
+        # Hierarchy metadata (WP-14.3) — empty for pre-WP-14.2 artifacts
+        "section_ref_path": req.get("section_ref_path", []),
+        "section_title_path": req.get("section_title_path", []),
+        "parent_section_ref": req.get("parent_section_ref"),
+        "parent_context": req.get("parent_context"),
+        "child_section_refs": req.get("child_section_refs", []),
         "schema_version": req.get("schema_version", ""),
         "pipeline_version": req.get("pipeline_version", ""),
         "extraction_model": req.get("extraction_model", ""),

@@ -28,7 +28,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 PIPELINE_VERSION = "1.0"
 
 VALID_DOMAIN_TAGS = {
@@ -133,6 +133,45 @@ def build_chunk_page_map(chunks: list[dict]) -> dict[int, tuple[int, int]]:
         c["chunk_id"]: (c["page_start"], c["page_end"])
         for c in chunks
     }
+
+
+def build_chunk_hierarchy_map(chunks: list[dict]) -> dict[int, dict]:
+    """Build a mapping from chunk_id to its hierarchy metadata fields.
+
+    Returns empty-field dicts for chunks without WP-14.2 hierarchy output
+    (legacy pymupdf/pdfplumber chunks) so callers get safe defaults.
+    """
+    result: dict[int, dict] = {}
+    for c in chunks:
+        result[c["chunk_id"]] = {
+            "section_ref_path": c.get("section_ref_path") or [],
+            "section_title_path": c.get("section_title_path") or [],
+            "parent_header_text": c.get("parent_header_text"),
+            "parent_context": c.get("parent_context"),
+        }
+    return result
+
+
+def build_section_children_map(chunks: list[dict]) -> dict[str, list[str]]:
+    """Build a mapping from each section ref to its direct child section refs.
+
+    Walks every consecutive pair in each chunk's section_ref_path so that
+    intermediate sections with no body chunk (heading-only, dropped by WP-14.2
+    HybridChunker) are still represented.  For example, a chunk with path
+    ["1", "1.1", "1.1.1"] contributes both "1" → "1.1" and "1.1" → "1.1.1",
+    even if no chunk carries path ["1", "1.1"] directly.
+
+    Only chunks with WP-14.2 numbered section_ref_path contribute; legacy
+    chunks with empty paths are silently skipped.
+    """
+    parent_to_children: dict[str, set[str]] = {}
+    for chunk in chunks:
+        path = chunk.get("section_ref_path") or []
+        for i in range(1, len(path)):
+            parent_ref = path[i - 1]
+            child_ref = path[i]
+            parent_to_children.setdefault(parent_ref, set()).add(child_ref)
+    return {k: sorted(v) for k, v in parent_to_children.items()}
 
 
 def normalize_text(text: str) -> str:
@@ -249,12 +288,21 @@ def run(
     raw_reqs = load_jsonl(reqs_path)
     log.info("Loaded %d raw requirements", len(raw_reqs))
 
-    chunk_page_map = {}
+    chunk_page_map: dict[int, tuple[int, int]] = {}
+    chunk_hierarchy_map: dict[int, dict] = {}
+    section_children_map: dict[str, list[str]] = {}
     if chunks_path.exists():
         log.info("Loading chunk metadata from: %s", chunks_path)
         chunks = load_jsonl(chunks_path)
         chunk_page_map = build_chunk_page_map(chunks)
+        chunk_hierarchy_map = build_chunk_hierarchy_map(chunks)
+        section_children_map = build_section_children_map(chunks)
         log.info("Loaded page references for %d chunks", len(chunk_page_map))
+        sections_with_children = sum(1 for v in section_children_map.values() if v)
+        log.info(
+            "Hierarchy map: %d chunks, %d sections with children",
+            len(chunk_hierarchy_map), sections_with_children,
+        )
     else:
         log.warning("Chunks file not found: %s — page references will be empty", chunks_path)
 
@@ -300,6 +348,29 @@ def run(
         if chunk_id is not None and chunk_id in chunk_page_map:
             page_start, page_end = chunk_page_map[chunk_id]
 
+        # Hierarchy metadata — sourced from deterministic WP-14.2 parser output.
+        # Falls back to empty values for legacy (pre-WP-14.2) chunks.
+        hierarchy = chunk_hierarchy_map.get(chunk_id) if chunk_id is not None else None
+        if hierarchy:
+            section_ref_path: list[str] = hierarchy["section_ref_path"]
+            section_title_path: list[str] = hierarchy["section_title_path"]
+            parent_context: str | None = hierarchy["parent_context"]
+            # parent_section_ref: penultimate element of the ancestry path
+            parent_section_ref: str | None = (
+                section_ref_path[-2] if len(section_ref_path) >= 2 else None
+            )
+            # child_section_refs: direct children of this section across all chunks
+            current_ref = section_ref_path[-1] if section_ref_path else None
+            child_section_refs: list[str] = (
+                section_children_map.get(current_ref, []) if current_ref else []
+            )
+        else:
+            section_ref_path = []
+            section_title_path = []
+            parent_context = None
+            parent_section_ref = None
+            child_section_refs = []
+
         confidence = 1.0
         if not domain_tags:
             confidence -= 0.2
@@ -321,6 +392,13 @@ def run(
             "page_start": page_start,
             "page_end": page_end,
             "confidence": round(max(0.0, confidence), 2),
+            # Hierarchy metadata (WP-14.3) — deterministic parser output from WP-14.2.
+            # Empty for requirements produced by the legacy fixed-size chunker.
+            "section_ref_path": section_ref_path,
+            "section_title_path": section_title_path,
+            "parent_section_ref": parent_section_ref,
+            "parent_context": parent_context,
+            "child_section_refs": child_section_refs,
             "document_id": doc_identity["document_id"],
             "document_hash_full": doc_identity["document_hash_full"],
             "source_pdf": doc_identity["source_pdf"],

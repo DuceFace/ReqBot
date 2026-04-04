@@ -111,6 +111,13 @@ def run(requirements_jsonl: str, output_dir: str, source_pdf: str = "") -> dict:
     has_source_ref = sum(1 for s in source_refs if s)
     unique_source_refs = len(set(s for s in source_refs if s))
 
+    # Hierarchy coverage (WP-14.3) — meaningful only for Docling-path artifacts
+    with_section_path = sum(1 for r in requirements if r.get("section_ref_path"))
+    with_parent_context = sum(1 for r in requirements if r.get("parent_context"))
+    hierarchy_coverage_pct = round(
+        with_section_path / len(requirements) * 100 if requirements else 0.0, 1
+    )
+
     final_output = {
         "metadata": {
             "source_pdf": source_pdf or stem,
@@ -150,6 +157,11 @@ def run(requirements_jsonl: str, output_dir: str, source_pdf: str = "") -> dict:
             "average_confidence": round(avg_confidence, 3),
             "domain_tag_distribution": dict(sorted(tag_counts.items())),
             "requirement_type_distribution": dict(sorted(type_counts.items())),
+            "hierarchy": {
+                "with_section_path": with_section_path,
+                "with_parent_context": with_parent_context,
+                "hierarchy_coverage_pct": hierarchy_coverage_pct,
+            },
         },
     }
 

@@ -113,11 +113,6 @@ WP-14.1 (`section_parser.py`) implements:
 
 WP-14.2 validation confirmed the default produces adequate parent context across all three document classes (NIST, DODI, AFI). The 600-char / 5-paragraph cap is accepted. No further lock action required — WP-14.3 passes `parent_context` through unchanged.
 
-Recommended default (for reference):
-- `parent_context` = the full immediate parent clause text when available, not just the numeric header
-
-If the parent clause body cannot be isolated cleanly, fall back to the immediate parent header text and log the degradation.
-
 ---
 
 ## 6. Work Packages

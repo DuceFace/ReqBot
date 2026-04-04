@@ -106,12 +106,14 @@ Docling `HybridChunker` handles paragraph boundary detection internally. The bla
 
 ### 5.3 Decision C - Parent Context Scope
 
-**STILL REQUIRED before WP-14.1/14.2 implementation begins.**
+**PARTIALLY RESOLVED 2026-04-04 — recommended default shipped in WP-14.1.**
 
-Lock the definition of parent context before implementation. It should not drift package by package.
+WP-14.1 (`section_parser.py`) implements the recommended default:
+- `parent_context` = first `_PARENT_CONTEXT_MAX_CHARS` (600) chars of body text after the immediate parent heading (up to 5 paragraphs), falling back to parent header text when no body text exists.
 
-Recommended default:
+This is marked partial because the exact scope cap (600 chars / 5 paragraphs) has not been formally validated as the right boundary. **Lock before WP-14.2 if the default needs adjustment.** If the default is accepted as-is, no further action is required — WP-14.2 simply inherits it from the ancestry map.
 
+Recommended default (for reference):
 - `parent_context` = the full immediate parent clause text when available, not just the numeric header
 
 If the parent clause body cannot be isolated cleanly, fall back to the immediate parent header text and log the degradation.
@@ -121,6 +123,17 @@ If the parent clause body cannot be isolated cleanly, fall back to the immediate
 ## 6. Work Packages
 
 ### 6.1 WP-14.1: Docling Integration + Ancestry Traversal
+
+**Status: DONE 2026-04-04 — `section_parser.py` shipped, PR #19 merged.**
+
+Validation gate results (--max-pages 40):
+- NIST SP 800-128: PASS (68 headings, depth 3, 102 items with 2+ title ancestors)
+- DODI 8551.01: PASS (24 headings, depth 2, hierarchy `SECTION-1 > 1.1` confirmed)
+- afman17-204: PASS (29 headings, depth 2, 97 items with 2+ title ancestors)
+
+Known deferred (WP-14.2 scope): prose heading depth collapse. All prose titles resolve to depth=1; documented in code as a known constraint with a path to using Docling structural level in a future pass.
+
+---
 
 **Goal:** replace `extract_pdf_to_text.py` + regex section parser with Docling as the primary structural parsing backend, and build a deterministic ancestry map from the Docling document model.
 

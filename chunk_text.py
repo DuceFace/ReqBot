@@ -253,11 +253,15 @@ def _chunk_page_range(chunk: object) -> tuple[int, int]:
 
 
 def _best_ancestry(chunk: object, item_ancestry: dict) -> dict:
-    """Return the best ancestry context for a chunk from its doc_items.
+    """Return the deepest ancestry context for a chunk from its doc_items.
 
-    Scans doc_items in order and returns the ancestry of the first item that
-    has a non-empty section_title_path.  Falls back to the first item with
-    any ancestry entry, then to an empty ancestry dict.
+    Scans ALL doc_items and returns the ancestry with the longest
+    section_title_path (most specific hierarchy).  Ties are broken by keeping
+    the last match in document order.
+
+    This full scan is required to handle chunks that span a section transition:
+    an early break on the first non-empty title path can yield a shallower
+    breadcrumb than items later in the same chunk.
     """
     empty: dict = {
         "section_ref_path": [],
@@ -266,6 +270,7 @@ def _best_ancestry(chunk: object, item_ancestry: dict) -> dict:
         "parent_context": None,
     }
     best = empty
+    best_depth = -1
     for item in chunk.meta.doc_items:
         self_ref = getattr(item, "self_ref", None)
         if not self_ref:
@@ -273,11 +278,10 @@ def _best_ancestry(chunk: object, item_ancestry: dict) -> dict:
         ancestry = item_ancestry.get(self_ref)
         if ancestry is None:
             continue
-        if best is empty:
-            best = ancestry  # first match — accept even if shallow
-        if ancestry.get("section_title_path"):
-            best = ancestry  # deeper match — prefer and stop
-            break
+        depth = len(ancestry.get("section_title_path") or [])
+        if depth >= best_depth:  # >= so last deepest item wins on tie
+            best = ancestry
+            best_depth = depth
     return best
 
 

@@ -106,12 +106,12 @@ Docling `HybridChunker` handles paragraph boundary detection internally. The bla
 
 ### 5.3 Decision C - Parent Context Scope
 
-**PARTIALLY RESOLVED 2026-04-04 — recommended default shipped in WP-14.1.**
+**RESOLVED 2026-04-04 — default accepted as-is; WP-14.2 inherits without adjustment.**
 
-WP-14.1 (`section_parser.py`) implements the recommended default:
+WP-14.1 (`section_parser.py`) implements:
 - `parent_context` = first `_PARENT_CONTEXT_MAX_CHARS` (600) chars of body text after the immediate parent heading (up to 5 paragraphs), falling back to parent header text when no body text exists.
 
-This is marked partial because the exact scope cap (600 chars / 5 paragraphs) has not been formally validated as the right boundary. **Lock before WP-14.2 if the default needs adjustment.** If the default is accepted as-is, no further action is required — WP-14.2 simply inherits it from the ancestry map.
+WP-14.2 validation confirmed the default produces adequate parent context across all three document classes (NIST, DODI, AFI). The 600-char / 5-paragraph cap is accepted. No further lock action required — WP-14.3 passes `parent_context` through unchanged.
 
 Recommended default (for reference):
 - `parent_context` = the full immediate parent clause text when available, not just the numeric header

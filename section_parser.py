@@ -70,9 +70,11 @@ _KEYWORD_RE  = re.compile(r'^(SECTION|ENCLOSURE|APPENDIX|ANNEX|ATTACHMENT)\s+(\w
 # "3.1.4" → 3 dots → depth 3
 _DEPTH_RE = re.compile(r'^[A-Z]?\d+(\.\d+)*', re.IGNORECASE)
 
-# Heading text that looks like a ToC entry (dotted leaders or trailing page number).
+# Heading text that looks like a ToC entry via dotted leaders (5+ consecutive dots).
 # These are sometimes labeled section_header by Docling on ToC pages.
-_TOC_HEADING_RE = re.compile(r'\.{5,}|\s+\d{1,4}\s*$')
+# NOTE: Do NOT add a trailing-page-number alternative like \s+\d{1,4}\s*$ —
+# that would match real headings such as "Chapter 1", "Appendix 2", "Section 3".
+_TOC_HEADING_RE = re.compile(r'\.{5,}')
 
 
 # ---------------------------------------------------------------------------
@@ -243,11 +245,11 @@ def _parse_ancestry(doc: Any) -> tuple[list[dict], dict[str, dict], dict[str, st
     body_accum: dict[str, list[str]] = {}  # heading self_ref → body paragraphs
     total_items = 0
 
-    try:
-        items = list(doc.iterate_items())
-    except Exception as e:
-        log.error("doc.iterate_items() failed: %s", e)
-        return sections, item_ancestry, {}, 0
+    # Do NOT catch iterate_items() exceptions here — let them propagate to run()'s
+    # outer try/except, which appends ancestry_traversal_failed to result.warnings.
+    # Catching internally would make a hard parser failure indistinguishable from a
+    # legitimately empty document in the output JSON.
+    items = list(doc.iterate_items())
 
     for item, _ in items:
         self_ref = getattr(item, "self_ref", None)

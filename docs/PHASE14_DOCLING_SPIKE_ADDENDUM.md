@@ -1,7 +1,7 @@
 # ReqBot Phase 14 - Docling Evaluation Addendum
 
-**Status:** Proposed pre-implementation addendum to Phase 14  
-**Purpose:** Decide whether Docling should replace the planned custom Step A / Step B structural parsing work before WP-14.1 begins
+**Status:** COMPLETE — spike merged 2026-04-04, Outcome B (hybrid) selected  
+**Purpose:** Decided whether Docling should replace the planned custom Step A / Step B structural parsing work before WP-14.1 begins
 
 ---
 
@@ -251,3 +251,37 @@ The right move is:
 - decide from evidence, not optimism
 
 This is a good candidate for evaluation, but it is not yet proven enough to become the new plan by default.
+
+---
+
+## 13. Decision Record — 2026-04-04
+
+**Decision: Outcome B — Docling + deterministic post-processing (hybrid)**
+
+Confirmed by Codex review after tightened scoring pass.
+
+Spike artifacts: `eval/spike_results/report.md`
+
+### What passed
+
+- Structure detection: headings and tables clean across all 3 doc classes (NIST SP, DODI, AFI)
+- Chunk granularity: 3–5x more chunks, avg 680–750 chars vs 2837–2969 for fixed-size chunker
+- Table extraction: intact markdown tables across all 3 docs
+- DODI section IDs: numbered headings (e.g. `1.1`) extract to valid canonical refs via regex
+- ToC detection: dotted-line filter captures 10–36% of chunks per doc as noise
+
+### What still requires deterministic post-processing
+
+1. **Full heading ancestry.** `chunk.meta.headings` gives only the immediate heading per chunk, not the full path from document root. All 3 docs showed 0 chunks with 2+ headings in the list. Full ancestry requires traversal of the Docling document model (`doc.body` / item parent chain), not just HybridChunker output.
+
+2. **Canonical section IDs for prose-titled docs.** Numbered headings (DODI `1.1.`) extract cleanly. Prose titles (NIST "Authority", AFI "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY") return empty `section_ref_path`. Custom derivation is still needed for non-numbered sections.
+
+3. **`parent_context` (parent clause body text).** Not available from HybridChunker at all. Requires identifying the parent clause in the document model and extracting its text body separately.
+
+### Implementation impact on WP-14.1 and WP-14.2
+
+WP-14.1 is now: Docling `DocumentConverter` integration + `doc.body` traversal to build full heading ancestry + deterministic section ID derivation from numbered headings.
+
+WP-14.2 is now: Docling `HybridChunker` as the chunking backend + ToC chunk filter + breadcrumb injection from the ancestry traversal output of WP-14.1.
+
+Phase 14 goals are unchanged. Only the implementation path changed.

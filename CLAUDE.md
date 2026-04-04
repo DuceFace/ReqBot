@@ -51,16 +51,24 @@ GPT-4o is optional and off by default.
 
 ### Phase 14 — Structure-Aware Chunking (In Progress)
 
+**Docling spike: COMPLETE 2026-04-04 — Outcome B (hybrid) confirmed by Codex review.**
+See `eval/spike_results/report.md` and `docs/PHASE14_DOCLING_SPIKE_ADDENDUM.md`.
+
+Key spike findings:
+- Docling provides structural improvement on all 3 doc classes (NIST SP, DODI, AFI)
+- `chunk.meta.headings` gives only the immediate heading per chunk — full ancestry requires `doc.body` traversal (bridge complexity)
+- Canonical section IDs: numbered headings (e.g. "1.1") extract cleanly; prose titles (NIST/AFI) return empty refs — deterministic post-processing required
+- ToC noise: 10–36% of chunks per doc are ToC garbage; must be filtered
+- Decisions A and B from section 5 of the plan are moot — Docling replaces the layout/boundary decisions
+
 | Work Package | Status | Description |
 |---|---|---|
-| WP-14.1: Section Header Parser | NOT STARTED | New `section_parser.py`; regex-based; 3 doc classes (NIST SP, AFI/DAF, DODI/DoDM); 80% target; clean graceful failure required |
-| WP-14.2: Structure-Aware Chunker | NOT STARTED | Rewrite `chunk_text.py`; paragraph-boundary atomic unit; breadcrumb prepended to chunk text |
+| WP-14.1: Section Header Parser | REDEFINED | Replace `section_parser.py` with Docling integration; `doc.body` traversal for full ancestry; deterministic section ID derivation from numbered headings |
+| WP-14.2: Structure-Aware Chunker | REDEFINED | Replace custom chunker with Docling HybridChunker + ToC filter + breadcrumb injection from ancestry traversal |
 | WP-14.3: Schema + Normalization | NOT STARTED | Propagate `section_path`/`parent_ref`/`parent_context`/`child_refs` through Steps C→D→D.5→E; schema v2.0 |
 | WP-14.4: Full Re-ingest | NOT STARTED | 45-doc re-ingest; record baseline dir names in `docs/phase14_baseline_dirs.txt` before running |
 
-**Two decisions required before WP-14.1 starts (see Section 2.5 of plan):**
-1. **Decision A — Layout mode:** Run `extract_pdf_to_text.py` with both `--layout-mode pymupdf` and `--layout-mode pdfplumber` on `NIST.SP.800-53r5.pdf`; compare 10 control catalog pages; decide whether to standardize on pdfplumber everywhere.
-2. **Decision B — Paragraph boundary heuristic:** Must specify before WP-14.2 (candidate: double `\n\n`, or pdfplumber y-coordinate gap if Decision A = pdfplumber-everywhere).
+**Decision C (parent context scope) still required** — lock definition of `parent_context` before WP-14.1/14.2 work begins.
 
 ---
 

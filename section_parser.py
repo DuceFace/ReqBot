@@ -70,6 +70,10 @@ _KEYWORD_RE  = re.compile(r'^(SECTION|ENCLOSURE|APPENDIX|ANNEX|ATTACHMENT)\s+(\w
 # "3.1.4" → 3 dots → depth 3
 _DEPTH_RE = re.compile(r'^[A-Z]?\d+(\.\d+)*', re.IGNORECASE)
 
+# Heading text that looks like a ToC entry (dotted leaders or trailing page number).
+# These are sometimes labeled section_header by Docling on ToC pages.
+_TOC_HEADING_RE = re.compile(r'\.{5,}|\s+\d{1,4}\s*$')
+
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -117,6 +121,17 @@ def _estimate_heading_depth(text: str) -> int:
       "A4.2. Annex"             → 2
       "SECTION 3: ..."          → 1
       "Authority"               → 1 (prose; depth 1 is the shallowest fallback)
+
+    NOTE — text-based vs Docling structural level:
+    This uses the numbering prefix to estimate depth rather than the `level`
+    parameter from doc.iterate_items().  For numbered headings ("3.1.4") this
+    is reliable.  For prose-titled headings, all non-numbered titles return
+    depth=1 — this collapses sibling prose labels ("Chapter 1" and "ROLES AND
+    RESPONSIBILITIES") to the same depth level, which is correct for documents
+    where they are parallel section identifiers rather than true parent/child
+    nodes.  A future improvement could use Docling's structural level as the
+    primary depth signal (falling back to numbering), but that requires
+    validation against all 3 doc classes to avoid regression on numbered docs.
     """
     text = text.strip()
     m = _DEPTH_RE.match(text)
@@ -166,6 +181,18 @@ def _is_heading_label(label_str: str) -> bool:
 def _is_body_label(label_str: str) -> bool:
     """Return True if label string indicates prose body content."""
     return any(sub in label_str for sub in _BODY_LABEL_SUBS)
+
+
+def _is_toc_heading(text: str) -> bool:
+    """Return True if a heading text looks like a ToC entry rather than a real heading.
+
+    Docling occasionally labels ToC lines as section_header.  These must be
+    excluded from the heading stack and sections list to avoid corrupting
+    ancestry for content items that follow them.
+
+    Heuristic: dotted-line leaders (5+ dots) or a bare trailing page number.
+    """
+    return bool(_TOC_HEADING_RE.search(text.strip()))
 
 
 def _ancestry_from_stack(stack: list[dict]) -> dict:
@@ -232,14 +259,27 @@ def _parse_ancestry(doc: Any) -> tuple[list[dict], dict[str, dict], dict[str, st
         text = _item_text(item)
 
         if _is_heading_label(label_str):
+            # Skip ToC entries that Docling may label as section_header.
+            # These must not enter the heading stack or sections list.
+            if _is_toc_heading(text):
+                log.debug("Skipping ToC-like heading: %r", text[:80])
+                continue
+
             depth = _estimate_heading_depth(text)
             section_ref = _extract_section_ref(text)
 
             if not section_ref:
                 log.debug("Prose title (no canonical ref): %r", text[:80])
 
-            # Pop same-or-deeper headings before pushing the new one
+            # Pop same-or-deeper headings before pushing the new one.
             heading_stack = [h for h in heading_stack if h["depth"] < depth]
+
+            # Record ancestry for this heading BEFORE pushing it onto the stack.
+            # The heading's own parent is the current stack top, not itself.
+            # (Codex P1: recording after push would make stack[-1] == self → self-referential parent)
+            item_ancestry[self_ref] = _ancestry_from_stack(heading_stack)
+
+            # Now push this heading so children below will see it as their parent.
             heading_stack.append({
                 "depth": depth,
                 "self_ref": self_ref,
@@ -247,7 +287,7 @@ def _parse_ancestry(doc: Any) -> tuple[list[dict], dict[str, dict], dict[str, st
                 "section_ref": section_ref,
             })
 
-            # Compute full paths at this position
+            # Compute full paths for the sections list (stack now includes this heading).
             ref_path = [h["section_ref"] for h in heading_stack if h["section_ref"]]
             title_path = [h["heading_text"] for h in heading_stack]
 
@@ -262,17 +302,17 @@ def _parse_ancestry(doc: Any) -> tuple[list[dict], dict[str, dict], dict[str, st
             })
             body_accum[self_ref] = []
 
-        # Record ancestry for every item (heading and body alike)
-        ancestry = _ancestry_from_stack(heading_stack)
-        item_ancestry[self_ref] = ancestry
+        else:
+            # Non-heading items: ancestry from current stack (heading above is the parent).
+            item_ancestry[self_ref] = _ancestry_from_stack(heading_stack)
 
-        # Accumulate body text for the immediate parent heading
-        if _is_body_label(label_str) and heading_stack and text.strip():
-            parent_ref = heading_stack[-1]["self_ref"]
-            if parent_ref not in body_accum:
-                body_accum[parent_ref] = []
-            if len(body_accum[parent_ref]) < _PARENT_CONTEXT_MAX_PARAGRAPHS:
-                body_accum[parent_ref].append(text.strip())
+            # Accumulate body text for the immediate parent heading.
+            if _is_body_label(label_str) and heading_stack and text.strip():
+                parent_ref = heading_stack[-1]["self_ref"]
+                if parent_ref not in body_accum:
+                    body_accum[parent_ref] = []
+                if len(body_accum[parent_ref]) < _PARENT_CONTEXT_MAX_PARAGRAPHS:
+                    body_accum[parent_ref].append(text.strip())
 
     # Finalize section_bodies: join and truncate
     section_bodies: dict[str, str] = {
@@ -510,16 +550,19 @@ def _validate_result(result: AncestryResult, stem: str) -> None:
     print(f"    [{'PASS' if gate4 else 'FAIL'}] prose titles have empty section_ref_path "
           f"(no slug leakage): {len(prose_with_bad_ref)} violations")
 
-    # Gate 5: parent_context populated for items with a parent
+    # Gate 5 (advisory — does NOT affect Overall): parent_context populated.
+    # Decision C has not been formally locked; gate 5 cannot be a hard gate until
+    # the parent_context scope definition is finalised.
     items_with_parent = [v for v in item_ancestry.values() if v.get("parent_header_text")]
     items_parent_ctx  = [v for v in items_with_parent if v.get("parent_context")]
     gate5_pct = round(100 * len(items_parent_ctx) / len(items_with_parent), 0) if items_with_parent else 0
     gate5 = gate5_pct >= 50
-    print(f"    [{'PASS' if gate5 else 'WARN'}] parent_context populated: "
+    print(f"    [{'PASS' if gate5 else 'WARN'}] (advisory) parent_context coverage: "
           f"{len(items_parent_ctx)}/{len(items_with_parent)} ({gate5_pct:.0f}%)")
 
+    # Overall = gates 1–4 only; gate 5 is advisory until Decision C is locked
     overall = gate1 and gate2 and gate3 and gate4
-    print(f"\n  Overall: {'PASS' if overall else 'FAIL'}")
+    print(f"\n  Overall: {'PASS' if overall else 'FAIL'} (gates 1–4; gate 5 advisory)")
 
     # Sample headings
     print(f"\n  Heading samples (first 10):")
@@ -544,6 +587,23 @@ def _validate_result(result: AncestryResult, stem: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CLI helpers
+# ---------------------------------------------------------------------------
+
+def _positive_int(value: str) -> int:
+    """argparse type validator: accept only positive integers."""
+    try:
+        ivalue = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an integer")
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(
+            f"--max-pages must be a positive integer, got {ivalue}"
+        )
+    return ivalue
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -557,8 +617,8 @@ def main() -> None:
         help="Output directory (default: same directory as PDF)",
     )
     parser.add_argument(
-        "--max-pages", type=int, default=None,
-        help="Limit conversion to first N pages (testing only)",
+        "--max-pages", type=_positive_int, default=None,
+        help="Limit conversion to first N pages (testing only; must be > 0)",
     )
     parser.add_argument(
         "--validate", action="store_true",

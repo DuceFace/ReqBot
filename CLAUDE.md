@@ -65,7 +65,7 @@ Key spike findings:
 |---|---|---|
 | WP-14.1: Section Header Parser | DONE 2026-04-04 | `section_parser.py`: Docling DocumentConverter + `iterate_items()` ancestry traversal; `section_ref_path` (numbered only) / `section_title_path` (all); ToC heading filter; `parent_context` via recommended Decision C default; PR #19 merged |
 | WP-14.2: Structure-Aware Chunker | DONE 2026-04-04 | `chunk_text.py` `run_structure_aware()`: Docling HybridChunker backend; ToC chunk filter (>40% dotted-leader lines); breadcrumb injection from WP-14.1 ancestry map; `raw_text` / `text` / `breadcrumb` / `section_ref_path` / `section_title_path` / `parent_header_text` / `parent_context` fields; `--layout-mode docling` in `run_pipeline.py` |
-| WP-14.3: Schema + Normalization | NOT STARTED | Propagate `section_path`/`parent_ref`/`parent_context`/`child_refs` through Steps C→D→D.5→E; schema v2.0 |
+| WP-14.3: Schema + Normalization | DONE 2026-04-04 | `parse_and_normalize.py` schema v2.0; 5 hierarchy fields in normalized records; `aggregate_and_export.py` hierarchy stats; `embed_and_index.py` payload updated; PR open |
 | WP-14.4: Full Re-ingest | NOT STARTED | 45-doc re-ingest; record baseline dir names in `docs/phase14_baseline_dirs.txt` before running |
 
 **Decision C (parent context scope):** accepted as-is. WP-14.2 inherits the WP-14.1 default — `parent_context` = first ~600 chars of body text after the immediate parent heading, fallback to header text. No further action required; WP-14.3 passes it through unchanged.

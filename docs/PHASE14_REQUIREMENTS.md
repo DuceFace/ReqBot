@@ -224,6 +224,16 @@ For representative documents:
 
 ### 6.3 WP-14.3: Schema and Pipeline Propagation
 
+**Status: DONE 2026-04-04 — schema v2.0; hierarchy fields propagated through Steps D → D.5 → E → F.**
+
+- `parse_and_normalize.py`: `SCHEMA_VERSION = "2.0"`; `build_chunk_hierarchy_map()` + `build_section_children_map()` from chunks.jsonl; 5 new fields on every normalized record (`section_ref_path`, `section_title_path`, `parent_section_ref`, `parent_context`, `child_section_refs`); legacy v1.0 chunks gracefully degrade to empty values.
+- `aggregate_and_export.py`: `stats.json` now includes `hierarchy.with_section_path`, `hierarchy.with_parent_context`, `hierarchy.hierarchy_coverage_pct`.
+- `embed_and_index.py`: `build_payload()` includes all 5 hierarchy fields in Qdrant payload.
+- `enrich_requirements.py`: no changes needed — `{**req, **enrichment}` spread already passes hierarchy fields through unchanged.
+- `llm_extract_requirements.py`: no changes needed — breadcrumb is already in `chunk["text"]`; Step C does not infer hierarchy.
+
+---
+
 **Goal:** propagate deterministic hierarchy metadata through extraction, normalization, enrichment, and export.
 
 #### Requirements

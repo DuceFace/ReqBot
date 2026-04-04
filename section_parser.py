@@ -192,7 +192,7 @@ def _is_toc_heading(text: str) -> bool:
     excluded from the heading stack and sections list to avoid corrupting
     ancestry for content items that follow them.
 
-    Heuristic: dotted-line leaders (5+ dots) or a bare trailing page number.
+    Heuristic: dotted-line leaders (5+ consecutive dots).
     """
     return bool(_TOC_HEADING_RE.search(text.strip()))
 

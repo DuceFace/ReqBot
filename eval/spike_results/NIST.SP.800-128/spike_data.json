@@ -1,0 +1,228 @@
+{
+  "stem": "NIST.SP.800-128",
+  "doc_class": "nist_sp",
+  "docling_ok": true,
+  "docling_error": "",
+  "convert_seconds": 158.1,
+  "total_items": 1020,
+  "heading_items": 145,
+  "table_items": 33,
+  "text_items": 782,
+  "max_heading_depth": 3,
+  "heading_samples": [
+    [
+      1,
+      "NIST Special Publication 800-128"
+    ],
+    [
+      1,
+      "Guide for Security-Focused Configuration Management of Information Systems"
+    ],
+    [
+      1,
+      "I N F O R M A T I O N   S E C U R I T Y"
+    ],
+    [
+      1,
+      "NIST Special Publication 800-128"
+    ],
+    [
+      1,
+      "Guide for Security-Focused Configuration Management of Information Systems"
+    ],
+    [
+      1,
+      "Authority"
+    ],
+    [
+      1,
+      "Comments on this publication may be submitted to:"
+    ],
+    [
+      1,
+      "Reports on Computer Systems Technology"
+    ],
+    [
+      1,
+      "Abstract"
+    ],
+    [
+      1,
+      "Keywords"
+    ],
+    [
+      1,
+      "Acknowledgments"
+    ],
+    [
+      1,
+      "Table of Contents"
+    ],
+    [
+      1,
+      "Errata"
+    ],
+    [
+      1,
+      "CHAPTER ONE"
+    ],
+    [
+      1,
+      "INTRODUCTION"
+    ],
+    [
+      2,
+      "1.1 PURPOSE AND APPLICABILITY"
+    ],
+    [
+      2,
+      "1.2 TARGET AUDIENCE"
+    ],
+    [
+      2,
+      "1.3 RELATIONSHIP TO OTHER SECURITY PUBLICATIONS"
+    ],
+    [
+      2,
+      "1.4 ORGANIZATION OF THIS SPECIAL PUBLICATION"
+    ],
+    [
+      1,
+      "CHAPTER TWO"
+    ]
+  ],
+  "table_samples": [
+    "| Date       | Type        | Change                                                                                                                                                                                                                                                                                                                      | Page            |\n|------------|-------------|-------…",
+    "| Date       | Type        | Change                                                                                                                                                                                                                                                                                                                  |   Page |\n|------------|-------------|--------------------…",
+    "| Date       | Type        | Change                                                                                                                                                                  |   Page |\n|------------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------…",
+    "| Date       | Type        | Change                                                                                                                                                                                                                                                                                                                                                  | Page   |\n|------------|--…",
+    "| Date       | Type        | Change                                                                                                                                                                                                                                                                                                                                                                             …"
+  ],
+  "docling_chunk_count": 364,
+  "toc_chunk_count": 25,
+  "docling_avg_chars": 739.0,
+  "docling_chunk_samples": [
+    {
+      "text_preview": "Arnold Johnson Kelley Dempsey Ron Ross Sarbari Gupta Dennis Bailey\nThis publication is available free of charge from: https://doi.org/10.6028/NIST.SP.800-128\nArnold Johnson Kelley Dempsey Ron Ross Computer Security Division Information Technology Laboratory\nSarbari Gupta Dennis Bailey Electrosoft Services, Inc. Reston, VA\nThis publication is available free of charge from: https://doi.org/10.6028/N…",
+      "char_count": 668,
+      "headings": [
+        "Guide for Security-Focused Configuration Management of Information Systems"
+      ]
+    },
+    {
+      "text_preview": "This publication has been developed by NIST to further its statutory responsibilities under the Federal Information Security Modernization Act of 2014, 44 U.S.C. § 3551 et seq ., Public Law (P.L.) 113-283. NIST is responsible for developing information security standards and guidelines, including minimum requirements for federal information systems, but such standards and guidelines shall not appl…",
+      "char_count": 1201,
+      "headings": [
+        "Authority"
+      ]
+    },
+    {
+      "text_preview": "National Institute of Standards and Technology Special Publication 800-128 Natl. Inst. Stand. Technol. Spec. Publ. 800-128, 99 pages (August 2011) CODEN: NSPUE2\nThis publication is available free of charge from: https://doi.org/10.6028/NIST.SP.800-128\nCertain  commercial  entities,  equipment,  or  materials  may  be  identified  in  this  document  in  order  to  describe  an experimental  proced…",
+      "char_count": 1266,
+      "headings": [
+        "Authority"
+      ]
+    },
+    {
+      "text_preview": "Organizations are encouraged to review all draft publications during public comment periods and provide feedback to NIST. Many NIST cybersecurity publications, other than the ones noted above, are available at https://csrc.nist.gov/publications.",
+      "char_count": 245,
+      "headings": [
+        "Authority"
+      ]
+    },
+    {
+      "text_preview": "National Institute of Standards and Technology Attn: Computer Security Division, Information Technology Laboratory 100 Bureau Drive (Mail Stop 8930) Gaithersburg, MD 20899-8930 Electronic mail: sec-cert@nist.gov\nAll comments are subject to release under the Freedom of Information Act (FOIA).\n_______________________________________________________________________________________________",
+      "char_count": 388,
+      "headings": [
+        "Comments on this publication may be submitted to:"
+      ]
+    }
+  ],
+  "parent_child_groups": 0,
+  "parent_child_example": {},
+  "chunk_heading_dist": {
+    "0": 0,
+    "1": 339,
+    "2+": 0
+  },
+  "existing_chunk_count": 103,
+  "existing_avg_chars": 2969.0,
+  "existing_chunk_samples": [
+    {
+      "chunk_id": 0,
+      "pages": "1–3",
+      "text_preview": "NIST Special Publication 800-128 \n \nGuide for Security-Focused \nConfiguration Management of \nInformation Systems \n \nArnold Johnson \nKelley Dempsey \nRon Ross \nSarbari Gupta \nDennis Bailey \n \n \nThis publication is available free of charge from: \nhttps://doi.org/10.6028/NIST.SP.800-128 \n \n \nI N F O R M…"
+    },
+    {
+      "chunk_id": 1,
+      "pages": "3–4",
+      "text_preview": "equipment are necessarily the best \navailable for the purpose.  \nThere may be references in this publication to other publications currently under development by NIST in accordance \nwith its assigned statutory responsibilities. The information in this publication, including concepts and methodologie…"
+    },
+    {
+      "chunk_id": 2,
+      "pages": "4–5",
+      "text_preview": "ciples described in \nthis publication provide supporting information for NIST SP 800-53, Security and Privacy Controls for \nFederal Information Systems and Organizations. NIST SP 800-128 assumes that information security is \nan integral part of an organization’s overall configuration management. The…"
+    }
+  ],
+  "bridge_samples": [
+    {
+      "chunk_id": 0,
+      "page_start": 1,
+      "page_end": 2,
+      "text": "[Guide for Security-Focused Configuration Management of Information Systems]\n\nArnold Johnson Kelley Dempsey Ron Ross Sarbari Gupta Dennis Bailey\nThis publication is available free of charge from: https://doi.org/10.6028/NIST.SP.800-128\nArnold Johnson Kelley Dempsey Ron Ross Computer Security Division Information Technology Laboratory\nSarbari Gupta Dennis Bailey Electrosoft Services, Inc. Reston, VA\nThis publication is available free of charge from: https://doi.org/10.6028/NIST.SP.800-128\nAugust 2011\nINCLUDES UPDATES AS OF 10-10-2019; SEE PAGE IV\nU.S. Department of Commerce Wilbur L. Ross, Jr.,…",
+      "raw_text": "Arnold Johnson Kelley Dempsey Ron Ross Sarbari Gupta Dennis Bailey\nThis publication is available free of charge from: https://doi.org/10.6028/NIST.SP.800-128\nArnold Johnson Kelley Dempsey Ron Ross Computer Security Division Information Technology Laboratory\nSarbari Gupta Dennis Bailey Electrosoft Services, Inc. Reston, VA\nThis publication is available free of charge from: https://doi.org/10.6028/N…",
+      "breadcrumb": "Guide for Security-Focused Configuration Management of Information Systems",
+      "section_ref_path": [
+        ""
+      ],
+      "section_title_path": [
+        "Guide for Security-Focused Configuration Management of Information Systems"
+      ],
+      "parent_header_text": "Guide for Security-Focused Configuration Management of Information Systems",
+      "parent_context": null
+    },
+    {
+      "chunk_id": 1,
+      "page_start": 3,
+      "page_end": 3,
+      "text": "[Authority]\n\nThis publication has been developed by NIST to further its statutory responsibilities under the Federal Information Security Modernization Act of 2014, 44 U.S.C. § 3551 et seq ., Public Law (P.L.) 113-283. NIST is responsible for developing information security standards and guidelines, including minimum requirements for federal information systems, but such standards and guidelines shall not apply to national security systems without the express approval of appropriate federal officials exercising policy authority over such systems. This guideline is consistent with the requireme…",
+      "raw_text": "This publication has been developed by NIST to further its statutory responsibilities under the Federal Information Security Modernization Act of 2014, 44 U.S.C. § 3551 et seq ., Public Law (P.L.) 113-283. NIST is responsible for developing information security standards and guidelines, including minimum requirements for federal information systems, but such standards and guidelines shall not appl…",
+      "breadcrumb": "Authority",
+      "section_ref_path": [
+        ""
+      ],
+      "section_title_path": [
+        "Authority"
+      ],
+      "parent_header_text": "Authority",
+      "parent_context": null
+    },
+    {
+      "chunk_id": 2,
+      "page_start": 3,
+      "page_end": 3,
+      "text": "[Authority]\n\nNational Institute of Standards and Technology Special Publication 800-128 Natl. Inst. Stand. Technol. Spec. Publ. 800-128, 99 pages (August 2011) CODEN: NSPUE2\nThis publication is available free of charge from: https://doi.org/10.6028/NIST.SP.800-128\nCertain  commercial  entities,  equipment,  or  materials  may  be  identified  in  this  document  in  order  to  describe  an experimental  procedure  or  concept  adequately.  Such  identification  is  not  intended  to  imply  recommendation  or endorsement by NIST, nor is it intended to imply that the entities, materials, or equ…",
+      "raw_text": "National Institute of Standards and Technology Special Publication 800-128 Natl. Inst. Stand. Technol. Spec. Publ. 800-128, 99 pages (August 2011) CODEN: NSPUE2\nThis publication is available free of charge from: https://doi.org/10.6028/NIST.SP.800-128\nCertain  commercial  entities,  equipment,  or  materials  may  be  identified  in  this  document  in  order  to  describe  an experimental  proced…",
+      "breadcrumb": "Authority",
+      "section_ref_path": [
+        ""
+      ],
+      "section_title_path": [
+        "Authority"
+      ],
+      "parent_header_text": "Authority",
+      "parent_context": null
+    }
+  ],
+  "structure_verdict": "pass",
+  "chunk_verdict": "pass",
+  "parent_context_verdict": "fail",
+  "bridge_verdict": "partial",
+  "overall_verdict": "PARTIAL PASS",
+  "notes": [
+    "Existing Step B: 103 chunks, avg 2969 chars, ~93% end without sentence terminator (rough mid-split proxy)",
+    "ToC filter: 25 of 364 chunks flagged as Table of Contents noise and excluded from samples",
+    "parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading per chunk (not full ancestry path) — 339 chunks carry exactly 1 heading, 0 carry 2+. Full ancestry requires traversal of the Docling document model (doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity that must be estimated before recommending Outcome A.",
+    "bridge_verdict=partial: bridge samples produced but section_ref_path contains only empty strings (headings present without numbered prefixes)"
+  ]
+}

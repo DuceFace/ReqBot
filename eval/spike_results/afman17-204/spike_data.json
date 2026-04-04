@@ -1,0 +1,220 @@
+{
+  "stem": "afman17-204",
+  "doc_class": "afi_daf",
+  "docling_ok": true,
+  "docling_error": "",
+  "convert_seconds": 73.1,
+  "total_items": 237,
+  "heading_items": 29,
+  "table_items": 3,
+  "text_items": 198,
+  "max_heading_depth": 2,
+  "heading_samples": [
+    [
+      1,
+      "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+    ],
+    [
+      1,
+      "SUMMARY OF CHANGES"
+    ],
+    [
+      1,
+      "Chapter 1"
+    ],
+    [
+      1,
+      "ROLES AND RESPONSIBILITIES"
+    ],
+    [
+      2,
+      "1.2. Deputy Chief of Staff of the Air Force, Intelligence, Surveillance, Reconnaissance, and Cyber Effects Operations (A…"
+    ],
+    [
+      2,
+      "1.3. Secretary of the Air Force, Office of Information and Deputy Chief Information Officer (SAF/CN) will:"
+    ],
+    [
+      2,
+      "1.4. Air Force Career Field Manager (AFCFM). AFCFMs:"
+    ],
+    [
+      2,
+      "1.6. The 81st Training Support Squadron Qualification Flight (81st TRSS/TSQ) will:"
+    ],
+    [
+      2,
+      "1.7. High Performance Team (HPT) will:"
+    ],
+    [
+      2,
+      "1.8. Learning Program Manager will:"
+    ],
+    [
+      1,
+      "Chapter 2"
+    ],
+    [
+      1,
+      "TRAINING PRODUCTS AND RESOURCES"
+    ],
+    [
+      2,
+      "2.3. Requesting New Training Products."
+    ],
+    [
+      2,
+      "2.6. Managing Training Products."
+    ],
+    [
+      1,
+      "Attachment 1"
+    ],
+    [
+      1,
+      "GLOSSARY OF REFERENCES AND SUPPORTING INFORMATION"
+    ],
+    [
+      1,
+      "References"
+    ],
+    [
+      1,
+      "Terms"
+    ],
+    [
+      1,
+      "Attachment 2"
+    ],
+    [
+      1,
+      "PRIORITIES FOR DEVELOPING AIR FORCE CYBER TRAINING PRODUCTS"
+    ]
+  ],
+  "table_samples": [
+    "| Project / Package Type   |   797 Only |   AFJQS |   AFJQS w/ Modules |   AFQTP |   Interactive Courseware |\n|--------------------------|------------|---------|--------------------|---------|--------------------------|\n| New                      |         97 |     126 |                156 |     136 |                      182 |\n| Major Revision           |         75 |     104 |                134…",
+    "| A    | B                                                                                     | C     | D   | E                          | F                         | G                       | H                                     |\n|------|---------------------------------------------------------------------------------------|-------|-----|----------------------------|---------------------------…",
+    "|   5 | Review and coordinate tentative AFJQS/AFQTP                      |    | X   | X   | X   |\n|-----|------------------------------------------------------------------|----|-----|-----|-----|\n|   6 | Prepare final AFJQS/ AFQTP                                       |    |     | X   |     |\n|   7 | Approve final AFJQS/ AFQTP and if applicable, sign AF673         | X  |     |     |     |\n|   8 | …"
+  ],
+  "docling_chunk_count": 69,
+  "toc_chunk_count": 10,
+  "docling_avg_chars": 682.0,
+  "docling_chunk_samples": [
+    {
+      "text_preview": "BY ORDER OF THE SECRETARY OF THE AIR FORCE\nAIR FORCE MANUAL 17-204\n26 FEBRUARY 2020\nCyberspace\nAIR FORCE ON-THE-JOB TRAINING PRODUCTS FOR CYBER SUPPORT ENLISTED SPECIALTY TRAINING",
+      "char_count": 179,
+      "headings": []
+    },
+    {
+      "text_preview": "ACCESSIBILITY:\nPublications and forms are available for downloading or ordering on the e-Publishing website at www.e-Publishing.af.mil\nRELEASABILITY:\nThere are no releasability restrictions for this publication\nOPR:\nAF/A2/6FD\nSupersedes:\nAFI33-154, 1 May 2013 and\nAFI17-204, 1 May 2013\nCertified by: AF/A2/6,\n(Maj Gen Kevin B. Kennedy)\nPages: 21",
+      "char_count": 345,
+      "headings": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+      ]
+    },
+    {
+      "text_preview": "This manual implements Air Force Policy Directive (AFPD) 17-2, Cyberspace Operations, and is consistent with Air Force Instruction (AFI) 36-2651, Air Force Training Program . It establishes procedures and assigns responsibilities for developing, distributing, evaluating and using Air Force (AF) training products for cyber support enlisted specialty qualification training. It applies to all Regular…",
+      "char_count": 1331,
+      "headings": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+      ]
+    },
+    {
+      "text_preview": "requestor's  commander  for  non-tiered compliance items. This publication may be supplemented at any level, but all supplements must be routed to the OPR of this publication for coordination prior to certification and approval. Ensure all  records  created  as  a  result  of  processes  prescribed  in  this  publication  are  maintained  in accordance with Air Force Manual (AFMAN) 33-363, Managem…",
+      "char_count": 716,
+      "headings": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+      ]
+    },
+    {
+      "text_preview": "This document has been substantially revised from an AFI to an AFMAN and must be completely reviewed.    Major  changes  include  revisions  to  terminology  and  unit  nomenclature,  chapter reorganization, timeline additions to Table 2.1 ,  addition of several attachments, and updates to Table A3.1\n4\n4\n4\n4\n4\n5\n6\n7\n8\n9\n9\n9\n9",
+      "char_count": 327,
+      "headings": [
+        "SUMMARY OF CHANGES"
+      ]
+    }
+  ],
+  "parent_child_groups": 0,
+  "parent_child_example": {},
+  "chunk_heading_dist": {
+    "0": 1,
+    "1": 58,
+    "2+": 0
+  },
+  "existing_chunk_count": 16,
+  "existing_avg_chars": 2837.0,
+  "existing_chunk_samples": [
+    {
+      "chunk_id": 0,
+      "pages": "1–2",
+      "text_preview": "BY ORDER OF THE SECRETARY  \nOF THE AIR FORCE \n \nAIR FORCE MANUAL 17-204 \n26 FEBRUARY 2020 \nCyberspace \nAIR FORCE ON-THE-JOB TRAINING \nPRODUCTS FOR CYBER SUPPORT \nENLISTED SPECIALTY TRAINING \nCOMPLIANCE WITH THIS PUBLICATION IS MANDATORY \n \nACCESSIBILITY:  Publications and forms are available for dow…"
+    },
+    {
+      "chunk_id": 1,
+      "pages": "2–4",
+      "text_preview": "completely \nreviewed.  Major changes include revisions to terminology and unit nomenclature, chapter \nreorganization, timeline additions to Table 2.1, addition of several attachments, and updates to \nTable A3.1 \n \nChapter 1—ROLES AND RESPONSIBILITIES \n \n4 \n1.1. \nGeneral.  ...........................…"
+    },
+    {
+      "chunk_id": 2,
+      "pages": "3–5",
+      "text_preview": "—OPR REQUEST LETTER \n \n21 \n \n \n \n4 \nAFMAN 17-204  26 FEBRUARY 2020 \nChapter 1 \nROLES AND RESPONSIBILITIES \n1.1.  General.  The following paragraphs provide a summary of the objectives, organizational and \nfunctional relationships, and responsibilities that form the foundation for the cyber support t…"
+    }
+  ],
+  "bridge_samples": [
+    {
+      "chunk_id": 0,
+      "page_start": 1,
+      "page_end": 1,
+      "text": "BY ORDER OF THE SECRETARY OF THE AIR FORCE\nAIR FORCE MANUAL 17-204\n26 FEBRUARY 2020\nCyberspace\nAIR FORCE ON-THE-JOB TRAINING PRODUCTS FOR CYBER SUPPORT ENLISTED SPECIALTY TRAINING",
+      "raw_text": "BY ORDER OF THE SECRETARY OF THE AIR FORCE\nAIR FORCE MANUAL 17-204\n26 FEBRUARY 2020\nCyberspace\nAIR FORCE ON-THE-JOB TRAINING PRODUCTS FOR CYBER SUPPORT ENLISTED SPECIALTY TRAINING",
+      "breadcrumb": null,
+      "section_ref_path": [],
+      "section_title_path": [],
+      "parent_header_text": null,
+      "parent_context": null
+    },
+    {
+      "chunk_id": 1,
+      "page_start": 1,
+      "page_end": 1,
+      "text": "[COMPLIANCE WITH THIS PUBLICATION IS MANDATORY]\n\nACCESSIBILITY:\nPublications and forms are available for downloading or ordering on the e-Publishing website at www.e-Publishing.af.mil\nRELEASABILITY:\nThere are no releasability restrictions for this publication\nOPR:\nAF/A2/6FD\nSupersedes:\nAFI33-154, 1 May 2013 and\nAFI17-204, 1 May 2013\nCertified by: AF/A2/6,\n(Maj Gen Kevin B. Kennedy)\nPages: 21",
+      "raw_text": "ACCESSIBILITY:\nPublications and forms are available for downloading or ordering on the e-Publishing website at www.e-Publishing.af.mil\nRELEASABILITY:\nThere are no releasability restrictions for this publication\nOPR:\nAF/A2/6FD\nSupersedes:\nAFI33-154, 1 May 2013 and\nAFI17-204, 1 May 2013\nCertified by: AF/A2/6,\n(Maj Gen Kevin B. Kennedy)\nPages: 21",
+      "breadcrumb": "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+      "section_ref_path": [
+        ""
+      ],
+      "section_title_path": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+      ],
+      "parent_header_text": "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+      "parent_context": null
+    },
+    {
+      "chunk_id": 2,
+      "page_start": 1,
+      "page_end": 1,
+      "text": "[COMPLIANCE WITH THIS PUBLICATION IS MANDATORY]\n\nThis manual implements Air Force Policy Directive (AFPD) 17-2, Cyberspace Operations, and is consistent with Air Force Instruction (AFI) 36-2651, Air Force Training Program . It establishes procedures and assigns responsibilities for developing, distributing, evaluating and using Air Force (AF) training products for cyber support enlisted specialty qualification training. It applies to all Regular Air Force, Air National Guard, Air Force Reserve, and civilian cyber support personnel in  a  training  status  or  filling  a  crew  position  that  …",
+      "raw_text": "This manual implements Air Force Policy Directive (AFPD) 17-2, Cyberspace Operations, and is consistent with Air Force Instruction (AFI) 36-2651, Air Force Training Program . It establishes procedures and assigns responsibilities for developing, distributing, evaluating and using Air Force (AF) training products for cyber support enlisted specialty qualification training. It applies to all Regular…",
+      "breadcrumb": "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+      "section_ref_path": [
+        ""
+      ],
+      "section_title_path": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+      ],
+      "parent_header_text": "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+      "parent_context": null
+    }
+  ],
+  "structure_verdict": "pass",
+  "chunk_verdict": "pass",
+  "parent_context_verdict": "fail",
+  "bridge_verdict": "partial",
+  "overall_verdict": "PARTIAL PASS",
+  "notes": [
+    "Existing Step B: 16 chunks, avg 2837 chars, ~88% end without sentence terminator (rough mid-split proxy)",
+    "ToC filter: 10 of 69 chunks flagged as Table of Contents noise and excluded from samples",
+    "parent_context_verdict=fail: HybridChunker provides only the IMMEDIATE heading per chunk (not full ancestry path) — 58 chunks carry exactly 1 heading, 0 carry 2+. Full ancestry requires traversal of the Docling document model (doc.body / item.parent), not just chunk.meta.headings. This is bridge complexity that must be estimated before recommending Outcome A.",
+    "bridge_verdict=partial: bridge samples produced but section_ref_path contains only empty strings (headings present without numbered prefixes)"
+  ]
+}

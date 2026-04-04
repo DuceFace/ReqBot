@@ -96,27 +96,74 @@ def run(
 
     pipeline_start = time.time()
 
-    if "A" in steps_to_run:
-        log.info("=" * 60)
-        log.info("Starting Step A (PDF → Text)")
-        log.info("=" * 60)
-        try:
-            extract_pdf_to_text.run(str(pdf), str(pages_path), layout_mode=layout_mode)
-        except Exception as e:
-            raise RuntimeError(f"Step A failed: {e}") from e
+    # Steps A and B: PDF → chunks.  Two paths depending on layout_mode.
+    #
+    # Docling path (layout_mode="docling"):
+    #   Step A = section_parser.run() → DoclingDocument + *_ancestry.json
+    #   Step B = chunk_text.run_structure_aware() → enriched *_chunks.jsonl
+    #   The ancestry_result is passed in-process so HybridChunker reuses the
+    #   already-parsed DoclingDocument without a second PDF conversion.
+    #
+    # Legacy path (layout_mode="pymupdf" or "pdfplumber"):
+    #   Step A = extract_pdf_to_text.run() → *_pages.jsonl
+    #   Step B = chunk_text.run()          → *_chunks.jsonl (fixed-size)
 
-    if "B" in steps_to_run:
-        log.info("=" * 60)
-        log.info("Starting Step B (Text → Chunks)")
-        log.info("=" * 60)
-        try:
-            chunk_text_mod.run(
-                str(pages_path), str(chunks_path),
-                chunk_size=chunk_size, overlap=overlap,
-                table_aware=(layout_mode == "pdfplumber"),
-            )
-        except Exception as e:
-            raise RuntimeError(f"Step B failed: {e}") from e
+    ancestry_result = None  # populated by Step A in docling mode; used in Step B
+
+    if layout_mode == "docling":
+        if "A" in steps_to_run:
+            log.info("=" * 60)
+            log.info("Starting Step A (PDF → Docling ancestry map)")
+            log.info("=" * 60)
+            try:
+                import section_parser as _section_parser
+                ancestry_result = _section_parser.run(str(pdf), str(out_dir))
+            except Exception as e:
+                raise RuntimeError(f"Step A (Docling) failed: {e}") from e
+
+        if "B" in steps_to_run:
+            log.info("=" * 60)
+            log.info("Starting Step B (Docling HybridChunker + breadcrumb injection)")
+            log.info("=" * 60)
+            # If --skip-to B in docling mode, Step A was skipped so we need the ancestry
+            if ancestry_result is None:
+                log.info("Step A was skipped — running section_parser to obtain DoclingDocument")
+                try:
+                    import section_parser as _section_parser
+                    ancestry_result = _section_parser.run(str(pdf), str(out_dir))
+                except Exception as e:
+                    raise RuntimeError(f"Step A (Docling, skip-to-B recovery) failed: {e}") from e
+            try:
+                chunk_text_mod.run_structure_aware(
+                    str(chunks_path),
+                    ancestry_result=ancestry_result,
+                )
+            except Exception as e:
+                raise RuntimeError(f"Step B (Docling) failed: {e}") from e
+
+    else:
+        # Legacy path
+        if "A" in steps_to_run:
+            log.info("=" * 60)
+            log.info("Starting Step A (PDF → Text)")
+            log.info("=" * 60)
+            try:
+                extract_pdf_to_text.run(str(pdf), str(pages_path), layout_mode=layout_mode)
+            except Exception as e:
+                raise RuntimeError(f"Step A failed: {e}") from e
+
+        if "B" in steps_to_run:
+            log.info("=" * 60)
+            log.info("Starting Step B (Text → Chunks)")
+            log.info("=" * 60)
+            try:
+                chunk_text_mod.run(
+                    str(pages_path), str(chunks_path),
+                    chunk_size=chunk_size, overlap=overlap,
+                    table_aware=(layout_mode == "pdfplumber"),
+                )
+            except Exception as e:
+                raise RuntimeError(f"Step B failed: {e}") from e
 
     if "C" in steps_to_run:
         log.info("=" * 60)
@@ -273,9 +320,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--layout-mode",
-        choices=["pymupdf", "pdfplumber"],
+        choices=["pymupdf", "pdfplumber", "docling"],
         default="pymupdf",
-        help="PDF extraction backend for Step A (default: pymupdf). Use 'pdfplumber' for table-aware extraction.",
+        help="PDF extraction backend for Step A (default: pymupdf). "
+             "Use 'pdfplumber' for table-aware extraction. "
+             "Use 'docling' for structure-aware chunking (WP-14.2 path).",
     )
     parser.add_argument(
         "--skip-enrichment",

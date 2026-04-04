@@ -106,21 +106,29 @@ Docling `HybridChunker` handles paragraph boundary detection internally. The bla
 
 ### 5.3 Decision C - Parent Context Scope
 
-**STILL REQUIRED before WP-14.1/14.2 implementation begins.**
+**RESOLVED 2026-04-04 — default accepted as-is; WP-14.2 inherits without adjustment.**
 
-Lock the definition of parent context before implementation. It should not drift package by package.
+WP-14.1 (`section_parser.py`) implements:
+- `parent_context` = first `_PARENT_CONTEXT_MAX_CHARS` (600) chars of body text after the immediate parent heading (up to 5 paragraphs), falling back to parent header text when no body text exists.
 
-Recommended default:
-
-- `parent_context` = the full immediate parent clause text when available, not just the numeric header
-
-If the parent clause body cannot be isolated cleanly, fall back to the immediate parent header text and log the degradation.
+WP-14.2 validation confirmed the default produces adequate parent context across all three document classes (NIST, DODI, AFI). The 600-char / 5-paragraph cap is accepted. No further lock action required — WP-14.3 passes `parent_context` through unchanged.
 
 ---
 
 ## 6. Work Packages
 
 ### 6.1 WP-14.1: Docling Integration + Ancestry Traversal
+
+**Status: DONE 2026-04-04 — `section_parser.py` shipped, PR #19 merged.**
+
+Validation gate results (--max-pages 40):
+- NIST SP 800-128: PASS (68 headings, depth 3, 102 items with 2+ title ancestors)
+- DODI 8551.01: PASS (24 headings, depth 2, hierarchy `SECTION-1 > 1.1` confirmed)
+- afman17-204: PASS (29 headings, depth 2, 97 items with 2+ title ancestors)
+
+Known deferred (WP-14.2 scope): prose heading depth collapse. All prose titles resolve to depth=1; documented in code as a known constraint with a path to using Docling structural level in a future pass.
+
+---
 
 **Goal:** replace `extract_pdf_to_text.py` + regex section parser with Docling as the primary structural parsing backend, and build a deterministic ancestry map from the Docling document model.
 
@@ -162,6 +170,19 @@ Run on one representative document per major class and confirm:
 ---
 
 ### 6.2 WP-14.2: Docling-Based Structure-Aware Chunker
+
+**Status: DONE 2026-04-04 — `run_structure_aware()` shipped in `chunk_text.py`; `--layout-mode docling` added to `run_pipeline.py`.**
+
+Validation gate results (--max-pages 25–30):
+- NIST SP 800-128: PASS — 125 chunks, 17 ToC filtered, 100% breadcrumb coverage, 47/125 items with depth≥2 ancestry, 0 ToC lines in output
+- DODI 8551.01: PASS — 35 chunks, 18 ToC filtered, 100% breadcrumb coverage, 23/35 items with depth≥2 ancestry, 0 ToC lines in output
+- afman17-204: PASS — 60 chunks, 8 ToC filtered, 98% breadcrumb (1 cover-page chunk with no heading context — correct degradation), 28/60 with depth≥2, 0 ToC lines in output
+
+Decision C: accepted as-is. WP-14.2 inherits the WP-14.1 recommended default (600 chars). No adjustment needed.
+
+Known: the 1 AFI chunk without breadcrumb is the document cover page — it precedes any heading in the document. Empty breadcrumb is the correct graceful-degradation behavior for pre-heading content.
+
+---
 
 **Goal:** replace the fixed-size chunker (`chunk_text.py`) with Docling `HybridChunker` as the chunking backend, augmented with ToC filtering and breadcrumb injection from the WP-14.1 ancestry map.
 
@@ -245,6 +266,8 @@ Verify on representative documents:
 1. Record baseline artifact directories before regeneration.
 
 2. Re-run ingestion on the full corpus using the same extraction and enrichment models as the current baseline.
+
+   **Step C cache note:** the Step C cache is keyed on a hash of prompt content and chunk `text`. WP-14.2 breadcrumb injection changes the `text` field of every chunk, so all Step C cache entries will self-invalidate automatically — no manual cache clearing is required. Full re-processing of Step C is expected and intentional.
 
 3. Rebuild indexes from the regenerated artifacts.
 

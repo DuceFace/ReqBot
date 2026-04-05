@@ -87,6 +87,13 @@ Steps A–E          → (no cross-imports between steps)
 **Key constraint:** Pipeline steps (A–E) are intentionally isolated — they do not import each
 other. `run_pipeline.py` is the only orchestrator. Do not add cross-imports between step scripts.
 
+**Docling exception (in-memory pass-through):** In the docling path, `run_pipeline.py` passes
+an in-memory `AncestryResult` object from `section_parser.py` (Step A) directly to
+`chunk_text.py` (Step B). This avoids a redundant second PDF parse but is a deliberate
+exception to the JSONL-only inter-step communication pattern. The `_ancestry.json` file is
+still written to disk as a durable artifact; the in-memory object is an optimization, not a
+replacement for it. All other step boundaries remain JSONL-only.
+
 ---
 
 ## External Dependencies

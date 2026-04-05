@@ -1,9 +1,9 @@
 # Indexed Documents
 
 Documents currently in the Qdrant `grc_requirements` collection.
-Run `python3 grcai.py docs` to see a live view with up-to-date counts.
+Run `reqbot docs` to see a live view with up-to-date counts.
 
-Last updated: 2026-03-08 | Total: 45 documents, 28,826 requirements
+Last updated: 2026-04-05 | Total: 45 documents, 31,734 requirements
 
 > **Extraction mode note:** `pdfplumber` is detected from the presence of table
 > sentinels in the chunk file. DODI docs re-run on 2026-03-07 were all processed

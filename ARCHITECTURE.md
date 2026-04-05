@@ -21,7 +21,6 @@ console.py         ← Interactive shell (cmd.Cmd); wraps reqbot.py commands
 config.py          ← Configuration loader (stdlib only; no internal imports)
 run_pipeline.py    ← Pipeline orchestrator (Steps A–E + D.5); called by reqbot.py
 synthesis.py       ← LLM synthesis abstraction (local Ollama or remote API)
-CLAUDE.md          ← Agent onboarding (read first; current phase, file map, gotchas)
 
 --- Pipeline Steps (standalone, no cross-imports) ---
 extract_pdf_to_text.py       Step A  (legacy):  PDF → pages JSONL  [pymupdf / pdfplumber]

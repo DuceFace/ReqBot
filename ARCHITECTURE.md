@@ -288,5 +288,5 @@ Optional files loaded at startup:
 | `ask.py` (search result format) | `reqbot.py` (ask, compare, evidence commands) | Result parsing in reqbot.py must match |
 | `synthesis.py` API signature | `reqbot.py` (evidence, ask --synthesize) | Signature is: `synthesize(snippets, query, backend, model, ollama_url, provider, api_key)` |
 | `run_pipeline.py` return value | `reqbot.py` (ingest, batch commands) | Returns path to normalized/enriched JSONL; change breaks auto-index |
-| `section_parser.py` output fields | `chunk_text.py` `run_structure_aware()` | AncestryResult fields (ancestry_map, doc) must stay stable; chunk_text reads both |
+| `section_parser.py` output fields | `chunk_text.py` `run_structure_aware()` | AncestryResult fields (item_ancestry, doc) must stay stable; chunk_text reads both |
 | `chunk_text.py` chunk fields (docling) | `parse_and_normalize.py` `build_chunk_hierarchy_map()` | Hierarchy field names (section_ref_path etc.) must match what Step D reads from chunks.jsonl |

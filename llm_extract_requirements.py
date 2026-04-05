@@ -240,7 +240,6 @@ def call_ollama(
         "model": model,
         "prompt": prompt,
         "stream": False,
-        "format": "json",  # R-1.1: constrain output to valid JSON (grammar-guided sampling)
         "options": {
             "temperature": 0.1,
             "num_predict": 4096,

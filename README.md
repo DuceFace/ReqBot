@@ -307,6 +307,5 @@ Useful flags:
 - [ARCHITECTURE.md](ARCHITECTURE.md) - module map and data flows
 - [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
 - [INDEXED_DOCUMENTS.md](INDEXED_DOCUMENTS.md) - current corpus inventory
-- [CLAUDE.md](CLAUDE.md) - project phase status and agent workflow
 - [docs/PHASE13_REQUIREMENTS.md](docs/PHASE13_REQUIREMENTS.md) - Phase 13 extraction optimization plan
 - [docs/PHASE14_REQUIREMENTS.md](docs/PHASE14_REQUIREMENTS.md) - Phase 14 structure-aware chunking plan

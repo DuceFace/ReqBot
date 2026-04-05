@@ -177,7 +177,7 @@ ReqBot uses a two-pass extraction pipeline by default.
 | Step | Script | Input | Output | LLM? |
 |---|---|---|---|---|
 | A | `extract_pdf_to_text.py` | PDF | `*_pages.jsonl` | No |
-| B | `chunk_text.py` | pages JSONL or PDF (docling) | `*_chunks.jsonl` | No |
+| B | `chunk_text.py` | pages JSONL (legacy) or ancestry map (docling) | `*_chunks.jsonl` | No |
 | C | `llm_extract_requirements.py` | chunks JSONL | `*_extracted_requirements.jsonl` | Yes |
 | D | `parse_and_normalize.py` | extracted requirements JSONL | `*_requirements_normalized.jsonl` | No |
 | D.5 | `enrich_requirements.py` | normalized JSONL | `*_requirements_enriched.jsonl` | Yes |
@@ -271,7 +271,7 @@ Typical processed output includes:
 ```text
 *_pages.jsonl                    # Step A
 *_chunks.jsonl                   # Step B (includes breadcrumb/hierarchy fields in docling mode)
-*_ancestry.json                  # Step B (docling mode only — section ancestry map)
+*_ancestry.json                  # Step A (docling mode only — section ancestry map)
 *_raw_responses.jsonl            # Raw Step C model responses
 *_extracted_requirements.jsonl   # Parsed Step C output
 *_parse_failures.jsonl           # Step C parse failures

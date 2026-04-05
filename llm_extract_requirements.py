@@ -634,6 +634,33 @@ def run(
                 "Loaded %d cached prompt hashes (model=%s) — matching chunks will be skipped",
                 len(cached_hashes), model,
             )
+            # Guard against stale cache after a prompt template change (e.g. structured
+            # output upgrade). If cached_hashes is non-empty but NO chunk's current
+            # prompt hash matches, opening files in append mode would duplicate every row.
+            # Scan chunks with early exit: if at least one hit exists the cache is valid;
+            # if none match, discard it so write_mode falls through to "w".
+            any_cache_hit = False
+            for _c in chunks:
+                _refs = scan_source_refs(_c["text"])
+                _hints = (
+                    "\nCandidate source references found in this text "
+                    "(use these for the \"source_ref\" field where applicable): "
+                    + ", ".join(_refs) + "\n"
+                ) if _refs else ""
+                _ph = compute_prompt_hash(
+                    template
+                    .replace("{source_ref_hints}", _hints)
+                    .replace("{chunk_text}", _c["text"])
+                )
+                if _ph in cached_hashes:
+                    any_cache_hit = True
+                    break
+            if not any_cache_hit:
+                log.warning(
+                    "Cached prompt hashes exist but none match the current template — "
+                    "prompt may have changed. Discarding stale cache and starting fresh write."
+                )
+                cached_hashes = set()
 
     log.info("Processing %d chunks with model=%s, ollama=%s", len(chunks), model, ollama_url)
 

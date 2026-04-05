@@ -269,19 +269,23 @@ Verify on representative documents:
 
 ### 6.4 WP-14.4: Corpus Regeneration
 
-**Status: IN PROGRESS 2026-04-05 — batch running, 28/45 docs complete as of 13:05.**
+**Status: DONE 2026-04-05 — 45/45 docs complete; Qdrant rebuilt; old artifacts purged.**
 
 Bugs found and fixed during WP-14.4 run (all on branch `phase14-wp143-schema`):
 
 1. **CLI gap** — `--layout-mode docling` not wired into `reqbot ingest` / `reqbot batch` arg parsers (was in `run_pipeline.py` only). Fixed in `reqbot.py`.
-2. **Installed binary stale** — `~/.reqbot/app/` did not have WP-14.2/14.3 source files or `section_parser.py`. Synced manually; rebuild from installer pending after merge.
-3. **Step C `KeyError: '"source_quote"'`** — `PASS1_PROMPT_TEMPLATE` contains literal `{"source_quote": ...}` JSON in few-shot examples; `str.format()` treated these as format placeholders. Fixed by switching to `str.replace()` at both call sites (`process_chunk` and `run()` prompt hash computation). Latent since Phase 13 WP-1.
-4. **Step C 100% parse failures** — `format: "json"` in Ollama payload constrains output to valid JSON but not to an array; `llama3.1:8b` returns a single object `{}` instead of an array `[]`. Removed `format: "json"`. **Codex P1 (PR #23):** this is a regression — unconstrained generation risks prose fallback. Proper fix is Ollama structured output with an object-wrapped JSON schema `{"requirements": [...]}` + unwrap in parser. Planned before next re-ingest; current batch is running without it and parse failures are low in practice.
+2. **Installed binary stale** — `~/.reqbot/app/` did not have WP-14.2/14.3 source files or `section_parser.py`. Synced manually for the batch run; proper fix was rebuilding the installer after merge (done — `build/bundle.sh` now includes `section_parser.py` and `enrich_requirements.py`).
+3. **Step C `KeyError: '"source_quote"'`** — `PASS1_PROMPT_TEMPLATE` contains literal `{"source_quote": ...}` JSON in few-shot examples; `str.format()` treated these as format placeholders. Fixed by switching to `str.replace()` at both call sites. Latent since Phase 13 WP-1. Note: because the Step C cache is keyed on a hash of the rendered prompt, this template change implicitly invalidated all existing cache entries — any previously processed chunks required a full re-run of Step C to benefit from the fix.
+4. **Step C 100% parse failures** — `format: "json"` in Ollama payload constrains output to valid JSON but not to an array; `llama3.1:8b` returns a single object `{}` instead of an array `[]`. Removed `format: "json"`. **Codex P1 (open):** this is a regression — unconstrained generation risks prose fallback. Proper fix is Ollama structured output with an object-wrapped JSON schema `{"requirements": [...]}` + unwrap in parser. Deferred to next work session; parse failure rate was 0% in practice during WP-14.4 run.
 
-Preliminary quality results (from completed docs):
-- `parent_context` coverage: 100% on all docs (breadcrumb + governing clause available for every requirement)
-- `section_ref_path` coverage: ~48–79% (numbered docs higher; prose-heading docs like DODI degrade to empty ref but retain `section_title_path` breadcrumb — correct behavior)
-- Requirement counts: CNSSI 1471→4589 (badly broken chunking before); other docs broadly stable or slightly lower (more precise extraction, fewer duplicates)
+Final quality results:
+- **31,734 requirements** across 45 docs (vs 29,433 baseline — net +2,301)
+- Old baseline inflated by 5–10 reqs/chunk from oversized fixed-size chunks; new rate ~1–2 reqs/chunk, which is correct for policy documents
+- `parent_context` coverage: 100% on all docs
+- `section_ref_path` coverage: ~48–79% (numbered-section docs higher; prose-heading docs degrade to empty ref but retain `section_title_path` breadcrumb — correct behavior)
+- Notable count changes: CNSSI 1471→4589 (badly broken before); NIST 800-53Ar5 5679→6899; most docs slightly lower (deduplication of noise from old oversized chunks)
+- `grc_context` collection rebuilt from Phase 14 chunks: 13,762 points (was 19,507 from old chunking)
+- Pre-Phase-14 processed artifact directories purged; only newest Phase 14 dirs retained
 
 ---
 

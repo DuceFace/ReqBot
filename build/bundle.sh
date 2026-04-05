@@ -40,8 +40,10 @@ APP_FILES=(
     run_pipeline.py
     extract_pdf_to_text.py
     chunk_text.py
+    section_parser.py
     llm_extract_requirements.py
     parse_and_normalize.py
+    enrich_requirements.py
     aggregate_and_export.py
     embed_and_index.py
     embed_context_index.py

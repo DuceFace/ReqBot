@@ -4,7 +4,7 @@ ReqBot is a local-first compliance requirements intelligence engine. It extracts
 
 Everything is designed to run on local infrastructure with Ollama + Qdrant. JSONL is the system of record; Qdrant is a rebuildable index.
 
-**Current corpus:** 45 documents, about 32,000 indexed requirements. See [INDEXED_DOCUMENTS.md](INDEXED_DOCUMENTS.md) for the current inventory.
+Run `reqbot docs` to see your indexed documents and requirement counts.
 
 ## What It Does
 
@@ -306,6 +306,5 @@ Useful flags:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - module map and data flows
 - [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
-- [INDEXED_DOCUMENTS.md](INDEXED_DOCUMENTS.md) - current corpus inventory
 - [docs/PHASE13_REQUIREMENTS.md](docs/PHASE13_REQUIREMENTS.md) - Phase 13 extraction optimization plan
 - [docs/PHASE14_REQUIREMENTS.md](docs/PHASE14_REQUIREMENTS.md) - Phase 14 structure-aware chunking plan

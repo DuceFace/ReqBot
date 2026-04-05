@@ -8,6 +8,10 @@ on:
 
 jobs:
   review:
+    # Only run on PRs from this repo's own branches, not from forks.
+    # Prevents external contributors from triggering paid Gemini API usage
+    # on every PR once the repository is public.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

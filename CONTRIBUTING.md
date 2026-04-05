@@ -30,7 +30,7 @@ Include the signed block in your first merge request, or email it in advance.
 
 ### Reporting Bugs
 
-Open a GitLab issue. Include:
+Open a GitHub issue. Include:
 
 - What you did (command, input, config)
 - What you expected

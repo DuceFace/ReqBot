@@ -149,7 +149,7 @@ def synthesize(
     evidence: str,
     backend: str = "local",
     model: str = "qwen2.5:14b",
-    ollama_url: str = "http://192.168.90.100:11434",
+    ollama_url: str = "http://localhost:11434",
     provider: str = "anthropic",
     api_key: str = "",
     raw_prompt: str = "",

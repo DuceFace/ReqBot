@@ -101,8 +101,8 @@ replacement for it. All other step boundaries remain JSONL-only.
 
 | Service | Default URL | Used By | Purpose |
 |---------|-------------|---------|---------|
-| Ollama | `http://192.168.90.100:11434` | Steps C, F, F2; ask; reqbot (compare, evidence, trace) | LLM inference + dense embeddings |
-| Qdrant | `http://192.168.30.153:6333` | Steps F, F2; ask; reqbot | Vector storage and hybrid search |
+| Ollama | `http://localhost:11434` | Steps C, F, F2; ask; reqbot (compare, evidence, trace) | LLM inference + dense embeddings |
+| Qdrant | `http://localhost:6333` | Steps F, F2; ask; reqbot | Vector storage and hybrid search |
 | Anthropic API | `https://api.anthropic.com` | synthesis.py (optional) | Remote synthesis fallback |
 | OpenAI API | `https://api.openai.com` | synthesis.py (optional) | Remote synthesis fallback |
 
@@ -254,8 +254,8 @@ Three-layer load order (later layers win):
 
 | Config Key | Env Var | Default |
 |------------|---------|---------|
-| `ollama_url` | `REQBOT_OLLAMA_URL` | `http://192.168.90.100:11434` |
-| `qdrant_url` | `REQBOT_QDRANT_URL` | `http://192.168.30.153:6333` |
+| `ollama_url` | `REQBOT_OLLAMA_URL` | `http://localhost:11434` |
+| `qdrant_url` | `REQBOT_QDRANT_URL` | `http://localhost:6333` |
 | `default_model` | `REQBOT_DEFAULT_MODEL` | `llama3.1:8b-instruct-q4_K_M` |
 | `extraction_model` | `REQBOT_EXTRACTION_MODEL` | falls back to `default_model` |
 | `enrichment_model` | `REQBOT_ENRICHMENT_MODEL` | falls back to `default_model` |

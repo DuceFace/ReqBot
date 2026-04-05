@@ -33,7 +33,7 @@ def run(
     *,
     extraction_model: str = "llama3.1:8b-instruct-q4_K_M",
     enrichment_model: str = "llama3.1:8b-instruct-q4_K_M",
-    ollama_url: str = "http://192.168.90.100:11434",
+    ollama_url: str = "http://localhost:11434",
     chunk_size: int = 3000,
     overlap: int = 200,
     max_chunks: int | None = None,
@@ -273,14 +273,14 @@ def main() -> None:
     parser.add_argument(
         "--ollama-url",
         type=str,
-        default="http://192.168.90.100:11434",
+        default="http://localhost:11434",
         help="Ollama API base URL",
     )
     parser.add_argument(
         "--qdrant-url",
         type=str,
-        default="http://192.168.30.153:6333",
-        help="Qdrant API base URL (used with --index; default: http://192.168.30.153:6333)",
+        default="http://localhost:6333",
+        help="Qdrant API base URL (used with --index; default: http://localhost:6333)",
     )
     parser.add_argument(
         "--chunk-size",

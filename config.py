@@ -19,8 +19,8 @@ CONFIG_PATH = Path.home() / ".config" / "reqbot" / "config.json"
 AUTHORITY_REGISTRY_PATH = Path.home() / ".config" / "reqbot" / "authority.json"
 
 _DEFAULTS: dict = {
-    "ollama_url": "http://192.168.90.100:11434",
-    "qdrant_url": "http://192.168.30.153:6333",
+    "ollama_url": "http://localhost:11434",
+    "qdrant_url": "http://localhost:6333",
     "default_model": "llama3.1:8b-instruct-q4_K_M",
     "extraction_model": None,   # None → falls back to default_model at load time (R-2.1)
     "enrichment_model": None,   # None → falls back to default_model at load time (R-2.1)

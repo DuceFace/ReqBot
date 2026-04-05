@@ -348,7 +348,7 @@ def run(
     output_dir: str,
     *,
     model: str = "llama3.1:8b-instruct-q4_K_M",
-    ollama_url: str = "http://192.168.90.100:11434",
+    ollama_url: str = "http://localhost:11434",
     timeout: int = 120,
     batch_size: int = 10,
     max_reqs: int | None = None,
@@ -551,7 +551,7 @@ def main() -> None:
     parser.add_argument(
         "--ollama-url",
         type=str,
-        default="http://192.168.90.100:11434",
+        default="http://localhost:11434",
         help="Ollama API base URL",
     )
     parser.add_argument(

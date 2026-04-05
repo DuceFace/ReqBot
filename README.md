@@ -9,7 +9,7 @@ Everything is designed to run on local infrastructure with Ollama + Qdrant. JSON
 ## What It Does
 
 - Extracts requirement statements from PDFs with a two-pass pipeline.
-- Uses structured JSON output in Step C to reduce parse failures.
+- Preserves document hierarchy (section breadcrumbs, parent context, section ref paths) through the full pipeline.
 - Separates extraction and enrichment models so each stage can be tuned independently.
 - Supports hybrid retrieval over requirements plus optional raw chunk context lookup.
 - Rebuilds Qdrant from existing JSONL without re-running extraction.
@@ -94,7 +94,7 @@ reqbot ingest <pdf> [options]
 Important options:
 
 - `--index` - also embed and index into Qdrant after extraction
-- `--layout-mode {pymupdf,pdfplumber}` - PDF extraction backend
+- `--layout-mode {pymupdf,pdfplumber,docling}` - PDF extraction backend
 - `--output-dir DIR` - write artifacts to a specific directory
 - `--extraction-model M` - Step C model
 - `--enrichment-model M` - Step D.5 model
@@ -110,7 +110,7 @@ Run the pipeline on every PDF in a directory.
 reqbot batch <pdf_dir> [options]
 ```
 
-Supports the same model and enrichment flags as `ingest`.
+Supports the same `--layout-mode`, model, and enrichment flags as `ingest`.
 
 ### `reindex`
 
@@ -177,7 +177,7 @@ ReqBot uses a two-pass extraction pipeline by default.
 | Step | Script | Input | Output | LLM? |
 |---|---|---|---|---|
 | A | `extract_pdf_to_text.py` | PDF | `*_pages.jsonl` | No |
-| B | `chunk_text.py` | pages JSONL | `*_chunks.jsonl` | No |
+| B | `chunk_text.py` | pages JSONL (legacy) or ancestry map (docling) | `*_chunks.jsonl` | No |
 | C | `llm_extract_requirements.py` | chunks JSONL | `*_extracted_requirements.jsonl` | Yes |
 | D | `parse_and_normalize.py` | extracted requirements JSONL | `*_requirements_normalized.jsonl` | No |
 | D.5 | `enrich_requirements.py` | normalized JSONL | `*_requirements_enriched.jsonl` | Yes |
@@ -199,19 +199,31 @@ Advanced/legacy behavior:
 
 ## Layout-Aware Extraction
 
-Use `pdfplumber` mode for table-heavy documents such as DODIs and DoDMs:
+ReqBot supports three PDF extraction backends via `--layout-mode`.
+
+**`pymupdf` (default)** — fast text extraction for prose-heavy documents (NIST SPs, AFIs, DAF manuals).
+
+**`pdfplumber`** — table-aware extraction for documents with structured tables (DODIs, DoDMs):
 
 ```bash
 reqbot ingest "DODI 5200.01_vol2.pdf" --index --layout-mode pdfplumber
 ```
 
-This mode:
-
 - extracts tables as structured rows
 - preserves table boundaries during chunking
 - falls back per page if table extraction fails
 
-For prose-heavy NIST, AFI, and DAF documents, `pymupdf` remains the default.
+**`docling`** — structure-aware chunking that preserves section hierarchy:
+
+```bash
+reqbot ingest "NIST.SP.800-53r5.pdf" --index --layout-mode docling
+```
+
+- parses document structure with Docling's `DocumentConverter`
+- injects breadcrumbs (`section_title_path`, `section_ref_path`) into each chunk
+- attaches `parent_context` (first ~600 chars of the parent section body) to each requirement
+- filters table-of-contents noise automatically
+- produces schema v2.0 records with full hierarchy fields
 
 ## Qdrant Collections
 
@@ -258,15 +270,16 @@ Typical processed output includes:
 
 ```text
 *_pages.jsonl                    # Step A
-*_chunks.jsonl                   # Step B
+*_chunks.jsonl                   # Step B (includes breadcrumb/hierarchy fields in docling mode)
+*_ancestry.json                  # Step A (docling mode only — section ancestry map)
 *_raw_responses.jsonl            # Raw Step C model responses
 *_extracted_requirements.jsonl   # Parsed Step C output
 *_parse_failures.jsonl           # Step C parse failures
-*_requirements_normalized.jsonl  # Step D validated + deduplicated records
+*_requirements_normalized.jsonl  # Step D validated + deduplicated records (schema v2.0)
 *_normalization_failures.jsonl   # Step D validation failures
 *_requirements_enriched.jsonl    # Step D.5 enriched records
 *_final_output.json              # Step E aggregate export
-*_stats.json                     # Step E metrics
+*_stats.json                     # Step E metrics (includes hierarchy coverage stats in v2.0)
 ```
 
 These artifacts are the durable source of record. If Qdrant needs to be rebuilt, use `reqbot reindex`.
@@ -284,6 +297,7 @@ Useful flags:
 - `--skip-to {A,B,C,D,E}` - resume from an existing output directory
 - `--skip-enrichment` - stop after Step D
 - `--full-extraction` - use the legacy single-pass Step C prompt
+- `--layout-mode {pymupdf,pdfplumber,docling}` - PDF extraction backend
 - `--extraction-model M`
 - `--enrichment-model M`
 - `--model M` - set both

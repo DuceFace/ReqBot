@@ -444,7 +444,11 @@ def process_chunk(
     else:
         source_ref_hints = ""
 
-    prompt = prompt_template.format(chunk_text=chunk_text, source_ref_hints=source_ref_hints)
+    prompt = (
+        prompt_template
+        .replace("{source_ref_hints}", source_ref_hints)
+        .replace("{chunk_text}", chunk_text)
+    )
     prompt_hash = compute_prompt_hash(prompt)
     timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -624,7 +628,9 @@ def run(
                 + ", ".join(_refs) + "\n"
             ) if _refs else ""
             _prompt_hash = compute_prompt_hash(
-                template.format(chunk_text=chunk["text"], source_ref_hints=_hints)
+                template
+                .replace("{source_ref_hints}", _hints)
+                .replace("{chunk_text}", chunk["text"])
             )
             if _prompt_hash in cached_hashes:
                 log.info("Chunk %d/%d (id=%d): skipping (cached)", i + 1, len(chunks), chunk_id)

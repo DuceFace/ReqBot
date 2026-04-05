@@ -76,10 +76,11 @@ DO NOT extract:
 - Cross-references to other controls (e.g., "Related controls: AC-2, IA-1")
 - General background, context, or informational text
 
-Return ONLY a valid JSON array. No markdown code fences. No text before or after the array.
-If there are no actionable requirements, return an empty array: []
+Return a JSON object with a single "requirements" key whose value is an array.
+No markdown code fences. No text before or after the JSON object.
+If there are no actionable requirements, return: {"requirements": []}
 
-Each element must be a JSON object with exactly these keys:
+Each element in the "requirements" array must be a JSON object with exactly these keys:
 - "source_quote": (REQUIRED) The exact verbatim quote from the text establishing this requirement
   (under 500 characters). Copy word-for-word — do NOT paraphrase or summarize. If you cannot find
   an exact verbatim quote for a requirement, do NOT include that requirement.
@@ -90,15 +91,15 @@ Each element must be a JSON object with exactly these keys:
 
 Example 1 — NIST prose (requirements present):
 Text: "AC-3 ACCESS ENFORCEMENT\nControl: The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies.\nSupplemental Guidance: Access control policies (e.g., identity-based policies, role-based policies, attribute-based policies) and access enforcement mechanisms are employed by organizations to control access between active entities or subjects and passive entities or objects in information systems."
-Output: [{"source_quote": "The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies.", "source_ref": "AC-3"}]
+Output: {"requirements": [{"source_quote": "The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies.", "source_ref": "AC-3"}]}
 
 Example 2 — DoD policy table (multiple requirements):
 Text: "3.2 POLICY\n3.2.1 All DoD information systems shall implement multi-factor authentication for all privileged user accounts.\n3.2.2 Password complexity requirements shall conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters.\n3.2.3 See Table 3.2-1 for password requirements by account type (informational)."
-Output: [{"source_quote": "All DoD information systems shall implement multi-factor authentication for all privileged user accounts.", "source_ref": "3.2.1"}, {"source_quote": "Password complexity requirements shall conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters.", "source_ref": "3.2.2"}]
+Output: {"requirements": [{"source_quote": "All DoD information systems shall implement multi-factor authentication for all privileged user accounts.", "source_ref": "3.2.1"}, {"source_quote": "Password complexity requirements shall conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters.", "source_ref": "3.2.2"}]}
 
 Example 3 — References section (no requirements):
 Text: "1. REFERENCES\na. DoD Instruction 8500.01, Cybersecurity, March 14, 2014, as amended.\nb. NIST Special Publication 800-53, Security and Privacy Controls for Federal Information Systems and Organizations, Revision 5, September 2020.\nc. Committee on National Security Systems Instruction No. 1253."
-Output: []
+Output: {"requirements": []}
 
 --- END EXAMPLES ---
 {source_ref_hints}
@@ -172,6 +173,30 @@ _SOURCE_REF_PATTERNS = [
 ]
 _MAX_HINT_REFS = 20  # cap to avoid bloating the prompt
 
+# Ollama object-wrapped JSON Schema for Pass 1 structured output.
+# Constrains the model at the tokenizer level — eliminates parse failures
+# caused by preamble text, markdown fences, or malformed bare arrays.
+# The response will always be {"requirements": [...]}, which extract_json_array()
+# unwraps before the existing fallback strategies.
+# NOTE: this constant is not used by the legacy PROMPT_TEMPLATE path (--full-extraction).
+_PASS1_FORMAT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requirements": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source_quote": {"type": "string"},
+                    "source_ref": {"type": "string"},
+                },
+                "required": ["source_quote", "source_ref"],
+            },
+        }
+    },
+    "required": ["requirements"],
+}
+
 
 def _is_ip_address(candidate: str) -> bool:
     """Return True if candidate looks like an IPv4 address.
@@ -219,6 +244,7 @@ def call_ollama(
     base_url: str,
     timeout: int = 120,
     max_retries: int = 3,
+    json_schema: dict | None = None,
 ) -> str:
     """Call the Ollama generate API with exponential backoff for transient errors.
 
@@ -228,6 +254,11 @@ def call_ollama(
         base_url: Ollama API base URL.
         timeout: Request timeout in seconds.
         max_retries: Number of retries before giving up (default: 3).
+        json_schema: Optional Ollama object-wrapped JSON Schema for constrained
+            generation (passed as the "format" field). When provided, the model
+            output is guaranteed to match the schema — eliminates parse failures
+            from preamble text and malformed JSON. Pass None for unconstrained
+            generation (legacy PROMPT_TEMPLATE / --full-extraction path).
 
     Returns:
         The raw text response from the model.
@@ -245,6 +276,8 @@ def call_ollama(
             "num_predict": 4096,
         },
     }
+    if json_schema is not None:
+        payload["format"] = json_schema
 
     attempt = 0
     while attempt <= max_retries:
@@ -286,6 +319,9 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
         result = json.loads(text_clean)
         if isinstance(result, list):
             return result
+        # Unwrap Ollama structured-output response: {"requirements": [...]}
+        if isinstance(result, dict) and isinstance(result.get("requirements"), list):
+            return result["requirements"]
     except json.JSONDecodeError:
         pass
 
@@ -422,6 +458,7 @@ def process_chunk(
     base_url: str,
     timeout: int,
     prompt_template: str = PROMPT_TEMPLATE,
+    json_schema: dict | None = None,
 ) -> tuple[dict, list[dict], dict | None]:
     """Process a single chunk through the LLM.
 
@@ -461,7 +498,7 @@ def process_chunk(
 
     # Call LLM
     try:
-        raw_response = call_ollama(prompt, model, base_url, timeout)
+        raw_response = call_ollama(prompt, model, base_url, timeout, json_schema=json_schema)
         raw_record["raw_response"] = raw_response
     except requests.RequestException as e:
         log.error("Chunk %d: Ollama request failed: %s", chunk_id, e)
@@ -540,8 +577,12 @@ def run(
         Path to the extracted_requirements.jsonl file that was written (str).
     """
     template = PASS1_PROMPT_TEMPLATE if pass1_only else PROMPT_TEMPLATE
+    # Pass 1 uses Ollama constrained generation — eliminates parse failures
+    # from preamble text and malformed bare arrays (Codex P1 fix).
+    # Legacy full-extraction path (PROMPT_TEMPLATE) uses unconstrained generation.
+    schema = _PASS1_FORMAT_SCHEMA if pass1_only else None
     if pass1_only:
-        log.info("Using Pass 1 prompt (source_quote + source_ref only)")
+        log.info("Using Pass 1 prompt (source_quote + source_ref only) with structured output")
 
     chunks_path = Path(chunks_jsonl).resolve()
     out_dir = Path(output_dir).resolve()
@@ -637,7 +678,7 @@ def run(
                 continue
 
             chunk_start = time.time()
-            raw_record, valid_reqs, failure = process_chunk(chunk, model, ollama_url, timeout, template)
+            raw_record, valid_reqs, failure = process_chunk(chunk, model, ollama_url, timeout, template, json_schema=schema)
 
             append_jsonl(raw_record, raw_f)
 

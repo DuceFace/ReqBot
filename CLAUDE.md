@@ -68,7 +68,7 @@ Key spike findings:
 | WP-14.3: Schema + Normalization | DONE 2026-04-04 | `parse_and_normalize.py` schema v2.0; 5 hierarchy fields in normalized records; `aggregate_and_export.py` hierarchy stats; `embed_and_index.py` payload updated; PR open |
 | WP-14.4: Full Re-ingest | DONE 2026-04-05 | 45/45 complete; 31,734 reqs (vs 29,433 baseline); Qdrant rebuilt; old artifacts purged; grc_context rebuilt from Phase 14 chunks; installer rebuilt with section_parser.py + enrich_requirements.py in bundle.sh |
 
-**Open follow-on (Phase 15 or standalone PR):** Codex P1 — `call_ollama()` in `llm_extract_requirements.py` currently uses unconstrained generation (no `format` field). Proper fix is Ollama object-wrapped JSON Schema: `format: {"type": "object", "properties": {"requirements": {"type": "array", ...}}}` + unwrap `response["requirements"]` in `extract_json_array()`. Parse failure rate was 0% in the Phase 14 run without it, but the fix should land before the next large re-ingest.
+**Codex P1 landed (PR #codex-p1-structured-output):** `call_ollama()` now uses Ollama object-wrapped JSON Schema structured output for Pass 1 (`_PASS1_FORMAT_SCHEMA`). `extract_json_array()` unwraps the `{"requirements": [...]}` envelope. Prompt template and examples updated to match. Legacy `--full-extraction` path unchanged. Note: the prompt template change invalidates all existing Step C prompt-hash cache entries — any prior output directories will require a full Step C re-run.
 
 **Decision C (parent context scope):** accepted as-is. WP-14.2 inherits the WP-14.1 default — `parent_context` = first ~600 chars of body text after the immediate parent heading, fallback to header text. No further action required; WP-14.3 passes it through unchanged.
 

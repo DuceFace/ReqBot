@@ -603,7 +603,7 @@ def run(
     # Keep the full list for stale-cache detection (below). Filtering by
     # max_chunks or start_chunk would cause the scan to miss valid cache
     # entries outside the current subset and falsely discard the cache.
-    all_chunks = chunks
+    all_chunks = list(chunks)
 
     if start_chunk > 0:
         chunks = [c for c in chunks if c["chunk_id"] >= start_chunk]

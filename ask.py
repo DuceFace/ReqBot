@@ -372,8 +372,8 @@ def run(
     document_ids: list[str] | None = None,
     no_rewrite: bool = False,
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
-    qdrant_url: str = "http://192.168.30.153:6333",
-    ollama_url: str = "http://192.168.90.100:11434",
+    qdrant_url: str = "http://localhost:6333",
+    ollama_url: str = "http://localhost:11434",
     json_output: bool = False,
     context: bool = False,
     context_collection: str = CONTEXT_COLLECTION_NAME,
@@ -581,8 +581,8 @@ def main() -> None:
         log.warning("Could not load config defaults (%s) — using hardcoded defaults", e)
         _default_top_k = 20
         _default_min_score = 0.02
-        _default_qdrant_url = "http://192.168.30.153:6333"
-        _default_ollama_url = "http://192.168.90.100:11434"
+        _default_qdrant_url = "http://localhost:6333"
+        _default_ollama_url = "http://localhost:11434"
 
     parser = argparse.ArgumentParser(
         description="Query GRC requirements via Qdrant vector search"

@@ -600,6 +600,11 @@ def run(
             if line:
                 chunks.append(json.loads(line))
 
+    # Keep the full list for stale-cache detection (below). Filtering by
+    # max_chunks or start_chunk would cause the scan to miss valid cache
+    # entries outside the current subset and falsely discard the cache.
+    all_chunks = chunks
+
     if start_chunk > 0:
         chunks = [c for c in chunks if c["chunk_id"] >= start_chunk]
 
@@ -640,7 +645,7 @@ def run(
             # Scan chunks with early exit: if at least one hit exists the cache is valid;
             # if none match, discard it so write_mode falls through to "w".
             any_cache_hit = False
-            for _c in chunks:
+            for _c in all_chunks:
                 _refs = scan_source_refs(_c["text"])
                 _hints = (
                     "\nCandidate source references found in this text "

@@ -66,8 +66,8 @@ VALID_REQUIREMENT_TYPES = {
 }
 
 # HyDE prompt — generates a single hypothetical requirement statement in corpus register.
-# Explicitly prohibits control IDs and numeric thresholds to prevent BM25 token latching
-# on fabricated identifiers (e.g. "IA-5(1)", "15 characters") during sparse retrieval.
+# Explicitly prohibits control IDs and numeric thresholds to avoid introducing fabricated
+# identifiers (e.g. "IA-5(1)", "15 characters") that can distort retrieval relevance.
 HYDE_PROMPT = """Given this compliance question, write a single regulatory requirement statement that would answer it. Use formal language matching DoD/NIST style. Do NOT include specific control IDs, section numbers, or numeric thresholds. Describe only the semantic intent of the requirement.
 
 Question: {question}
@@ -342,9 +342,9 @@ def generate_hyde_hypothesis(
     dense vector aligns with answer-shaped corpus text rather than question-shaped
     query text.
 
-    Logs every attempt to log_file for batch review — inspect hypotheses in
-    aggregate after an evaluation run, not inline. Returns None on any failure;
-    caller falls back to baseline-only retrieval silently.
+    Logs successful hypotheses to log_file for batch review — inspect in aggregate
+    after an evaluation run, not inline. Empty responses and generation failures
+    are not logged; caller receives None and falls back to baseline retrieval.
     """
     import time
     try:
@@ -357,7 +357,7 @@ def generate_hyde_hypothesis(
         if not hypothesis:
             log.warning("HyDE: model returned empty hypothesis — skipping HyDE leg")
             return None
-        log.info("HyDE hypothesis: %s", hypothesis[:120] + ("..." if len(hypothesis) > 120 else ""))
+        log.debug("HyDE hypothesis: %s", hypothesis[:120] + ("..." if len(hypothesis) > 120 else ""))
         try:
             with open(log_file, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps({
@@ -476,12 +476,18 @@ def run(
     # BM25 stays on the raw/expanded query — it already handles exact term matching well.
     hyde_vector = None
     if hyde:
-        log.info("HyDE: generating hypothesis with model: %s", model)
-        hypothesis = generate_hyde_hypothesis(question, model, ollama_client)
+        # Use rewrite_model (always a local Ollama model) — not the synthesis model,
+        # which may be a remote backend name (e.g. claude-sonnet-4-6) incompatible
+        # with a direct ollama.generate() call.
+        log.info("HyDE: generating hypothesis with model: %s", rewrite_model)
+        hypothesis = generate_hyde_hypothesis(question, rewrite_model, ollama_client)
         if hypothesis:
-            hyde_result = ollama_client.embed(model=EMBEDDING_MODEL, input=hypothesis)
-            hyde_vector = hyde_result.embeddings[0]
-            log.info("HyDE: hypothesis embedded successfully")
+            try:
+                hyde_result = ollama_client.embed(model=EMBEDDING_MODEL, input=hypothesis)
+                hyde_vector = hyde_result.embeddings[0]
+                log.info("HyDE: hypothesis embedded successfully")
+            except Exception as e:
+                log.warning("HyDE: hypothesis embedding failed (%s) — falling back to baseline", e)
         else:
             log.info("HyDE: no hypothesis — proceeding with baseline retrieval only")
 

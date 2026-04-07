@@ -65,6 +65,15 @@ VALID_REQUIREMENT_TYPES = {
     "policy", "technical-control", "procedural-control", "assessment", "guidance",
 }
 
+# HyDE prompt — generates a single hypothetical requirement statement in corpus register.
+# Explicitly prohibits control IDs and numeric thresholds to prevent BM25 token latching
+# on fabricated identifiers (e.g. "IA-5(1)", "15 characters") during sparse retrieval.
+HYDE_PROMPT = """Given this compliance question, write a single regulatory requirement statement that would answer it. Use formal language matching DoD/NIST style. Do NOT include specific control IDs, section numbers, or numeric thresholds. Describe only the semantic intent of the requirement.
+
+Question: {question}
+
+Requirement:"""
+
 SYNTHESIS_PROMPT = """You are a GRC (Governance, Risk, Compliance) analyst. Answer the user's question using ONLY the evidence provided below. Follow these rules strictly:
 
 1. Every claim must cite the evidence by number: [N]
@@ -321,6 +330,50 @@ def rewrite_query(question: str, model: str, client: ollama.Client) -> dict:
         return fallback
 
 
+def generate_hyde_hypothesis(
+    question: str,
+    model: str,
+    client: ollama.Client,
+    log_file: str = "hyde_hypotheses.jsonl",
+) -> str | None:
+    """Generate a hypothetical requirement statement for HyDE dense retrieval.
+
+    Embeds the hypothesis instead of (or in addition to) the raw query so the
+    dense vector aligns with answer-shaped corpus text rather than question-shaped
+    query text.
+
+    Logs every attempt to log_file for batch review — inspect hypotheses in
+    aggregate after an evaluation run, not inline. Returns None on any failure;
+    caller falls back to baseline-only retrieval silently.
+    """
+    import time
+    try:
+        response = client.generate(
+            model=model,
+            prompt=HYDE_PROMPT.format(question=question),
+            options={"temperature": 0.3, "num_predict": 150},
+        )
+        hypothesis = response.response.strip()
+        if not hypothesis:
+            log.warning("HyDE: model returned empty hypothesis — skipping HyDE leg")
+            return None
+        log.info("HyDE hypothesis: %s", hypothesis[:120] + ("..." if len(hypothesis) > 120 else ""))
+        try:
+            with open(log_file, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({
+                    "query": question,
+                    "hypothesis": hypothesis,
+                    "model": model,
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                }, ensure_ascii=False) + "\n")
+        except Exception as log_err:
+            log.warning("HyDE: failed to write hypothesis log (%s)", log_err)
+        return hypothesis
+    except Exception as e:
+        log.warning("HyDE: hypothesis generation failed (%s) — skipping HyDE leg", e)
+        return None
+
+
 def synthesize_answer(
     question: str,
     evidence: str,
@@ -377,6 +430,7 @@ def run(
     json_output: bool = False,
     context: bool = False,
     context_collection: str = CONTEXT_COLLECTION_NAME,
+    hyde: bool = False,
 ) -> list[dict]:
     """Query GRC requirements and print results to stdout.
 
@@ -416,6 +470,21 @@ def run(
     dense_result = ollama_client.embed(model=EMBEDDING_MODEL, input=dense_query)
     dense_vector = dense_result.embeddings[0]
 
+    # HyDE — generate a hypothetical requirement and embed it as a second dense leg.
+    # The hypothesis is intentionally answer-shaped so its embedding aligns more closely
+    # with indexed corpus text than the question-shaped query embedding does.
+    # BM25 stays on the raw/expanded query — it already handles exact term matching well.
+    hyde_vector = None
+    if hyde:
+        log.info("HyDE: generating hypothesis with model: %s", model)
+        hypothesis = generate_hyde_hypothesis(question, model, ollama_client)
+        if hypothesis:
+            hyde_result = ollama_client.embed(model=EMBEDDING_MODEL, input=hypothesis)
+            hyde_vector = hyde_result.embeddings[0]
+            log.info("HyDE: hypothesis embedded successfully")
+        else:
+            log.info("HyDE: no hypothesis — proceeding with baseline retrieval only")
+
     # Sparse embed — keyword-stuffed string (expanded + control IDs) for BM25
     log.info("Loading sparse embedding model...")
     sparse_model = SparseTextEmbedding(model_name=SPARSE_MODEL)
@@ -432,30 +501,43 @@ def run(
     if query_filter:
         log.info("Applying filters: %s", query_filter)
 
-    # Hybrid query: dense semantic + sparse BM25, fused via Reciprocal Rank Fusion.
-    # Prefetch a deep pool (at least 100) so RRF sees enough candidates from both
-    # retrievers before fusing — shallow prefetch starves RRF of good matches.
+    # Hybrid query: dense semantic + sparse BM25 (+ optional HyDE dense leg), fused via RRF.
+    # Prefetch a deep pool (at least 100) so RRF sees enough candidates from all legs
+    # before fusing — shallow prefetch starves RRF of good matches.
     # Fetch more fused results than top_k so min_score filtering has overflow candidates
     # to draw from — otherwise low-score hits can consume top_k slots before filtering.
     prefetch_limit = max(100, top_k * 5)
     fusion_limit = max(top_k * 3, 50) if min_score > 0 else top_k
     qdrant_client = QdrantClient(url=qdrant_url)
-    results = qdrant_client.query_points(
-        collection_name=COLLECTION_NAME,
-        prefetch=[
+
+    prefetch_legs = [
+        models.Prefetch(
+            query=dense_vector,
+            using="dense",
+            filter=query_filter,
+            limit=prefetch_limit,
+        ),
+        models.Prefetch(
+            query=sparse_vector,
+            using="sparse",
+            filter=query_filter,
+            limit=prefetch_limit,
+        ),
+    ]
+    if hyde_vector is not None:
+        prefetch_legs.append(
             models.Prefetch(
-                query=dense_vector,
+                query=hyde_vector,
                 using="dense",
                 filter=query_filter,
                 limit=prefetch_limit,
-            ),
-            models.Prefetch(
-                query=sparse_vector,
-                using="sparse",
-                filter=query_filter,
-                limit=prefetch_limit,
-            ),
-        ],
+            )
+        )
+        log.info("HyDE: using 3-leg RRF (baseline dense + BM25 + HyDE dense)")
+
+    results = qdrant_client.query_points(
+        collection_name=COLLECTION_NAME,
+        prefetch=prefetch_legs,
         query=models.FusionQuery(fusion=models.Fusion.RRF),
         limit=fusion_limit,
         with_payload=True,
@@ -677,6 +759,15 @@ def main() -> None:
         default=CONTEXT_COLLECTION_NAME,
         help=f"Qdrant context collection name (default: {CONTEXT_COLLECTION_NAME})",
     )
+    parser.add_argument(
+        "--hyde",
+        action="store_true",
+        help=(
+            "Enable HyDE (Hypothetical Document Embedding) augmentation — generates a "
+            "hypothetical requirement statement and adds its embedding as a second dense "
+            "RRF leg. Spike evaluation flag; logs hypotheses to hyde_hypotheses.jsonl."
+        ),
+    )
     args = parser.parse_args()
 
     run(
@@ -695,6 +786,7 @@ def main() -> None:
         json_output=args.json_output,
         context=args.context,
         context_collection=args.context_collection,
+        hyde=args.hyde,
     )
 
 

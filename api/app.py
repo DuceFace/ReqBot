@@ -79,6 +79,7 @@ _INDEX_HTML = _DIST_DIR / "index.html"
 _DIST_DIR_RESOLVED = _DIST_DIR.resolve()
 
 if _INDEX_HTML.exists():
+    from fastapi import HTTPException as _HTTPException
     from fastapi.responses import FileResponse as _FileResponse
 
     @app.get("/{full_path:path}", include_in_schema=False)
@@ -86,6 +87,13 @@ if _INDEX_HTML.exists():
         candidate = (_DIST_DIR / full_path).resolve()
         if candidate.is_file() and candidate.is_relative_to(_DIST_DIR_RESOLVED):
             return _FileResponse(str(candidate))
+        # Requests that look like static asset paths (have a file extension) but
+        # have no matching file under dist/ return 404 rather than index.html.
+        # This surfaces broken asset references as real errors instead of silently
+        # serving HTML to the browser.  Bare paths (/search, /trace/REQ-123)
+        # have no suffix and fall through to the SPA entry point.
+        if Path(full_path).suffix:
+            raise _HTTPException(status_code=404, detail="Not found")
         return _FileResponse(str(_INDEX_HTML))
 
 else:

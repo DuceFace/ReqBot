@@ -453,7 +453,7 @@ None. All design questions are resolved. Implementation may begin with WP-18.1.
 - The service layer is untouched. The GUI calls the same functions the CLI does, via the API.
 - The CLI is untouched. `reqbot ask`, `reqbot trace`, etc. work exactly as before.
 - The pipeline is untouched.
-- No new pip dependencies (unless FastAPI `StaticFiles` needs `aiofiles` — verify).
+- One new pip dependency: `aiofiles` (added in WP-18.5 for `StaticFiles` serving). No others.
 - JSONL is still the source of record.
 
 ---

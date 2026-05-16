@@ -1290,11 +1290,19 @@ def cmd_setup(args: argparse.Namespace) -> int:
             print(f"    Check permissions on {config_path.parent} and re-run: reqbot setup")
             return 1
 
-    # Run status with localhost URLs
-    status_args = argparse.Namespace(
-        ollama_url="http://localhost:11434",
-        qdrant_url="http://localhost:6333",
-    )
+    # Run status against whichever config will actually be active after setup:
+    # - wrote new config  → localhost defaults we just wrote
+    # - kept existing     → the URLs that were already in _cfg (loaded at startup)
+    if do_write:
+        status_args = argparse.Namespace(
+            ollama_url="http://localhost:11434",
+            qdrant_url="http://localhost:6333",
+        )
+    else:
+        status_args = argparse.Namespace(
+            ollama_url=_cfg.ollama_url,
+            qdrant_url=_cfg.qdrant_url,
+        )
     cmd_status(status_args)
 
     print("=== ReqBot is ready ===")

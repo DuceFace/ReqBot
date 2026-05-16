@@ -13,9 +13,8 @@ pull models, write a config file. A first-time user who reads the README and run
 config file or issuing a separate `ollama pull`.
 
 Phase 17 is infrastructure work. It does not change the pipeline, the retrieval engine,
-the service layer, or the API. All changes are confined to `cli/reqbot.py` (`cmd_setup`),
-`core/synthesis.py` (lazy model pull), and minor supporting changes to `core/config.py`
-if needed.
+the service layer, or the API. All changes are confined to `cli/reqbot.py` (`cmd_setup`)
+and `core/synthesis.py` (lazy model pull).
 
 ---
 
@@ -29,149 +28,195 @@ if needed.
 
 ---
 
-## 3. Work Package Summary
+## 3. Decisions Locked for Phase 17
+
+These decisions are fixed. They are not re-opened during implementation.
+
+| Decision | Choice |
+|----------|--------|
+| Target platform | Linux x86_64 only |
+| Docker | Required prerequisite — never auto-installed |
+| Qdrant runtime | Docker container (`reqbot-qdrant`) |
+| Qdrant data path | `~/.local/share/reqbot/qdrant/` — XDG, outside installer tree |
+| Ollama | Only thing auto-installed; official installer only |
+| Ollama service management | Verify reachability only; never invoke `ollama serve` directly |
+| Synthesis model | Lazy-pulled on first `--synthesize` use; not pulled during setup |
+| `reqbot init` | Kept unchanged; `reqbot setup --advanced` delegates to it verbatim |
+| Air-gapped path | Future extension — not built in Phase 17; no `--offline` flag shipped |
+
+---
+
+## 4. Work Package Summary
 
 | WP | Title | Scope |
 |----|-------|-------|
 | WP-17.1 | `reqbot setup` automated flow | New subcommand; Docker check, Qdrant container, Ollama check/install, core model pull, config write, status confirm |
 | WP-17.2 | Lazy synthesis model pull | Detect missing synthesis model on first `--synthesize` use; pull transparently with progress message |
-| WP-17.3 | `reqbot setup --advanced` | Flag that drops into the existing `reqbot init` interactive flow; `init` command kept as alias |
+| WP-17.3 | `reqbot setup --advanced` | Flag that drops into the existing `reqbot init` interactive flow; `init` command kept unchanged |
 
 ---
 
-## 4. WP-17.1 — `reqbot setup` Automated Flow
+## 5. WP-17.1 — `reqbot setup` Automated Flow
 
-### 4.1 Goal
+### 5.1 Goal
 
 A user with Docker installed can run `reqbot setup` on a fresh Linux machine and arrive
 at a working `reqbot ask` without any other manual steps.
 
-### 4.2 Command
+### 5.2 Command
 
 ```
 reqbot setup [--advanced]
 ```
 
-Default (no flags): automated flow described in §4.3.
-`--advanced`: drops into the existing interactive `reqbot init` wizard (§6).
+Default (no flags): automated flow described in §5.3.
+`--advanced`: drops into the existing interactive `reqbot init` wizard (§7).
 
-### 4.3 Setup Flow (default path)
+### 5.3 User-Facing Flow
 
-The command executes these steps in order. Each step prints a clear status line. Any
-hard failure prints an actionable error message and exits non-zero.
+The command executes five steps in order. Each step prints a `[N/5]` status line before
+starting. Any hard failure prints an actionable error message and exits non-zero — the
+remaining steps do not run.
 
 #### Step 1 — Docker check
 
 ```
 [1/5] Checking for Docker...
+      OK — Docker 26.1.4
 ```
 
-- Run `docker info` (or `docker version`) to verify Docker is installed and the daemon
-  is reachable.
-- **If Docker is missing or daemon is not running:** print a clear message with
-  installation instructions and exit 1. Do not auto-install Docker — it requires
-  distro-specific handling and often `sudo`, making silent install unsafe and fragile.
+Run `docker info` to verify Docker is installed and the daemon is reachable. Print the
+detected version on success.
+
+On failure:
 
 ```
 [-] Docker is not running or not installed.
-    Install Docker: https://docs.docker.com/engine/install/
-    Then start the daemon and re-run: reqbot setup
+    Install Docker:  https://docs.docker.com/engine/install/
+    Start the daemon and re-run: reqbot setup
 ```
+
+Exit 1. Docker is never auto-installed.
 
 #### Step 2 — Qdrant container
 
 ```
 [2/5] Starting Qdrant...
+      Container reqbot-qdrant started.
+      Waiting for Qdrant to accept connections...
+      OK — Qdrant ready (http://localhost:6333)
 ```
 
-Check and start state in order:
+State machine (check in order):
 
-1. `docker ps` — if a container named `reqbot-qdrant` is already running, print
-   `Already running` and skip.
-2. `docker ps -a` — if `reqbot-qdrant` exists but is stopped, run `docker start reqbot-qdrant`.
-3. Otherwise, run:
+1. `docker ps` — container `reqbot-qdrant` already running → print `Already running` and skip.
+2. `docker ps -a` — container exists but stopped → `docker start reqbot-qdrant`.
+3. Container does not exist → `docker run`:
 
 ```bash
 docker run -d \
   --name reqbot-qdrant \
   --restart unless-stopped \
   -p 6333:6333 \
-  -v "$HOME/.reqbot/qdrant:/qdrant/storage" \
+  -v "$HOME/.local/share/reqbot/qdrant:/qdrant/storage" \
   qdrant/qdrant
 ```
 
-- Data directory: `~/.reqbot/qdrant/` — persists across upgrades (install dir
-  `~/.reqbot/` is wiped on upgrade, but the qdrant subdirectory is excluded; verify
-  this is true in the installer or document the caveat).
-- Port: 6333 (default Qdrant REST port).
-- After starting, poll `http://localhost:6333/collections` up to 10 times (1s sleep
-  between attempts) to confirm Qdrant is accepting connections before proceeding.
+**Data path:** `~/.local/share/reqbot/qdrant/` — XDG Base Directory, outside the
+installer-managed `~/.reqbot/` tree. Installer upgrades wipe `~/.reqbot/`; they do not
+touch `~/.local/share/`. This path is safe across all upgrade paths without any special
+installer exclusion logic.
+
+After the container starts, poll `http://localhost:6333/collections` (up to 10 attempts,
+1-second sleep between) to confirm Qdrant is accepting connections before proceeding.
 
 #### Step 3 — Ollama check and install
 
 ```
 [3/5] Checking for Ollama...
+      Found Ollama 0.6.1 — reachable at http://localhost:11434
 ```
 
-- Run `ollama --version` (or `which ollama`) to check if Ollama is installed.
-- **If installed:** print `Found Ollama <version>` and skip installation.
-- **If missing:** print the intent and run the official installer:
+**Check (binary):** run `ollama --version`. If found, verify the API is reachable:
+`GET http://localhost:11434` with a 5-second timeout.
+
+- API reachable → print version and continue.
+- Binary found but API not reachable → print instructions and exit 1:
 
 ```
-    Not found. Installing Ollama via official installer...
+[-] Ollama is installed but not reachable at http://localhost:11434.
+    Ensure the Ollama service is running and re-run: reqbot setup
+```
+
+Do not attempt to start the Ollama service. The official installer manages the service
+via systemd or an equivalent init system. Invoking `ollama serve` directly from setup
+would conflict with that and could result in duplicate processes or non-persistent
+behavior. Verifying reachability is sufficient.
+
+**Install (binary missing):** print intent and run the official installer:
+
+```
+      Not found. Installing Ollama via official installer...
 ```
 
 ```bash
 curl -fsSL https://ollama.ai/install.sh | sh
 ```
 
-This is the only auto-install step. It is transparent (user sees the installer output),
-uses the official channel, and is widely documented. After install, verify `ollama serve`
-is running (check the API at `http://localhost:11434`); start it if not.
+Stream the installer's stdout/stderr directly to the terminal. After the installer exits,
+verify API reachability at `http://localhost:11434` (same poll pattern as Qdrant — up to
+10 attempts, 1-second sleep). If the API is still not reachable after polling:
+
+```
+[-] Ollama was installed but the service is not yet reachable at http://localhost:11434.
+    Try: systemctl start ollama   (or your init system's equivalent)
+    Then re-run: reqbot setup
+```
+
+Exit 1.
 
 #### Step 4 — Pull core models
 
 ```
 [4/5] Pulling core models...
+      nomic-embed-text      Already pulled
+      llama3.1:8b-instruct-q4_K_M  Pulling... (4.7 GB)
 ```
 
-Pull exactly two models — enough to make `reqbot ask` and `reqbot ingest` work:
+Pull exactly two models. For each: check `ollama list`; skip if present; otherwise run
+`ollama pull <model>` with stdout/stderr streamed directly to the terminal.
 
 | Model | Size (approx.) | Purpose |
 |-------|----------------|---------|
 | `nomic-embed-text` | ~274 MB | Dense embeddings (required for search) |
 | `llama3.1:8b-instruct-q4_K_M` | ~4.7 GB | Step C extraction + query rewriting |
 
-For each model:
-- Check if already present: `ollama list` and look for the model name.
-- If present: print `Already pulled` and skip.
-- If missing: run `ollama pull <model>` — the Ollama CLI shows progress natively.
+Do **not** pull `qwen2.5:14b` (synthesis, ~9 GB) — lazy-loaded in WP-17.2.
 
-Do **not** pull `qwen2.5:14b` (synthesis model, ~9 GB) here. It is lazy-loaded in WP-17.2.
-
-Total first-run download (if both missing): ~5 GB.
+Total first-run download (both missing): ~5 GB.
 
 #### Step 5 — Write config and confirm
 
 ```
 [5/5] Writing config and running status check...
+      Config written to ~/.config/reqbot/config.json
 ```
 
-- Write `~/.config/reqbot/config.json` with localhost defaults:
-  - `qdrant_url`: `http://localhost:6333`
-  - `ollama_url`: `http://localhost:11434`
-  - All model names at their standard defaults (same as `core/config.py _DEFAULTS`)
-- **If a config file already exists:** print a warning and ask before overwriting:
+Write `~/.config/reqbot/config.json` with localhost defaults:
+- `qdrant_url`: `http://localhost:6333`
+- `ollama_url`: `http://localhost:11434`
+- All model names at their standard defaults (same as `core/config.py _DEFAULTS`)
+
+If a config file already exists, ask before overwriting:
 
 ```
     Config already exists at ~/.config/reqbot/config.json.
     Overwrite with localhost defaults? (y/N):
 ```
 
-  If user says no: skip the write (existing config stands).
+If user says no, skip the write (existing config stands).
 
-- Run `reqbot status` inline and print its output. If status shows all green, print the
-  success banner:
+Run `reqbot status` inline and print its output. If status shows all green, print:
 
 ```
 === ReqBot is ready ===
@@ -184,54 +229,101 @@ Note: The synthesis model (qwen2.5:14b, ~9 GB) will download automatically
 on your first use of --synthesize.
 ```
 
-### 4.4 Implementation Notes
+---
 
-- `cmd_setup` lives in `cli/reqbot.py` alongside `cmd_init` and the other `cmd_*`
-  functions.
-- All subprocess calls (`docker`, `ollama`) use `subprocess.run()` with explicit
-  `check=False` — capture returncode and stderr, handle failures explicitly rather than
-  letting exceptions propagate unchecked.
-- HTTP polling (Qdrant readiness) uses `requests.get()` with a short timeout, same
-  pattern as `cmd_init`'s `_test_qdrant()`.
-- The setup command must be importable without Docker, Ollama, or any third-party package
-  installed — all subprocess and HTTP calls happen inside the function body, not at
-  module import time.
+### 5.4 Behavior on Re-Run
 
-### 4.5 Success Criteria
+`reqbot setup` is idempotent. Running it on an already-configured machine is always safe.
 
-- Fresh Linux machine with Docker installed → `reqbot setup` completes without errors
-- `reqbot ask "test"` succeeds after setup without any additional manual steps
-- `reqbot status` shows all green after setup
-- No manual config editing required
-- Clear, actionable error message for every failure path (Docker missing, Qdrant
-  fails to start, Ollama install fails, model pull fails)
-- Re-running `reqbot setup` on an already-configured machine is safe and idempotent
-  (each step skips if already satisfied)
+| Component | State | Behavior |
+|-----------|-------|----------|
+| Docker | Running | Proceed |
+| Docker | Not running / not installed | Exit 1 with instructions |
+| `reqbot-qdrant` container | Running | Skip — print `Already running` |
+| `reqbot-qdrant` container | Stopped | `docker start reqbot-qdrant` |
+| `reqbot-qdrant` container | Does not exist | `docker run` with volume mount |
+| Ollama binary | Present and API reachable | Skip install — print version |
+| Ollama binary | Present but API not reachable | Exit 1 with instructions |
+| Ollama binary | Missing | Run official installer; poll for reachability |
+| `nomic-embed-text` | Already pulled | Skip — print `Already pulled` |
+| `nomic-embed-text` | Missing | `ollama pull` |
+| `llama3.1:8b-instruct-q4_K_M` | Already pulled | Skip — print `Already pulled` |
+| `llama3.1:8b-instruct-q4_K_M` | Missing | `ollama pull` |
+| Config file | Exists | Prompt before overwrite |
+| Config file | Does not exist | Write with localhost defaults |
 
 ---
 
-## 5. WP-17.2 — Lazy Synthesis Model Pull
+### 5.5 Failure Handling Matrix
 
-### 5.1 Goal
+| Failure | User Message | Exit Code | Setup Continues? |
+|---------|-------------|-----------|-----------------|
+| Docker not installed | "Install Docker: ..." | 1 | No |
+| Docker daemon not running | "Start the daemon and re-run..." | 1 | No |
+| `docker run reqbot-qdrant` fails | "Failed to start Qdrant container: <stderr>" | 1 | No |
+| Qdrant not reachable after 10s | "Qdrant did not become ready in time..." | 1 | No |
+| Ollama API not reachable (binary present) | "Ensure the Ollama service is running..." | 1 | No |
+| Ollama official installer exits non-zero | "Ollama install failed: <stderr>" | 1 | No |
+| Ollama API not reachable after install | "Service not yet reachable — try: systemctl start ollama" | 1 | No |
+| `ollama pull` exits non-zero | "Model pull failed: <model> — <stderr>" | 1 | No |
+| Config write fails (permissions) | "Could not write config: <error>" | 1 | No |
+| User declines config overwrite | Existing config used; setup continues | — | Yes |
+| `reqbot status` reports unhealthy | Status output shown; no hard exit | 0 | — |
+
+All failure messages end with a concrete next-step instruction. Generic `Something went
+wrong` messages are not acceptable.
+
+---
+
+### 5.6 Internal Implementation Notes
+
+- `cmd_setup` lives in `cli/reqbot.py` alongside the other `cmd_*` functions.
+- All subprocess calls (`docker`, `ollama`) use `subprocess.run()` with `check=False`.
+  Capture `returncode` and `stderr`; handle failures explicitly.
+- For long-running commands (`docker run`, `ollama pull`, Ollama installer): pass
+  `stdout=None, stderr=None` so the subprocess inherits the parent's terminal and the
+  user sees live output. For brief probe commands (`docker info`, `ollama --version`,
+  HTTP checks): capture output for parsing.
+- HTTP polling uses `requests.get()` with a 5-second timeout, same pattern as
+  `cmd_init`'s `_test_qdrant()`. Sleep 1 second between attempts; give up after 10.
+- All subprocess and HTTP calls happen inside `cmd_setup()`. Importing `cli/reqbot.py`
+  must not trigger any subprocess or network call — this is already the pattern for all
+  other `cmd_*` functions.
+- No new pip dependencies. `subprocess`, `requests`, `time`, and `os` are all already in
+  use in `cli/reqbot.py`.
+
+---
+
+### 5.7 Success Criteria
+
+- Fresh Linux machine with Docker installed → `reqbot setup` completes, `reqbot ask "test"` works
+- `reqbot status` shows all green after setup completes
+- No manual config editing required
+- Re-running on an already-configured machine is safe and idempotent per §5.4
+- Every failure path produces a message matching the matrix in §5.5
+
+---
+
+## 6. WP-17.2 — Lazy Synthesis Model Pull
+
+### 6.1 Goal
 
 Users who only need search and trace should not wait for a 9 GB download during setup.
 The synthesis model (`qwen2.5:14b`) is pulled automatically and transparently on the
 first command that requires it.
 
-### 5.2 Trigger Points
+### 6.2 Hook Location
 
-Any path that calls `core/synthesis.py`'s `synthesize_answer()` or
-`core/ask.retrieve()` with `synthesize=True` can trigger the lazy pull. The cleanest
-hook is inside `synthesize_answer()` itself — it already handles the Ollama client
-and knows which model is requested.
+`core/synthesis.py` — inside `synthesize_answer()`, local Ollama path only. This
+function already holds the model name and Ollama URL; it is the right place to check
+presence before issuing a generation request.
 
-### 5.3 Behavior
+### 6.3 User-Facing Behavior
 
-When `synthesize_answer()` is called with a local Ollama backend:
+When `synthesize_answer()` is called with a local Ollama backend and the model is not
+present:
 
-1. Before issuing the generation request, check whether the model is available:
-   `GET http://<ollama_url>/api/tags` and scan the name list.
-2. If the model is **not** present, print to stderr (one-time message):
+1. Print to stderr (one-time, before pull begins):
 
 ```
 [*] Synthesis model qwen2.5:14b not found locally. Downloading (~9 GB)...
@@ -239,39 +331,45 @@ When `synthesize_answer()` is called with a local Ollama backend:
     control timing.
 ```
 
-3. Run `ollama pull <synthesis_model>` via subprocess, streaming output to stderr so
-   the user sees progress.
-4. After the pull completes, proceed with the synthesis call normally.
+2. Run `ollama pull <synthesis_model>` via subprocess with output streamed to the
+   terminal.
+3. After the pull completes, proceed with the synthesis call normally.
 
-### 5.4 Scope Constraints
+### 6.4 Internal Behavior
+
+- Check: `GET http://<ollama_url>/api/tags`, scan `models[].name` for the synthesis
+  model. If present, skip all of the above.
+- The `/api/tags` check adds one lightweight HTTP call per synthesis invocation while
+  the model is absent. Once pulled, the check is a fast list scan — no noticeable
+  overhead.
+- Do not add a persistent "model is present" flag or cache file. The `/api/tags`
+  endpoint is the authoritative source.
+
+### 6.5 Scope Constraints
 
 - Lazy pull applies to **local Ollama backend only**. Remote synthesis (Anthropic,
-  OpenAI) has no model to pull.
-- The check adds one HTTP call per synthesis invocation only when the model is missing.
-  Once pulled, the check is a fast list lookup with no noticeable overhead.
-- Do not add a persistent "model is pulled" flag or cache file — the `/api/tags`
-  check is the authoritative source.
+  OpenAI) has no model to pull; skip the check entirely on the remote path.
+- No changes to `core/ask.py`, the service layer, or the API.
 
-### 5.5 Success Criteria
+### 6.6 Success Criteria
 
 - First `reqbot ask "..." --synthesize` after setup pulls the synthesis model
   transparently with visible progress
-- Subsequent `--synthesize` calls do not repeat the download or the check message
-- Pulling a remote synthesis backend (Anthropic, OpenAI) is unaffected
+- Subsequent `--synthesize` calls proceed without a download or check message
+- Remote synthesis backends (Anthropic, OpenAI) are unaffected
 
 ---
 
-## 6. WP-17.3 — `reqbot setup --advanced`
+## 7. WP-17.3 — `reqbot setup --advanced`
 
-### 6.1 Goal
+### 7.1 Goal
 
 Power users who want to configure remote Ollama/Qdrant URLs, custom models, or remote
 synthesis backends should still have access to the full interactive wizard.
 
-### 6.2 Behavior
+### 7.2 Behavior
 
-`reqbot setup --advanced` runs the existing `cmd_init` logic verbatim. No rewrite of
-`cmd_init` is required in this phase — `--advanced` is a dispatch alias:
+`reqbot setup --advanced` dispatches to `cmd_init` verbatim:
 
 ```python
 def cmd_setup(args: argparse.Namespace) -> int:
@@ -280,70 +378,66 @@ def cmd_setup(args: argparse.Namespace) -> int:
     # ... automated flow ...
 ```
 
-`reqbot init` remains available as a direct command (no deprecation in this phase).
+`reqbot init` remains a direct command. No deprecation in this phase.
 
-### 6.3 Success Criteria
+### 7.3 Success Criteria
 
-- `reqbot setup --advanced` produces identical behavior to `reqbot init`
-- `reqbot init` still works unchanged
-
----
-
-## 7. Explicit Exclusions
-
-The following are out of scope for Phase 17:
-
-- **Air-gapped bundle** — designing an offline bundle (`reqbot setup --offline
-  /path/to/bundle`) that includes pre-pulled model files and a Qdrant Docker image.
-  The setup command should accept `--offline <path>` as a flag from day one (to avoid
-  a future breaking change) but the bundle itself is not built in this phase.
-  Implementation: `--offline` flag is parsed but prints `Not yet implemented` and exits.
-- **Windows / macOS support** — setup.sh targets Linux. Other platforms are deferred.
-- **Docker Compose full-stack** — API + GUI + Qdrant in one `docker-compose up`.
-  Natural extension of Phases 16–18 but not a Phase 17 deliverable.
-- **`reqbot uninstall`** — out of scope.
-- **Automated Qdrant upgrade** — if a newer Qdrant image is available, setup does not
-  auto-upgrade. Document this as a manual `docker pull qdrant/qdrant` + container
-  recreation step in README if needed.
+- `reqbot setup --advanced` is identical in behavior to `reqbot init`
+- `reqbot init` works unchanged
 
 ---
 
-## 8. Anti-Patterns to Avoid
+## 8. Explicit Exclusions
 
-- **Silent installs.** Only Ollama is auto-installed, and it is done visibly using the
-  official installer with all output passed through to the terminal. Docker is never
-  silently installed.
-- **Swallowing subprocess failures.** Every `subprocess.run()` call checks the return
-  code. A failed `docker run`, `ollama pull`, or `ollama install` stops the setup with
-  an actionable message, never silently continues.
-- **Mutation of pipeline or retrieval behavior.** Phase 17 is CLI-only. No changes to
-  `core/ask.py`, the service layer, or the API.
-- **Adding setup logic to module import time.** All Docker/Ollama checks happen inside
-  `cmd_setup()`. Importing `cli/reqbot.py` must not trigger any subprocess or network
-  call.
+| Exclusion | Rationale |
+|-----------|-----------|
+| Windows / macOS support | Linux x86_64 only in Phase 17 |
+| Docker Compose full-stack | API + GUI + Qdrant as one `docker-compose up` — natural extension of Phase 18, not a Phase 17 deliverable |
+| `reqbot uninstall` | Out of scope |
+| Automated Qdrant upgrade | No auto-upgrade; users run `docker pull qdrant/qdrant` + container recreation manually |
+| Air-gapped offline bundle | Future extension. The `--offline` flag is **not** shipped as a stub — CLI surface area should not be added before the feature exists. Document the planned flag in a future PHASE19+ requirements doc when ready. |
 
 ---
 
-## 9. Files Changed
+## 9. Anti-Patterns to Avoid
+
+- **Silent installs.** Only Ollama is auto-installed, using the official installer with
+  all output passed through to the terminal. Docker is never silently installed.
+- **Managing the Ollama service lifecycle.** Never invoke `ollama serve` from setup.
+  The official installer owns service management; verify reachability and fail cleanly
+  if it is not reachable.
+- **Swallowing subprocess failures.** Every `subprocess.run()` call inspects the return
+  code. A failed `docker run`, `ollama pull`, or Ollama install stops setup with an
+  actionable message matching the matrix in §5.5.
+- **Setup logic at import time.** All subprocess and HTTP calls stay inside `cmd_setup()`.
+  Importing `cli/reqbot.py` must not trigger network or subprocess calls.
+- **Mutation of pipeline or retrieval behavior.** Phase 17 touches only `cli/reqbot.py`
+  and `core/synthesis.py`. No changes to `core/ask.py`, the service layer, or the API.
+
+---
+
+## 10. Files Changed
 
 | File | Change |
 |------|--------|
-| `cli/reqbot.py` | Add `cmd_setup()`; add `setup` subparser with `--advanced` and `--offline` flags; add `"setup": cmd_setup` to commands dict |
-| `core/synthesis.py` | Add lazy model pull check inside `synthesize_answer()` local path |
-| `docs/PHASE17_REQUIREMENTS.md` | This document |
+| `cli/reqbot.py` | Add `cmd_setup()`; add `setup` subparser with `--advanced` flag; add `"setup": cmd_setup` to commands dict |
+| `core/synthesis.py` | Add lazy model presence check + pull inside `synthesize_answer()` local Ollama path |
+| `README.md` | Update quick-start section to lead with `reqbot setup` instead of manual first-run steps |
+| `ARCHITECTURE.md` | Note that `reqbot setup` is operational bootstrap — not part of pipeline/runtime retrieval logic |
 
-No new pip dependencies. `subprocess`, `requests`, and `time` are all already in use.
+No new pip dependencies. `subprocess`, `requests`, `time`, and `os` are all already
+imported in `cli/reqbot.py`.
 
 ---
 
-## 10. Final Gate
+## 11. Final Gate
 
 Phase 17 is complete when:
 
 - `reqbot setup` on a Docker-equipped fresh Linux machine produces a working
   `reqbot ask` in one session, no manual steps required
-- Re-running `reqbot setup` is idempotent and safe
-- `--synthesize` triggers a transparent model pull on first use
+- Re-running `reqbot setup` on an already-configured machine is safe and produces
+  no unintended side effects (idempotency per §5.4)
+- First `--synthesize` call triggers a transparent synthesis model pull
 - `reqbot setup --advanced` and `reqbot init` behave identically
-- `--offline` flag is stubbed (parses without error, prints not-implemented message)
-- No regression in CLI, pipeline, or API behavior
+- No regression in CLI, pipeline, service layer, or API behavior

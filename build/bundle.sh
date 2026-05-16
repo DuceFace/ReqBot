@@ -31,23 +31,28 @@ PYTHON_FILENAME="cpython-${PYTHON_VERSION}+${PYTHON_RELEASE}-x86_64-unknown-linu
 PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_RELEASE}/${PYTHON_FILENAME}"
 PYTHON_SHA256="c710dd6b63e4df92f4c5b7b29ccad4276226a024a9017d5018f15321c7854af4"
 
-# Application source files to bundle
+# Application source files to bundle (paths relative to repo root)
 APP_FILES=(
-    reqbot.py
-    config.py
-    console.py
-    synthesis.py
-    run_pipeline.py
-    extract_pdf_to_text.py
-    chunk_text.py
-    section_parser.py
-    llm_extract_requirements.py
-    parse_and_normalize.py
-    enrich_requirements.py
-    aggregate_and_export.py
-    embed_and_index.py
-    embed_context_index.py
-    ask.py
+    cli/reqbot.py
+    cli/console.py
+    cli/__init__.py
+    core/config.py
+    core/synthesis.py
+    core/ask.py
+    core/__init__.py
+    pipeline/run_pipeline.py
+    pipeline/extract_pdf_to_text.py
+    pipeline/chunk_text.py
+    pipeline/section_parser.py
+    pipeline/llm_extract_requirements.py
+    pipeline/parse_and_normalize.py
+    pipeline/enrich_requirements.py
+    pipeline/aggregate_and_export.py
+    pipeline/embed_and_index.py
+    pipeline/embed_context_index.py
+    pipeline/__init__.py
+    services/__init__.py
+    models/__init__.py
 )
 
 BUNDLED_PYTHON="$BUNDLE_DIR/python/bin/python3"
@@ -137,7 +142,9 @@ for f in "${APP_FILES[@]}"; do
         echo "  ERROR: expected source file not found: $src" >&2
         exit 1
     fi
-    cp "$src" "$BUNDLE_DIR/app/"
+    dst="$BUNDLE_DIR/app/$f"
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
     echo "  + $f"
 done
 
@@ -158,7 +165,7 @@ REQBOT_HOME="$(cd "$(dirname "$0")" && pwd)"
 # HuggingFace — required for air-gapped environments.
 export FASTEMBED_CACHE_PATH="$REQBOT_HOME/models"
 
-exec "$REQBOT_HOME/python/bin/python3" "$REQBOT_HOME/app/reqbot.py" "$@"
+exec "$REQBOT_HOME/python/bin/python3" "$REQBOT_HOME/app/cli/reqbot.py" "$@"
 LAUNCHER_SCRIPT
 
 chmod +x "$BUNDLE_DIR/reqbot"

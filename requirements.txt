@@ -11,6 +11,9 @@ qdrant-client==1.17.0
 ollama==0.6.1
 requests==2.33.0
 
+# Phase 18 — FastAPI StaticFiles (SPA serving)
+aiofiles==25.1.0
+
 # WP-3 eval harness (eval/eval_harness.py)
 rapidfuzz>=3.0.0    # required — source_quote fuzzy matching
 # scipy>=1.7.0      # optional — bipartite Hungarian matching; greedy fallback if absent

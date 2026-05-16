@@ -110,13 +110,15 @@ Option A is the chosen strategy. WP-18.1 adds the `/api/` prefix to all existing
    - Resolve the dist path relative to `api/app.py`: `Path(__file__).resolve().parent.parent / "frontend" / "dist"`. This works identically in both a dev checkout and the installed app tree (where the same relative structure is preserved during bundling — see WP-18.5).
    - If `frontend/dist/index.html` is present → mount SPA catch-all.
    - If not present → skip mount and log one line: `Frontend build not found; serving API only`. No error; `reqbot serve` starts normally in API-only mode.
-3. Add SPA catch-all route that returns `index.html` for any path not matched by an API route:
+3. Add SPA catch-all route that returns `index.html` for any path not matched by an API route. The response must use the same resolved absolute path — not a CWD-relative string — so that it works identically in a dev checkout and the installed bundle:
    ```python
+   _DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
    @app.get("/{full_path:path}")
    def spa_fallback(full_path: str):
-       return FileResponse("frontend/dist/index.html")
+       return FileResponse(_DIST_DIR / "index.html")
    ```
-   This must come last in route registration order.
+   `_DIST_DIR` is computed once at module load. The catch-all must come last in route registration order so it does not shadow any `/api/` route.
 4. Update CORS to cover Vite default port (`:5173`) in addition to `:3000` and `:8080`.
 5. Update Swagger URL if prefix changes.
 6. Smoke test: `curl localhost:8000/api/ask` still works; `curl localhost:8000/` returns index.html or 404 gracefully.
@@ -357,15 +359,13 @@ During development: `vite dev` runs on `:5173`; API calls proxy to `:8000`. No C
 
 **Behavior:**
 - Route: `/trace/:reqId` — calls `GET /api/trace/{req_id}` on mount.
-- Requirement ID must be URL-encoded when navigating (see open question below).
+- Use `encodeURIComponent(reqId)` when constructing the fetch URL. Corpus IDs are path-safe (no `/` in the ID format), but encoding is still correct practice and costs nothing.
 - "Back to search" preserves the previous search URL (use React Router state or `?q=` param).
 - Cross-framework matches are cards; each is clickable → navigates to its own trace view.
 - Context text (raw chunk) is hidden by default, optional expand (calls `/api/trace/{req_id}?context=true`).
 - Loading state while fetching.
 - 404 state: "Requirement not found" with back link.
 - 503 state: "Backend unavailable" with retry.
-
-**Open question:** Requirement IDs may contain characters that are unsafe in URL path segments (e.g., `/`, `.`, `:`). Need to verify the actual format of `requirement_id` values in the corpus and decide whether `encodeURIComponent` is sufficient or if a mapping is needed.
 
 **Success criteria:**
 - All payload fields are displayed.
@@ -391,11 +391,15 @@ During development: `vite dev` runs on `:5173`; API calls proxy to `:8000`. No C
    echo "[+] Frontend built → frontend/dist/"
    ```
 
-2. `build/bundle.sh` — add frontend build step after Python bundle:
-   ```bash
-   bash build/build-frontend.sh
-   ```
-   The existing `build/bundle.sh` already packages Python artifacts; frontend dist goes alongside.
+2. `build/bundle.sh` — add two steps after the existing Python source copy (Step 5):
+   - Run the frontend build: `bash build/build-frontend.sh`
+   - Copy the built dist into the installed app tree at the path `api/app.py` resolves to at runtime:
+     ```bash
+     cp -r "$ROOT_DIR/frontend/dist" "$BUNDLE_DIR/app/frontend/dist"
+     ```
+   At install time `__file__` is `$BUNDLE_DIR/app/api/app.py`, so `parent.parent / "frontend" / "dist"` resolves to `$BUNDLE_DIR/app/frontend/dist/` — exactly where this copy lands. The existing `APP_FILES` list covers Python source; `frontend/dist/` is a directory copy and is handled separately.
+
+   `build/bundle.sh` must also install `aiofiles` alongside the existing pip installs. FastAPI's `StaticFiles` mount depends on Starlette's file-serving path, which uses synchronous I/O and does not strictly require `aiofiles` — but the Starlette dependency tree pulls it in implicitly. To be explicit, add it to the pinned pip install block in Step 3 and to `requirements.txt`.
 
 3. `frontend/dist/` added to `.gitignore` (dist is a build artifact, not source).
 
@@ -420,7 +424,7 @@ Remove unused CSS classes via Tailwind's purge/content configuration. Keep bundl
 - `npm run build` completes without errors.
 - `reqbot serve` responds to API calls AND serves the SPA from a single port.
 - `build/build-frontend.sh` runs clean in a fresh checkout.
-- A non-technical user can navigate to `localhost:8000` (or `/app`), run a query, and drill into a trace without assistance.
+- A non-technical user can navigate to `localhost:8000`, run a query, and drill into a trace without assistance.
 - No crashes or confusing error states during a live walkthrough.
 
 ---
@@ -440,9 +444,7 @@ The following questions were raised in the draft and resolved before implementat
 
 ## Remaining Open Questions
 
-1. **`aiofiles` dependency:** FastAPI's `StaticFiles` mount may require `aiofiles`. Verify whether it is already in `requirements.txt`; add it if not.
-
-2. **Installer layout for `frontend/dist/`:** Confirm that `build/bundle.sh` copies `frontend/dist/` into the installed app tree at the same relative path (`app/frontend/dist/`). If the installer layout differs, the `api/app.py` path resolution breaks in the binary. Verify before WP-18.5.
+None. All design questions are resolved. Implementation may begin with WP-18.1.
 
 ---
 

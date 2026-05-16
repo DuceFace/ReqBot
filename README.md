@@ -17,29 +17,40 @@ Run `reqbot docs` to see your indexed documents and requirement counts.
 ## Requirements
 
 - Python 3.12+
-- Ollama
-- Qdrant
-- Install dependencies:
+- Docker (required; runs Qdrant as a container)
+- [Ollama](https://ollama.ai/) (auto-installed by `reqbot setup` if absent)
+- Python dependencies:
 
 ```bash
 pip3 install --break-system-packages -r requirements.txt
 ```
 
-Recommended Ollama models:
-
-- `llama3.1:8b-instruct-q4_K_M` - Step C extraction and query rewriting
-- `nomic-embed-text` - dense embeddings
-- `qwen2.5:14b` - synthesis answers
-
 ## Setup
 
-Initialize config once:
+Run once on a fresh Linux machine with Docker installed:
 
 ```bash
-reqbot init
+reqbot setup
 ```
 
-This writes `~/.config/reqbot/config.json`.
+This automates five steps: Docker check → Qdrant container → Ollama install (if absent) → core model pull → config write. When it completes, `reqbot ask` is ready.
+
+The two core models pulled during setup:
+
+| Model | Size | Purpose |
+|-------|------|---------|
+| `nomic-embed-text` | ~274 MB | Dense embeddings (required for all search) |
+| `llama3.1:8b-instruct-q4_K_M` | ~4.7 GB | Step C extraction + query rewriting |
+
+The synthesis model (`qwen2.5:14b`, ~9 GB) is **not** pulled during setup. It downloads automatically the first time you run `--synthesize`.
+
+**Advanced / custom infrastructure:**
+
+```bash
+reqbot setup --advanced   # or: reqbot init
+```
+
+Opens an interactive wizard for configuring remote Ollama/Qdrant URLs, custom models, or remote synthesis backends (Anthropic, OpenAI).
 
 ## Quick Start
 
@@ -153,6 +164,25 @@ Generate evidence mappings for a topic or control.
 ```bash
 reqbot evidence "topic or control" [--domain-tag T] [--requirement-type T]
 ```
+
+### `setup`
+
+Automated first-run setup (Docker, Qdrant, Ollama, models, config).
+
+```bash
+reqbot setup            # automated flow
+reqbot setup --advanced # interactive wizard (same as reqbot init)
+```
+
+### `init`
+
+Interactive setup wizard — configure URLs, models, and optional remote synthesis.
+
+```bash
+reqbot init
+```
+
+Writes `~/.config/reqbot/config.json`. Use this for non-default infrastructure (remote Ollama/Qdrant, custom models).
 
 ### `docs`
 

@@ -416,106 +416,60 @@ def cmd_reindex(args: argparse.Namespace) -> int:
 
 def cmd_docs(args: argparse.Namespace) -> int:
     """List all indexed documents with requirement counts and extraction mode."""
-    import re as _re
+    from services import docs_service
 
     processed_dir = _cfg.processed_dir_path()
     if not processed_dir.exists():
         log.error("Processed documents directory not found: %s", processed_dir)
         return 1
 
-    all_files = sorted(processed_dir.rglob("*_requirements_normalized.jsonl"))
-    latest: dict[str, Path] = {}
-    for p in all_files:
-        # Key off filename stem, not directory name — robust to custom --output-dir usage
-        doc_key = p.stem.replace("_requirements_normalized", "")
-        if doc_key not in latest or p.stat().st_mtime > latest[doc_key].stat().st_mtime:
-            latest[doc_key] = p
+    result = docs_service.list_docs(processed_dir)
 
-    total_reqs = 0
     print(f"\n{'Document':<30} {'Reqs':>6}  {'Extraction':<12}  {'Run Date'}")
     print("-" * 68)
-
-    for doc_key, path in sorted(latest.items()):
-        count = sum(1 for line in open(path, encoding="utf-8") if line.strip())
-        total_reqs += count
-
-        # Detect pdfplumber by scanning chunks for TABLE_START sentinels
-        chunks = list(path.parent.glob("*_chunks.jsonl"))
-        mode = "pymupdf"
-        if chunks:
-            with open(chunks[0], encoding="utf-8") as f:
-                for line in f:
-                    if "<<<TABLE_START>>>" in line:
-                        mode = "pdfplumber"
-                        break
-
-        # Run date from directory timestamp suffix
-        dir_name = path.parent.name
-        ts_match = _re.search(r"_(\d{4})(\d{2})(\d{2})_\d{6}$", dir_name)
-        run_date = f"{ts_match.group(1)}-{ts_match.group(2)}-{ts_match.group(3)}" if ts_match else "unknown"
-
-        print(f"{doc_key:<30} {count:>6}  {mode:<12}  {run_date}")
-
+    for doc in result["docs"]:
+        print(f"{doc['doc_key']:<30} {doc['count']:>6}  {doc['mode']:<12}  {doc['run_date']}")
     print("-" * 68)
-    print(f"{'TOTAL':<30} {total_reqs:>6}  ({len(latest)} documents)")
+    print(f"{'TOTAL':<30} {result['total_reqs']:>6}  ({result['total_docs']} documents)")
     print()
     return 0
 
 
 def cmd_status(args: argparse.Namespace) -> int:
     """Show system status."""
+    from services import status_service
+
+    ollama_url = getattr(args, "ollama_url", _cfg.ollama_url)
+    qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
+    result = status_service.check(ollama_url, qdrant_url, _cfg.processed_dir_path())
+
     print("=" * 60)
     print("ReqBot System Status")
     print("=" * 60)
 
-    ollama_url = getattr(args, "ollama_url", _cfg.ollama_url)
-    qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
-
-    # Check Ollama
+    ollama = result["ollama"]
     print(f"\n--- Ollama ({ollama_url}) ---")
-    try:
-        resp = requests.get(f"{ollama_url}/api/tags", timeout=5)
-        resp.raise_for_status()
-        models = resp.json().get("models", [])
-        print(f"  Status: Running ({len(models)} models)")
-        for m in models:
-            size_gb = m.get("size", 0) / (1024**3)
-            print(f"  - {m['name']} ({size_gb:.1f} GB)")
-    except requests.RequestException:
+    if ollama["reachable"]:
+        print(f"  Status: Running ({len(ollama['models'])} models)")
+        for m in ollama["models"]:
+            print(f"  - {m['name']} ({m['size_gb']:.1f} GB)")
+    else:
         print("  Status: NOT REACHABLE")
 
-    # Check Qdrant
+    qdrant = result["qdrant"]
     print(f"\n--- Qdrant ({qdrant_url}) ---")
-    try:
-        resp = requests.get(f"{qdrant_url}/collections", timeout=5)
-        resp.raise_for_status()
-        collections = resp.json().get("result", {}).get("collections", [])
-        print(f"  Status: Running ({len(collections)} collections)")
-        for c in collections:
-            name = c.get("name", "?")
-            # Get collection details
-            detail_resp = requests.get(f"{qdrant_url}/collections/{name}", timeout=5)
-            if detail_resp.ok:
-                info = detail_resp.json().get("result", {})
-                points = info.get("points_count", "?")
-                print(f"  - {name}: {points} points")
-            else:
-                print(f"  - {name}")
-    except requests.RequestException:
+    if qdrant["reachable"]:
+        print(f"  Status: Running ({len(qdrant['collections'])} collections)")
+        for c in qdrant["collections"]:
+            print(f"  - {c['name']}: {c['points']} points")
+    else:
         print("  Status: NOT REACHABLE")
 
-    # Check processed documents
     print("\n--- Processed Documents ---")
-    processed_dir = _cfg.processed_dir_path()
-    if processed_dir.exists():
-        norm_files = list(processed_dir.rglob("*_requirements_normalized.jsonl"))
-        for nf in sorted(norm_files):
-            count = sum(1 for line in open(nf, encoding="utf-8") if line.strip())
-            try:
-                display = "~/" + str(nf.relative_to(Path.home()))
-            except ValueError:
-                display = str(nf)
-            print(f"  - {display}: {count} requirements")
+    docs = result["processed_documents"]
+    if docs:
+        for d in docs:
+            print(f"  - {d['path']}: {d['count']} requirements")
     else:
         print("  No processed documents found")
 
@@ -525,17 +479,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_trace(args: argparse.Namespace) -> int:
     """Trace the full provenance of a specific requirement by ID."""
-    try:
-        from qdrant_client import QdrantClient
-        from qdrant_client.models import FieldCondition, Filter, MatchValue
-    except ImportError:
-        log.error("qdrant_client not installed — run: pip3 install qdrant-client")
-        return 1
-
+    from services import trace_service
     import textwrap as _tw
-
-    # Must match CONTEXT_UUID_NAMESPACE in ask.py and embed_context_index.py
-    _CONTEXT_UUID_NS = uuid.UUID("b5f2e8d1-3a7c-4e9f-b8a2-6d4f1c7e3b5a")
 
     qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
     req_id = args.requirement_id
@@ -543,100 +488,18 @@ def cmd_trace(args: argparse.Namespace) -> int:
     show_context = getattr(args, "context", False)
 
     try:
-        client = QdrantClient(url=qdrant_url, timeout=10)
-    except Exception as e:
-        log.error("Could not connect to Qdrant: %s", e)
+        result = trace_service.trace(req_id, qdrant_url, show_context=show_context)
+    except ValueError as e:
+        log.error("%s", e)
+        return 1
+    except RuntimeError as e:
+        log.error("%s", e)
         return 1
 
-    # Step 1: Look up requirement by ID — scroll with filter, no vector search
-    try:
-        results, _ = client.scroll(
-            collection_name="grc_requirements",
-            scroll_filter=Filter(
-                must=[FieldCondition(key="requirement_id", match=MatchValue(value=req_id))]
-            ),
-            limit=1,
-            with_payload=True,
-            with_vectors=False,
-        )
-    except Exception as e:
-        log.error("Qdrant query failed: %s", e)
-        return 1
-
-    if not results:
-        log.error("Requirement not found: %s", req_id)
-        return 1
-
-    payload = results[0].payload or {}
-
-    # Step 2: Cross-framework matches — same source_ref, one representative per other document.
-    # Skip by requirement_id first (the exact point being traced), then deduplicate by
-    # document_id. If document_id is None, include without deduplication — can't group them.
+    payload = result["requirement"]
+    cross_matches = result["cross_matches"]
+    context_text = result["context_text"]
     source_ref = payload.get("source_ref", "")
-    cross_matches: list[dict] = []
-    if source_ref:
-        try:
-            all_matches, _ = client.scroll(
-                collection_name="grc_requirements",
-                scroll_filter=Filter(
-                    must=[FieldCondition(key="source_ref", match=MatchValue(value=source_ref))]
-                ),
-                limit=200,
-                with_payload=True,
-                with_vectors=False,
-            )
-            target_doc_id = payload.get("document_id")
-            seen_docs: set = set()
-            if target_doc_id:
-                seen_docs.add(target_doc_id)
-            for r in all_matches:
-                p = r.payload or {}
-                # Always skip the exact requirement being traced
-                if p.get("requirement_id") == req_id:
-                    continue
-                doc_id = p.get("document_id")
-                if doc_id:
-                    if doc_id not in seen_docs:
-                        seen_docs.add(doc_id)
-                        cross_matches.append(p)
-                else:
-                    # No document_id — can't deduplicate, include it
-                    cross_matches.append(p)
-        except Exception as e:
-            log.warning("Cross-framework query failed: %s", e)
-
-    # Step 3: Retrieve context chunk from grc_context (optional, --context flag)
-    context_text: str | None = None
-    if show_context:
-        doc_id = payload.get("document_id", "")
-        chunk_id = payload.get("chunk_id")
-        if doc_id and chunk_id is not None:
-            pid = str(uuid.uuid5(_CONTEXT_UUID_NS, f"{doc_id}:{chunk_id}"))
-            try:
-                ctx_hits = client.retrieve(
-                    collection_name="grc_context",
-                    ids=[pid],
-                    with_payload=True,
-                )
-                if ctx_hits:
-                    ctx = ctx_hits[0].payload.get("text", "") if ctx_hits[0].payload else ""
-                    if ctx:
-                        # Window around the source_quote (300 chars each side)
-                        quote = payload.get("source_quote", "")
-                        window = 300
-                        if quote and quote in ctx:
-                            idx = ctx.find(quote)
-                            start = max(0, idx - window)
-                            end = min(len(ctx), idx + len(quote) + window)
-                            prefix = "..." if start > 0 else ""
-                            suffix = "..." if end < len(ctx) else ""
-                            context_text = prefix + ctx[start:end] + suffix
-                        else:
-                            context_text = ctx[:window * 2] + ("..." if len(ctx) > window * 2 else "")
-            except Exception as e:
-                log.warning("Context retrieval failed: %s", e)
-        else:
-            log.warning("No chunk_id or document_id — cannot retrieve context chunk")
 
     if json_output:
         out: dict = {
@@ -717,15 +580,8 @@ def cmd_trace(args: argparse.Namespace) -> int:
 
 def cmd_compare(args: argparse.Namespace) -> int:
     """Compare a control ID or free-text query across all indexed documents."""
-    import re as _re
     import textwrap as _tw
-
-    try:
-        from qdrant_client import QdrantClient
-        from qdrant_client import models as _qm
-    except ImportError:
-        log.error("qdrant_client not installed — run: pip3 install qdrant-client")
-        return 1
+    from services import compare_service
 
     query = args.query.strip()
     qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
@@ -735,61 +591,27 @@ def cmd_compare(args: argparse.Namespace) -> int:
     markdown_output = getattr(args, "markdown_output", False)
     document_ids = getattr(args, "document_ids", None) or []
 
-    # Control ID detection: AC-2, IA-5(1), AU-9, AC-2(j), IA-5(1)(a), SA-4(10)
-    # Pattern: letter block, hyphen, digits, optional parenthetical suffixes
-    CONTROL_ID_RE = _re.compile(r'^[A-Z]{1,4}-\d+(\([0-9a-z]+\))*$', _re.IGNORECASE)
-    is_control_id = bool(CONTROL_ID_RE.match(query))
-
     try:
-        client = QdrantClient(url=qdrant_url, timeout=10)
-    except Exception as e:
-        log.error("Could not connect to Qdrant: %s", e)
+        result = compare_service.compare(query, qdrant_url, ollama_url, top_k, document_ids)
+    except ValueError as e:
+        log.error("%s", e)
+        return 1
+    except RuntimeError as e:
+        log.error("%s", e)
         return 1
 
     # -----------------------------------------------------------------------
-    # Exact match path — control ID detected, scroll with source_ref filter
+    # Exact match display
     # -----------------------------------------------------------------------
-    if is_control_id:
-        query = query.upper()  # Federal control IDs are always uppercase; Qdrant MatchValue is case-sensitive
-        log.info("Control ID detected — using exact source_ref match for: %s", query)
-        conditions: list = [
-            _qm.FieldCondition(key="source_ref", match=_qm.MatchValue(value=query))
-        ]
-        if document_ids:
-            conditions.append(
-                _qm.FieldCondition(key="document_id", match=_qm.MatchAny(any=document_ids))
-            )
-
-        try:
-            scroll_results, _ = client.scroll(
-                collection_name="grc_requirements",
-                scroll_filter=_qm.Filter(must=conditions),
-                limit=200,
-                with_payload=True,
-                with_vectors=False,
-            )
-        except Exception as e:
-            log.error("Qdrant query failed: %s", e)
-            return 1
-
-        if not scroll_results:
-            log.error("No requirements found with source_ref: %s", query)
-            return 1
-
-        # One representative per document — highest confidence wins ties
-        doc_groups: dict[str, dict] = {}
-        for r in scroll_results:
-            p = r.payload or {}
-            doc_key = p.get("source_pdf") or p.get("document_id") or "unknown"
-            existing = doc_groups.get(doc_key)
-            if existing is None or (p.get("confidence") or 0) > (existing.get("confidence") or 0):
-                doc_groups[doc_key] = p
+    if result["mode"] == "exact":
+        query = result["query"]
+        doc_groups = result["groups"]
 
         if json_output:
             print(json.dumps({
                 "query": query,
                 "mode": "exact",
-                "source_ref": query,
+                "source_ref": result["source_ref"],
                 "groups": list(doc_groups.values()),
             }, indent=2, ensure_ascii=False))
             return 0
@@ -824,79 +646,12 @@ def cmd_compare(args: argparse.Namespace) -> int:
             print()
 
     # -----------------------------------------------------------------------
-    # Semantic path — free text, hybrid search, group results by source_ref
+    # Semantic display
     # -----------------------------------------------------------------------
     else:
-        log.info("Free-text query — using hybrid semantic search for: %s", query)
-
-        # Dense embedding — use the ollama package (consistent with ask.py; handles API version drift)
-        try:
-            import ollama as _ollama
-            dense_vector = _ollama.Client(host=ollama_url).embed(
-                model="nomic-embed-text", input=query
-            ).embeddings[0]
-        except Exception as e:
-            log.error("Dense embedding failed: %s", e)
-            return 1
-
-        # Sparse embedding via fastembed BM25
-        try:
-            from fastembed import SparseTextEmbedding as _STE
-            sparse_emb = next(iter(_STE(model_name="Qdrant/bm25").embed([query])))
-            sparse_vector = _qm.SparseVector(
-                indices=sparse_emb.indices.tolist(),
-                values=sparse_emb.values.tolist(),
-            )
-        except Exception as e:
-            log.error("Sparse embedding failed: %s", e)
-            return 1
-
-        prefetch_limit = max(100, top_k * 5)
-        filter_obj = (
-            _qm.Filter(must=[
-                _qm.FieldCondition(key="document_id", match=_qm.MatchAny(any=document_ids))
-            ])
-            if document_ids else None
-        )
-
-        try:
-            hits = client.query_points(
-                collection_name="grc_requirements",
-                prefetch=[
-                    _qm.Prefetch(
-                        query=dense_vector, using="dense",
-                        filter=filter_obj, limit=prefetch_limit,
-                    ),
-                    _qm.Prefetch(
-                        query=sparse_vector, using="sparse",
-                        filter=filter_obj, limit=prefetch_limit,
-                    ),
-                ],
-                query=_qm.FusionQuery(fusion=_qm.Fusion.RRF),
-                limit=top_k,
-                with_payload=True,
-            ).points
-        except Exception as e:
-            log.error("Hybrid search failed: %s", e)
-            return 1
-
-        if not hits:
-            log.error("No results found for: %s", query)
-            return 1
-
-        # Group by source_ref, one representative per (source_ref, document) pair.
-        # Preserve rank order — first occurrence of each source_ref wins ordering.
-        ref_groups: dict[str, dict[str, dict]] = {}  # source_ref -> {doc_key -> payload}
-        ref_order: list[str] = []
-        for hit in hits:
-            p = hit.payload or {}
-            ref = p.get("source_ref") or "(no ref)"
-            doc_key = p.get("source_pdf") or p.get("document_id") or "unknown"
-            if ref not in ref_groups:
-                ref_groups[ref] = {}
-                ref_order.append(ref)
-            if doc_key not in ref_groups[ref]:
-                ref_groups[ref][doc_key] = p
+        query = result["query"]
+        ref_order = result["ref_order"]
+        ref_groups = result["ref_groups"]
 
         if json_output:
             print(json.dumps({
@@ -945,40 +700,11 @@ def cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
-_EVIDENCE_AUDITOR_PROMPT = """You are a strict compliance auditor reviewing evidence for a System Security Plan (SSP).
-You have been given a set of retrieved compliance requirements grouped by control ID.
-Your task is to produce a concise Executive Summary for the evidence pack.
-
-Rules you MUST follow:
-1. Identify the dominant control families present in the evidence (e.g., AC, IA, AU).
-2. Summarize what the evidence collectively requires — in plain, precise language an auditor would use.
-3. Flag any gaps: controls that appear in only one framework, or controls with conflicting language across frameworks.
-4. Do NOT invent requirements not present in the evidence.
-5. Do NOT provide implementation guidance — only describe what the evidence says.
-6. Keep the summary under 250 words. Use bullet points for clarity.
-
-QUERY: {query}
-
-EVIDENCE GROUPS ({group_count} control groups, {source_count} sources):
-{evidence_summary}
-
-Write the Executive Summary now:"""
-
-
 def cmd_evidence(args: argparse.Namespace) -> int:
     """Export a defensible evidence pack grouped by control ID."""
+    import os
     import textwrap as _tw
-    from datetime import datetime as _datetime, timezone as _tz
-
-    try:
-        from qdrant_client import QdrantClient
-        from qdrant_client import models as _qm
-    except ImportError:
-        log.error("qdrant_client not installed — run: pip3 install qdrant-client")
-        return 1
-
-    # Must match CONTEXT_UUID_NAMESPACE in ask.py and embed_context_index.py
-    _CONTEXT_UUID_NS = uuid.UUID("b5f2e8d1-3a7c-4e9f-b8a2-6d4f1c7e3b5a")
+    from services import evidence_service
 
     query = args.query.strip()
     qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
@@ -990,190 +716,38 @@ def cmd_evidence(args: argparse.Namespace) -> int:
     document_ids = getattr(args, "document_ids", None) or []
     domain_tags = getattr(args, "domain_tags", None) or []
     requirement_types = getattr(args, "requirement_types", None) or []
-
-    timestamp = _datetime.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    try:
-        client = QdrantClient(url=qdrant_url, timeout=10)
-    except Exception as e:
-        log.error("Could not connect to Qdrant: %s", e)
-        return 1
-
-    # Dense embedding
-    try:
-        import ollama as _ollama
-        dense_vector = _ollama.Client(host=ollama_url).embed(
-            model="nomic-embed-text", input=query
-        ).embeddings[0]
-    except Exception as e:
-        log.error("Dense embedding failed: %s", e)
-        return 1
-
-    # Sparse embedding
-    try:
-        from fastembed import SparseTextEmbedding as _STE
-        sparse_emb = next(iter(_STE(model_name="Qdrant/bm25").embed([query])))
-        sparse_vector = _qm.SparseVector(
-            indices=sparse_emb.indices.tolist(),
-            values=sparse_emb.values.tolist(),
-        )
-    except Exception as e:
-        log.error("Sparse embedding failed: %s", e)
-        return 1
-
-    # Build filter
-    filter_conditions: list = []
-    if document_ids:
-        filter_conditions.append(
-            _qm.FieldCondition(key="document_id", match=_qm.MatchAny(any=document_ids))
-        )
-    if domain_tags:
-        filter_conditions.append(
-            _qm.FieldCondition(key="domain_tags", match=_qm.MatchAny(any=domain_tags))
-        )
-    if requirement_types:
-        filter_conditions.append(
-            _qm.FieldCondition(key="requirement_type", match=_qm.MatchAny(any=requirement_types))
-        )
-    filter_obj = _qm.Filter(must=filter_conditions) if filter_conditions else None
-
-    prefetch_limit = max(100, top_k * 5)
+    api_key = os.environ.get(_cfg.api_key_env, "") if _cfg.synthesis_backend == "remote" else ""
 
     try:
-        hits = client.query_points(
-            collection_name="grc_requirements",
-            prefetch=[
-                _qm.Prefetch(
-                    query=dense_vector, using="dense",
-                    filter=filter_obj, limit=prefetch_limit,
-                ),
-                _qm.Prefetch(
-                    query=sparse_vector, using="sparse",
-                    filter=filter_obj, limit=prefetch_limit,
-                ),
-            ],
-            query=_qm.FusionQuery(fusion=_qm.Fusion.RRF),
-            limit=top_k,
-            with_payload=True,
-        ).points
-    except Exception as e:
-        log.error("Search failed: %s", e)
-        return 1
-
-    if not hits:
-        log.error("No results found for: %s", query)
-        return 1
-
-    # Group by source_ref.
-    # Every result in a group becomes a "source" row in the evidence table.
-    # The representative (canonical description) is the highest-confidence result per group.
-    groups: dict[str, dict] = {}
-    group_order: list[str] = []
-    for hit in hits:
-        p = hit.payload or {}
-        ref = p.get("source_ref") or "(no ref)"
-        if ref not in groups:
-            groups[ref] = {
-                "source_ref": ref,
-                "representative": p,
-                "sources": [],
-                "context_text": None,
-            }
-            group_order.append(ref)
-        groups[ref]["sources"].append(p)
-        if (p.get("confidence") or 0) > (groups[ref]["representative"].get("confidence") or 0):
-            groups[ref]["representative"] = p
-
-    # Context retrieval — batch fetch for all group representatives in one call
-    if show_context:
-        pid_to_ref: dict[str, str] = {}
-        pids: list[str] = []
-        for ref in group_order:
-            rep = groups[ref]["representative"]
-            doc_id = rep.get("document_id", "")
-            chunk_id = rep.get("chunk_id")
-            if doc_id and chunk_id is not None:
-                pid = str(uuid.uuid5(_CONTEXT_UUID_NS, f"{doc_id}:{chunk_id}"))
-                pids.append(pid)
-                pid_to_ref[pid] = ref
-        if pids:
-            try:
-                ctx_hits = client.retrieve(
-                    collection_name="grc_context",
-                    ids=pids,
-                    with_payload=True,
-                )
-                for point in ctx_hits:
-                    ref = pid_to_ref.get(str(point.id))
-                    if not ref:
-                        continue
-                    ctx = (point.payload or {}).get("text", "")
-                    if not ctx:
-                        continue
-                    rep = groups[ref]["representative"]
-                    quote = rep.get("source_quote", "")
-                    window = 300
-                    if quote and quote in ctx:
-                        idx = ctx.find(quote)
-                        start = max(0, idx - window)
-                        end = min(len(ctx), idx + len(quote) + window)
-                        prefix = "..." if start > 0 else ""
-                        suffix = "..." if end < len(ctx) else ""
-                        groups[ref]["context_text"] = prefix + ctx[start:end] + suffix
-                    else:
-                        groups[ref]["context_text"] = (
-                            ctx[:window * 2] + ("..." if len(ctx) > window * 2 else "")
-                        )
-            except Exception as e:
-                log.warning("Context batch retrieval failed: %s", e)
-
-    total_sources = sum(len(g["sources"]) for g in groups.values())
-
-    # -----------------------------------------------------------------------
-    # LLM Synthesis — Compliance Auditor Executive Summary
-    # -----------------------------------------------------------------------
-    # Build a compact evidence summary for the LLM (control IDs + descriptions only,
-    # not the full source table — keeps the prompt tight and within context window).
-    _evidence_lines: list[str] = []
-    for i, ref in enumerate(group_order, 1):
-        g = groups[ref]
-        rep = g["representative"]
-        _primary = rep.get("description") or rep.get("source_quote") or "(no text)"
-        _evidence_lines.append(
-            f"[{i}] Control: {ref}  |  Sources: {len(g['sources'])}\n"
-            f"    {_primary}"
-        )
-
-    _evidence_summary = "\n\n".join(_evidence_lines)
-    _auditor_prompt = _EVIDENCE_AUDITOR_PROMPT.format(
-        query=query,
-        group_count=len(groups),
-        source_count=total_sources,
-        evidence_summary=_evidence_summary,
-    )
-
-    _synthesis_text: str = ""
-    _api_key = (
-        __import__("os").environ.get(_cfg.api_key_env, "")
-        if _cfg.synthesis_backend == "remote" else ""
-    )
-    try:
-        from core import synthesis as _syn
-        _synthesis_text = _syn.synthesize(
-            question="",
-            evidence="",
-            backend=_cfg.synthesis_backend,
-            model=_cfg.synthesis_model,
+        result = evidence_service.build(
+            query=query,
+            qdrant_url=qdrant_url,
             ollama_url=ollama_url,
+            top_k=top_k,
+            show_context=show_context,
+            document_ids=document_ids,
+            domain_tags=domain_tags,
+            requirement_types=requirement_types,
+            synthesis_backend=_cfg.synthesis_backend,
+            synthesis_model=_cfg.synthesis_model,
             provider=_cfg.remote_provider,
-            api_key=_api_key,
-            raw_prompt=_auditor_prompt,
+            api_key=api_key,
         )
-    except Exception as e:
-        log.warning("Evidence synthesis failed (%s) — producing evidence pack without summary", e)
+    except ValueError as e:
+        log.error("%s", e)
+        return 1
+    except RuntimeError as e:
+        log.error("%s", e)
+        return 1
+
+    groups = result["groups"]
+    group_order = result["group_order"]
+    total_sources = result["total_sources"]
+    synthesis_text = result["synthesis_text"]
+    timestamp = result["timestamp"]
 
     # -----------------------------------------------------------------------
-    # Build output (JSON or Markdown)
+    # Build output (JSON or Markdown) — rendering stays in the CLI layer
     # -----------------------------------------------------------------------
     if fmt == "json":
         out_groups = []
@@ -1205,7 +779,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             "generated": timestamp,
             "group_count": len(groups),
             "source_count": total_sources,
-            "executive_summary": _synthesis_text or None,
+            "executive_summary": synthesis_text or None,
             "groups": out_groups,
         }, indent=2, ensure_ascii=False)
 
@@ -1220,10 +794,10 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             f"Results:   {len(groups)} requirement group(s), {total_sources} source(s)",
             "",
         ]
-        if _synthesis_text:
+        if synthesis_text:
             lines.append("## Executive Summary")
             lines.append("")
-            for line in _tw.wrap(_synthesis_text.strip(), width=80):
+            for line in _tw.wrap(synthesis_text.strip(), width=80):
                 lines.append(line)
             lines.append("")
 

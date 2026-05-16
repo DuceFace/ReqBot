@@ -27,12 +27,19 @@ import time
 import uuid
 from pathlib import Path
 
+# Ensure repo root is on sys.path when run as a standalone script from pipeline/.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import ollama
 from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient, models
 
-# Must match CONTEXT_UUID_NAMESPACE in ask.py — never change.
-CONTEXT_UUID_NAMESPACE = uuid.UUID("b5f2e8d1-3a7c-4e9f-b8a2-6d4f1c7e3b5a")
+from core import constants as _const
+
+# Canonical source is core/constants.py — imported above.
+CONTEXT_UUID_NAMESPACE = _const.CONTEXT_UUID_NS
 
 logging.basicConfig(
     level=logging.INFO,

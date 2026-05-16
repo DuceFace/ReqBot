@@ -13,74 +13,100 @@ remote synthesis via Anthropic or OpenAI APIs.
 
 ---
 
-## Top-Level Module Map
+## Package Structure (Phase 16A+)
 
 ```
-reqbot.py          ← CLI entry point + all command implementations
-console.py         ← Interactive shell (cmd.Cmd); wraps reqbot.py commands
-config.py          ← Configuration loader (stdlib only; no internal imports)
-run_pipeline.py    ← Pipeline orchestrator (Steps A–E + D.5); called by reqbot.py
-synthesis.py       ← LLM synthesis abstraction (local Ollama or remote API)
+cli/
+  reqbot.py      ← CLI entry point; argparse + cmd_* shims; display/formatting
+  console.py     ← Interactive shell (cmd.Cmd); wraps reqbot.py commands
 
---- Pipeline Steps (standalone, no cross-imports) ---
-extract_pdf_to_text.py       Step A  (legacy):  PDF → pages JSONL  [pymupdf / pdfplumber]
-section_parser.py            Step A  (docling):  PDF → *_ancestry.json + in-memory AncestryResult
-                                                 Docling DocumentConverter + iterate_items() traversal
-                                                 section_ref_path (numbered only) / section_title_path (all)
-                                                 parent_context = first ~600 chars after immediate parent heading
-chunk_text.py                Step B  (legacy):  pages JSONL → chunks JSONL  (fixed-size sliding window)
-                             Step B  (docling):  AncestryResult → chunks JSONL  (HybridChunker + breadcrumb injection)
-                                                 Output fields: raw_text, text (breadcrumb+raw_text), breadcrumb,
-                                                 section_ref_path, section_title_path, parent_header_text, parent_context
-llm_extract_requirements.py  Step C:  chunks JSONL → extracted requirements JSONL  [Ollama: extraction_model]
-                                      Pass 1 (default): source_quote + source_ref only
-                                      Full mode (--full-extraction): adds description/tags/type
-parse_and_normalize.py       Step D:  normalize, validate, deduplicate → normalized JSONL (schema v2.0)
-                                      Derives hierarchy fields from chunks.jsonl:
-                                      section_ref_path, section_title_path, parent_section_ref,
-                                      parent_context, child_section_refs
-enrich_requirements.py       Step D.5: normalized JSONL → enriched JSONL  [Ollama: enrichment_model]
-                                        Adds description, domain_tags, requirement_type via batched LLM calls
-                                        Resumable by requirement_id; skipped with --skip-enrichment
-aggregate_and_export.py      Step E:  stats aggregation → final_output.json + stats.json
-                                      stats.json includes hierarchy coverage (with_section_path, with_parent_context)
+core/
+  config.py      ← Configuration loader (stdlib only; no internal imports)
+  synthesis.py   ← LLM synthesis abstraction (local Ollama or remote API)
+  ask.py         ← Standalone query module: hybrid search + RRF + query rewrite + HyDE
 
---- Indexing ---
-embed_and_index.py        Step F:  normalized/enriched JSONL → Qdrant grc_requirements
-embed_context_index.py    Step F2: chunks JSONL              → Qdrant grc_context
-ask.py                    Standalone query module (also callable from reqbot.py)
+services/
+  status_service.py   ← Ollama + Qdrant health checks; processed-doc listing
+  docs_service.py     ← JSONL directory scan; document listing with counts/mode/date
+  trace_service.py    ← Requirement lookup by ID; cross-framework matches; context window
+  compare_service.py  ← Exact control-ID match + hybrid semantic search; grouped results
+  evidence_service.py ← Hybrid search + grouping + context retrieval + LLM synthesis
+
+pipeline/
+  run_pipeline.py              ← Pipeline orchestrator (Steps A–E + D.5)
+  extract_pdf_to_text.py       Step A  (legacy):  PDF → pages JSONL  [pymupdf / pdfplumber]
+  section_parser.py            Step A  (docling):  PDF → *_ancestry.json + in-memory AncestryResult
+                                                   Docling DocumentConverter + iterate_items() traversal
+                                                   section_ref_path (numbered only) / section_title_path (all)
+                                                   parent_context = first ~600 chars after immediate parent heading
+  chunk_text.py                Step B  (legacy):  pages JSONL → chunks JSONL  (fixed-size sliding window)
+                               Step B  (docling):  AncestryResult → chunks JSONL  (HybridChunker + breadcrumb injection)
+                                                   Output fields: raw_text, text (breadcrumb+raw_text), breadcrumb,
+                                                   section_ref_path, section_title_path, parent_header_text, parent_context
+  llm_extract_requirements.py  Step C:  chunks JSONL → extracted requirements JSONL  [Ollama: extraction_model]
+                                        Pass 1 (default): source_quote + source_ref only
+                                        Full mode (--full-extraction): adds description/tags/type
+  parse_and_normalize.py       Step D:  normalize, validate, deduplicate → normalized JSONL (schema v2.0)
+                                        Derives hierarchy fields from chunks.jsonl:
+                                        section_ref_path, section_title_path, parent_section_ref,
+                                        parent_context, child_section_refs
+  enrich_requirements.py       Step D.5: normalized JSONL → enriched JSONL  [Ollama: enrichment_model]
+                                          Adds description, domain_tags, requirement_type via batched LLM calls
+                                          Resumable by requirement_id; skipped with --skip-enrichment
+  aggregate_and_export.py      Step E:  stats aggregation → final_output.json + stats.json
+                                        stats.json includes hierarchy coverage (with_section_path, with_parent_context)
+  embed_and_index.py           Step F:  normalized/enriched JSONL → Qdrant grc_requirements
+  embed_context_index.py       Step F2: chunks JSONL              → Qdrant grc_context
+
+models/            ← Shared data schemas (populated in Phase 16C+)
 ```
+
+Each package contains an `__init__.py`. Every entry point injects its repo root (or
+bundle `app/`) onto `sys.path` at startup, enabling both standalone execution and
+cross-package imports without a venv.
 
 ### Internal Import Graph
 
 ```
-console.py
-  └── config
-  └── reqbot
+cli/console.py
+  └── core.config
+  └── cli.reqbot
 
-reqbot.py
-  └── config
-  └── run_pipeline       (lazy, ingest/batch commands)
-  └── embed_and_index    (lazy, ingest/index/batch/reindex commands)
-  └── embed_context_index (lazy, ingest/batch/index-context commands)
-  └── ask                (lazy, ask command)
-  └── synthesis          (lazy, when --synthesize is used)
+cli/reqbot.py
+  └── core.config
+  └── services.status_service   (lazy, status command)
+  └── services.docs_service     (lazy, docs command)
+  └── services.trace_service    (lazy, trace command)
+  └── services.compare_service  (lazy, compare command)
+  └── services.evidence_service (lazy, evidence command)
+  └── pipeline.run_pipeline       (lazy, ingest/batch commands)
+  └── pipeline.embed_and_index    (lazy, ingest/index/batch/reindex commands)
+  └── pipeline.embed_context_index (lazy, ingest/batch/index-context commands)
+  └── core.ask                    (lazy, ask command)
+  └── core.synthesis              (lazy, when --synthesize is used)
 
-run_pipeline.py
-  └── extract_pdf_to_text  (in-process; legacy path only)
-  └── section_parser       (in-process; docling Step A — lazy import)
-  └── chunk_text           (in-process; both legacy and docling Step B)
-  └── llm_extract_requirements (in-process)
-  └── parse_and_normalize  (in-process)
-  └── enrich_requirements  (in-process; Step D.5 — skipped with --skip-enrichment)
-  └── aggregate_and_export (in-process)
+services/*.py
+  └── (no cross-service imports)
+  └── core.synthesis  (evidence_service only — LLM auditor summary)
 
-config.py          → (no internal imports)
-synthesis.py       → (no internal imports; all third-party imports are lazy)
-ask.py             → (no internal imports)
-section_parser.py  → (no internal imports)
-enrich_requirements.py → (no internal imports)
-Steps A–E          → (no cross-imports between steps)
+pipeline/run_pipeline.py
+  └── pipeline.extract_pdf_to_text  (in-process; legacy path only)
+  └── pipeline.section_parser       (in-process; docling Step A — lazy import)
+  └── pipeline.chunk_text           (in-process; both legacy and docling Step B)
+  └── pipeline.llm_extract_requirements (in-process)
+  └── pipeline.parse_and_normalize  (in-process)
+  └── pipeline.enrich_requirements  (in-process; Step D.5 — skipped with --skip-enrichment)
+  └── pipeline.aggregate_and_export (in-process)
+
+pipeline/chunk_text.py
+  └── pipeline.section_parser  (lazy; docling path only)
+
+core/config.py     → (no internal imports)
+core/synthesis.py  → (no internal imports; all third-party imports are lazy)
+core/ask.py        → core.synthesis  (lazy, --synthesize only)
+pipeline/section_parser.py  → (no internal imports)
+pipeline/enrich_requirements.py → (no internal imports)
+Steps A–E          → (no cross-imports between steps; run_pipeline.py is the sole orchestrator)
 ```
 
 **Key constraint:** Pipeline steps (A–E) are intentionally isolated — they do not import each
@@ -117,11 +143,11 @@ Both service URLs are configurable via `~/.config/reqbot/config.json` or environ
 | `pdfplumber` | `pdfplumber` | extract_pdf_to_text | Optional; lazy import; table-aware backend |
 | `docling` | `docling` | section_parser, chunk_text | Optional; lazy import; structure-aware backend (Phase 14) |
 | `requests` | `requests` | llm_extract_requirements, reqbot | HTTP calls to Ollama REST API |
-| `ollama` | `ollama` | ask, embed_and_index, embed_context_index, synthesis, reqbot | Ollama Python client |
-| `fastembed` | `fastembed` | ask, embed_and_index, embed_context_index, reqbot | BM25 sparse embeddings (CPU-only) |
-| `qdrant_client` | `qdrant-client` | ask, embed_and_index, embed_context_index, reqbot | Qdrant client |
-| `anthropic` | `anthropic` | synthesis (optional) | Remote synthesis; lazy import |
-| `openai` | `openai` | synthesis (optional) | Remote synthesis; lazy import |
+| `ollama` | `ollama` | core/ask, embed_and_index, embed_context_index, synthesis, services/compare_service, services/evidence_service | Ollama Python client |
+| `fastembed` | `fastembed` | core/ask, embed_and_index, embed_context_index, services/compare_service, services/evidence_service | BM25 sparse embeddings (CPU-only) |
+| `qdrant_client` | `qdrant-client` | core/ask, embed_and_index, embed_context_index, services/trace_service, services/compare_service, services/evidence_service | Qdrant client |
+| `anthropic` | `anthropic` | core/synthesis (optional) | Remote synthesis; lazy import |
+| `openai` | `openai` | core/synthesis (optional) | Remote synthesis; lazy import |
 
 **Install (dev/system Python):**
 ```bash
@@ -277,10 +303,10 @@ Optional files loaded at startup:
 
 | Entry | How | Notes |
 |-------|-----|-------|
-| `reqbot` | Installed launcher → `reqbot.py` | CLI mode (subcommand) or shell mode (no args) |
-| `python3 reqbot.py <cmd>` | Dev/source mode | Same behavior, no installer needed |
-| `python3 run_pipeline.py <pdf>` | Direct pipeline run | Bypass reqbot for Step C resume with `--output-dir` |
-| `python3 <step>.py` | Individual step | Each step is standalone with `--help` |
+| `reqbot` | Installed launcher → `cli/reqbot.py` | CLI mode (subcommand) or shell mode (no args) |
+| `python3 cli/reqbot.py <cmd>` | Dev/source mode | Same behavior, no installer needed |
+| `python3 pipeline/run_pipeline.py <pdf>` | Direct pipeline run | Bypass reqbot for Step C resume with `--output-dir` |
+| `python3 pipeline/<step>.py` | Individual step | Each step is standalone with `--help` |
 
 ---
 
@@ -288,11 +314,12 @@ Optional files loaded at startup:
 
 | Module | Dependents | Risk |
 |--------|-----------|------|
-| `config.py` | `reqbot.py`, `console.py` | Config schema changes break both entry points |
-| `parse_and_normalize.py` (JSONL schema) | `embed_and_index.py`, `embed_context_index.py`, `reqbot.py` (trace/compare/evidence), `ask.py` | Schema version bump required; reindex needed |
-| `embed_and_index.py` (vector schema) | `ask.py`, `reqbot.py` (all query commands) | Collection recreation required; full reindex needed |
-| `ask.py` (search result format) | `reqbot.py` (ask, compare, evidence commands) | Result parsing in reqbot.py must match |
-| `synthesis.py` API signature | `reqbot.py` (evidence, ask --synthesize) | Signature is: `synthesize(snippets, query, backend, model, ollama_url, provider, api_key)` |
-| `run_pipeline.py` return value | `reqbot.py` (ingest, batch commands) | Returns path to normalized/enriched JSONL; change breaks auto-index |
-| `section_parser.py` output fields | `chunk_text.py` `run_structure_aware()` | AncestryResult fields (item_ancestry, doc) must stay stable; chunk_text reads both |
-| `chunk_text.py` chunk fields (docling) | `parse_and_normalize.py` `build_chunk_hierarchy_map()` | Hierarchy field names (section_ref_path etc.) must match what Step D reads from chunks.jsonl |
+| `core/config.py` | `cli/reqbot.py`, `cli/console.py`, all services | Config schema changes break all entry points and services |
+| `pipeline/parse_and_normalize.py` (JSONL schema) | `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py`, `services/trace_service.py`, `services/compare_service.py`, `services/evidence_service.py`, `core/ask.py` | Schema version bump required; reindex needed |
+| `pipeline/embed_and_index.py` (vector schema) | `core/ask.py`, all services that query Qdrant | Collection recreation required; full reindex needed |
+| `core/ask.py` (search result format) | `cli/reqbot.py` cmd_ask | Result format from `ask.run()` drives CLI display |
+| `core/synthesis.py` API signature | `services/evidence_service.py`, `core/ask.py` (--synthesize) | Signature: `synthesize(question, evidence, backend, model, ollama_url, provider, api_key, raw_prompt)` |
+| `pipeline/run_pipeline.py` return value | `cli/reqbot.py` cmd_ingest, cmd_batch | Returns path to normalized/enriched JSONL; change breaks auto-index |
+| `pipeline/section_parser.py` output fields | `pipeline/chunk_text.py` `run_structure_aware()` | AncestryResult fields (item_ancestry, doc) must stay stable; chunk_text reads both |
+| `pipeline/chunk_text.py` chunk fields (docling) | `pipeline/parse_and_normalize.py` `build_chunk_hierarchy_map()` | Hierarchy field names (section_ref_path etc.) must match what Step D reads from chunks.jsonl |
+| Service return schemas | `cli/reqbot.py` cmd_* display logic | Services return structured dicts; CLI display code unpacks specific keys — adding/renaming keys is safe, removing is breaking |

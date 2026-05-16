@@ -16,6 +16,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+# Ensure repo root is on sys.path when run as a standalone script from pipeline/.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -71,11 +76,11 @@ def run(
     Raises:
         RuntimeError: If any pipeline step fails.
     """
-    import extract_pdf_to_text
-    import chunk_text as chunk_text_mod
-    import llm_extract_requirements
-    import parse_and_normalize
-    import aggregate_and_export
+    from pipeline import extract_pdf_to_text
+    from pipeline import chunk_text as chunk_text_mod
+    from pipeline import llm_extract_requirements
+    from pipeline import parse_and_normalize
+    from pipeline import aggregate_and_export
 
     pdf = Path(pdf_path).resolve()
     out_dir = Path(output_dir).resolve()
@@ -116,7 +121,7 @@ def run(
             log.info("Starting Step A (PDF → Docling ancestry map)")
             log.info("=" * 60)
             try:
-                import section_parser as _section_parser
+                from pipeline import section_parser as _section_parser
                 ancestry_result = _section_parser.run(str(pdf), str(out_dir))
             except Exception as e:
                 raise RuntimeError(f"Step A (Docling) failed: {e}") from e
@@ -129,7 +134,7 @@ def run(
             if ancestry_result is None:
                 log.info("Step A was skipped — running section_parser to obtain DoclingDocument")
                 try:
-                    import section_parser as _section_parser
+                    from pipeline import section_parser as _section_parser
                     ancestry_result = _section_parser.run(str(pdf), str(out_dir))
                 except Exception as e:
                     raise RuntimeError(f"Step A (Docling, skip-to-B recovery) failed: {e}") from e
@@ -205,7 +210,7 @@ def run(
         log.info("Step D.5 — enrichment model: %s", enrichment_model)
         log.info("=" * 60)
         try:
-            import enrich_requirements as _enrich_mod
+            from pipeline import enrich_requirements as _enrich_mod
             enrich_result = _enrich_mod.run(
                 str(norm_path), str(out_dir),
                 model=enrichment_model, ollama_url=ollama_url, timeout=timeout,
@@ -383,8 +388,8 @@ def main() -> None:
     # Step F: Embed and index into Qdrant (optional)
     if args.index:
         import json as _json
-        import embed_and_index as _embed
-        import embed_context_index as _embed_ctx
+        from pipeline import embed_and_index as _embed
+        from pipeline import embed_context_index as _embed_ctx
 
         try:
             _embed.run(index_path, ollama_url=args.ollama_url, qdrant_url=args.qdrant_url)

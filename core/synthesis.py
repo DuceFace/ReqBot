@@ -73,36 +73,30 @@ def synthesize_local(
     # Lazy model pull: verify the model is present on the Ollama server before calling
     # generate(). This only runs on the local path; synthesize_remote() never reaches here.
     # Fails open: if the check itself errors, proceed and let generate() surface the error.
+    import os as _os
     import subprocess as _subprocess
     import sys as _sys
     try:
         import requests as _requests
-        from urllib.parse import urlparse as _urlparse
         tags_resp = _requests.get(f"{ollama_url}/api/tags", timeout=10)
         tags_resp.raise_for_status()
         present = [m["name"] for m in tags_resp.json().get("models", [])]
         if model not in present:
-            # Only pull via the CLI if ollama_url is local — the ollama CLI always
-            # talks to its own default host, so pulling against a remote ollama_url
-            # would target the wrong server.
-            _is_local = _urlparse(ollama_url).hostname in ("localhost", "127.0.0.1", "::1")
-            if _is_local:
+            print(
+                f"[*] Synthesis model {model} not found. Downloading (~9 GB)...\n"
+                f"    This is a one-time download. Run `OLLAMA_HOST={ollama_url} ollama pull {model}`\n"
+                f"    manually to control timing.",
+                file=_sys.stderr,
+            )
+            # Set OLLAMA_HOST so the CLI targets the same server as ollama_url, not
+            # whatever default daemon port the local binary happens to be pointing at.
+            pull_result = _subprocess.run(
+                ["ollama", "pull", model],
+                env={**_os.environ, "OLLAMA_HOST": ollama_url},
+            )
+            if pull_result.returncode != 0:
                 print(
-                    f"[*] Synthesis model {model} not found locally. Downloading (~9 GB)...\n"
-                    f"    This is a one-time download. Run `ollama pull {model}` manually to\n"
-                    f"    control timing.",
-                    file=_sys.stderr,
-                )
-                pull_result = _subprocess.run(["ollama", "pull", model])
-                if pull_result.returncode != 0:
-                    print(
-                        f"[-] Failed to pull synthesis model {model}. Will attempt synthesis anyway.",
-                        file=_sys.stderr,
-                    )
-            else:
-                print(
-                    f"[*] Synthesis model {model} not found on Ollama at {ollama_url}.\n"
-                    f"    Add it to the Ollama host to enable synthesis: ollama pull {model}",
+                    f"[-] Failed to pull synthesis model {model}. Will attempt synthesis anyway.",
                     file=_sys.stderr,
                 )
     except Exception:

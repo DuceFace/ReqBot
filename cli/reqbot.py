@@ -1173,7 +1173,8 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
     if ollama_found:
         try:
-            requests.get("http://localhost:11434", timeout=5)
+            resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+            resp.raise_for_status()
             print(f"      Found {version_str} — reachable at http://localhost:11434")
         except requests.RequestException:
             print("[-] Ollama is installed but not reachable at http://localhost:11434.")
@@ -1190,13 +1191,15 @@ def cmd_setup(args: argparse.Namespace) -> int:
             print("    Then re-run: reqbot setup")
             return 1
 
-        # Poll for reachability after install
+        # Poll for reachability after install — verify /api/tags, not just the root,
+        # so we confirm it's Ollama and not an unrelated service on port 11434.
         ollama_ready = False
         for _ in range(10):
             try:
-                requests.get("http://localhost:11434", timeout=5)
-                ollama_ready = True
-                break
+                resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+                if resp.status_code == 200:
+                    ollama_ready = True
+                    break
             except requests.RequestException:
                 pass
             _time.sleep(1)

@@ -1072,9 +1072,15 @@ def cmd_setup(args: argparse.Namespace) -> int:
     # Step 1: Docker check
     # ------------------------------------------------------------------ #
     print("[1/5] Checking for Docker...")
-    docker_info = _subprocess.run(
-        ["docker", "info"], capture_output=True, text=True
-    )
+    try:
+        docker_info = _subprocess.run(
+            ["docker", "info"], capture_output=True, text=True
+        )
+    except FileNotFoundError:
+        print("[-] Docker is not running or not installed.")
+        print("    Install Docker:  https://docs.docker.com/engine/install/")
+        print("    Start the daemon and re-run: reqbot setup")
+        return 1
     if docker_info.returncode != 0:
         print("[-] Docker is not running or not installed.")
         print("    Install Docker:  https://docs.docker.com/engine/install/")
@@ -1155,12 +1161,17 @@ def cmd_setup(args: argparse.Namespace) -> int:
     # Step 3: Ollama check and install
     # ------------------------------------------------------------------ #
     print("[3/5] Checking for Ollama...")
-    ollama_ver = _subprocess.run(
-        ["ollama", "--version"], capture_output=True, text=True
-    )
+    try:
+        ollama_ver = _subprocess.run(
+            ["ollama", "--version"], capture_output=True, text=True
+        )
+        ollama_found = ollama_ver.returncode == 0
+        version_str = ollama_ver.stdout.strip() if ollama_found else ""
+    except FileNotFoundError:
+        ollama_found = False
+        version_str = ""
 
-    if ollama_ver.returncode == 0:
-        version_str = ollama_ver.stdout.strip()
+    if ollama_found:
         try:
             requests.get("http://localhost:11434", timeout=5)
             print(f"      Found {version_str} — reachable at http://localhost:11434")
@@ -1206,15 +1217,23 @@ def cmd_setup(args: argparse.Namespace) -> int:
         ("llama3.1:8b-instruct-q4_K_M", "~4.7 GB"),
     ]
 
-    list_result = _subprocess.run(["ollama", "list"], capture_output=True, text=True)
-    pulled_output = list_result.stdout if list_result.returncode == 0 else ""
+    try:
+        list_result = _subprocess.run(["ollama", "list"], capture_output=True, text=True)
+        pulled_output = list_result.stdout if list_result.returncode == 0 else ""
+    except FileNotFoundError:
+        pulled_output = ""
 
     for model_name, size in CORE_MODELS:
         if model_name in pulled_output:
             print(f"      {model_name:<40} Already pulled")
         else:
             print(f"      {model_name:<40} Pulling... ({size})")
-            pull = _subprocess.run(["ollama", "pull", model_name])
+            try:
+                pull = _subprocess.run(["ollama", "pull", model_name])
+            except FileNotFoundError:
+                print(f"[-] ollama binary not found — cannot pull {model_name}")
+                print("    Ensure Ollama is installed and re-run: reqbot setup")
+                return 1
             if pull.returncode != 0:
                 print(f"[-] Model pull failed: {model_name}")
                 print("    Check Ollama logs and re-run: reqbot setup")

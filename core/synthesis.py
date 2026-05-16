@@ -77,17 +77,34 @@ def synthesize_local(
     import sys as _sys
     try:
         import requests as _requests
+        from urllib.parse import urlparse as _urlparse
         tags_resp = _requests.get(f"{ollama_url}/api/tags", timeout=10)
         tags_resp.raise_for_status()
         present = [m["name"] for m in tags_resp.json().get("models", [])]
         if model not in present:
-            print(
-                f"[*] Synthesis model {model} not found locally. Downloading (~9 GB)...\n"
-                f"    This is a one-time download. Run `ollama pull {model}` manually to\n"
-                f"    control timing.",
-                file=_sys.stderr,
-            )
-            _subprocess.run(["ollama", "pull", model])
+            # Only pull via the CLI if ollama_url is local — the ollama CLI always
+            # talks to its own default host, so pulling against a remote ollama_url
+            # would target the wrong server.
+            _is_local = _urlparse(ollama_url).hostname in ("localhost", "127.0.0.1", "::1")
+            if _is_local:
+                print(
+                    f"[*] Synthesis model {model} not found locally. Downloading (~9 GB)...\n"
+                    f"    This is a one-time download. Run `ollama pull {model}` manually to\n"
+                    f"    control timing.",
+                    file=_sys.stderr,
+                )
+                pull_result = _subprocess.run(["ollama", "pull", model])
+                if pull_result.returncode != 0:
+                    print(
+                        f"[-] Failed to pull synthesis model {model}. Will attempt synthesis anyway.",
+                        file=_sys.stderr,
+                    )
+            else:
+                print(
+                    f"[*] Synthesis model {model} not found on Ollama at {ollama_url}.\n"
+                    f"    Add it to the Ollama host to enable synthesis: ollama pull {model}",
+                    file=_sys.stderr,
+                )
     except Exception:
         pass  # check fails open — generate() will surface a clear error if model is truly missing
 

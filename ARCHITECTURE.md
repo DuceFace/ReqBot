@@ -85,7 +85,7 @@ cli/console.py
 
 cli/reqbot.py
   └── core.config
-  └── services.status_service   (lazy, status command)
+  └── services.status_service   (lazy, status + setup commands)
   └── services.docs_service     (lazy, docs command)
   └── services.trace_service    (lazy, trace command)
   └── services.compare_service  (lazy, compare command)
@@ -189,9 +189,12 @@ pip3 install --break-system-packages anthropic openai
 
 | Model | Role | Pulled Via |
 |-------|------|-----------|
-| `llama3.1:8b-instruct-q4_K_M` | Step C extraction + query rewriting | `ollama pull llama3.1:8b-instruct-q4_K_M` |
-| `nomic-embed-text` | Dense embeddings (768-dim) | `ollama pull nomic-embed-text` |
-| `qwen2.5:14b` | Synthesis answers | `ollama pull qwen2.5:14b` |
+| `llama3.1:8b-instruct-q4_K_M` | Step C extraction + query rewriting | `reqbot setup` (or `ollama pull llama3.1:8b-instruct-q4_K_M`) |
+| `nomic-embed-text` | Dense embeddings (768-dim) | `reqbot setup` (or `ollama pull nomic-embed-text`) |
+| `qwen2.5:14b` | Synthesis answers | **Lazy-pulled** on first `--synthesize` use; not pulled during setup (~9 GB) |
+
+**Qdrant data path (Docker-managed):** `~/.local/share/reqbot/qdrant/` — XDG Base Directory, outside the
+installer-managed `~/.reqbot/` tree so it survives installer upgrades without exclusion logic.
 
 ---
 
@@ -334,6 +337,7 @@ Optional files loaded at startup:
 |-------|-----|-------|
 | `reqbot` | Installed launcher → `cli/reqbot.py` | CLI mode (subcommand) or shell mode (no args) |
 | `python3 cli/reqbot.py <cmd>` | Dev/source mode | Same behavior, no installer needed |
+| `reqbot setup [--advanced]` | Bootstrap | One-shot first-run setup: Docker check, Qdrant container, Ollama install, core model pull, config write. Operational bootstrap — not part of pipeline or retrieval. `--advanced` delegates to `reqbot init` verbatim. |
 | `reqbot serve [--host H] [--port P]` | API server | Starts uvicorn on 127.0.0.1:8000; Swagger at /api-docs |
 | `python3 pipeline/run_pipeline.py <pdf>` | Direct pipeline run | Bypass reqbot for Step C resume with `--output-dir` |
 | `python3 pipeline/<step>.py` | Individual step | Each step is standalone with `--help` |

@@ -53,11 +53,19 @@ APP_FILES=(
     pipeline/embed_context_index.py
     pipeline/__init__.py
     services/__init__.py
+    services/ask_service.py
     services/status_service.py
     services/docs_service.py
     services/trace_service.py
     services/compare_service.py
     services/evidence_service.py
+    api/__init__.py
+    api/app.py
+    api/routes/__init__.py
+    api/routes/ask.py
+    api/routes/docs.py
+    api/routes/status.py
+    api/routes/trace.py
     models/__init__.py
 )
 
@@ -116,6 +124,8 @@ echo "[3/5] Installing Python dependencies..."
     "qdrant-client==1.17.0" \
     "ollama==0.6.1" \
     "requests==2.32.5" \
+    "fastapi==0.115.12" \
+    "uvicorn==0.34.3" \
     --quiet --disable-pip-version-check
 
 echo "  Dependencies installed"

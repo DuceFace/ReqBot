@@ -223,71 +223,77 @@ def _context_text_for_hit(hit, context_map: dict | None, window: int = 300) -> s
     return ctx
 
 
-def format_evidence(results: list, context_map: dict | None = None) -> str:
-    """Format Qdrant search results as numbered evidence for the LLM."""
+def format_evidence(results: list[dict]) -> str:
+    """Format result dicts as numbered evidence for the LLM.
+
+    Expects dicts from retrieve() — each dict has score + payload fields,
+    and optionally context_text if context=True was passed to retrieve().
+    """
     lines = []
     for i, hit in enumerate(results, 1):
-        p = hit.payload
         page_info = ""
-        if p.get("page_start") and p.get("page_end"):
-            if p["page_start"] == p["page_end"]:
-                page_info = f"p.{p['page_start']}"
+        if hit.get("page_start") and hit.get("page_end"):
+            if hit["page_start"] == hit["page_end"]:
+                page_info = f"p.{hit['page_start']}"
             else:
-                page_info = f"pp.{p['page_start']}-{p['page_end']}"
+                page_info = f"pp.{hit['page_start']}-{hit['page_end']}"
 
-        ref = p.get("source_ref", "")
-        source = p.get("source_pdf", "")
+        ref = hit.get("source_ref", "")
+        source = hit.get("source_pdf", "")
         cite_parts = [x for x in [source, ref, page_info] if x]
         cite = ", ".join(cite_parts)
 
-        primary = p.get("description") or p.get("source_quote", "")
+        primary = hit.get("description") or hit.get("source_quote", "")
         entry = (
             f"[{i}] ({cite})\n"
-            f"    Type: {p.get('requirement_type', 'unknown')}\n"
-            f"    Tags: {', '.join(p.get('domain_tags', []))}\n"
+            f"    Type: {hit.get('requirement_type', 'unknown')}\n"
+            f"    Tags: {', '.join(hit.get('domain_tags', []))}\n"
             f"    Requirement: {primary}\n"
-            f"    Quote: {p.get('source_quote', '')}"
+            f"    Quote: {hit.get('source_quote', '')}"
         )
-        ctx = _context_text_for_hit(hit, context_map, window=300)
+        ctx = hit.get("context_text")
         if ctx:
             entry += f"\n    Context: {ctx}"
         lines.append(entry)
     return "\n\n".join(lines)
 
 
-def print_results_table(results: list, context_map: dict | None = None) -> None:
-    """Print search results as a readable table."""
+def print_results_table(results: list[dict]) -> None:
+    """Print search results as a readable table.
+
+    Expects dicts from retrieve() — each dict has score + payload fields,
+    and optionally context_text if context=True was passed to retrieve().
+    """
     print(f"\n{'='*80}")
     print(f"Retrieved {len(results)} requirements (ranked by relevance)")
     print(f"{'='*80}\n")
 
     for i, hit in enumerate(results, 1):
-        p = hit.payload
-        score = hit.score
+        score = hit.get("score", 0)
 
         page_info = ""
-        if p.get("page_start") and p.get("page_end"):
-            if p["page_start"] == p["page_end"]:
-                page_info = f"p.{p['page_start']}"
+        if hit.get("page_start") and hit.get("page_end"):
+            if hit["page_start"] == hit["page_end"]:
+                page_info = f"p.{hit['page_start']}"
             else:
-                page_info = f"pp.{p['page_start']}-{p['page_end']}"
+                page_info = f"pp.{hit['page_start']}-{hit['page_end']}"
 
-        ref = p.get("source_ref", "")
-        source = p.get("source_pdf", "")
+        ref = hit.get("source_ref", "")
+        source = hit.get("source_pdf", "")
 
-        print(f"[{i}] Score: {score:.4f} | {p.get('requirement_id', '?')}")
+        print(f"[{i}] Score: {score:.4f} | {hit.get('requirement_id', '?')}")
         if source or ref or page_info:
             cite_parts = [x for x in [source, ref, page_info] if x]
             print(f"    Source: {', '.join(cite_parts)}")
-        print(f"    Type: {p.get('requirement_type', 'unknown')} | Tags: {', '.join(p.get('domain_tags', []))}")
-        primary = p.get("description") or p.get("source_quote", "")
+        print(f"    Type: {hit.get('requirement_type', 'unknown')} | Tags: {', '.join(hit.get('domain_tags', []))}")
+        primary = hit.get("description") or hit.get("source_quote", "")
         print(f"    {primary}")
-        if p.get("source_quote") and p.get("description"):
-            quote = p["source_quote"]
+        if hit.get("source_quote") and hit.get("description"):
+            quote = hit["source_quote"]
             if len(quote) > 120:
                 quote = quote[:120] + "..."
             print(f"    Quote: \"{quote}\"")
-        ctx = _context_text_for_hit(hit, context_map, window=150)
+        ctx = hit.get("context_text")
         if ctx:
             print(f"    Context: {ctx}")
         print()
@@ -418,7 +424,7 @@ def synthesize_answer(
         return response.response
 
 
-def run(
+def retrieve(
     question: str,
     *,
     top_k: int = 20,
@@ -432,20 +438,28 @@ def run(
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
     qdrant_url: str = "http://localhost:6333",
     ollama_url: str = "http://localhost:11434",
-    json_output: bool = False,
     context: bool = False,
     context_collection: str = CONTEXT_COLLECTION_NAME,
     hyde: bool = False,
-) -> list[dict]:
-    """Query GRC requirements and print results to stdout.
+    synthesis_backend: str = "local",
+    synthesis_provider: str = "anthropic",
+    synthesis_api_key: str = "",
+) -> dict:
+    """Retrieve matching requirements and optionally synthesize an answer.
 
-    Callable interface for in-process use by reqbot.py.
-    Standalone CLI usage is unchanged via main() / __main__.
+    Pure data path — no console output. Called by both run() (CLI render layer)
+    and ask_service.ask() (API/service layer). All retrieval logic lives here;
+    display and rendering stay in the callers.
 
-    Returns:
-        List of result payload dicts (score + payload fields).
+    Returns a dict:
+        results:        list[dict]  score + payload fields; context_text included when context=True
+        synthesis_text: str         empty string if synthesize=False or synthesis failed
+        expanded_query: str         rewritten query; equals question when no_rewrite=True
+        total:          int         number of results after min_score filtering and top_k trim
+        retrieval_ms:   int         wall-clock ms from entry to just before synthesis (pure retrieval)
     """
-    # Connect to Ollama
+    import time as _time
+    _t0 = _time.monotonic()
     ollama_client = ollama.Client(host=ollama_url)
 
     # Query rewriting: expand acronyms, extract control IDs and domain hints.
@@ -546,7 +560,7 @@ def run(
         )
         log.info("HyDE: using 3-leg RRF (baseline dense + BM25 + HyDE dense)")
 
-    results = qdrant_client.query_points(
+    hits = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
         prefetch=prefetch_legs,
         query=models.FusionQuery(fusion=models.Fusion.RRF),
@@ -557,24 +571,28 @@ def run(
     # Score threshold — drop results below min_score, then trim to top_k.
     # Filtering after fusion (not before) ensures the threshold acts on final RRF scores.
     if min_score > 0:
-        before = len(results)
-        results = [r for r in results if r.score >= min_score]
-        dropped = before - len(results)
+        before = len(hits)
+        hits = [r for r in hits if r.score >= min_score]
+        dropped = before - len(hits)
         if dropped:
             log.info("Dropped %d result(s) below min_score=%.3f", dropped, min_score)
-    results = results[:top_k]
+    hits = hits[:top_k]
 
-    if not results:
-        print("No results met the minimum relevance threshold.")
-        print(f"Try lowering --min-score (current: {min_score:.3f}) or broadening your query.")
-        return []
+    if not hits:
+        return {
+            "results": [],
+            "synthesis_text": "",
+            "expanded_query": dense_query,
+            "total": 0,
+            "retrieval_ms": int((_time.monotonic() - _t0) * 1000),
+        }
 
-    # Retrieve surrounding context chunks from grc_context (P4 dual index)
+    # Context retrieval (uses Qdrant hit objects — happens before dict conversion)
     context_map: dict | None = None
     if context:
         log.info("Retrieving context chunks from: %s", context_collection)
         try:
-            context_map = retrieve_context_chunks(results, qdrant_client, context_collection)
+            context_map = retrieve_context_chunks(hits, qdrant_client, context_collection)
             log.info("Retrieved %d context chunk(s)", len(context_map))
             if not context_map:
                 log.warning(
@@ -582,60 +600,131 @@ def run(
                 )
         except Exception as e:
             log.warning("Context retrieval failed (%s) — proceeding without context", e)
-            context_map = None
 
-    # JSON output mode
-    if json_output:
-        output = []
-        for hit in results:
-            output.append({
-                "score": hit.score,
-                **hit.payload,
-            })
-        print(json.dumps(output, indent=2, ensure_ascii=False))
-        return output
+    # Convert hits to dicts, embedding context_text in each result when available
+    result_dicts: list[dict] = []
+    for hit in hits:
+        d: dict = {"score": hit.score, **hit.payload}
+        if context_map:
+            ctx = _context_text_for_hit(hit, context_map, window=300)
+            if ctx:
+                d["context_text"] = ctx
+        result_dicts.append(d)
 
-    # Print results table
-    print_results_table(results, context_map)
+    # Checkpoint: everything above this line is pure retrieval.
+    _retrieval_ms = int((_time.monotonic() - _t0) * 1000)
 
-    # Synthesize if requested
+    # Synthesis
+    synthesis_text = ""
     if synthesize:
-        evidence = format_evidence(results, context_map)
-        # Load synthesis config (synthesis_backend, provider, api_key_env)
-        _syn_backend = "local"
-        _syn_provider = "anthropic"
-        _syn_api_key = ""
+        evidence = format_evidence(result_dicts)
+        synthesis_text = synthesize_answer(
+            question, evidence, model, ollama_client,
+            backend=synthesis_backend,
+            provider=synthesis_provider,
+            api_key=synthesis_api_key,
+            ollama_url=ollama_url,
+        )
+
+    return {
+        "results": result_dicts,
+        "synthesis_text": synthesis_text,
+        "expanded_query": dense_query,
+        "total": len(result_dicts),
+        "retrieval_ms": _retrieval_ms,
+    }
+
+
+def run(
+    question: str,
+    *,
+    top_k: int = 20,
+    min_score: float = 0.02,
+    synthesize: bool = False,
+    model: str = DEFAULT_SYNTHESIS_MODEL,
+    domain_tags: list[str] | None = None,
+    requirement_types: list[str] | None = None,
+    document_ids: list[str] | None = None,
+    no_rewrite: bool = False,
+    rewrite_model: str = DEFAULT_REWRITE_MODEL,
+    qdrant_url: str = "http://localhost:6333",
+    ollama_url: str = "http://localhost:11434",
+    json_output: bool = False,
+    context: bool = False,
+    context_collection: str = CONTEXT_COLLECTION_NAME,
+    hyde: bool = False,
+) -> list[dict]:
+    """Query GRC requirements and print results to stdout.
+
+    Thin render wrapper over retrieve(). Loads synthesis config from disk
+    and delegates all retrieval + synthesis logic to retrieve().
+
+    Callable by reqbot.py (cmd_ask) and standalone via main() / __main__.
+    Returns list of result dicts — identical to what retrieve() returns in
+    its "results" key — for any caller that needs the raw data.
+    """
+    # Load synthesis config from disk when synthesis is requested
+    syn_backend = "local"
+    syn_provider = "anthropic"
+    syn_api_key = ""
+    if synthesize:
         try:
             from core import config as _cfg_mod
             _cfg_syn = _cfg_mod.load()
-            _syn_backend = _cfg_syn.synthesis_backend
-            _syn_provider = _cfg_syn.remote_provider
-            if _syn_backend == "remote":
+            syn_backend = _cfg_syn.synthesis_backend
+            syn_provider = _cfg_syn.remote_provider
+            if syn_backend == "remote":
                 import os as _os
-                _syn_api_key = _os.environ.get(_cfg_syn.api_key_env, "")
-                if not _syn_api_key:
+                syn_api_key = _os.environ.get(_cfg_syn.api_key_env, "")
+                if not syn_api_key:
                     print(
                         f"[!] Remote synthesis configured but {_cfg_syn.api_key_env} "
                         "is not set — falling back to local"
                     )
-                    _syn_backend = "local"
+                    syn_backend = "local"
         except Exception:
             pass  # config unavailable — use local defaults
 
-        answer = synthesize_answer(
-            question, evidence, model, ollama_client,
-            backend=_syn_backend,
-            provider=_syn_provider,
-            api_key=_syn_api_key,
-            ollama_url=ollama_url,
-        )
+    data = retrieve(
+        question,
+        top_k=top_k,
+        min_score=min_score,
+        synthesize=synthesize,
+        model=model,
+        domain_tags=domain_tags,
+        requirement_types=requirement_types,
+        document_ids=document_ids,
+        no_rewrite=no_rewrite,
+        rewrite_model=rewrite_model,
+        qdrant_url=qdrant_url,
+        ollama_url=ollama_url,
+        context=context,
+        context_collection=context_collection,
+        hyde=hyde,
+        synthesis_backend=syn_backend,
+        synthesis_provider=syn_provider,
+        synthesis_api_key=syn_api_key,
+    )
+
+    if not data["results"]:
+        print("No results met the minimum relevance threshold.")
+        print(f"Try lowering --min-score (current: {min_score:.3f}) or broadening your query.")
+        return []
+
+    if json_output:
+        print(json.dumps(data["results"], indent=2, ensure_ascii=False))
+        return data["results"]
+
+    print_results_table(data["results"])
+
+    if data["synthesis_text"]:
         print(f"{'='*80}")
         print("SYNTHESIZED ANSWER")
         print(f"{'='*80}\n")
-        print(answer)
+        print(data["synthesis_text"])
         print()
 
-    return [{"score": hit.score, **hit.payload} for hit in results]
+    return data["results"]
 
 
 def _positive_int(value: str) -> int:

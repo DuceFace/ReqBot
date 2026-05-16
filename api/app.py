@@ -9,8 +9,8 @@ Endpoints (all prefixed /api/):
   GET  /api/docs             — Indexed document listing
 
 GUI (when frontend/dist/ is built):
-  GET  /assets/*             — Vite-built JS/CSS assets (StaticFiles mount)
-  GET  /{any}                — index.html catch-all; React Router handles client-side routing
+  GET  /{any}                — catch-all: serves real file if it exists in dist/,
+                               otherwise index.html (React Router handles routing)
 
 Swagger UI is at /api-docs.
 """
@@ -25,7 +25,6 @@ if str(_ROOT) not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from api.routes import ask, docs, status, trace
 
@@ -67,29 +66,26 @@ app.include_router(trace.router, prefix="/api")
 app.include_router(docs.router, prefix="/api")
 
 # SPA static file serving — only when the frontend build exists.
-# StaticFiles(html=True) serves index.html for directory requests but does NOT
-# serve it for arbitrary missing paths like /search or /trace/REQ-xxx (Starlette
-# documented behaviour). We therefore use two steps:
+# Registered after all /api/ routes so it never shadows an API endpoint.
 #
-#   1. Mount StaticFiles at /assets for Vite's JS/CSS bundles. This mount is
-#      registered before the catch-all, so /assets/* requests hit it first.
-#   2. Register a /{full_path:path} catch-all route that returns index.html,
-#      giving React Router full control over client-side navigation.
+# The catch-all checks whether the requested path maps to a real file under
+# dist/ first (favicon.ico, robots.txt, assets/*.js, assets/*.css, etc.).
+# If it does, serve that file. Otherwise serve index.html so React Router
+# handles the client-side route (/search, /trace/:id, etc.).
 #
-# Both are registered after all /api/ routes so neither shadows any API endpoint.
+# A resolved-path check guards against directory traversal: only files that
+# actually live under _DIST_DIR are served directly.
 _INDEX_HTML = _DIST_DIR / "index.html"
-if _INDEX_HTML.exists():
-    if (_DIST_DIR / "assets").is_dir():
-        app.mount(
-            "/assets",
-            StaticFiles(directory=str(_DIST_DIR / "assets")),
-            name="assets",
-        )
+_DIST_DIR_RESOLVED = _DIST_DIR.resolve()
 
+if _INDEX_HTML.exists():
     from fastapi.responses import FileResponse as _FileResponse
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str) -> _FileResponse:
+        candidate = (_DIST_DIR / full_path).resolve()
+        if candidate.is_file() and candidate.is_relative_to(_DIST_DIR_RESOLVED):
+            return _FileResponse(str(candidate))
         return _FileResponse(str(_INDEX_HTML))
 
 else:

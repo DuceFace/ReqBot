@@ -1,6 +1,6 @@
 GRC Pipeline - Future Improvements
 ================================================================
-Last updated: 2026-03-07
+Last updated: 2026-05-16
 Reviews incorporated: ChatGPT, Claude, Gemini
 
 ================================================================
@@ -93,6 +93,31 @@ ACTIVE BACKLOG (good ideas, not blocking)
     Decision: BACKBURNER. Implement only if a concrete integration target
     (Archer, ServiceNow, external handoff) emerges. Not applicable to
     AFI/SOP/non-GRC documents.
+
+12. RERANKER SPIKE (WP-15.5) — DEFERRED POST-PHASE 18
+    Add a local reranker stage after RRF fusion for precision improvement.
+    Candidates: FlashRank (fast), cross-encoder (higher quality).
+    Architecture: retrieve top-N → reranker scores each → return top-k reordered.
+    Gate: Precision@5 improvement, no regressions, acceptable latency.
+    Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
+
+13. MULTI-VECTOR RETRIEVAL (WP-15.8) — DEFERRED POST-PHASE 18
+    Index multiple semantic surfaces per requirement (description + source_quote)
+    to improve recall across different query styles.
+    Critical rule: collapse to unique requirement_id before reranking to prevent
+    crowding. Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
+
+14. HYPE + RETRIEVAL DEPTH (WP-15.6) — DEFERRED POST-PHASE 18
+    Pre-embed hypothetical questions per requirement at ingest time (HyPE).
+    Expose retrieval depth as a CLI flag: --depth fast|normal|deep.
+    HyPE = free query-time recall; HyDE = runtime query-specific hypothesis.
+    Complementary, not competing. Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
+
+15. CORRECTIVE RETRIEVAL GATE (WP-15.9) — DEFERRED POST-PHASE 18
+    Confidence-aware recovery: if reranker scores are weak, retry once with a
+    targeted rewrite, then return low-confidence warning if still weak.
+    Depends on WP-15.5 reranker being calibrated first.
+    Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
 
 ================================================================
 DECIDED AGAINST

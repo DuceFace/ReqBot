@@ -22,6 +22,7 @@ cli/
 
 core/
   config.py      ← Configuration loader (stdlib only; no internal imports)
+  constants.py   ← Shared constants (CONTEXT_UUID_NS namespace UUID)
   synthesis.py   ← LLM synthesis abstraction (local Ollama or remote API)
   ask.py         ← Standalone query module: hybrid search + RRF + query rewrite + HyDE
 
@@ -31,6 +32,16 @@ services/
   trace_service.py    ← Requirement lookup by ID; cross-framework matches; context window
   compare_service.py  ← Exact control-ID match + hybrid semantic search; grouped results
   evidence_service.py ← Hybrid search + grouping + context retrieval + LLM synthesis
+  ask_service.py      ← Thin orchestration over core/ask.retrieve(); returns canonical API shape
+
+api/
+  app.py         ← FastAPI application; registers routers; CORS for localhost GUI origins
+  routes/
+    ask.py       ← POST /ask     → ask_service.ask(); validates AskRequest; RuntimeError → 503
+    docs.py      ← GET /docs     → docs_service.list_docs(); exceptions → 503
+    status.py    ← GET /status   → status_service.check(); exceptions → 503
+    trace.py     ← GET /trace/{req_id} → trace_service.trace(); ValueError → 404, RuntimeError → 503
+  (Swagger UI at /api-docs; /docs reserved for the document-listing endpoint)
 
 pipeline/
   run_pipeline.py              ← Pipeline orchestrator (Steps A–E + D.5)
@@ -84,10 +95,24 @@ cli/reqbot.py
   └── pipeline.embed_context_index (lazy, ingest/batch/index-context commands)
   └── core.ask                    (lazy, ask command)
   └── core.synthesis              (lazy, when --synthesize is used)
+  └── api.app + uvicorn           (lazy, serve command — ImportError-guarded)
 
 services/*.py
   └── (no cross-service imports)
-  └── core.synthesis  (evidence_service only — LLM auditor summary)
+  └── core.synthesis   (evidence_service only — LLM auditor summary)
+  └── core.ask         (ask_service only — calls core.ask.retrieve())
+  └── core.constants   (trace_service, evidence_service — CONTEXT_UUID_NS)
+
+api/app.py
+  └── api.routes.ask
+  └── api.routes.docs
+  └── api.routes.status
+  └── api.routes.trace
+
+api/routes/ask.py    → core.config, services.ask_service
+api/routes/docs.py   → core.config, services.docs_service
+api/routes/status.py → services.status_service
+api/routes/trace.py  → core.config, services.trace_service
 
 pipeline/run_pipeline.py
   └── pipeline.extract_pdf_to_text  (in-process; legacy path only)
@@ -102,8 +127,10 @@ pipeline/chunk_text.py
   └── pipeline.section_parser  (lazy; docling path only)
 
 core/config.py     → (no internal imports)
+core/constants.py  → (no internal imports; stdlib uuid only)
 core/synthesis.py  → (no internal imports; all third-party imports are lazy)
-core/ask.py        → core.synthesis  (lazy, --synthesize only)
+core/ask.py        → core.synthesis   (lazy, --synthesize only)
+               → core.constants   (CONTEXT_UUID_NS for grc_context lookup)
 pipeline/section_parser.py  → (no internal imports)
 pipeline/enrich_requirements.py → (no internal imports)
 Steps A–E          → (no cross-imports between steps; run_pipeline.py is the sole orchestrator)
@@ -148,6 +175,8 @@ Both service URLs are configurable via `~/.config/reqbot/config.json` or environ
 | `qdrant_client` | `qdrant-client` | core/ask, embed_and_index, embed_context_index, services/trace_service, services/compare_service, services/evidence_service | Qdrant client |
 | `anthropic` | `anthropic` | core/synthesis (optional) | Remote synthesis; lazy import |
 | `openai` | `openai` | core/synthesis (optional) | Remote synthesis; lazy import |
+| `fastapi` | `fastapi` | api/ | REST API framework (Phase 16C+) |
+| `uvicorn` | `uvicorn` | cli/reqbot.py serve | ASGI server; lazy import; only needed for `reqbot serve` |
 
 **Install (dev/system Python):**
 ```bash
@@ -305,6 +334,7 @@ Optional files loaded at startup:
 |-------|-----|-------|
 | `reqbot` | Installed launcher → `cli/reqbot.py` | CLI mode (subcommand) or shell mode (no args) |
 | `python3 cli/reqbot.py <cmd>` | Dev/source mode | Same behavior, no installer needed |
+| `reqbot serve [--host H] [--port P]` | API server | Starts uvicorn on 127.0.0.1:8000; Swagger at /api-docs |
 | `python3 pipeline/run_pipeline.py <pdf>` | Direct pipeline run | Bypass reqbot for Step C resume with `--output-dir` |
 | `python3 pipeline/<step>.py` | Individual step | Each step is standalone with `--help` |
 
@@ -318,6 +348,9 @@ Optional files loaded at startup:
 | `pipeline/parse_and_normalize.py` (JSONL schema) | `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py`, `services/trace_service.py`, `services/compare_service.py`, `services/evidence_service.py`, `core/ask.py` | Schema version bump required; reindex needed |
 | `pipeline/embed_and_index.py` (vector schema) | `core/ask.py`, all services that query Qdrant | Collection recreation required; full reindex needed |
 | `core/ask.py` (search result format) | `cli/reqbot.py` cmd_ask | Result format from `ask.run()` drives CLI display |
+| `core/ask.retrieve()` return dict keys | `services/ask_service.py` | ask_service reads `results`, `synthesis_text`, `total`, `retrieval_ms` — adding keys is safe, removing/renaming is breaking |
+| `services/ask_service.py` response shape | `api/routes/ask.py` | API contract: `query`, `filters`, `results`, `metadata.{top_k,result_count,retrieval_ms,synthesis}` — treat as versioned from Phase 16C |
+| `api/routes/*.py` response shapes | future GUI / frontend consumers | API responses are versioned from day one per Phase 16 design principles |
 | `core/synthesis.py` API signature | `services/evidence_service.py`, `core/ask.py` (--synthesize) | Signature: `synthesize(question, evidence, backend, model, ollama_url, provider, api_key, raw_prompt)` |
 | `pipeline/run_pipeline.py` return value | `cli/reqbot.py` cmd_ingest, cmd_batch | Returns path to normalized/enriched JSONL; change breaks auto-index |
 | `pipeline/section_parser.py` output fields | `pipeline/chunk_text.py` `run_structure_aware()` | AncestryResult fields (item_ancestry, doc) must stay stable; chunk_text reads both |

@@ -44,6 +44,12 @@ These decisions are fixed. They are not re-opened during implementation.
 | `reqbot init` | Kept unchanged; `reqbot setup --advanced` delegates to it verbatim |
 | Air-gapped path | Future extension — not built in Phase 17; no `--offline` flag shipped |
 
+`reqbot setup` is opinionated by design: it provisions the supported local ReqBot stack
+for first-time users (Docker-hosted Qdrant, local Ollama, localhost config). Users who
+want nonstandard infrastructure, alternate endpoints, or a different deployment topology
+should use `reqbot setup --advanced` or `reqbot init` instead of the default automated
+path.
+
 ---
 
 ## 4. Work Package Summary
@@ -314,14 +320,15 @@ first command that requires it.
 
 ### 6.2 Hook Location
 
-`core/synthesis.py` — inside `synthesize_answer()`, local Ollama path only. This
-function already holds the model name and Ollama URL; it is the right place to check
-presence before issuing a generation request.
+`core/synthesis.py` — inside `synthesize_local()`, before the `client.generate()` call.
+`synthesize_local()` already holds the model name and `ollama_url`; placing the check
+here means it runs only on the local path and never fires for remote synthesis
+(Anthropic, OpenAI). `synthesize()` is the router that dispatches to `synthesize_local()`
+or `synthesize_remote()` — the hook does not belong there.
 
 ### 6.3 User-Facing Behavior
 
-When `synthesize_answer()` is called with a local Ollama backend and the model is not
-present:
+When `synthesize_local()` is called and the model is not present on the Ollama server:
 
 1. Print to stderr (one-time, before pull begins):
 

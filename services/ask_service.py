@@ -44,7 +44,9 @@ def ask(
       query:    str    — original question
       filters:  dict   — active filters (None when not applied)
       results:  list   — score + payload fields per result; context_text included when context=True
-      metadata: dict   — top_k, result_count, retrieval_ms, synthesis (str | None)
+      metadata: dict   — top_k, result_count, elapsed_ms, synthesis (str | None)
+                         Note: elapsed_ms covers retrieval + optional synthesis; it is not
+                         a pure retrieval latency figure when synthesize=True.
 
     Does not raise ValueError for empty results — returns result_count=0 instead.
     Raises RuntimeError on connection or embedding failure (propagated from retrieve()).
@@ -72,7 +74,7 @@ def ask(
         synthesis_provider=synthesis_provider,
         synthesis_api_key=synthesis_api_key,
     )
-    retrieval_ms = int((time.monotonic() - t0) * 1000)
+    elapsed_ms = int((time.monotonic() - t0) * 1000)
 
     return {
         "query": question,
@@ -85,7 +87,7 @@ def ask(
         "metadata": {
             "top_k": top_k,
             "result_count": data["total"],
-            "retrieval_ms": retrieval_ms,
+            "elapsed_ms": elapsed_ms,
             "synthesis": data["synthesis_text"] or None,
         },
     }

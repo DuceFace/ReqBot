@@ -33,7 +33,7 @@ def post_ask(req: AskRequest) -> dict:
       query:    original question
       filters:  active filters (null when not applied)
       results:  list of matching requirements (score + payload fields)
-      metadata: top_k, result_count, retrieval_ms, synthesis (str | null)
+      metadata: top_k, result_count, elapsed_ms, synthesis (str | null)
     """
     cfg = _config.load()
 
@@ -68,3 +68,5 @@ def post_ask(req: AskRequest) -> dict:
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:  # noqa: BLE001 — normalise unexpected backend errors
+        raise HTTPException(status_code=503, detail=f"Unexpected backend error: {e}")

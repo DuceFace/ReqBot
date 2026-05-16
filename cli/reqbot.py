@@ -45,6 +45,17 @@ log = logging.getLogger(__name__)
 _cfg = _config.load()
 
 
+def _positive_int(value: str) -> int:
+    """Argparse type validator that requires a positive integer."""
+    try:
+        i = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a valid integer")
+    if i <= 0:
+        raise argparse.ArgumentTypeError(f"{value} must be a positive integer")
+    return i
+
+
 def cmd_ingest(args: argparse.Namespace) -> int:
     """Run the full extraction pipeline on a PDF."""
     from pipeline import run_pipeline as _run_pipeline
@@ -1060,7 +1071,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
         return 1
 
     host = getattr(args, "host", "127.0.0.1")
-    port = int(getattr(args, "port", 8000))
+    port = getattr(args, "port", 8000)
     log.info("Starting ReqBot API on http://%s:%s", host, port)
     log.info("Swagger UI available at http://%s:%s/api-docs", host, port)
     uvicorn.run(app, host=host, port=port, log_level="info")
@@ -1267,7 +1278,7 @@ def main() -> None:
         help="Bind host (default: 127.0.0.1; use 0.0.0.0 to expose on all interfaces)",
     )
     p_serve.add_argument(
-        "--port", type=int, default=8000,
+        "--port", type=_positive_int, default=8000,
         help="Port to listen on (default: 8000)",
     )
 

@@ -70,6 +70,27 @@ def synthesize_local(
             "[-] Ollama package not found: pip3 install --break-system-packages ollama"
         )
 
+    # Lazy model pull: verify the model is present on the Ollama server before calling
+    # generate(). This only runs on the local path; synthesize_remote() never reaches here.
+    # Fails open: if the check itself errors, proceed and let generate() surface the error.
+    import subprocess as _subprocess
+    import sys as _sys
+    try:
+        import requests as _requests
+        tags_resp = _requests.get(f"{ollama_url}/api/tags", timeout=10)
+        tags_resp.raise_for_status()
+        present = [m["name"] for m in tags_resp.json().get("models", [])]
+        if model not in present:
+            print(
+                f"[*] Synthesis model {model} not found locally. Downloading (~9 GB)...\n"
+                f"    This is a one-time download. Run `ollama pull {model}` manually to\n"
+                f"    control timing.",
+                file=_sys.stderr,
+            )
+            _subprocess.run(["ollama", "pull", model])
+    except Exception:
+        pass  # check fails open — generate() will surface a clear error if model is truly missing
+
     prompt = raw_prompt if raw_prompt else SYNTHESIS_PROMPT.format(evidence=evidence, question=question)
     log.info("Synthesizing answer with local model: %s", model)
 

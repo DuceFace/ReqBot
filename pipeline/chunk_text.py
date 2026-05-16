@@ -589,7 +589,7 @@ def main() -> None:
         try:
             from pipeline import section_parser
         except ImportError:
-            log.error("section_parser.py not found — it must be in the same directory")
+            log.error("section_parser not found — ensure pipeline/ is a package and repo root is on sys.path")
             sys.exit(1)
 
         try:

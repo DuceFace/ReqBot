@@ -7,7 +7,6 @@ Returns structured data; all display/rendering stays in cli/reqbot.py.
 """
 import logging
 import sys
-import time
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -44,16 +43,15 @@ def ask(
       query:    str    — original question
       filters:  dict   — active filters (None when not applied)
       results:  list   — score + payload fields per result; context_text included when context=True
-      metadata: dict   — top_k, result_count, elapsed_ms, synthesis (str | None)
-                         Note: elapsed_ms covers retrieval + optional synthesis; it is not
-                         a pure retrieval latency figure when synthesize=True.
+      metadata: dict   — top_k, result_count, retrieval_ms, synthesis (str | None)
+                         retrieval_ms is the pure retrieval wall-time (ms) from entry to just
+                         before synthesis; synthesis latency is excluded even when synthesize=True.
 
     Does not raise ValueError for empty results — returns result_count=0 instead.
     Raises RuntimeError on connection or embedding failure (propagated from retrieve()).
     """
     from core import ask as _ask
 
-    t0 = time.monotonic()
     data = _ask.retrieve(
         question,
         top_k=top_k,
@@ -74,8 +72,6 @@ def ask(
         synthesis_provider=synthesis_provider,
         synthesis_api_key=synthesis_api_key,
     )
-    elapsed_ms = int((time.monotonic() - t0) * 1000)
-
     return {
         "query": question,
         "filters": {
@@ -87,7 +83,7 @@ def ask(
         "metadata": {
             "top_k": top_k,
             "result_count": data["total"],
-            "elapsed_ms": elapsed_ms,
+            "retrieval_ms": data["retrieval_ms"],
             "synthesis": data["synthesis_text"] or None,
         },
     }

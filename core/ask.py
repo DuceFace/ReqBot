@@ -456,7 +456,10 @@ def retrieve(
         synthesis_text: str         empty string if synthesize=False or synthesis failed
         expanded_query: str         rewritten query; equals question when no_rewrite=True
         total:          int         number of results after min_score filtering and top_k trim
+        retrieval_ms:   int         wall-clock ms from entry to just before synthesis (pure retrieval)
     """
+    import time as _time
+    _t0 = _time.monotonic()
     ollama_client = ollama.Client(host=ollama_url)
 
     # Query rewriting: expand acronyms, extract control IDs and domain hints.
@@ -576,7 +579,13 @@ def retrieve(
     hits = hits[:top_k]
 
     if not hits:
-        return {"results": [], "synthesis_text": "", "expanded_query": dense_query, "total": 0}
+        return {
+            "results": [],
+            "synthesis_text": "",
+            "expanded_query": dense_query,
+            "total": 0,
+            "retrieval_ms": int((_time.monotonic() - _t0) * 1000),
+        }
 
     # Context retrieval (uses Qdrant hit objects — happens before dict conversion)
     context_map: dict | None = None
@@ -602,6 +611,9 @@ def retrieve(
                 d["context_text"] = ctx
         result_dicts.append(d)
 
+    # Checkpoint: everything above this line is pure retrieval.
+    _retrieval_ms = int((_time.monotonic() - _t0) * 1000)
+
     # Synthesis
     synthesis_text = ""
     if synthesize:
@@ -619,6 +631,7 @@ def retrieve(
         "synthesis_text": synthesis_text,
         "expanded_query": dense_query,
         "total": len(result_dicts),
+        "retrieval_ms": _retrieval_ms,
     }
 
 

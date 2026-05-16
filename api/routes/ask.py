@@ -33,7 +33,7 @@ def post_ask(req: AskRequest) -> dict:
       query:    original question
       filters:  active filters (null when not applied)
       results:  list of matching requirements (score + payload fields)
-      metadata: top_k, result_count, elapsed_ms, synthesis (str | null)
+      metadata: top_k, result_count, retrieval_ms, synthesis (str | null)
     """
     cfg = _config.load()
 

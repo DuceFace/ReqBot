@@ -52,6 +52,11 @@ APP_FILES=(
     pipeline/embed_context_index.py
     pipeline/__init__.py
     services/__init__.py
+    services/status_service.py
+    services/docs_service.py
+    services/trace_service.py
+    services/compare_service.py
+    services/evidence_service.py
     models/__init__.py
 )
 

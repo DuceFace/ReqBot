@@ -37,6 +37,7 @@ APP_FILES=(
     cli/console.py
     cli/__init__.py
     core/config.py
+    core/constants.py
     core/synthesis.py
     core/ask.py
     core/__init__.py

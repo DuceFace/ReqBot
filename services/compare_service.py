@@ -42,8 +42,14 @@ def compare(
       ValueError  — no results found
       RuntimeError — connection or embedding failure
     """
-    from qdrant_client import QdrantClient
-    from qdrant_client import models as _qm
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client import models as _qm
+    except ImportError as e:
+        raise RuntimeError(
+            "qdrant-client is not installed — run: "
+            "pip3 install --break-system-packages qdrant-client"
+        ) from e
 
     document_ids = document_ids or []
     is_control_id = bool(CONTROL_ID_RE.match(query.strip()))

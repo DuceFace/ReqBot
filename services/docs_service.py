@@ -2,6 +2,7 @@
 
 Returns structured data; all display logic stays in cli/reqbot.py.
 """
+import logging
 import re
 import sys
 from pathlib import Path
@@ -9,6 +10,8 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+log = logging.getLogger(__name__)
 
 
 def list_docs(processed_dir: Path) -> dict:
@@ -32,7 +35,11 @@ def list_docs(processed_dir: Path) -> dict:
     total_reqs = 0
 
     for doc_key, path in sorted(latest.items()):
-        count = sum(1 for line in open(path, encoding="utf-8") if line.strip())
+        try:
+            count = sum(1 for line in open(path, encoding="utf-8") if line.strip())
+        except IOError as e:
+            log.warning("Could not read %s: %s", path, e)
+            count = 0
         total_reqs += count
 
         # Detect pdfplumber by scanning chunks for TABLE_START sentinels

@@ -13,8 +13,7 @@ if str(_ROOT) not in sys.path:
 
 log = logging.getLogger(__name__)
 
-# Must match CONTEXT_UUID_NAMESPACE in core/ask.py and pipeline/embed_context_index.py
-_CONTEXT_UUID_NS = uuid.UUID("b5f2e8d1-3a7c-4e9f-b8a2-6d4f1c7e3b5a")
+from core import constants as _const
 
 
 def trace(req_id: str, qdrant_url: str, show_context: bool = False) -> dict:
@@ -29,8 +28,14 @@ def trace(req_id: str, qdrant_url: str, show_context: bool = False) -> dict:
       ValueError  — requirement not found
       RuntimeError — Qdrant connection or query failure
     """
-    from qdrant_client import QdrantClient
-    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+    except ImportError as e:
+        raise RuntimeError(
+            "qdrant-client is not installed — run: "
+            "pip3 install --break-system-packages qdrant-client"
+        ) from e
 
     try:
         client = QdrantClient(url=qdrant_url, timeout=10)
@@ -94,7 +99,7 @@ def trace(req_id: str, qdrant_url: str, show_context: bool = False) -> dict:
         doc_id = payload.get("document_id", "")
         chunk_id = payload.get("chunk_id")
         if doc_id and chunk_id is not None:
-            pid = str(uuid.uuid5(_CONTEXT_UUID_NS, f"{doc_id}:{chunk_id}"))
+            pid = str(uuid.uuid5(_const.CONTEXT_UUID_NS, f"{doc_id}:{chunk_id}"))
             try:
                 ctx_hits = client.retrieve(
                     collection_name="grc_context",

@@ -15,8 +15,7 @@ if str(_ROOT) not in sys.path:
 
 log = logging.getLogger(__name__)
 
-# Must match CONTEXT_UUID_NAMESPACE in core/ask.py and pipeline/embed_context_index.py
-_CONTEXT_UUID_NS = uuid.UUID("b5f2e8d1-3a7c-4e9f-b8a2-6d4f1c7e3b5a")
+from core import constants as _const
 
 _EVIDENCE_AUDITOR_PROMPT = """You are a strict compliance auditor reviewing evidence for a System Security Plan (SSP).
 You have been given a set of retrieved compliance requirements grouped by control ID.
@@ -66,8 +65,14 @@ def build(
       ValueError  — no results found
       RuntimeError — connection or embedding failure
     """
-    from qdrant_client import QdrantClient
-    from qdrant_client import models as _qm
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client import models as _qm
+    except ImportError as e:
+        raise RuntimeError(
+            "qdrant-client is not installed — run: "
+            "pip3 install --break-system-packages qdrant-client"
+        ) from e
 
     document_ids = document_ids or []
     domain_tags = domain_tags or []
@@ -169,7 +174,7 @@ def build(
             doc_id = rep.get("document_id", "")
             chunk_id = rep.get("chunk_id")
             if doc_id and chunk_id is not None:
-                pid = str(uuid.uuid5(_CONTEXT_UUID_NS, f"{doc_id}:{chunk_id}"))
+                pid = str(uuid.uuid5(_const.CONTEXT_UUID_NS, f"{doc_id}:{chunk_id}"))
                 pids.append(pid)
                 pid_to_ref[pid] = ref
         if pids:
@@ -210,6 +215,9 @@ def build(
     for i, ref in enumerate(group_order, 1):
         g = groups[ref]
         rep = g["representative"]
+        # description first: for LLM synthesis, an interpretive description yields a
+        # more coherent auditor summary than a raw verbatim quote. source_quote remains
+        # the canonical asset in all other contexts (trace, evidence table rows).
         primary = rep.get("description") or rep.get("source_quote") or "(no text)"
         evidence_lines.append(
             f"[{i}] Control: {ref}  |  Sources: {len(g['sources'])}\n"

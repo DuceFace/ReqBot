@@ -40,8 +40,8 @@ SPARSE_MODEL = "Qdrant/bm25"
 DEFAULT_SYNTHESIS_MODEL = "qwen2.5:14b"
 DEFAULT_REWRITE_MODEL = "llama3.1:8b-instruct-q4_K_M"
 
-# Must match CONTEXT_UUID_NAMESPACE in embed_context_index.py — never change.
-CONTEXT_UUID_NAMESPACE = uuid.UUID("b5f2e8d1-3a7c-4e9f-b8a2-6d4f1c7e3b5a")
+from core import constants as _const
+CONTEXT_UUID_NAMESPACE = _const.CONTEXT_UUID_NS
 
 # Query rewrite prompt — forces JSON output via Ollama's format="json" mode.
 # Temperature 0 keeps output deterministic. {valid_tags} is injected at call time

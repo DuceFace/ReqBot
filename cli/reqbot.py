@@ -1043,6 +1043,30 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    """Start the ReqBot read-only API server."""
+    try:
+        import uvicorn
+    except ImportError:
+        log.error(
+            "uvicorn is not installed — run: "
+            "pip3 install --break-system-packages uvicorn fastapi"
+        )
+        return 1
+    try:
+        from api.app import app
+    except ImportError as e:
+        log.error("API module could not be loaded: %s", e)
+        return 1
+
+    host = getattr(args, "host", "127.0.0.1")
+    port = int(getattr(args, "port", 8000))
+    log.info("Starting ReqBot API on http://%s:%s", host, port)
+    log.info("Swagger UI available at http://%s:%s/api-docs", host, port)
+    uvicorn.run(app, host=host, port=port, log_level="info")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="reqbot",
@@ -1236,6 +1260,17 @@ def main() -> None:
     p_status.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
     p_status.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")
 
+    # serve
+    p_serve = subparsers.add_parser("serve", help="Start the read-only ReqBot API server")
+    p_serve.add_argument(
+        "--host", type=str, default="127.0.0.1",
+        help="Bind host (default: 127.0.0.1; use 0.0.0.0 to expose on all interfaces)",
+    )
+    p_serve.add_argument(
+        "--port", type=int, default=8000,
+        help="Port to listen on (default: 8000)",
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1256,6 +1291,7 @@ def main() -> None:
         "trace": cmd_trace,
         "compare": cmd_compare,
         "evidence": cmd_evidence,
+        "serve": cmd_serve,
     }
 
     rc = commands[args.command](args)

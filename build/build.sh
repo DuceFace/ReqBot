@@ -44,7 +44,7 @@ fi
 # Extract version from reqbot.py using Python — avoids quote-style
 # fragility (grep+cut breaks on single quotes or reformatted lines).
 # ---------------------------------------------------------------
-VERSION=$(python3 - "$ROOT_DIR/reqbot.py" <<'PYEOF'
+VERSION=$(python3 - "$ROOT_DIR/cli/reqbot.py" <<'PYEOF'
 import sys, ast, pathlib
 src = pathlib.Path(sys.argv[1]).read_text()
 tree = ast.parse(src)

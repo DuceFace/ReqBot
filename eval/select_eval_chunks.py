@@ -342,7 +342,7 @@ def main() -> None:
         # Try config, fall back to default
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-            import config as _cfg_mod
+            from core import config as _cfg_mod
             cfg = _cfg_mod.load()
             processed_dir = cfg.processed_dir_path()
         except Exception:

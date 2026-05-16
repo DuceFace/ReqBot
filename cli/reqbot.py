@@ -1290,20 +1290,28 @@ def cmd_setup(args: argparse.Namespace) -> int:
             print(f"    Check permissions on {config_path.parent} and re-run: reqbot setup")
             return 1
 
-    # Run status against whichever config will actually be active after setup:
+    # Determine which URLs will be active after setup exits:
     # - wrote new config  → localhost defaults we just wrote
-    # - kept existing     → the URLs that were already in _cfg (loaded at startup)
+    # - kept existing     → whatever _cfg already held (loaded at startup)
     if do_write:
-        status_args = argparse.Namespace(
-            ollama_url="http://localhost:11434",
-            qdrant_url="http://localhost:6333",
-        )
+        effective_ollama = "http://localhost:11434"
+        effective_qdrant = "http://localhost:6333"
     else:
-        status_args = argparse.Namespace(
-            ollama_url=_cfg.ollama_url,
-            qdrant_url=_cfg.qdrant_url,
-        )
+        effective_ollama = _cfg.ollama_url
+        effective_qdrant = _cfg.qdrant_url
+
+    # Render human-readable status output (display only — always returns 0).
+    status_args = argparse.Namespace(ollama_url=effective_ollama, qdrant_url=effective_qdrant)
     cmd_status(status_args)
+
+    # Gate the success banner on actual service health.
+    # cmd_status() is a display primitive; use status_service.check() for truth.
+    from services import status_service as _status_service
+    health = _status_service.check(effective_ollama, effective_qdrant, _cfg.processed_dir_path())
+    if not health["ollama"]["reachable"] or not health["qdrant"]["reachable"]:
+        print("[-] ReqBot setup completed, but the environment is not healthy yet.")
+        print("    Fix the status issues above and re-run: reqbot setup")
+        return 1
 
     print("=== ReqBot is ready ===")
     print()

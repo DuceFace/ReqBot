@@ -8,6 +8,16 @@ Subcommands:
     reqbot status           Show system status (Qdrant, Ollama, docs)
 """
 
+import sys
+from pathlib import Path
+
+# When running from cli/ subfolder, add the repo root (bundle: app/) to sys.path
+# so that `from core import ...`, `from pipeline import ...`, and
+# `from _build_info import ...` all resolve correctly.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 __version__ = "0.1.0"
 __build_date__ = "dev"
 try:
@@ -18,14 +28,12 @@ except ImportError:
 import argparse
 import json
 import logging
-import sys
 import uuid
 from datetime import datetime as _dt
-from pathlib import Path
 
 import requests
 
-import config as _config
+from core import config as _config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,9 +47,9 @@ _cfg = _config.load()
 
 def cmd_ingest(args: argparse.Namespace) -> int:
     """Run the full extraction pipeline on a PDF."""
-    import run_pipeline as _run_pipeline
-    import embed_and_index as _embed
-    import embed_context_index as _embed_ctx
+    from pipeline import run_pipeline as _run_pipeline
+    from pipeline import embed_and_index as _embed
+    from pipeline import embed_context_index as _embed_ctx
 
     pdf_path = Path(args.pdf).resolve()
     if not pdf_path.exists():
@@ -121,7 +129,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 def cmd_index(args: argparse.Namespace) -> int:
     """Embed and index requirements into Qdrant."""
-    import embed_and_index as _embed
+    from pipeline import embed_and_index as _embed
     try:
         _embed.run(
             args.jsonl,
@@ -138,7 +146,7 @@ def cmd_index(args: argparse.Namespace) -> int:
 
 def cmd_ask(args: argparse.Namespace) -> int:
     """Query requirements via vector search."""
-    import ask as _ask
+    from core import ask as _ask
     try:
         _ask.run(
             args.question,
@@ -165,7 +173,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
 
 def cmd_index_context(args: argparse.Namespace) -> int:
     """Embed and index raw chunks into the grc_context collection."""
-    import embed_context_index as _embed_ctx
+    from pipeline import embed_context_index as _embed_ctx
     try:
         _embed_ctx.run(
             args.chunks_jsonl,
@@ -184,9 +192,9 @@ def cmd_index_context(args: argparse.Namespace) -> int:
 
 def cmd_batch(args: argparse.Namespace) -> int:
     """Run the full pipeline on every PDF in a directory."""
-    import run_pipeline as _run_pipeline
-    import embed_and_index as _embed
-    import embed_context_index as _embed_ctx
+    from pipeline import run_pipeline as _run_pipeline
+    from pipeline import embed_and_index as _embed
+    from pipeline import embed_context_index as _embed_ctx
     pdf_dir = Path(args.pdf_dir).resolve()
     if not pdf_dir.is_dir():
         log.error("Not a directory: %s", pdf_dir)
@@ -293,7 +301,7 @@ def cmd_reindex(args: argparse.Namespace) -> int:
     No LLM re-extraction needed — JSONL is the system of record.
     """
     import time as _time
-    import embed_and_index as _embed
+    from pipeline import embed_and_index as _embed
     from qdrant_client import QdrantClient as _QC
     from qdrant_client.models import (
         CreateAliasOperation, CreateAlias,
@@ -1150,7 +1158,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
         if _cfg.synthesis_backend == "remote" else ""
     )
     try:
-        import synthesis as _syn
+        from core import synthesis as _syn
         _synthesis_text = _syn.synthesize(
             question="",
             evidence="",
@@ -1657,7 +1665,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.command:
-        import console as _console
+        from cli import console as _console
         _console.launch()
         sys.exit(0)
 

@@ -17,6 +17,11 @@ import sys
 import uuid
 from pathlib import Path
 
+# Ensure repo root is on sys.path when run as a standalone script from core/.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import ollama
 from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient, models
@@ -391,7 +396,7 @@ def synthesize_answer(
     Falls back to direct Ollama call if synthesis module is unavailable.
     """
     try:
-        import synthesis as _syn
+        from core import synthesis as _syn
         return _syn.synthesize(
             question=question,
             evidence=evidence,
@@ -601,7 +606,7 @@ def run(
         _syn_provider = "anthropic"
         _syn_api_key = ""
         try:
-            import config as _cfg_mod
+            from core import config as _cfg_mod
             _cfg_syn = _cfg_mod.load()
             _syn_backend = _cfg_syn.synthesis_backend
             _syn_provider = _cfg_syn.remote_provider
@@ -659,7 +664,7 @@ def main() -> None:
     # Load config for defaults — falls back to hardcoded values if config unavailable.
     # Keeps standalone `python3 ask.py` consistent with `reqbot ask` defaults.
     try:
-        import config as _config
+        from core import config as _config
         _cfg = _config.load()
         _default_top_k = _cfg.top_k
         _default_min_score = _cfg.min_score

@@ -24,6 +24,11 @@ import sys
 import time
 from pathlib import Path
 
+# Ensure repo root is on sys.path when run as a standalone script from pipeline/.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 # Sentinel markers that may be present in pdfplumber-extracted pages.
 # Must match TABLE_START_SENTINEL / TABLE_END_SENTINEL in extract_pdf_to_text.py.
 TABLE_START_SENTINEL = "<<<TABLE_START>>>"
@@ -582,7 +587,7 @@ def main() -> None:
             output_path = out_dir / f"{stem}_chunks.jsonl"
 
         try:
-            import section_parser
+            from pipeline import section_parser
         except ImportError:
             log.error("section_parser.py not found — it must be in the same directory")
             sys.exit(1)

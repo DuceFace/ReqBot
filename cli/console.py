@@ -18,8 +18,13 @@ from pathlib import Path
 
 import requests
 
-import config as _config
-import reqbot as _reqbot
+# Ensure repo root (bundle: app/) is on sys.path for cross-package imports.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from core import config as _config
+from cli import reqbot as _reqbot
 
 # Readline history — graceful fallback if not available
 _READLINE_AVAILABLE = False

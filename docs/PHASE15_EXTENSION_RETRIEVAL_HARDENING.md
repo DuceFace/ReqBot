@@ -43,13 +43,18 @@ If accepted, these work packages act as Phase 15 extension work, not Phase 16 sc
 
 ## 3. Time Box
 
-**Weeks 1–2:** WP-15.5 (reranker) and WP-15.8 (multi-vector). These are the highest-value, lowest-risk spikes and do not depend on each other.
+> **SUPERSEDED by deferral decision (2026-05-16).** The schedule below was written when this
+> work was proposed as near-term. The decision was made to defer all four work packages until
+> after Phase 18. This section is preserved as reference for when implementation resumes.
+> See `docs/TODO_future_improvements.txt` items #12–15 for the backlog entries.
 
-**Week 3:** Evaluate results. If retrieval is strong enough, freeze Phase 15 and move to Phase 16. If gaps remain, run WP-15.6 (retrieval depth / HyPE) in parallel with early Phase 16 API scaffolding — they don't conflict architecturally.
+~~**Weeks 1–2:** WP-15.5 (reranker) and WP-15.8 (multi-vector). These are the highest-value, lowest-risk spikes and do not depend on each other.~~
 
-**WP-15.9 (corrective gate):** Runs after the reranker ships, since it depends on reranker scores as its confidence signal. Can run in parallel with Phase 16.
+~~**Week 3:** Evaluate results. If retrieval is strong enough, freeze Phase 15 and move to Phase 16. If gaps remain, run WP-15.6 (retrieval depth / HyPE) in parallel with early Phase 16 API scaffolding — they don't conflict architecturally.~~
 
-If any spike runs past its allocated time without clear results, kill it and move on. The retrieval stack is already good. These extensions make it better, but none of them are blocking.
+~~**WP-15.9 (corrective gate):** Runs after the reranker ships, since it depends on reranker scores as its confidence signal. Can run in parallel with Phase 16.~~
+
+~~If any spike runs past its allocated time without clear results, kill it and move on. The retrieval stack is already good. These extensions make it better, but none of them are blocking.~~
 
 ---
 
@@ -392,14 +397,18 @@ If a work package violates those constraints, the design is wrong.
 
 ## 13. Decision Gate
 
+> **DECISION (2026-05-16): DEFERRED.** All four work packages are frozen backlog.
+> Resume after Phase 18 is complete and stable. The recommendation below is preserved
+> as the suggested approach when this work is eventually picked up.
+
 | Decision | Meaning |
 |----------|---------|
 | **Full adopt** | Run all four work packages per the time-boxed schedule |
 | **Partial adopt** | Run WP-15.5 + WP-15.8 only, evaluate before committing further |
-| **Reject** | Freeze retrieval after HyDE and proceed directly to Phase 16 |
+| ~~**Reject**~~ | ~~Freeze retrieval after HyDE and proceed directly to Phase 16~~ |
 
-**Recommendation: Partial adopt.** Run the reranker and multi-vector spikes first. They have the best risk/reward ratio and build directly on ReqBot's existing strengths. Decide on WP-15.6 and WP-15.9 based on observed results, not speculation.
+**Original recommendation (for future reference): Partial adopt.** Run the reranker and multi-vector spikes first. They have the best risk/reward ratio and build directly on ReqBot's existing strengths. Decide on WP-15.6 and WP-15.9 based on observed results, not speculation.
 
 ---
 
-*This document is a proposal for review by Gemini, GPT, and Claude Code. No implementation should begin until the decision gate is resolved and the time box is agreed.*
+*This document is deferred backlog. See `docs/TODO_future_improvements.txt` items #12–15.*

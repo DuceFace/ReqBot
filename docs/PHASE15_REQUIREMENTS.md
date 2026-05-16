@@ -130,7 +130,7 @@ Requirement:
 
 ### 6.4 Implementation Notes
 
-- Use the existing `synthesis_model` (qwen2.5:14b) for hypothesis generation — it produces cleaner formal language than the extraction model.
+- Use the existing `rewrite_model` (llama3.1:8b-instruct-q4_K_M) for hypothesis generation — decoupled from the synthesis model so HyDE works even when synthesis is pointed at a remote API. Note: original spec suggested `synthesis_model` (qwen2.5:14b) but the implementation used `rewrite_model` to keep HyDE self-contained on local Ollama.
 - Log every generated hypothesis to `hyde_hypotheses.jsonl` during testing. Review in batch after the evaluation run, not inline.
 - Hypothesis generation failure (timeout, empty response) → fall back to baseline-only retrieval silently.
 - This is a spike; implement in `ask.py` behind a `--hyde` flag for the duration of testing. Do not expose in the shell or make it permanent until WP-15.4 passes the gate.
@@ -185,7 +185,7 @@ All three conditions must hold for HyDE to proceed to default path:
 |--------|--------|
 | **Passes gate** | HyDE becomes a candidate for default dense retrieval. Proceed to Phase 16. |
 | **Inconclusive** | Refine hypothesis prompt; retry with synthesis model if not already used; re-evaluate once. |
-| **Negative** | Discard HyDE. Reassess retrieval strategy before Phase 16. Document findings in `docs/PHASE15_HYDE_OUTCOME.md`. |
+| **Negative** | Discard HyDE. Reassess retrieval strategy before Phase 16. Document findings in section 11 of this document (outcome embedded inline; no separate file was created). |
 
 ---
 
@@ -271,4 +271,4 @@ One additional LLM generate call + one additional embed call per query. Observed
 | `eval/hyde_eval_results.jsonl` | New — per-query baseline vs. HyDE comparison (gitignored; scratch output) |
 | `hyde_hypotheses.jsonl` | New — generated hypotheses log (gitignored; scratch output) |
 | `eval/gold_eval_chunks_review.csv` | Regenerated from Phase 14 artifacts |
-| `docs/PHASE15_HYDE_OUTCOME.md` | New — written at WP-15.4 completion |
+| section 11 of this document (outcome embedded inline; no separate file was created) | New — written at WP-15.4 completion |

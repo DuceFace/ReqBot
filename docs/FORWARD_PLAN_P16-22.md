@@ -1,10 +1,10 @@
-# ReqBot — Forward Plan (Phases 15–18)
+# ReqBot — Forward Plan (Phases 16–22)
 
-**Status:** Pre-implementation planning
-**Date:** 2026-04-05
-**Intent:** Break post-Phase 14 work into gated phases with clear success criteria. Validate retrieval quality before building interfaces. Protect pipeline stability throughout.
+**Status:** Active — Phase 15 complete, Phase 16 next
+**Date:** 2026-04-05 (updated 2026-05-16)
+**Intent:** Gated phases with clear success criteria from Phase 16 through Phase 22. Phases 16–18 are fully defined here. Phases 19–22 (domain profiles, checklist generation, evidence requests, gap analysis) are defined in `docs/PRODUCT_PRD.md`.
 
-*This document is the single source of truth for forward planning. It incorporates planning from Claude, architectural review from GPT, and risk analysis from Gemini. It is intended as the Codex input and execution reference.*
+*This document is the single source of truth for Phase 16–18 planning. It incorporates planning from Claude, architectural review from GPT, and risk analysis from Gemini. It is intended as the Codex input and execution reference.*
 
 ---
 
@@ -26,7 +26,7 @@ Phase 16 therefore explicitly restructures the repository into smaller cohesive 
 
 The goal is not abstraction for abstraction's sake. The goal is maintainability, debuggability, lower-risk refactoring, and faster AI-assisted iteration.
 
-This restructuring also supports the broader product direction defined in `REQBOT_GENERAL_REQUIREMENTS_AND_CHECKLIST_PRD.md`: generalized requirements ingestion, domain profiles, audit checklist generation, evidence request generation, and future policy alignment workflows.
+This restructuring also supports the broader product direction defined in `PRODUCT_PRD.md`: generalized requirements ingestion, domain profiles, audit checklist generation, evidence request generation, and future policy alignment workflows.
 
 ### The Stack
 
@@ -238,7 +238,7 @@ The purpose of this layer is to prevent schema drift between CLI output, API res
 
 ### Future Product Compatibility
 
-Phase 16 must support the broader product direction documented in `REQBOT_GENERAL_REQUIREMENTS_AND_CHECKLIST_PRD.md`.
+Phase 16 must support the broader product direction documented in `PRODUCT_PRD.md`.
 
 The structure should support future capabilities including:
 

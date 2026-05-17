@@ -1,14 +1,9 @@
 import { Link, useLocation } from 'react-router-dom'
 import type { AskResult } from '../api/types'
+import { pageRange } from '../utils/ui'
 
 interface Props {
   result: AskResult
-}
-
-function pageRange(start?: number, end?: number): string | null {
-  if (start == null) return null
-  if (end != null && end !== start) return `pp. ${start}–${end}`
-  return `p. ${start}`
 }
 
 export default function ResultCard({ result }: Props) {

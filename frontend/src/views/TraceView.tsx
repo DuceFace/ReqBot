@@ -1,18 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import * as api from '../api/client'
 import { NotFoundError } from '../api/client'
 import type { TraceResponse, Requirement } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function pageRange(start?: number, end?: number): string | null {
-  if (start == null) return null
-  if (end != null && end !== start) return `pp. ${start}–${end}`
-  return `p. ${start}`
-}
+import { pageRange } from '../utils/ui'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -38,7 +31,12 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function CrossMatchCard({ match }: { match: Requirement }) {
+/**
+ * `from` is the original search query string (e.g. "?q=encryption&doc=AFI").
+ * Threaded through so multi-hop cross-match navigation still has a working
+ * "← Back to search" link that restores the original query.
+ */
+function CrossMatchCard({ match, from }: { match: Requirement; from: string }) {
   const snippet =
     match.description.length > 200
       ? match.description.slice(0, 200) + '…'
@@ -48,6 +46,7 @@ function CrossMatchCard({ match }: { match: Requirement }) {
   return (
     <Link
       to={`/trace/${encodeURIComponent(match.requirement_id)}`}
+      state={{ from }}
       className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-sm transition-all no-underline"
     >
       <div className="flex items-center justify-between mb-1.5 gap-4">
@@ -73,8 +72,8 @@ export default function TraceView() {
   const { reqId } = useParams<{ reqId: string }>()
   const location = useLocation()
 
-  // Restore the previous search URL if ResultCard passed it via router state.
-  // Falls back to bare /search if the user navigated here directly.
+  // Restore the previous search URL if ResultCard (or CrossMatchCard) passed it
+  // via router state. Falls back to bare /search for direct navigation.
   const fromSearch = (location.state as { from?: string } | null)?.from ?? ''
   const backTo = fromSearch ? `/search${fromSearch}` : '/search'
 
@@ -88,40 +87,63 @@ export default function TraceView() {
   const [contextText, setContextText] = useState<string | null>(null)
   const [contextLoading, setContextLoading] = useState(false)
 
+  // Ref kept in sync with the current reqId on every render.
+  // Used to discard context-fetch responses that arrive after navigation.
+  const reqIdRef = useRef(reqId)
+  reqIdRef.current = reqId
+
+  // Main fetch — guarded with `cancelled` flag (same pattern as SearchView)
+  // to prevent superseded responses from overwriting state after navigation.
   useEffect(() => {
     if (!reqId) return
+    let cancelled = false
     setLoading(true)
     setError(null)
     setNotFound(false)
     setData(null)
     setContextText(null)
+    setContextLoading(false)
     api
       .trace(reqId)
       .then(res => {
+        if (cancelled) return
         setData(res)
       })
       .catch((err: unknown) => {
+        if (cancelled) return
         if (err instanceof NotFoundError) {
           setNotFound(true)
         } else {
           setError(err instanceof Error ? err.message : 'Request failed')
         }
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [reqId, retries])
 
   function handleExpandContext() {
     if (!reqId || contextLoading) return
+    // Capture reqId at the time of the request so we can discard the response
+    // if the user navigates to a different requirement before it returns.
+    const capturedReqId = reqId
     setContextLoading(true)
     api
       .trace(reqId, true)
       .then(res => {
+        if (reqIdRef.current !== capturedReqId) return
         setContextText(res.context_text ?? '(no context available)')
       })
       .catch(() => {
+        if (reqIdRef.current !== capturedReqId) return
         setContextText('(failed to load context)')
       })
-      .finally(() => setContextLoading(false))
+      .finally(() => {
+        if (reqIdRef.current === capturedReqId) setContextLoading(false)
+      })
   }
 
   // ── Loading ──────────────────────────────────────────────────────────────────
@@ -201,16 +223,26 @@ export default function TraceView() {
 
         {/* Description */}
         <Section label="Description">
-          <p className="text-sm text-gray-700 leading-relaxed">{req.description}</p>
+          {req.description ? (
+            <p className="text-sm text-gray-700 leading-relaxed">{req.description}</p>
+          ) : (
+            <p className="text-sm text-gray-400">No description available.</p>
+          )}
         </Section>
 
         {/* Source quote */}
         <Section label="Source Quote">
-          <blockquote className="border-l-4 border-blue-200 pl-4 text-sm text-gray-700 italic leading-relaxed">
-            {req.source_quote}
-          </blockquote>
-          {req.source_ref && (
-            <p className="mt-2 text-xs text-gray-400">{req.source_ref}</p>
+          {req.source_quote ? (
+            <>
+              <blockquote className="border-l-4 border-blue-200 pl-4 text-sm text-gray-700 italic leading-relaxed">
+                {req.source_quote}
+              </blockquote>
+              {req.source_ref && (
+                <p className="mt-2 text-xs text-gray-400">{req.source_ref}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-400">No source quote available.</p>
           )}
         </Section>
 
@@ -286,7 +318,7 @@ export default function TraceView() {
           ) : (
             <div className="space-y-3">
               {data.cross_matches.map(m => (
-                <CrossMatchCard key={m.requirement_id} match={m} />
+                <CrossMatchCard key={m.requirement_id} match={m} from={fromSearch} />
               ))}
             </div>
           )}

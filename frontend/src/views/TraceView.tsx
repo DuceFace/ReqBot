@@ -5,6 +5,7 @@ import * as api from '../api/client'
 import { NotFoundError } from '../api/client'
 import type { TraceResponse, Requirement } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorBanner from '../components/ErrorBanner'
 import StatusDot from '../components/StatusDot'
 import { pageRange } from '../utils/ui'
 
@@ -193,15 +194,7 @@ export default function TraceView() {
       <div className="min-h-screen bg-gray-50">
         <Header backTo={backTo} backLabel={backLabel} />
         <main className="max-w-4xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700">
-            <span>{error}</span>
-            <button
-              onClick={() => setRetries(r => r + 1)}
-              className="ml-4 underline hover:no-underline shrink-0"
-            >
-              Retry
-            </button>
-          </div>
+          <ErrorBanner message={error} onRetry={() => setRetries(r => r + 1)} />
         </main>
       </div>
     )

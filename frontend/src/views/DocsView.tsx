@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import * as api from '../api/client'
 import type { DocsEntry, DocsResponse } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorBanner from '../components/ErrorBanner'
 import NavBar from '../components/NavBar'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -126,11 +127,7 @@ export default function DocsView() {
         {loading && <LoadingSpinner />}
 
         {/* Error */}
-        {!loading && error && (
-          <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {!loading && error && <ErrorBanner message={error} />}
 
         {/* Results */}
         {!loading && !error && data && (

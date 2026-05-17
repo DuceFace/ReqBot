@@ -4,6 +4,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import * as api from '../api/client'
 import type { ComparePayload, CompareResponse, DocsEntry } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorBanner from '../components/ErrorBanner'
 import NavBar from '../components/NavBar'
 
 // ── Result-splitting logic ────────────────────────────────────────────────────
@@ -59,7 +60,7 @@ function splitResult(res: CompareResponse): SplitResult {
 
 // ── Card components ───────────────────────────────────────────────────────────
 
-function snippet(text: string, max = 220): string {
+function snip(text: string, max = 220): string {
   return text.length > max ? text.slice(0, max) + '…' : text
 }
 
@@ -90,7 +91,10 @@ function BothCard({ item, from }: { item: BothItem; from: string }) {
         </Link>
       </div>
       <p className="text-sm text-gray-700 leading-snug">
-        {snippet(item.p1.source_quote || item.p1.description)}
+        {snip(item.p1.source_quote || item.p1.description)}
+      </p>
+      <p className="mt-2 text-sm text-gray-500 leading-snug border-t border-gray-100 pt-2">
+        {snip(item.p2.source_quote || item.p2.description)}
       </p>
     </div>
   )
@@ -114,7 +118,7 @@ function SingleCard({ item, from }: { item: SingleItem; from: string }) {
         )}
       </div>
       <p className="text-sm text-gray-700 leading-snug">
-        {snippet(item.payload.source_quote || item.payload.description)}
+        {snip(item.payload.source_quote || item.payload.description)}
       </p>
       {item.ref && (
         <p className="mt-1.5 text-xs text-gray-400 truncate">{item.ref}</p>
@@ -149,6 +153,8 @@ export default function CompareView() {
   const [topic, setTopic] = useState(urlQ)
 
   const [docOptions, setDocOptions] = useState<DocsEntry[]>([])
+  const [docsError, setDocsError] = useState(false)
+  const [docsRetry, setDocsRetry] = useState(0)
   const [result, setResult] = useState<CompareResponse | null>(null)
   const [split, setSplit] = useState<SplitResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -159,10 +165,13 @@ export default function CompareView() {
   useEffect(() => { setDoc2(urlDoc2) }, [urlDoc2])
   useEffect(() => { setTopic(urlQ) }, [urlQ])
 
-  // Load document list once on mount
+  // Load document list; retry on demand via docsRetry counter
   useEffect(() => {
-    api.docs().then(d => setDocOptions(d.docs)).catch(() => { /* silent */ })
-  }, [])
+    setDocsError(false)
+    api.docs()
+      .then(d => setDocOptions(d.docs))
+      .catch(() => { setDocsError(true) })
+  }, [docsRetry])
 
   // Normalize legacy doc_key URL params (e.g. "afi17-101") to source_pdf
   // (e.g. "afi17-101.pdf") once docOptions are available. Old bookmarks
@@ -232,6 +241,16 @@ export default function CompareView() {
       <NavBar />
 
       <main className="max-w-4xl mx-auto px-6 py-8">
+        {/* Docs load error */}
+        {docsError && (
+          <div className="mb-6">
+            <ErrorBanner
+              message="Could not load document list. Check that the API is reachable."
+              onRetry={() => setDocsRetry(r => r + 1)}
+            />
+          </div>
+        )}
+
         {/* Compare form */}
         <form onSubmit={handleSubmit} className="space-y-3 mb-8">
           <div className="flex gap-3 flex-wrap">
@@ -299,11 +318,7 @@ export default function CompareView() {
         {loading && <LoadingSpinner />}
 
         {/* Error */}
-        {!loading && error && (
-          <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {!loading && error && <ErrorBanner message={error} />}
 
         {/* Results */}
         {!loading && !error && split !== null && (
@@ -323,7 +338,7 @@ export default function CompareView() {
             {split.both.length > 0 && (
               <section className="mb-8">
                 <SectionHeader
-                  label={`In both documents`}
+                  label="In both documents"
                   count={split.both.length}
                 />
                 <div className="space-y-3">

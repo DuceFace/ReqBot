@@ -77,7 +77,7 @@ echo ""
 # ---------------------------------------------------------------
 # Step 1: Prepare directory tree
 # ---------------------------------------------------------------
-echo "[1/5] Preparing bundle directories..."
+echo "[1/6] Preparing bundle directories..."
 # Always start clean so stale files from prior runs do not survive into the
 # new bundle. The .cache/ dir is preserved separately to avoid re-downloading
 # the Python tarball on every run.
@@ -88,7 +88,7 @@ mkdir -p "$CACHE_DIR"
 # ---------------------------------------------------------------
 # Step 2: Fetch portable Python
 # ---------------------------------------------------------------
-echo "[2/5] Fetching portable CPython ${PYTHON_VERSION}..."
+echo "[2/6] Fetching portable CPython ${PYTHON_VERSION}..."
 PYTHON_CACHE="$CACHE_DIR/$PYTHON_FILENAME"
 
 if [ -f "$PYTHON_CACHE" ]; then
@@ -111,7 +111,7 @@ echo "  Python extracted: $("$BUNDLED_PYTHON" --version)"
 # ---------------------------------------------------------------
 # Step 3: Install Python dependencies
 # ---------------------------------------------------------------
-echo "[3/5] Installing Python dependencies..."
+echo "[3/6] Installing Python dependencies..."
 # Upgrade pip first (bundled pip may be older)
 "$BUNDLED_PYTHON" -m pip install --upgrade pip --quiet --disable-pip-version-check
 
@@ -126,6 +126,7 @@ echo "[3/5] Installing Python dependencies..."
     "requests==2.32.5" \
     "fastapi==0.115.12" \
     "uvicorn==0.34.3" \
+    "aiofiles==25.1.0" \
     --quiet --disable-pip-version-check
 
 echo "  Dependencies installed"
@@ -133,7 +134,7 @@ echo "  Dependencies installed"
 # ---------------------------------------------------------------
 # Step 4: Pre-seed fastembed BM25 model cache
 # ---------------------------------------------------------------
-echo "[4/5] Pre-seeding fastembed BM25 model cache..."
+echo "[4/6] Pre-seeding fastembed BM25 model cache..."
 # fastembed defaults to /tmp/fastembed_cache/ (wiped on reboot).
 # We force it to download into our models/ directory so the bundle is
 # air-gap capable. The launcher sets FASTEMBED_CACHE_PATH at runtime.
@@ -151,7 +152,7 @@ echo "  BM25 model ready"
 # ---------------------------------------------------------------
 # Step 5: Copy application source
 # ---------------------------------------------------------------
-echo "[5/5] Copying application source..."
+echo "[5/6] Copying application source..."
 for f in "${APP_FILES[@]}"; do
     src="$ROOT_DIR/$f"
     if [ ! -f "$src" ]; then
@@ -163,6 +164,20 @@ for f in "${APP_FILES[@]}"; do
     cp "$src" "$dst"
     echo "  + $f"
 done
+
+# ---------------------------------------------------------------
+# Step 6: Build frontend and copy dist into the bundle
+# ---------------------------------------------------------------
+echo "[6/6] Building frontend and copying to bundle..."
+# build-frontend.sh runs npm ci + npm run build; output lands in frontend/dist/.
+bash "$SCRIPT_DIR/build-frontend.sh"
+
+# api/app.py resolves frontend/dist/ as:
+#   Path(__file__).resolve().parent.parent / "frontend" / "dist"
+# At install time __file__ is $BUNDLE_DIR/app/api/app.py, so parent.parent is
+# $BUNDLE_DIR/app/ — copy dist there to match that resolution path exactly.
+cp -r "$ROOT_DIR/frontend/dist" "$BUNDLE_DIR/app/frontend/dist"
+echo "  Frontend dist copied → $BUNDLE_DIR/app/frontend/dist/"
 
 # ---------------------------------------------------------------
 # Write launcher script

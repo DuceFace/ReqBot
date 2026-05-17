@@ -53,9 +53,11 @@ def compare(
         ) from e
 
     document_ids = document_ids or []
-    # doc_keys (human-readable, e.g. "afi17-101") are preferred over document_id hashes
-    # when callers come from the API layer. Convert to source_pdf filter values.
-    _source_pdf_filter: list[str] = [k if k.endswith(".pdf") else k + ".pdf" for k in (doc_keys or [])]
+    # doc_keys are source_pdf values (e.g. "afi17-101.pdf"), resolved by the caller.
+    # Normalise suffix defensively in case a caller omits it.
+    _source_pdf_filter: list[str] = [
+        k if k.lower().endswith(".pdf") else k + ".pdf" for k in (doc_keys or [])
+    ]
     is_control_id = bool(CONTROL_ID_RE.match(query.strip()))
 
     try:

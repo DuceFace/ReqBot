@@ -2,6 +2,7 @@
 
 Returns structured data; all display logic stays in cli/reqbot.py.
 """
+import json
 import logging
 import re
 import sys
@@ -35,11 +36,22 @@ def list_docs(processed_dir: Path) -> dict:
     total_reqs = 0
 
     for doc_key, path in sorted(latest.items()):
+        source_pdf = ""
+        count = 0
+        first_record = True
         try:
-            count = sum(1 for line in open(path, encoding="utf-8") if line.strip())
+            with open(path, encoding="utf-8") as _f:
+                for _line in _f:
+                    if _line.strip():
+                        if first_record:
+                            try:
+                                source_pdf = json.loads(_line).get("source_pdf", "")
+                            except Exception:
+                                pass
+                            first_record = False
+                        count += 1
         except IOError as e:
             log.warning("Could not read %s: %s", path, e)
-            count = 0
         total_reqs += count
 
         # Detect pdfplumber by scanning chunks for TABLE_START sentinels
@@ -62,6 +74,7 @@ def list_docs(processed_dir: Path) -> dict:
 
         docs.append({
             "doc_key": doc_key,
+            "source_pdf": source_pdf,
             "path": str(path),
             "count": count,
             "mode": mode,
@@ -73,3 +86,35 @@ def list_docs(processed_dir: Path) -> dict:
         "total_reqs": total_reqs,
         "total_docs": len(latest),
     }
+
+
+def resolve_source_pdfs(processed_dir: Path, doc_keys: list[str]) -> dict[str, str]:
+    """Resolve a list of doc_keys to their canonical source_pdf values.
+
+    Reads only the first record of each matching JSONL — much cheaper than
+    list_docs() when the caller only needs source_pdf for a small set of keys.
+
+    Returns a dict mapping each requested doc_key to its source_pdf (empty
+    string if not found).
+    """
+    all_files = sorted(processed_dir.rglob("*_requirements_normalized.jsonl"))
+    latest: dict[str, Path] = {}
+    for p in all_files:
+        key = p.stem.replace("_requirements_normalized", "")
+        if key not in latest or p.stat().st_mtime > latest[key].stat().st_mtime:
+            latest[key] = p
+
+    result: dict[str, str] = {k: "" for k in doc_keys}
+    for key in doc_keys:
+        path = latest.get(key)
+        if not path:
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        result[key] = json.loads(line).get("source_pdf", "")
+                        break
+        except Exception as e:
+            log.warning("Could not resolve source_pdf for %s: %s", key, e)
+    return result

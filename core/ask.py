@@ -136,7 +136,7 @@ def build_query_filter(
     if document_ids:
         conditions.append(
             models.FieldCondition(
-                key="document_id",
+                key="source_pdf",
                 match=models.MatchAny(any=document_ids),
             )
         )

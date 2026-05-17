@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { to: '/search', label: 'Search' },
   { to: '/compare', label: 'Compare' },
   { to: '/evidence', label: 'Evidence' },
+  { to: '/docs', label: 'Docs' },
 ]
 
 export default function NavBar() {

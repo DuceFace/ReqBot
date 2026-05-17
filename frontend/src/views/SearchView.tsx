@@ -28,7 +28,7 @@ export default function SearchView() {
   const [synthError, setSynthError] = useState<string | null>(null)
   const [synthText, setSynthText] = useState<string | null>(null)
   const [synthElapsed, setSynthElapsed] = useState(0)
-  const synthCancelledRef = useRef(false)
+  const synthGenRef = useRef(0)
 
   // Sync input field when q changes via browser back/forward.
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function SearchView() {
 
   // Reset synthesis when the committed query or doc filter changes.
   useEffect(() => {
-    synthCancelledRef.current = true
+    synthGenRef.current += 1
     setSynthLoading(false)
     setSynthError(null)
     setSynthText(null)
@@ -108,7 +108,7 @@ export default function SearchView() {
 
   function handleGenerateAnswer() {
     if (!q || synthLoading) return
-    synthCancelledRef.current = false
+    const gen = ++synthGenRef.current
     setSynthLoading(true)
     setSynthError(null)
     setSynthText(null)
@@ -120,15 +120,15 @@ export default function SearchView() {
         synthesize: true,
       })
       .then(res => {
-        if (synthCancelledRef.current) return
+        if (synthGenRef.current !== gen) return
         setSynthText(res.metadata.synthesis || null)
       })
       .catch((err: unknown) => {
-        if (synthCancelledRef.current) return
+        if (synthGenRef.current !== gen) return
         setSynthError(err instanceof Error ? err.message : 'Synthesis failed')
       })
       .finally(() => {
-        if (!synthCancelledRef.current) setSynthLoading(false)
+        if (synthGenRef.current === gen) setSynthLoading(false)
       })
   }
 

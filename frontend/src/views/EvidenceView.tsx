@@ -57,14 +57,14 @@ export default function EvidenceView() {
   const [synthError, setSynthError] = useState<string | null>(null)
   const [synthText, setSynthText] = useState<string | null>(null)
   const [synthElapsed, setSynthElapsed] = useState(0)
-  const synthCancelledRef = useRef(false)
+  const synthGenRef = useRef(0)
 
   // Sync input with URL on browser back/forward
   useEffect(() => { setTopic(urlQ) }, [urlQ])
 
   // Reset synthesis when topic changes
   useEffect(() => {
-    synthCancelledRef.current = true
+    synthGenRef.current += 1
     setSynthLoading(false)
     setSynthError(null)
     setSynthText(null)
@@ -115,22 +115,22 @@ export default function EvidenceView() {
 
   function handleGenerateAnswer() {
     if (!urlQ || synthLoading) return
-    synthCancelledRef.current = false
+    const gen = ++synthGenRef.current
     setSynthLoading(true)
     setSynthError(null)
     setSynthText(null)
     api
       .evidence({ topic: urlQ, top_k: 20, synthesize: true })
       .then(res => {
-        if (synthCancelledRef.current) return
+        if (synthGenRef.current !== gen) return
         setSynthText(res.synthesis_text || null)
       })
       .catch((err: unknown) => {
-        if (synthCancelledRef.current) return
+        if (synthGenRef.current !== gen) return
         setSynthError(err instanceof Error ? err.message : 'Synthesis failed')
       })
       .finally(() => {
-        if (!synthCancelledRef.current) setSynthLoading(false)
+        if (synthGenRef.current === gen) setSynthLoading(false)
       })
   }
 

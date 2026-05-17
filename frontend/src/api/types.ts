@@ -1,0 +1,133 @@
+/**
+ * TypeScript types mirroring the ReqBot API contract (Phase 16C).
+ * Field names are snake_case to match the Python/FastAPI response exactly.
+ * Any drift here becomes a runtime mismatch — keep in sync with:
+ *   api/routes/ask.py   (AskRequest, AskResponse)
+ *   api/routes/trace.py (TraceResponse)
+ *   api/routes/docs.py  (DocsResponse)
+ *   api/routes/status.py (StatusResponse)
+ *   services/ask_service.py (canonical response shape)
+ */
+
+// ─── Requirement ─────────────────────────────────────────────────────────────
+
+/**
+ * Base payload fields present on every indexed requirement.
+ * confidence comes from the extraction pipeline and is optional —
+ * older records may not carry it.
+ */
+export interface Requirement {
+  requirement_id: string
+  description: string
+  source_quote: string
+  source_ref: string
+  document_id: string
+  source_pdf: string
+  domain_tags: string[]
+  requirement_type: string
+  confidence?: number         // extraction-time confidence; not always present
+  page_start?: number
+  page_end?: number
+  section_title_path?: string // schema v2.0 hierarchy fields
+  section_ref_path?: string
+  parent_context?: string
+  chunk_id?: number
+}
+
+// ─── Ask ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Request body for POST /api/ask.
+ * All fields except question are optional (API provides defaults).
+ * synthesize is always omitted/false for GUI calls in Phase 18.
+ */
+export interface AskRequest {
+  question: string
+  top_k?: number
+  min_score?: number
+  synthesize?: boolean
+  model?: string
+  rewrite_model?: string
+  domain_tags?: string[]
+  requirement_types?: string[]
+  document_ids?: string[]
+  no_rewrite?: boolean
+  context?: boolean
+  hyde?: boolean
+}
+
+/**
+ * Ask results merge the Qdrant retrieval score with the full payload.
+ * score is always present (added by ask_service before returning).
+ */
+export interface AskResult extends Requirement {
+  score: number
+  context_text?: string | null // included when ask is called with context=true
+}
+
+/**
+ * filters mirrors ask_service.ask() return exactly:
+ *   document_id:       document_ids or None → string[] | null
+ *   domain_tag:        domain_tags or None  → string[] | null
+ *   requirement_type:  requirement_types or None → string[] | null
+ */
+export interface AskResponse {
+  query: string
+  filters: {
+    document_id: string[] | null
+    domain_tag: string[] | null
+    requirement_type: string[] | null
+  }
+  results: AskResult[]
+  metadata: {
+    top_k: number
+    result_count: number
+    retrieval_ms: number
+    synthesis: string | null  // always null in Phase 18 (synthesis not exposed in GUI)
+  }
+}
+
+// ─── Trace ───────────────────────────────────────────────────────────────────
+
+export interface TraceResponse {
+  requirement: Requirement
+  cross_matches: Requirement[]
+  context_text: string | null
+}
+
+// ─── Docs ────────────────────────────────────────────────────────────────────
+
+export interface DocsEntry {
+  doc_key: string
+  path: string
+  count: number
+  mode: string
+  run_date: string
+}
+
+export interface DocsResponse {
+  docs: DocsEntry[]
+  total_reqs: number
+  total_docs: number
+}
+
+// ─── Status ──────────────────────────────────────────────────────────────────
+
+/**
+ * Mirrors status_service.check() return shape.
+ * points is number | string because Qdrant returns "?" when the count
+ * is unavailable (collection detail request fails).
+ */
+export interface StatusResponse {
+  ollama_url: string
+  qdrant_url: string
+  ollama: {
+    reachable: boolean
+    models: Array<{ name: string; size_gb: number }>
+  }
+  qdrant: {
+    reachable: boolean
+    collections: Array<{ name: string; points: number | string }>
+  }
+  processed_documents: Array<{ path: string; count: number }>
+}

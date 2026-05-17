@@ -90,7 +90,7 @@ function BothCard({ item, from }: { item: BothItem; from: string }) {
         </Link>
       </div>
       <p className="text-sm text-gray-700 leading-snug">
-        {snippet(item.p1.description)}
+        {snippet(item.p1.source_quote || item.p1.description)}
       </p>
     </div>
   )
@@ -114,7 +114,7 @@ function SingleCard({ item, from }: { item: SingleItem; from: string }) {
         )}
       </div>
       <p className="text-sm text-gray-700 leading-snug">
-        {snippet(item.payload.description)}
+        {snippet(item.payload.source_quote || item.payload.description)}
       </p>
       {item.ref && (
         <p className="mt-1.5 text-xs text-gray-400 truncate">{item.ref}</p>
@@ -226,8 +226,8 @@ export default function CompareView() {
               >
                 <option value="">Select document…</option>
                 {docOptions.map(d => (
-                  <option key={d.doc_key} value={d.doc_key}>
-                    {d.doc_key}
+                  <option key={d.doc_key} value={d.source_pdf}>
+                    {d.source_pdf}
                   </option>
                 ))}
               </select>
@@ -244,8 +244,8 @@ export default function CompareView() {
               >
                 <option value="">Select document…</option>
                 {docOptions.map(d => (
-                  <option key={d.doc_key} value={d.doc_key}>
-                    {d.doc_key}
+                  <option key={d.doc_key} value={d.source_pdf}>
+                    {d.source_pdf}
                   </option>
                 ))}
               </select>

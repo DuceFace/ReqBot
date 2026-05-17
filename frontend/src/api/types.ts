@@ -173,6 +173,62 @@ export interface CompareResponseExact {
 
 export type CompareResponse = CompareResponseSemantic | CompareResponseExact
 
+// ─── Evidence ────────────────────────────────────────────────────────────────
+
+export interface EvidenceRequest {
+  topic: string
+  domain_tags?: string[]
+  requirement_types?: string[]
+  synthesize?: boolean
+  top_k?: number
+}
+
+/**
+ * Raw Qdrant payload for a single requirement returned by evidence_service.
+ * Uses optional fields because payload values are not guaranteed for every
+ * record (esp. older ingested docs). requirement_id is always present.
+ */
+export interface EvidenceRequirement {
+  requirement_id: string
+  description?: string
+  source_quote?: string
+  source_ref?: string
+  source_pdf?: string
+  document_id?: string
+  domain_tags?: string[]
+  requirement_type?: string
+  confidence?: number
+  page_start?: number
+  page_end?: number
+  section_title_path?: string
+}
+
+/**
+ * One evidence group keyed by source_ref.
+ * representative is the highest-confidence requirement in the group.
+ * sources is every requirement that matched in this group (includes representative).
+ */
+export interface EvidenceGroup {
+  source_ref: string
+  representative: EvidenceRequirement
+  sources: EvidenceRequirement[]
+  context_text: string | null
+}
+
+/**
+ * Full response from POST /api/evidence.
+ * groups is keyed by source_ref; group_order preserves the RRF rank order.
+ * synthesis_text is empty string when synthesize=false.
+ */
+export interface EvidenceResponse {
+  query: string
+  timestamp: string
+  groups: Record<string, EvidenceGroup>
+  group_order: string[]
+  total_sources: number
+  synthesis_text: string
+}
+
 // ─── Status ──────────────────────────────────────────────────────────────────
 
 /**

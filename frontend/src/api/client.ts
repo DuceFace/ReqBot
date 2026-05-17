@@ -11,6 +11,8 @@ import type {
   StatusResponse,
   CompareRequest,
   CompareResponse,
+  EvidenceRequest,
+  EvidenceResponse,
 } from './types'
 
 const BASE = '/api'
@@ -68,6 +70,19 @@ export async function compare(req: CompareRequest): Promise<CompareResponse> {
     throw new Error(detail || `compare failed: ${res.status} ${res.statusText}`)
   }
   return res.json() as Promise<CompareResponse>
+}
+
+export async function evidence(req: EvidenceRequest): Promise<EvidenceResponse> {
+  const res = await fetch(`${BASE}/evidence`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) {
+    const detail = await res.json().then((b: { detail?: string }) => b.detail ?? '').catch(() => '')
+    throw new Error(detail || `evidence failed: ${res.status} ${res.statusText}`)
+  }
+  return res.json() as Promise<EvidenceResponse>
 }
 
 /** Thrown by trace() when the requirement ID is not found (HTTP 404). */

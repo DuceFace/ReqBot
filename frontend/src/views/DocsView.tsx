@@ -28,7 +28,7 @@ function DocRow({ entry }: { entry: DocsEntry }) {
           </p>
         </div>
         <Link
-          to={`/search?doc=${encodeURIComponent(entry.doc_key)}`}
+          to={`/search?doc=${encodeURIComponent(entry.source_pdf)}`}
           className="shrink-0 text-sm text-blue-600 hover:underline whitespace-nowrap"
         >
           Search this doc ↗

@@ -127,8 +127,8 @@ export default function SearchView() {
           >
             <option value="">All documents</option>
             {docOptions.map(d => (
-              <option key={d.doc_key} value={d.doc_key}>
-                {d.doc_key}
+              <option key={d.doc_key} value={d.source_pdf}>
+                {d.source_pdf}
               </option>
             ))}
           </select>

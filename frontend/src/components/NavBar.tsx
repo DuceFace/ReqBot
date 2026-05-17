@@ -4,6 +4,7 @@ import StatusDot from './StatusDot'
 const NAV_LINKS = [
   { to: '/search', label: 'Search' },
   { to: '/compare', label: 'Compare' },
+  { to: '/evidence', label: 'Evidence' },
 ]
 
 export default function NavBar() {

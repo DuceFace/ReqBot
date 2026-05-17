@@ -9,11 +9,11 @@ import { pageRange } from '../utils/ui'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function Header({ backTo }: { backTo: string }) {
+function Header({ backTo, backLabel }: { backTo: string; backLabel: string }) {
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
       <Link to={backTo} className="text-sm text-blue-600 hover:underline shrink-0">
-        ← Back to search
+        {backLabel}
       </Link>
       <span className="text-xl font-bold text-gray-900">ReqBot</span>
     </header>
@@ -32,9 +32,8 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * `from` is the original search query string (e.g. "?q=encryption&doc=AFI").
- * Threaded through so multi-hop cross-match navigation still has a working
- * "← Back to search" link that restores the original query.
+ * `from` is the full originating URL (e.g. "/search?q=mfa" or "/compare?doc1=...&q=...").
+ * Threaded through so multi-hop cross-match navigation still has a working back link.
  */
 function CrossMatchCard({ match, from }: { match: Requirement; from: string }) {
   const snippet =
@@ -72,10 +71,12 @@ export default function TraceView() {
   const { reqId } = useParams<{ reqId: string }>()
   const location = useLocation()
 
-  // Restore the previous search URL if ResultCard (or CrossMatchCard) passed it
-  // via router state. Falls back to bare /search for direct navigation.
-  const fromSearch = (location.state as { from?: string } | null)?.from ?? ''
-  const backTo = fromSearch ? `/search${fromSearch}` : '/search'
+  // Restore the full previous URL if ResultCard (or CrossMatchCard) passed it
+  // via router state. Falls back to /search for direct navigation.
+  // from now carries the full path (e.g. "/compare?doc1=...&q=..." or "/search?q=...").
+  const fromPath = (location.state as { from?: string } | null)?.from ?? ''
+  const backTo = fromPath || '/search'
+  const backLabel = backTo.startsWith('/compare') ? '← Back to compare' : '← Back to search'
 
   const [data, setData] = useState<TraceResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -150,7 +151,7 @@ export default function TraceView() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header backTo={backTo} />
+        <Header backTo={backTo} backLabel={backLabel} />
         <main className="max-w-4xl mx-auto px-6 py-8">
           <LoadingSpinner />
         </main>
@@ -162,7 +163,7 @@ export default function TraceView() {
   if (notFound) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header backTo={backTo} />
+        <Header backTo={backTo} backLabel={backLabel} />
         <main className="max-w-4xl mx-auto px-6 py-8">
           <div className="bg-yellow-50 border border-yellow-200 rounded p-6 text-center">
             <p className="text-gray-700 font-medium mb-1">Requirement not found</p>
@@ -182,7 +183,7 @@ export default function TraceView() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header backTo={backTo} />
+        <Header backTo={backTo} backLabel={backLabel} />
         <main className="max-w-4xl mx-auto px-6 py-8">
           <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700">
             <span>{error}</span>
@@ -206,7 +207,7 @@ export default function TraceView() {
   // ── Full detail ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header backTo={backTo} />
+      <Header backTo={backTo} backLabel={backLabel} />
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
         {/* ID + breadcrumb */}
@@ -318,7 +319,7 @@ export default function TraceView() {
           ) : (
             <div className="space-y-3">
               {data.cross_matches.map(m => (
-                <CrossMatchCard key={m.requirement_id} match={m} from={fromSearch} />
+                <CrossMatchCard key={m.requirement_id} match={m} from={fromPath} />
               ))}
             </div>
           )}

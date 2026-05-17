@@ -99,6 +99,7 @@ export interface TraceResponse {
 
 export interface DocsEntry {
   doc_key: string
+  source_pdf: string  // canonical Qdrant key, e.g. "afi17-101.pdf" (added WP-19.1)
   path: string
   count: number
   mode: string
@@ -110,6 +111,67 @@ export interface DocsResponse {
   total_reqs: number
   total_docs: number
 }
+
+// ─── Compare ─────────────────────────────────────────────────────────────────
+
+export interface CompareRequest {
+  doc_id_1: string
+  doc_id_2: string
+  topic: string
+  top_k?: number
+}
+
+/**
+ * A single requirement payload as returned by compare_service.
+ * Mirrors the Qdrant stored payload; requirement_id is always present.
+ */
+export interface ComparePayload {
+  requirement_id: string
+  description: string
+  source_quote?: string
+  source_ref: string
+  source_pdf: string
+  document_id: string
+  domain_tags?: string[]
+  requirement_type?: string
+  confidence?: number
+  page_start?: number
+  page_end?: number
+  section_title_path?: string
+}
+
+/**
+ * Semantic mode (free-text topic): results grouped by source_ref, then by source_pdf.
+ * doc_pdf_1 / doc_pdf_2 are the exact keys used in ref_groups — use them to split
+ * results into three sections (both, doc1-only, doc2-only).
+ */
+export interface CompareResponseSemantic {
+  doc_id_1: string
+  doc_id_2: string
+  doc_pdf_1: string   // exact source_pdf key present in ref_groups
+  doc_pdf_2: string
+  query: string
+  mode: 'semantic'
+  ref_order: string[]
+  ref_groups: Record<string, Record<string, ComparePayload>>
+}
+
+/**
+ * Exact mode (control ID query): one representative per document.
+ * doc_pdf_1 / doc_pdf_2 are the exact keys present in groups.
+ */
+export interface CompareResponseExact {
+  doc_id_1: string
+  doc_id_2: string
+  doc_pdf_1: string
+  doc_pdf_2: string
+  query: string
+  mode: 'exact'
+  source_ref: string
+  groups: Record<string, ComparePayload>
+}
+
+export type CompareResponse = CompareResponseSemantic | CompareResponseExact
 
 // ─── Status ──────────────────────────────────────────────────────────────────
 

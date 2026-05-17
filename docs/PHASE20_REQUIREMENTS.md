@@ -137,7 +137,7 @@ These rules are unchanged from Phases 18–19 and apply throughout Phase 20.
 
 ```python
 REQUIRED_FIELDS = {"name", "obligation_verbs", "skip_sections", "domain_tags", "requirement_types"}
-OPTIONAL_FIELDS = {"description", "checklist_guidance"}
+OPTIONAL_FIELDS = {"description", "checklist_guidance", "version"}
 
 def load_profile(name: str) -> dict:
     """

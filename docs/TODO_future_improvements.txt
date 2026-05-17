@@ -119,6 +119,17 @@ ACTIVE BACKLOG (good ideas, not blocking)
     Depends on WP-15.5 reranker being calibrated first.
     Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
 
+16. ZOD RUNTIME VALIDATION FOR FRONTEND API RESPONSES — DEFERRED POST-PHASE 18
+    TypeScript types in frontend/src/api/types.ts only protect at compile time.
+    If the Python backend returns an unexpected shape (null where a string is
+    expected, missing field, etc.) the frontend silently misbehaves.
+    Zod would validate /api/ask, /api/trace, /api/docs, /api/status responses
+    at runtime and surface contract drift as a clear error rather than a silent
+    UI bug. Worth adding when: (a) the API surface grows significantly in
+    Phase 19+, (b) a second team is writing against the API, or (c) contract
+    drift has caused a real debugging session.
+    Recommended by Codex during WP-18.3 review (2026-05-17).
+
 ================================================================
 DECIDED AGAINST
 ================================================================

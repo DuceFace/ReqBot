@@ -176,6 +176,7 @@ bash "$SCRIPT_DIR/build-frontend.sh"
 #   Path(__file__).resolve().parent.parent / "frontend" / "dist"
 # At install time __file__ is $BUNDLE_DIR/app/api/app.py, so parent.parent is
 # $BUNDLE_DIR/app/ — copy dist there to match that resolution path exactly.
+mkdir -p "$BUNDLE_DIR/app/frontend"
 cp -r "$ROOT_DIR/frontend/dist" "$BUNDLE_DIR/app/frontend/dist"
 echo "  Frontend dist copied → $BUNDLE_DIR/app/frontend/dist/"
 

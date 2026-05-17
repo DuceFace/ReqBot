@@ -171,7 +171,7 @@ export default function TraceView() {
               <span className="font-mono">{reqId}</span> does not exist in the index.
             </p>
             <Link to={backTo} className="text-sm text-blue-600 underline">
-              ← Back to search
+              {backLabel}
             </Link>
           </div>
         </main>

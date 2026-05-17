@@ -196,11 +196,12 @@ export default function CompareView() {
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const trimmedQ = topic.trim()
-    if (!doc1 || !doc2 || !trimmedQ) return
+    if (!doc1 || !doc2 || !trimmedQ || doc1 === doc2) return
     setSearchParams({ doc1, doc2, q: trimmedQ })
   }
 
-  const canSubmit = doc1 !== '' && doc2 !== '' && topic.trim() !== ''
+  const sameDoc = doc1 !== '' && doc1 === doc2
+  const canSubmit = doc1 !== '' && doc2 !== '' && topic.trim() !== '' && !sameDoc
   // Full path string passed to trace cards so back-nav returns here
   const fromPath = location.pathname + location.search
   const totalCount = split ? split.both.length + split.doc1Only.length + split.doc2Only.length : 0
@@ -250,6 +251,11 @@ export default function CompareView() {
               </select>
             </div>
           </div>
+          {sameDoc && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              Document 1 and Document 2 must be different.
+            </p>
+          )}
           <div className="flex gap-2">
             <input
               type="text"

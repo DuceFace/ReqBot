@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import * as api from '../api/client'
@@ -53,8 +53,31 @@ export default function EvidenceView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [synthLoading, setSynthLoading] = useState(false)
+  const [synthError, setSynthError] = useState<string | null>(null)
+  const [synthText, setSynthText] = useState<string | null>(null)
+  const [synthElapsed, setSynthElapsed] = useState(0)
+  const synthGenRef = useRef(0)
+
   // Sync input with URL on browser back/forward
   useEffect(() => { setTopic(urlQ) }, [urlQ])
+
+  // Reset synthesis when topic changes
+  useEffect(() => {
+    synthGenRef.current += 1
+    setSynthLoading(false)
+    setSynthError(null)
+    setSynthText(null)
+    setSynthElapsed(0)
+  }, [urlQ])
+
+  // Elapsed timer while synthesis is running
+  useEffect(() => {
+    if (!synthLoading) return
+    setSynthElapsed(0)
+    const iv = setInterval(() => setSynthElapsed(s => s + 1), 1000)
+    return () => clearInterval(iv)
+  }, [synthLoading])
 
   // Run evidence map whenever URL param changes
   useEffect(() => {
@@ -88,6 +111,27 @@ export default function EvidenceView() {
     const trimmed = topic.trim()
     if (!trimmed) return
     setSearchParams({ q: trimmed })
+  }
+
+  function handleGenerateAnswer() {
+    if (!urlQ || synthLoading) return
+    const gen = ++synthGenRef.current
+    setSynthLoading(true)
+    setSynthError(null)
+    setSynthText(null)
+    api
+      .evidence({ topic: urlQ, top_k: 20, synthesize: true })
+      .then(res => {
+        if (synthGenRef.current !== gen) return
+        setSynthText(res.synthesis_text || null)
+      })
+      .catch((err: unknown) => {
+        if (synthGenRef.current !== gen) return
+        setSynthError(err instanceof Error ? err.message : 'Synthesis failed')
+      })
+      .finally(() => {
+        if (synthGenRef.current === gen) setSynthLoading(false)
+      })
   }
 
   const fromPath = location.pathname + location.search
@@ -134,14 +178,40 @@ export default function EvidenceView() {
                 {data.total_sources} requirement{data.total_sources !== 1 ? 's' : ''} across{' '}
                 {data.group_order.length} group{data.group_order.length !== 1 ? 's' : ''} for &ldquo;{urlQ}&rdquo;
               </p>
-              <button
-                disabled
-                title="Synthesis available in a future phase"
-                className="bg-gray-100 text-gray-400 cursor-not-allowed px-4 py-1.5 rounded text-sm font-medium border border-gray-200"
-              >
-                Generate Answer
-              </button>
+              {synthLoading ? (
+                <button
+                  disabled
+                  className="bg-gray-100 text-gray-500 cursor-not-allowed px-4 py-1.5 rounded text-sm font-medium border border-gray-200"
+                >
+                  Generating…{synthElapsed > 0 ? ` ${synthElapsed}s` : ''}
+                </button>
+              ) : (
+                <button
+                  onClick={handleGenerateAnswer}
+                  disabled={data.group_order.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                >
+                  Generate Answer
+                </button>
+              )}
             </div>
+
+            {/* Synthesis error */}
+            {synthError && (
+              <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700 mb-6">
+                Synthesis failed: {synthError}
+              </div>
+            )}
+
+            {/* Synthesis output */}
+            {synthText && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5 mb-6">
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
+                  Generated Answer
+                </p>
+                <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{synthText}</p>
+              </div>
+            )}
 
             {/* Empty state */}
             {data.group_order.length === 0 ? (

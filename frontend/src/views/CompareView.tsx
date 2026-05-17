@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { docValue } from '../utils/ui'
 import * as api from '../api/client'
 import type { ComparePayload, CompareResponse, DocsEntry } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -173,19 +174,20 @@ export default function CompareView() {
       .catch(() => { setDocsError(true) })
   }, [docsRetry])
 
-  // Normalize legacy doc_key URL params (e.g. "afi17-101") to source_pdf
-  // (e.g. "afi17-101.pdf") once docOptions are available. Old bookmarks
-  // created before the dropdown switch would otherwise produce blank selects
-  // because no <option> has a matching value. Uses replace:true to avoid a
-  // spurious history entry.
+  // Normalize legacy doc_key URL params (e.g. "afi17-101") to the canonical
+  // docValue (source_pdf when available, doc_key otherwise) once docOptions
+  // are loaded. Old bookmarks produce blank selects if no <option> value
+  // matches; this fixes them without a spurious history entry.
   useEffect(() => {
     if (!docOptions.length) return
-    const toSourcePdf = (val: string): string => {
-      if (!val || docOptions.some(d => d.source_pdf === val)) return val
-      return docOptions.find(d => d.doc_key === val)?.source_pdf ?? val
+    const toCanonical = (val: string): string => {
+      if (!val) return val
+      if (docOptions.some(d => docValue(d) === val)) return val
+      const found = docOptions.find(d => d.source_pdf === val || d.doc_key === val)
+      return found ? docValue(found) : val
     }
-    const n1 = toSourcePdf(urlDoc1)
-    const n2 = toSourcePdf(urlDoc2)
+    const n1 = toCanonical(urlDoc1)
+    const n2 = toCanonical(urlDoc2)
     if (n1 === urlDoc1 && n2 === urlDoc2) return
     const p: Record<string, string> = {}
     if (n1) p.doc1 = n1
@@ -266,8 +268,8 @@ export default function CompareView() {
               >
                 <option value="">Select document…</option>
                 {docOptions.map(d => (
-                  <option key={d.doc_key} value={d.source_pdf}>
-                    {d.source_pdf}
+                  <option key={d.doc_key} value={docValue(d)}>
+                    {docValue(d)}
                   </option>
                 ))}
               </select>
@@ -284,8 +286,8 @@ export default function CompareView() {
               >
                 <option value="">Select document…</option>
                 {docOptions.map(d => (
-                  <option key={d.doc_key} value={d.source_pdf}>
-                    {d.source_pdf}
+                  <option key={d.doc_key} value={docValue(d)}>
+                    {docValue(d)}
                   </option>
                 ))}
               </select>

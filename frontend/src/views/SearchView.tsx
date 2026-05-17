@@ -9,6 +9,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import SynthesisBox from '../components/SynthesisBox'
 import NavBar from '../components/NavBar'
 import { useSynthesis } from '../hooks/useSynthesis'
+import { docValue } from '../utils/ui'
 
 export default function SearchView() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -153,8 +154,8 @@ export default function SearchView() {
           >
             <option value="">All documents</option>
             {docOptions.map(d => (
-              <option key={d.doc_key} value={d.source_pdf}>
-                {d.source_pdf}
+              <option key={d.doc_key} value={docValue(d)}>
+                {docValue(d)}
               </option>
             ))}
           </select>

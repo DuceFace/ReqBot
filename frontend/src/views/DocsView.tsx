@@ -5,6 +5,7 @@ import type { DocsEntry, DocsResponse } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 import NavBar from '../components/NavBar'
+import { docValue } from '../utils/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ function DocRow({ entry }: { entry: DocsEntry }) {
           </p>
         </div>
         <Link
-          to={`/search?doc=${encodeURIComponent(entry.source_pdf)}`}
+          to={`/search?doc=${encodeURIComponent(docValue(entry))}`}
           className="shrink-0 text-sm text-blue-600 hover:underline whitespace-nowrap"
         >
           Search this doc ↗

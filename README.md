@@ -1,6 +1,6 @@
 # ReqBot
 
-ReqBot is a local-first compliance requirements intelligence engine. It extracts cybersecurity requirements from regulatory PDFs, stores the pipeline artifacts as JSONL, indexes the results into Qdrant, and provides a CLI, interactive shell, and web GUI for search, comparison, and evidence mapping.
+ReqBot is a local-first compliance requirements intelligence engine. It extracts cybersecurity requirements from regulatory PDFs, stores the pipeline artifacts as JSONL, indexes the results into Qdrant, and provides a CLI, interactive shell, and web GUI for search and trace.
 
 Everything is designed to run on local infrastructure with Ollama + Qdrant. JSONL is the system of record; Qdrant is a rebuildable index.
 

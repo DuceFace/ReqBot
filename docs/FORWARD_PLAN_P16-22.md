@@ -2,7 +2,7 @@
 
 **Status:** Active — Phases 15–18 complete, Phase 19 next
 **Date:** 2026-04-05 (updated 2026-05-17)
-**Intent:** Gated phases with clear success criteria from Phase 16 through Phase 22. Phases 16–18 are fully defined here. Phases 19–22 (domain profiles, checklist generation, evidence requests, gap analysis) are defined in `docs/PRODUCT_PRD.md`.
+**Intent:** Gated phases with clear success criteria from Phase 16 through Phase 22. Phases 16–18 are fully defined here. Phase 19 (GUI capability expansion — compare, evidence, synthesis, docs, polish) is defined in `docs/PHASE19_REQUIREMENTS.md`. Phases 20–22 (domain profiles, checklist generation, evidence requests, gap analysis) are defined in `docs/PRODUCT_PRD.md`.
 
 *This document is the single source of truth for Phase 16–18 planning. It incorporates planning from Claude, architectural review from GPT, and risk analysis from Gemini. It is intended as the Codex input and execution reference.*
 

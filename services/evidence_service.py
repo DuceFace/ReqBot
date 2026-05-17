@@ -46,6 +46,7 @@ def build(
     document_ids: list | None = None,
     domain_tags: list | None = None,
     requirement_types: list | None = None,
+    synthesize: bool = True,
     synthesis_backend: str = "local",
     synthesis_model: str = "",
     provider: str = "",
@@ -211,41 +212,42 @@ def build(
     total_sources = sum(len(g["sources"]) for g in groups.values())
 
     # --- LLM synthesis — Compliance Auditor Executive Summary ---
-    evidence_lines: list[str] = []
-    for i, ref in enumerate(group_order, 1):
-        g = groups[ref]
-        rep = g["representative"]
-        # description first: for LLM synthesis, an interpretive description yields a
-        # more coherent auditor summary than a raw verbatim quote. source_quote remains
-        # the canonical asset in all other contexts (trace, evidence table rows).
-        primary = rep.get("description") or rep.get("source_quote") or "(no text)"
-        evidence_lines.append(
-            f"[{i}] Control: {ref}  |  Sources: {len(g['sources'])}\n"
-            f"    {primary}"
-        )
-
-    auditor_prompt = _EVIDENCE_AUDITOR_PROMPT.format(
-        query=query,
-        group_count=len(groups),
-        source_count=total_sources,
-        evidence_summary="\n\n".join(evidence_lines),
-    )
-
     synthesis_text: str = ""
-    try:
-        from core import synthesis as _syn
-        synthesis_text = _syn.synthesize(
-            question="",
-            evidence="",
-            backend=synthesis_backend,
-            model=synthesis_model,
-            ollama_url=ollama_url,
-            provider=provider,
-            api_key=api_key,
-            raw_prompt=auditor_prompt,
+    if synthesize:
+        evidence_lines: list[str] = []
+        for i, ref in enumerate(group_order, 1):
+            g = groups[ref]
+            rep = g["representative"]
+            # description first: for LLM synthesis, an interpretive description yields a
+            # more coherent auditor summary than a raw verbatim quote. source_quote remains
+            # the canonical asset in all other contexts (trace, evidence table rows).
+            primary = rep.get("description") or rep.get("source_quote") or "(no text)"
+            evidence_lines.append(
+                f"[{i}] Control: {ref}  |  Sources: {len(g['sources'])}\n"
+                f"    {primary}"
+            )
+
+        auditor_prompt = _EVIDENCE_AUDITOR_PROMPT.format(
+            query=query,
+            group_count=len(groups),
+            source_count=total_sources,
+            evidence_summary="\n\n".join(evidence_lines),
         )
-    except Exception as e:
-        log.warning("Evidence synthesis failed (%s) — producing evidence pack without summary", e)
+
+        try:
+            from core import synthesis as _syn
+            synthesis_text = _syn.synthesize(
+                question="",
+                evidence="",
+                backend=synthesis_backend,
+                model=synthesis_model,
+                ollama_url=ollama_url,
+                provider=provider,
+                api_key=api_key,
+                raw_prompt=auditor_prompt,
+            )
+        except Exception as e:
+            log.warning("Evidence synthesis failed (%s) — producing evidence pack without summary", e)
 
     return {
         "query": query,

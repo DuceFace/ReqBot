@@ -119,7 +119,18 @@ ACTIVE BACKLOG (good ideas, not blocking)
     Depends on WP-15.5 reranker being calibrated first.
     Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
 
-16. ZOD RUNTIME VALIDATION FOR FRONTEND API RESPONSES — DEFERRED POST-PHASE 18
+16. VITE MAJOR VERSION UPGRADE (5 → 8) — DEFERRED POST-PHASE 18
+    Dependabot flagged GHSA-67mh-4wv8-2f99 (esbuild dev-server CORS) and
+    proposed bumping vite from 5.4.21 to 8.0.13. Codex reviewed and deferred:
+    the advisory only affects the Vite dev server, not the built static files
+    shipped via `reqbot serve`. Vite 8 also raises the Node requirement to
+    ^20.19.0 || >=22.12.0 and changes the underlying bundling stack — this is
+    a toolchain migration, not a narrow patch. Handle as an intentional upgrade
+    task once Phase 18 stabilises; verify @vitejs/plugin-react and Tailwind
+    postcss integration still work after the jump.
+    Flagged: 2026-05-17. Advisory: GHSA-67mh-4wv8-2f99.
+
+17. ZOD RUNTIME VALIDATION FOR FRONTEND API RESPONSES — DEFERRED POST-PHASE 18
     TypeScript types in frontend/src/api/types.ts only protect at compile time.
     If the Python backend returns an unexpected shape (null where a string is
     expected, missing field, etc.) the frontend silently misbehaves.

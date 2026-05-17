@@ -23,6 +23,7 @@ def compare(
     ollama_url: str,
     top_k: int = 10,
     document_ids: list | None = None,
+    doc_keys: list | None = None,
 ) -> dict:
     """Compare a control ID or free-text query across all indexed documents.
 
@@ -52,6 +53,11 @@ def compare(
         ) from e
 
     document_ids = document_ids or []
+    # doc_keys are source_pdf values (e.g. "afi17-101.pdf"), resolved by the caller.
+    # Normalise suffix defensively in case a caller omits it.
+    _source_pdf_filter: list[str] = [
+        k if k.lower().endswith(".pdf") else k + ".pdf" for k in (doc_keys or [])
+    ]
     is_control_id = bool(CONTROL_ID_RE.match(query.strip()))
 
     try:
@@ -69,7 +75,11 @@ def compare(
         conditions: list = [
             _qm.FieldCondition(key="source_ref", match=_qm.MatchValue(value=query))
         ]
-        if document_ids:
+        if _source_pdf_filter:
+            conditions.append(
+                _qm.FieldCondition(key="source_pdf", match=_qm.MatchAny(any=_source_pdf_filter))
+            )
+        elif document_ids:
             conditions.append(
                 _qm.FieldCondition(key="document_id", match=_qm.MatchAny(any=document_ids))
             )
@@ -128,12 +138,16 @@ def compare(
         raise RuntimeError(f"Sparse embedding failed: {e}") from e
 
     prefetch_limit = max(100, top_k * 5)
-    filter_obj = (
-        _qm.Filter(must=[
+    if _source_pdf_filter:
+        filter_obj = _qm.Filter(must=[
+            _qm.FieldCondition(key="source_pdf", match=_qm.MatchAny(any=_source_pdf_filter))
+        ])
+    elif document_ids:
+        filter_obj = _qm.Filter(must=[
             _qm.FieldCondition(key="document_id", match=_qm.MatchAny(any=document_ids))
         ])
-        if document_ids else None
-    )
+    else:
+        filter_obj = None
 
     try:
         hits = client.query_points(

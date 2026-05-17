@@ -1,6 +1,6 @@
 GRC Pipeline - Future Improvements
 ================================================================
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 Reviews incorporated: ChatGPT, Claude, Gemini
 
 ================================================================
@@ -140,6 +140,24 @@ ACTIVE BACKLOG (good ideas, not blocking)
     Phase 19+, (b) a second team is writing against the API, or (c) contract
     drift has caused a real debugging session.
     Recommended by Codex during WP-18.3 review (2026-05-17).
+
+18. EVIDENCE VIEW: CONFIGURABLE top_k — DEFERRED POST-WP-19.3
+    POST /api/evidence currently called with hardcoded top_k=20. A dropdown
+    or input in the Evidence view would let users tune result depth (e.g.
+    5 / 10 / 20 / 50). Low priority until users hit the 20-result ceiling
+    in practice. The EvidenceRequest type already has top_k?: number so
+    no API change needed.
+    Flagged by Gemini during WP-19.3 review (2026-05-17).
+
+19. EVIDENCE VIEW: EXPANDABLE SOURCES AND CONTEXT PER GROUP — DEFERRED POST-WP-19.3
+    Each evidence group currently shows only the representative requirement.
+    groups[ref].sources holds all matched requirements for the group, and
+    groups[ref].context_text holds the raw chunk window. An expandable
+    "Show N more sources" section per group would expose the full evidence
+    depth, and showing context_text would give auditors the verbatim
+    surrounding text. Hold until synthesis (WP-19.5) lands — the layout
+    will change once a synthesis panel is above the groups.
+    Flagged by Gemini during WP-19.3 review (2026-05-17).
 
 ================================================================
 DECIDED AGAINST

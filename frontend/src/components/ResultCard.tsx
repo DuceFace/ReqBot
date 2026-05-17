@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import type { AskResult } from '../api/types'
 
 interface Props {
@@ -12,6 +12,7 @@ function pageRange(start?: number, end?: number): string | null {
 }
 
 export default function ResultCard({ result }: Props) {
+  const location = useLocation()
   const snippet =
     result.description.length > 220
       ? result.description.slice(0, 220) + '…'
@@ -22,6 +23,9 @@ export default function ResultCard({ result }: Props) {
   return (
     <Link
       to={`/trace/${encodeURIComponent(result.requirement_id)}`}
+      // Pass the current search URL so TraceView can render "← Back to search"
+      // with the query intact (e.g. /search?q=encryption&doc=AFI-17-101).
+      state={{ from: location.search }}
       className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-sm transition-all no-underline"
     >
       <div className="flex items-center justify-between mb-1.5 gap-4">

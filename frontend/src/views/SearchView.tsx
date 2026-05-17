@@ -35,12 +35,19 @@ export default function SearchView() {
   }, [])
 
   // Run search whenever the committed query, doc filter, or retry count changes.
+  // A `cancelled` flag prevents stale responses from superseded requests
+  // overwriting the UI when the query changes before the previous fetch completes.
   useEffect(() => {
     if (!q) {
+      // Reset all search UI — previously only results/retrievalMs were cleared,
+      // leaving stale error banners and loading indicators after navigating back.
       setResults(null)
       setRetrievalMs(null)
+      setError(null)
+      setLoading(false)
       return
     }
+    let cancelled = false
     setLoading(true)
     setError(null)
     api
@@ -50,13 +57,18 @@ export default function SearchView() {
         document_ids: doc ? [doc] : undefined,
       })
       .then(res => {
+        if (cancelled) return
         setResults(res.results)
         setRetrievalMs(res.metadata.retrieval_ms)
       })
       .catch((err: unknown) => {
+        if (cancelled) return
         setError(err instanceof Error ? err.message : 'Search failed')
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
     // retries intentionally included so the retry button can re-run
     // the same query without changing the URL params.
     // eslint-disable-next-line react-hooks/exhaustive-deps

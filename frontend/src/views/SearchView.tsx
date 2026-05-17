@@ -5,7 +5,7 @@ import * as api from '../api/client'
 import type { AskResult, DocsEntry } from '../api/types'
 import ResultCard from '../components/ResultCard'
 import LoadingSpinner from '../components/LoadingSpinner'
-import StatusDot from '../components/StatusDot'
+import NavBar from '../components/NavBar'
 
 export default function SearchView() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -93,11 +93,7 @@ export default function SearchView() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <span className="text-xl font-bold text-gray-900">ReqBot</span>
-        <StatusDot />
-      </header>
+      <NavBar />
 
       {/* Main */}
       <main className="max-w-4xl mx-auto px-6 py-8">

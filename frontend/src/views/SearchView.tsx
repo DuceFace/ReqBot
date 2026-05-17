@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as api from '../api/client'
@@ -24,10 +24,33 @@ export default function SearchView() {
   // Incrementing this triggers a retry without changing q or doc.
   const [retries, setRetries] = useState(0)
 
+  const [synthLoading, setSynthLoading] = useState(false)
+  const [synthError, setSynthError] = useState<string | null>(null)
+  const [synthText, setSynthText] = useState<string | null>(null)
+  const [synthElapsed, setSynthElapsed] = useState(0)
+  const synthCancelledRef = useRef(false)
+
   // Sync input field when q changes via browser back/forward.
   useEffect(() => {
     setInput(q)
   }, [q])
+
+  // Reset synthesis when the committed query or doc filter changes.
+  useEffect(() => {
+    synthCancelledRef.current = true
+    setSynthLoading(false)
+    setSynthError(null)
+    setSynthText(null)
+    setSynthElapsed(0)
+  }, [q, doc])
+
+  // Elapsed timer while synthesis is running.
+  useEffect(() => {
+    if (!synthLoading) return
+    setSynthElapsed(0)
+    const iv = setInterval(() => setSynthElapsed(s => s + 1), 1000)
+    return () => clearInterval(iv)
+  }, [synthLoading])
 
   // Load document list once on mount for the filter dropdown.
   useEffect(() => {
@@ -81,6 +104,32 @@ export default function SearchView() {
     const params: Record<string, string> = { q: trimmed }
     if (doc) params.doc = doc
     setSearchParams(params)
+  }
+
+  function handleGenerateAnswer() {
+    if (!q || synthLoading) return
+    synthCancelledRef.current = false
+    setSynthLoading(true)
+    setSynthError(null)
+    setSynthText(null)
+    api
+      .ask({
+        question: q,
+        top_k: 20,
+        document_ids: doc ? [doc] : undefined,
+        synthesize: true,
+      })
+      .then(res => {
+        if (synthCancelledRef.current) return
+        setSynthText(res.metadata.synthesis || null)
+      })
+      .catch((err: unknown) => {
+        if (synthCancelledRef.current) return
+        setSynthError(err instanceof Error ? err.message : 'Synthesis failed')
+      })
+      .finally(() => {
+        if (!synthCancelledRef.current) setSynthLoading(false)
+      })
   }
 
   function handleDocChange(e: ChangeEvent<HTMLSelectElement>) {
@@ -155,10 +204,46 @@ export default function SearchView() {
           <>
             <div className="flex items-center justify-between mb-4 text-sm text-gray-500">
               <span>Results ({results.length})</span>
-              {retrievalMs !== null && (
-                <span className="tabular-nums">{retrievalMs.toFixed(0)} ms</span>
-              )}
+              <div className="flex items-center gap-3">
+                {retrievalMs !== null && (
+                  <span className="tabular-nums">{retrievalMs.toFixed(0)} ms</span>
+                )}
+                {results.length > 0 && (
+                  synthLoading ? (
+                    <button
+                      disabled
+                      className="bg-gray-100 text-gray-500 cursor-not-allowed px-3 py-1 rounded text-xs font-medium border border-gray-200"
+                    >
+                      Generating…{synthElapsed > 0 ? ` ${synthElapsed}s` : ''}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleGenerateAnswer}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                    >
+                      Generate Answer
+                    </button>
+                  )
+                )}
+              </div>
             </div>
+
+            {/* Synthesis error */}
+            {synthError && (
+              <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700 mb-4">
+                Synthesis failed: {synthError}
+              </div>
+            )}
+
+            {/* Synthesis output */}
+            {synthText && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5 mb-4">
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
+                  Generated Answer
+                </p>
+                <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{synthText}</p>
+              </div>
+            )}
 
             {results.length === 0 ? (
               <p className="text-sm text-gray-500">

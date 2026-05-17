@@ -210,6 +210,8 @@ raw_pdfs/
 Backups/
 build/linux-x86_64/
 dist/
+frontend/dist/
+frontend/node_modules/
 archive/*.log
 
 # WP-3 review scratch files (CSV is generated from JSONL; JSONL is source of truth)

@@ -164,6 +164,27 @@ export default function CompareView() {
     api.docs().then(d => setDocOptions(d.docs)).catch(() => { /* silent */ })
   }, [])
 
+  // Normalize legacy doc_key URL params (e.g. "afi17-101") to source_pdf
+  // (e.g. "afi17-101.pdf") once docOptions are available. Old bookmarks
+  // created before the dropdown switch would otherwise produce blank selects
+  // because no <option> has a matching value. Uses replace:true to avoid a
+  // spurious history entry.
+  useEffect(() => {
+    if (!docOptions.length) return
+    const toSourcePdf = (val: string): string => {
+      if (!val || docOptions.some(d => d.source_pdf === val)) return val
+      return docOptions.find(d => d.doc_key === val)?.source_pdf ?? val
+    }
+    const n1 = toSourcePdf(urlDoc1)
+    const n2 = toSourcePdf(urlDoc2)
+    if (n1 === urlDoc1 && n2 === urlDoc2) return
+    const p: Record<string, string> = {}
+    if (n1) p.doc1 = n1
+    if (n2) p.doc2 = n2
+    if (urlQ) p.q = urlQ
+    setSearchParams(p, { replace: true })
+  }, [docOptions, urlDoc1, urlDoc2, urlQ, setSearchParams])
+
   // Run compare whenever URL params change and all three are present
   useEffect(() => {
     if (!urlDoc1 || !urlDoc2 || !urlQ) {

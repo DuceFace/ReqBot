@@ -76,7 +76,11 @@ export default function TraceView() {
   // from now carries the full path (e.g. "/compare?doc1=...&q=..." or "/search?q=...").
   const fromPath = (location.state as { from?: string } | null)?.from ?? ''
   const backTo = fromPath || '/search'
-  const backLabel = backTo.startsWith('/compare') ? '← Back to compare' : '← Back to search'
+  const backLabel = backTo.startsWith('/compare')
+    ? '← Back to compare'
+    : backTo.startsWith('/evidence')
+    ? '← Back to evidence'
+    : '← Back to search'
 
   const [data, setData] = useState<TraceResponse | null>(null)
   const [loading, setLoading] = useState(true)

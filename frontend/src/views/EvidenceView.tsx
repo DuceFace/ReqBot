@@ -11,7 +11,7 @@ import { pageRange } from '../utils/ui'
 
 function EvidenceCard({ req, from }: { req: EvidenceRequirement; from: string }) {
   if (!req.requirement_id) return null
-  const text = req.description || req.source_quote || ''
+  const text = req.source_quote || req.description || ''
   const snippet = text.length > 220 ? text.slice(0, 220) + '…' : text
   const pages = pageRange(req.page_start, req.page_end)
 

@@ -5,17 +5,22 @@ import * as api from '../api/client'
 import { NotFoundError } from '../api/client'
 import type { TraceResponse, Requirement } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorBanner from '../components/ErrorBanner'
+import StatusDot from '../components/StatusDot'
 import { pageRange } from '../utils/ui'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function Header({ backTo, backLabel }: { backTo: string; backLabel: string }) {
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-      <Link to={backTo} className="text-sm text-blue-600 hover:underline shrink-0">
-        {backLabel}
-      </Link>
-      <span className="text-xl font-bold text-gray-900">ReqBot</span>
+    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <Link to={backTo} className="text-sm text-blue-600 hover:underline shrink-0">
+          {backLabel}
+        </Link>
+        <span className="text-xl font-bold text-gray-900">ReqBot</span>
+      </div>
+      <StatusDot />
     </header>
   )
 }
@@ -53,7 +58,7 @@ function CrossMatchCard({ match, from }: { match: Requirement; from: string }) {
           {match.requirement_id}
         </span>
         <div className="flex items-center gap-3 text-xs text-gray-400 shrink-0">
-          <span>{match.document_id}</span>
+          <span>{match.source_pdf}</span>
           {pages && <span>{pages}</span>}
         </div>
       </div>
@@ -189,15 +194,7 @@ export default function TraceView() {
       <div className="min-h-screen bg-gray-50">
         <Header backTo={backTo} backLabel={backLabel} />
         <main className="max-w-4xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700">
-            <span>{error}</span>
-            <button
-              onClick={() => setRetries(r => r + 1)}
-              className="ml-4 underline hover:no-underline shrink-0"
-            >
-              Retry
-            </button>
-          </div>
+          <ErrorBanner message={error} onRetry={() => setRetries(r => r + 1)} />
         </main>
       </div>
     )
@@ -220,7 +217,7 @@ export default function TraceView() {
             {req.requirement_id}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {req.document_id}
+            {req.source_pdf}
             {req.section_title_path && <> · {req.section_title_path}</>}
             {pages && <> · {pages}</>}
           </p>

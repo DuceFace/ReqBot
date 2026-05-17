@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import * as api from '../api/client'
 import type { DocsEntry, DocsResponse } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorBanner from '../components/ErrorBanner'
 import NavBar from '../components/NavBar'
+import { docValue } from '../utils/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,7 +30,7 @@ function DocRow({ entry }: { entry: DocsEntry }) {
           </p>
         </div>
         <Link
-          to={`/search?doc=${encodeURIComponent(entry.source_pdf)}`}
+          to={`/search?doc=${encodeURIComponent(docValue(entry))}`}
           className="shrink-0 text-sm text-blue-600 hover:underline whitespace-nowrap"
         >
           Search this doc ↗
@@ -126,11 +128,7 @@ export default function DocsView() {
         {loading && <LoadingSpinner />}
 
         {/* Error */}
-        {!loading && error && (
-          <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {!loading && error && <ErrorBanner message={error} />}
 
         {/* Results */}
         {!loading && !error && data && (

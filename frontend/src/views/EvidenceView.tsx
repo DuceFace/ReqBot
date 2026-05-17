@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import * as api from '../api/client'
 import type { EvidenceRequirement, EvidenceResponse } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorBanner from '../components/ErrorBanner'
+import SynthesisBox from '../components/SynthesisBox'
 import NavBar from '../components/NavBar'
+import { useSynthesis } from '../hooks/useSynthesis'
 import { pageRange } from '../utils/ui'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -53,31 +56,14 @@ export default function EvidenceView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [synthLoading, setSynthLoading] = useState(false)
-  const [synthError, setSynthError] = useState<string | null>(null)
-  const [synthText, setSynthText] = useState<string | null>(null)
-  const [synthElapsed, setSynthElapsed] = useState(0)
-  const synthGenRef = useRef(0)
+  const synth = useSynthesis()
+  const { reset: synthReset } = synth
 
   // Sync input with URL on browser back/forward
   useEffect(() => { setTopic(urlQ) }, [urlQ])
 
   // Reset synthesis when topic changes
-  useEffect(() => {
-    synthGenRef.current += 1
-    setSynthLoading(false)
-    setSynthError(null)
-    setSynthText(null)
-    setSynthElapsed(0)
-  }, [urlQ])
-
-  // Elapsed timer while synthesis is running
-  useEffect(() => {
-    if (!synthLoading) return
-    setSynthElapsed(0)
-    const iv = setInterval(() => setSynthElapsed(s => s + 1), 1000)
-    return () => clearInterval(iv)
-  }, [synthLoading])
+  useEffect(() => { synthReset() }, [urlQ, synthReset])
 
   // Run evidence map whenever URL param changes
   useEffect(() => {
@@ -114,24 +100,11 @@ export default function EvidenceView() {
   }
 
   function handleGenerateAnswer() {
-    if (!urlQ || synthLoading) return
-    const gen = ++synthGenRef.current
-    setSynthLoading(true)
-    setSynthError(null)
-    setSynthText(null)
-    api
-      .evidence({ topic: urlQ, top_k: 20, synthesize: true })
-      .then(res => {
-        if (synthGenRef.current !== gen) return
-        setSynthText(res.synthesis_text || null)
-      })
-      .catch((err: unknown) => {
-        if (synthGenRef.current !== gen) return
-        setSynthError(err instanceof Error ? err.message : 'Synthesis failed')
-      })
-      .finally(() => {
-        if (synthGenRef.current === gen) setSynthLoading(false)
-      })
+    if (!urlQ || synth.loading) return
+    synth.run(() =>
+      api.evidence({ topic: urlQ, top_k: 20, synthesize: true })
+        .then(res => res.synthesis_text || null)
+    )
   }
 
   const fromPath = location.pathname + location.search
@@ -163,11 +136,7 @@ export default function EvidenceView() {
         {loading && <LoadingSpinner />}
 
         {/* Error */}
-        {!loading && error && (
-          <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {!loading && error && <ErrorBanner message={error} />}
 
         {/* Results */}
         {!loading && !error && data && (
@@ -178,12 +147,12 @@ export default function EvidenceView() {
                 {data.total_sources} requirement{data.total_sources !== 1 ? 's' : ''} across{' '}
                 {data.group_order.length} group{data.group_order.length !== 1 ? 's' : ''} for &ldquo;{urlQ}&rdquo;
               </p>
-              {synthLoading ? (
+              {synth.loading ? (
                 <button
                   disabled
                   className="bg-gray-100 text-gray-500 cursor-not-allowed px-4 py-1.5 rounded text-sm font-medium border border-gray-200"
                 >
-                  Generating…{synthElapsed > 0 ? ` ${synthElapsed}s` : ''}
+                  Generating…{synth.elapsed > 0 ? ` ${synth.elapsed}s` : ''}
                 </button>
               ) : (
                 <button
@@ -197,19 +166,16 @@ export default function EvidenceView() {
             </div>
 
             {/* Synthesis error */}
-            {synthError && (
-              <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-700 mb-6">
-                Synthesis failed: {synthError}
+            {synth.error && (
+              <div className="mb-6">
+                <ErrorBanner message={`Synthesis failed: ${synth.error}`} />
               </div>
             )}
 
             {/* Synthesis output */}
-            {synthText && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5 mb-6">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
-                  Generated Answer
-                </p>
-                <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{synthText}</p>
+            {synth.text && (
+              <div className="mb-6">
+                <SynthesisBox text={synth.text} />
               </div>
             )}
 

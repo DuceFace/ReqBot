@@ -8,10 +8,8 @@ interface Props {
 
 export default function ResultCard({ result }: Props) {
   const location = useLocation()
-  const snippet =
-    result.description.length > 220
-      ? result.description.slice(0, 220) + '…'
-      : result.description
+  const text = result.source_quote || result.description
+  const snippet = text.length > 220 ? text.slice(0, 220) + '…' : text
 
   const pages = pageRange(result.page_start, result.page_end)
 
@@ -28,7 +26,7 @@ export default function ResultCard({ result }: Props) {
           {result.requirement_id}
         </span>
         <div className="flex items-center gap-3 text-xs text-gray-400 shrink-0">
-          <span>{result.document_id}</span>
+          <span>{result.source_pdf}</span>
           {pages && <span>{pages}</span>}
           <span className="font-medium text-gray-600 tabular-nums">
             {result.score.toFixed(3)}

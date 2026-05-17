@@ -70,7 +70,31 @@ pipeline/
   embed_context_index.py       Step F2: chunks JSONL              → Qdrant grc_context
 
 models/            ← Shared data schemas (populated in Phase 16C+)
+
+frontend/          ← React + TypeScript + Tailwind web GUI (Phase 18+)
+  package.json     ← dependencies: react, react-router-dom, tailwindcss
+  vite.config.ts   ← Vite bundler; dev proxy /api → :8000; no custom base:
+  src/
+    App.tsx        ← BrowserRouter + Routes (/, /search, /trace/:reqId, *)
+    api/
+      client.ts    ← typed fetch wrappers (ask, trace, docs, status)
+      types.ts     ← TypeScript types mirroring API contract (Phase 16C)
+    views/
+      SearchView.tsx   ← query + doc filter + results; URL-driven state (?q=&doc=)
+      TraceView.tsx    ← full requirement detail + cross-matches + context expand
+      NotFoundView.tsx ← catch-all 404 view
+    components/
+      ResultCard.tsx   ← result row; passes router state for back-link preservation
+      StatusDot.tsx    ← polls /api/status every 30s; green/red health indicator
+      LoadingSpinner.tsx
+    utils/
+      ui.ts        ← shared helpers (pageRange)
+  dist/            ← Vite production build output (gitignored; served by reqbot serve)
 ```
+
+**Build:** `bash build/build-frontend.sh` (npm ci + npm run build → frontend/dist/).
+`bundle.sh` runs this automatically and copies dist into the installer tree.
+`reqbot serve` detects dist/index.html and serves the GUI; falls back to API-only mode if absent.
 
 Each package contains an `__init__.py`. Every entry point injects its repo root (or
 bundle `app/`) onto `sys.path` at startup, enabling both standalone execution and
@@ -177,13 +201,24 @@ Both service URLs are configurable via `~/.config/reqbot/config.json` or environ
 | `openai` | `openai` | core/synthesis (optional) | Remote synthesis; lazy import |
 | `fastapi` | `fastapi` | api/ | REST API framework (Phase 16C+) |
 | `uvicorn` | `uvicorn` | cli/reqbot.py serve | ASGI server; lazy import; only needed for `reqbot serve` |
+| `aiofiles` | `aiofiles` | Starlette dep tree | Explicit pin; pulled in by Starlette; Phase 18+ |
 
 **Install (dev/system Python):**
 ```bash
-pip3 install --break-system-packages pymupdf pdfplumber fastembed qdrant-client ollama requests
+pip3 install --break-system-packages -r requirements.txt
 # Optional for remote synthesis:
 pip3 install --break-system-packages anthropic openai
 ```
+
+**Frontend build deps (dev machine only — end users receive pre-built dist/):**
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Node.js | 20 LTS | JavaScript runtime for Vite build |
+| npm | 10+ | Package manager (lockfile committed) |
+| Vite | 5 | Bundler + dev server |
+| TypeScript | 5 | Type checking |
+| Tailwind CSS | 3 | Utility-first CSS (purged at build time) |
 
 ### Models (Ollama)
 
@@ -266,25 +301,40 @@ PDF file
 **Source of record:** JSONL files on disk. Qdrant is a rebuildable index — always rebuild from
 JSONL via `reqbot reindex`, never treat Qdrant as authoritative.
 
-### Query Flow (ask / compare / evidence)
+### Query Flow (ask / compare / evidence / GUI)
 
 ```
-User query string
-  │
+Browser (SearchView)            CLI (reqbot ask)
+  │  POST /api/ask                │  cmd_ask()
+  │                               │
+  └──────────────┬────────────────┘
+                 ▼
+        ask_service.ask()
+                 │
+                 ▼
+        core/ask.retrieve()
+                 │
   ▼ Query rewriting   [Ollama: llama3.1:8b — expands query, extracts control IDs, detects domain tags]
 Rewritten query + control ID hints
   │
   ▼ Hybrid search     [nomic-embed-text dense + fastembed BM25 sparse → RRF fusion]
 Top-K results from Qdrant grc_requirements
   │
-  ├─▶ (if --context) Fetch surrounding chunks from Qdrant grc_context
+  ├─▶ (if context=true / --context) Fetch surrounding chunks from Qdrant grc_context
   │
-  ▼ (if --synthesize) synthesis.py
+  ▼ (if --synthesize; CLI only in Phase 18) synthesis.py
     ├─▶ Local: Ollama qwen2.5:14b
     └─▶ Remote: Anthropic claude-sonnet-4-6 or OpenAI gpt-4o
   │
-  ▼ Formatted output to stdout (or --output file for evidence)
+  ├─▶ CLI: Formatted output to stdout (or --output file for evidence)
+  └─▶ GUI: JSON → SearchView results list → TraceView on click
 ```
+
+**GUI-specific flows (Phase 18):**
+- `GET /api/trace/{req_id}` → `trace_service.trace()` → TraceView (full detail + cross-matches)
+- `GET /api/trace/{req_id}?context=true` → same service, triggers context window fetch from grc_context
+- `GET /api/docs` → `docs_service.list_docs()` → SearchView document filter dropdown
+- `GET /api/status` → `status_service.check()` → StatusDot (polls every 30s)
 
 ---
 

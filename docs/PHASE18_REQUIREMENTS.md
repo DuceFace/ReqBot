@@ -1,6 +1,6 @@
 # ReqBot — Phase 18: Minimal GUI (Demo-Focused)
 
-**Status:** Draft — pending Codex + Gemini review  
+**Status:** COMPLETE 2026-05-17  
 **Date:** 2026-05-16  
 **Preceded by:** Phase 17 (Setup + Environment Standardization — COMPLETE)  
 **Followed by:** Phase 19 (Domain Profile Foundation — per PRODUCT_PRD.md)

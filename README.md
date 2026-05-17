@@ -1,10 +1,10 @@
 # ReqBot
 
-ReqBot is a local-first compliance requirements intelligence engine. It extracts cybersecurity requirements from regulatory PDFs, stores the pipeline artifacts as JSONL, indexes the results into Qdrant, and provides a CLI and interactive shell for search, comparison, and evidence mapping.
+ReqBot is a local-first compliance requirements intelligence engine. It extracts cybersecurity requirements from regulatory PDFs, stores the pipeline artifacts as JSONL, indexes the results into Qdrant, and provides a CLI, interactive shell, and web GUI for search, comparison, and evidence mapping.
 
 Everything is designed to run on local infrastructure with Ollama + Qdrant. JSONL is the system of record; Qdrant is a rebuildable index.
 
-Run `reqbot docs` to see your indexed documents and requirement counts.
+Run `reqbot serve` to start the web interface. Run `reqbot docs` to see your indexed documents and requirement counts.
 
 ## What It Does
 
@@ -13,6 +13,7 @@ Run `reqbot docs` to see your indexed documents and requirement counts.
 - Separates extraction and enrichment models so each stage can be tuned independently.
 - Supports hybrid retrieval over requirements plus optional raw chunk context lookup.
 - Rebuilds Qdrant from existing JSONL without re-running extraction.
+- Serves a web GUI (`reqbot serve`) — search, filter, and drill into full requirement provenance in a browser.
 
 ## Requirements
 
@@ -55,6 +56,9 @@ Opens an interactive wizard for configuring remote Ollama/Qdrant URLs, custom mo
 ## Quick Start
 
 ```bash
+# Web interface (search + trace in a browser)
+reqbot serve          # then open http://localhost:8000
+
 # Interactive shell
 reqbot
 
@@ -191,6 +195,21 @@ List indexed documents and requirement counts.
 ```bash
 reqbot docs
 ```
+
+### `serve`
+
+Start the API server and web GUI.
+
+```bash
+reqbot serve [--host H] [--port P]
+```
+
+Defaults to `127.0.0.1:8000`. Opens a browser-accessible interface at `http://localhost:8000`:
+
+- **Search view** — query the corpus, filter by document, click through to trace
+- **Trace view** — full requirement detail: description, source quote, provenance, cross-framework matches, optional source context expansion
+
+The API is always available at `/api/` regardless of whether the frontend build is present. Swagger UI at `/api-docs`.
 
 ### `status`
 

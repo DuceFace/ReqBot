@@ -1,7 +1,7 @@
 # ReqBot — Forward Plan (Phases 16–22)
 
-**Status:** Active — Phase 15 complete, Phase 16 next
-**Date:** 2026-04-05 (updated 2026-05-16)
+**Status:** Active — Phases 15–18 complete, Phase 19 next
+**Date:** 2026-04-05 (updated 2026-05-17)
 **Intent:** Gated phases with clear success criteria from Phase 16 through Phase 22. Phases 16–18 are fully defined here. Phases 19–22 (domain profiles, checklist generation, evidence requests, gap analysis) are defined in `docs/PRODUCT_PRD.md`.
 
 *This document is the single source of truth for Phase 16–18 planning. It incorporates planning from Claude, architectural review from GPT, and risk analysis from Gemini. It is intended as the Codex input and execution reference.*

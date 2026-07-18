@@ -23,6 +23,8 @@ def list_docs(processed_dir: Path) -> dict:
       total_reqs: int
       total_docs: int
     """
+    if not processed_dir.exists():
+        raise FileNotFoundError(f"processed_dir not found: {processed_dir}")
     all_files = sorted(processed_dir.rglob("*_requirements_normalized.jsonl"))
 
     # Deduplicate by doc stem — keep the most recently modified file per document

@@ -653,59 +653,69 @@ def run(
 
     cached_hashes: set[str] = set()
     if raw_path.exists():
-        skipped_model_mismatch = 0
-        with open(raw_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        rec = json.loads(line)
-                        # Only accept cache entries produced by the same model (R-2.2 fix).
-                        # Switching --extraction-model must not reuse prior model's output.
-                        if rec.get("model") != model:
-                            skipped_model_mismatch += 1
-                            continue
-                        if ph := rec.get("prompt_hash"):
-                            cached_hashes.add(ph)
-                    except json.JSONDecodeError:
-                        pass
-        if skipped_model_mismatch:
+        # Non-default profiles always re-extract: extraction_profile is not tracked in
+        # cache records until WP-20.4, so cached records from one profile run could
+        # be mis-identified as compatible on a later run. Bypass explicitly for safety.
+        if profile["name"] != "cybersecurity":
             log.info(
-                "Skipped %d cached entries from a different model — will re-process with %s",
-                skipped_model_mismatch, model,
+                "Non-default profile '%s': bypassing Step C cache "
+                "(extraction_profile not tracked until WP-20.4)",
+                profile["name"],
             )
-        if cached_hashes:
-            log.info(
-                "Loaded %d cached prompt hashes (model=%s) — matching chunks will be skipped",
-                len(cached_hashes), model,
-            )
-            # Guard against stale cache after a prompt template change (e.g. structured
-            # output upgrade). If cached_hashes is non-empty but NO chunk's current
-            # prompt hash matches, opening files in append mode would duplicate every row.
-            # Scan chunks with early exit: if at least one hit exists the cache is valid;
-            # if none match, discard it so write_mode falls through to "w".
-            any_cache_hit = False
-            for _c in all_chunks:
-                _refs = scan_source_refs(_c["text"])
-                _hints = (
-                    "\nCandidate source references found in this text "
-                    "(use these for the \"source_ref\" field where applicable): "
-                    + ", ".join(_refs) + "\n"
-                ) if _refs else ""
-                _ph = compute_prompt_hash(
-                    template
-                    .replace("{source_ref_hints}", _hints)
-                    .replace("{chunk_text}", _c["text"])
+        else:
+            skipped_model_mismatch = 0
+            with open(raw_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            rec = json.loads(line)
+                            # Only accept cache entries produced by the same model (R-2.2 fix).
+                            # Switching --extraction-model must not reuse prior model's output.
+                            if rec.get("model") != model:
+                                skipped_model_mismatch += 1
+                                continue
+                            if ph := rec.get("prompt_hash"):
+                                cached_hashes.add(ph)
+                        except json.JSONDecodeError:
+                            pass
+            if skipped_model_mismatch:
+                log.info(
+                    "Skipped %d cached entries from a different model — will re-process with %s",
+                    skipped_model_mismatch, model,
                 )
-                if _ph in cached_hashes:
-                    any_cache_hit = True
-                    break
-            if not any_cache_hit:
-                log.warning(
-                    "Cached prompt hashes exist but none match the current template — "
-                    "prompt may have changed. Discarding stale cache and starting fresh write."
+            if cached_hashes:
+                log.info(
+                    "Loaded %d cached prompt hashes (model=%s) — matching chunks will be skipped",
+                    len(cached_hashes), model,
                 )
-                cached_hashes = set()
+                # Guard against stale cache after a prompt template change (e.g. structured
+                # output upgrade). If cached_hashes is non-empty but NO chunk's current
+                # prompt hash matches, opening files in append mode would duplicate every row.
+                # Scan chunks with early exit: if at least one hit exists the cache is valid;
+                # if none match, discard it so write_mode falls through to "w".
+                any_cache_hit = False
+                for _c in all_chunks:
+                    _refs = scan_source_refs(_c["text"])
+                    _hints = (
+                        "\nCandidate source references found in this text "
+                        "(use these for the \"source_ref\" field where applicable): "
+                        + ", ".join(_refs) + "\n"
+                    ) if _refs else ""
+                    _ph = compute_prompt_hash(
+                        template
+                        .replace("{source_ref_hints}", _hints)
+                        .replace("{chunk_text}", _c["text"])
+                    )
+                    if _ph in cached_hashes:
+                        any_cache_hit = True
+                        break
+                if not any_cache_hit:
+                    log.warning(
+                        "Cached prompt hashes exist but none match the current template — "
+                        "prompt may have changed. Discarding stale cache and starting fresh write."
+                    )
+                    cached_hashes = set()
 
     log.info("Processing %d chunks with model=%s, ollama=%s", len(chunks), model, ollama_url)
 

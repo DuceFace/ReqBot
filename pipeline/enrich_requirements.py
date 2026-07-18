@@ -238,14 +238,20 @@ def _extract_json_object(raw: str) -> dict | None:
 
 def _validate_enrichment(
     raw: dict,
-    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
-    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
+    valid_domain_tags: list[str] | None = None,
+    valid_requirement_types: list[str] | None = None,
 ) -> dict:
     """Validate and clean a single enrichment result dict.
 
     Always returns a dict with all three enrichment keys — invalid/missing
     values are normalized to empty string / empty list rather than raising.
     """
+    if valid_domain_tags is None:
+        from core.profiles import default_profile as _dp
+        valid_domain_tags = _dp()["domain_tags"]
+    if valid_requirement_types is None:
+        from core.profiles import default_profile as _dp
+        valid_requirement_types = _dp()["requirement_types"]
     description = str(raw.get("description", "")).strip()
 
     raw_tags = raw.get("domain_tags", [])
@@ -420,43 +426,52 @@ def run(
     #   1. It has at least one non-empty enrichment field (failed runs must be retried), AND
     #   2. It was enriched by the same model currently in use (R-2.2 fix).
     # Switching --enrichment-model must not silently preserve the old model's output.
+    #
+    # Non-default profiles bypass cache entirely: enrichment_profile is not written to
+    # output records until WP-20.4, so a non-cybersecurity enrichment record has no
+    # profile marker and would be mis-identified as "cybersecurity" on the next default
+    # run (rec.get("enrichment_profile", "cybersecurity") defaults all unmarked records).
     enriched_by_id: dict[str, dict] = {}
     if enriched_path.exists():
-        skipped_model_mismatch = 0
-        with open(enriched_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        rec = json.loads(line)
-                        rid = rec.get("requirement_id")
-                        if not rid:
-                            continue
-                        has_enrichment = rec.get("description") or rec.get("domain_tags") or rec.get("requirement_type")
-                        if not has_enrichment:
-                            continue
-                        # If enrichment_model is recorded, require it to match.
-                        # Records without enrichment_model (pre-WP-2 cache) are treated
-                        # as model-unknown and will be re-enriched.
-                        cached_model = rec.get("enrichment_model")
-                        # Treat records without enrichment_profile as "cybersecurity" — they
-                        # predate profile tracking, which only started in WP-20.3 caches.
-                        cached_profile = rec.get("enrichment_profile", "cybersecurity")
-                        if cached_model != model or cached_profile != profile["name"]:
-                            skipped_model_mismatch += 1
-                            continue
-                        enriched_by_id[rid] = rec
-                    except json.JSONDecodeError:
-                        pass
-        if skipped_model_mismatch:
+        if profile["name"] != "cybersecurity":
             log.info(
-                "Skipped %d cached enrichments (model or profile changed) — will re-enrich with %s / %s",
-                skipped_model_mismatch, model, profile["name"],
+                "Non-default profile '%s': bypassing enrichment cache "
+                "(enrichment_profile not written to records until WP-20.4)",
+                profile["name"],
             )
-        log.info(
-            "Loaded %d successfully-enriched requirements from cache (%s)",
-            len(enriched_by_id), enriched_path,
-        )
+        else:
+            skipped_model_mismatch = 0
+            with open(enriched_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            rec = json.loads(line)
+                            rid = rec.get("requirement_id")
+                            if not rid:
+                                continue
+                            has_enrichment = rec.get("description") or rec.get("domain_tags") or rec.get("requirement_type")
+                            if not has_enrichment:
+                                continue
+                            # If enrichment_model is recorded, require it to match.
+                            # Records without enrichment_model (pre-WP-2 cache) are treated
+                            # as model-unknown and will be re-enriched.
+                            cached_model = rec.get("enrichment_model")
+                            if cached_model != model:
+                                skipped_model_mismatch += 1
+                                continue
+                            enriched_by_id[rid] = rec
+                        except json.JSONDecodeError:
+                            pass
+            if skipped_model_mismatch:
+                log.info(
+                    "Skipped %d cached enrichments (model changed) — will re-enrich with %s",
+                    skipped_model_mismatch, model,
+                )
+            log.info(
+                "Loaded %d successfully-enriched requirements from cache (%s)",
+                len(enriched_by_id), enriched_path,
+            )
 
     # Requirements that still need enrichment (not yet successfully enriched)
     to_enrich = [req for req in reqs if req["requirement_id"] not in enriched_by_id]

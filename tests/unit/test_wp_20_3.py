@@ -427,17 +427,22 @@ def test_enrichment_cache_bypassed_on_profile_change(tmp_path):
 
 
 def test_enrichment_cache_honored_when_profile_matches(tmp_path):
-    """A cache record stamped with the active profile must NOT be re-enriched."""
+    """A cybersecurity cache record (no enrichment_profile field) must not be re-enriched on a cybersecurity run.
+
+    This is the production scenario: pre-WP-20.4 records have no enrichment_profile field;
+    the cybersecurity run treats them as cybersecurity-valid and skips re-enrichment.
+    """
     norm_file = tmp_path / "doc_requirements_normalized.jsonl"
     norm_file.write_text(json.dumps(_BASE_NORM_REQ) + "\n", encoding="utf-8")
 
+    # Production-accurate: cybersecurity enrichment record has no enrichment_profile field
     cached = {
         **_BASE_NORM_REQ,
-        "description": "Cached enrichment.",
-        "domain_tags": ["test-tag-alpha"],
-        "requirement_type": "policy",
+        "description": "Cached cybersecurity enrichment.",
+        "domain_tags": ["access-control"],
+        "requirement_type": "technical-control",
         "enrichment_model": "test-model",
-        "enrichment_profile": "test-domain",
+        # No enrichment_profile field — all existing records are cybersecurity by assumption
     }
     enriched_file = tmp_path / "doc_requirements_enriched.jsonl"
     enriched_file.write_text(json.dumps(cached) + "\n", encoding="utf-8")
@@ -459,10 +464,10 @@ def test_enrichment_cache_honored_when_profile_matches(tmp_path):
             str(norm_file), str(tmp_path),
             model="test-model",
             ollama_url="http://localhost:11434",
-            profile=_TEST_DOMAIN_PROFILE,
+            profile=_CYBER_PROFILE,
         )
 
-    assert len(enrich_calls) == 0, "Cache should be honored when model and profile both match"
+    assert len(enrich_calls) == 0, "Cybersecurity cache with matching model must be honored"
 
 
 # ---------------------------------------------------------------------------

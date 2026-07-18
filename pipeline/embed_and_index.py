@@ -87,6 +87,7 @@ def build_payload(req: dict) -> dict:
         "parent_section_ref": req.get("parent_section_ref"),
         "parent_context": req.get("parent_context"),
         "child_section_refs": req.get("child_section_refs", []),
+        "domain_profile": req.get("domain_profile", "cybersecurity"),
         "schema_version": req.get("schema_version", ""),
         "pipeline_version": req.get("pipeline_version", ""),
         "extraction_model": req.get("extraction_model", ""),

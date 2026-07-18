@@ -133,6 +133,8 @@ These rules are unchanged from Phases 18–19 and apply throughout Phase 20.
 }
 ```
 
+**`skip_sections` note:** This field is present in the schema and validated by the loader, but **not consumed by any pipeline step in Phase 20**. No skip-section filtering currently exists in `chunk_text.py` — wiring it would be new behavior, not externalization. The field is reserved config; see Post-Phase-20 Backlog below.
+
 **Loader contract (`core/profiles.py`):**
 
 ```python
@@ -174,7 +176,7 @@ def default_profile() -> dict:
 
 | Step | What changes |
 |------|-------------|
-| Step B (`chunk_text.py`) | Load skip-section patterns from `profile["skip_sections"]` instead of hardcoded list |
+| Step B (`chunk_text.py`) | No behavior change in Phase 20. `skip_sections` is loaded and validated as reserved profile configuration — no existing skip-section filter exists in `chunk_text.py` to externalize. |
 | Step C (`llm_extract_requirements.py`) | Inject `obligation_verbs` and `domain_tags` from profile into extraction prompt |
 | Step D.5 (`enrich_requirements.py`) | Inject `domain_tags` and `requirement_types` from profile into enrichment prompt |
 | `pipeline/run_pipeline.py` | Accept `profile_name` parameter; call `load_profile()`; pass dict to each step |
@@ -259,6 +261,7 @@ Any API response field that surfaces `domain_profile` must return the string `"c
 - **No retrieval filtering by `domain_profile`.** The field is payload metadata only in Phase 20.
 - **No API endpoint for profile management.** Profiles are config files on disk.
 - **No profile versioning logic.** Reserve the schema field; do not implement it.
+- **No skip-section filtering.** `skip_sections` is reserved config in the profile schema but no corresponding filter exists in `chunk_text.py` to externalize. Adding one would be new behavior. Deferred to Phase 21+.
 
 ---
 
@@ -284,3 +287,19 @@ Any API response field that surfaces `domain_profile` must return the string `"c
 | 20.5 | Integration gate | Full CLI regression + GUI spot-check pass |
 
 **Do one WP at a time. Codex/Gemini review after each before proceeding.**
+
+---
+
+## Post-Phase-20 Backlog
+
+### Skip-Section Filtering (Phase 21+)
+
+Implement profile-based skip-section filtering after Phase 20 parity is complete. Filtering
+should be section-title based, profile-driven, logged, tested against glossary/references/
+acronyms/table-of-contents cases, and documented as behavior-changing because it may alter
+extraction counts.
+
+The `skip_sections` field in `profiles/cybersecurity.json` (populated in WP-20.2) serves as
+the configuration source. Implementation belongs in Step B (`chunk_text.py`) for the
+structure-aware path and may require a separate handling decision for the legacy fixed-size
+chunker (which has no section-title awareness).

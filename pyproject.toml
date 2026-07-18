@@ -1,0 +1,29 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+exclude = [
+    ".git",
+    "archive",
+    "Backups",
+    "dist",
+    "build",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# E4: import errors  E7: statement errors  E9: runtime errors  F: pyflakes  I: isort
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# E402/I001: sys.path injection before imports is used throughout the codebase to
+# support both package import and direct-script invocation. Permanent fix is
+# `pip install -e .` — tracked as Phase 19.5 packaging tech debt.
+# F401/F541: baseline suppression; these are real findings but not correctness blockers.
+# Fix in a dedicated cleanup PR, not in WP-19.5.1.
+"api/*.py"             = ["E402"]
+"cli/*.py"             = ["E402", "F401", "F541", "I001"]
+"core/*.py"            = ["E402", "I001"]
+"pipeline/*.py"        = ["E402", "F541", "I001"]
+"services/*.py"        = ["E402"]
+"eval/*.py"            = ["E402", "E741", "F401", "F541", "F841", "I001"]
+"record_baseline_dirs.py" = ["F401"]

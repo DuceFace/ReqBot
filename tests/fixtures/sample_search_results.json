@@ -1,0 +1,49 @@
+{
+  "query": "access control requirements",
+  "filters": {
+    "document_id": null,
+    "domain_tag": null,
+    "requirement_type": null
+  },
+  "results": [
+    {
+      "score": 0.045,
+      "requirement_id": "REQ-a1b2c3d4e5f6",
+      "source_quote": "All systems must enforce role-based access control policies.",
+      "source_ref": "1",
+      "source_pdf": "SYNTHETIC_TEST_DOC.pdf",
+      "document_id": "abc123def456ab01",
+      "description": "Systems must implement role-based access control (RBAC) to restrict user access based on assigned roles.",
+      "domain_tags": ["access-control"],
+      "requirement_type": "technical-control"
+    },
+    {
+      "score": 0.038,
+      "requirement_id": "REQ-b2c3d4e5f6a1",
+      "source_quote": "Multi-factor authentication shall be required for all privileged accounts.",
+      "source_ref": "1.1",
+      "source_pdf": "SYNTHETIC_TEST_DOC.pdf",
+      "document_id": "abc123def456ab01",
+      "description": "Privileged accounts require multi-factor authentication (MFA) to prevent unauthorized access.",
+      "domain_tags": ["access-control", "authentication-and-identity"],
+      "requirement_type": "technical-control"
+    },
+    {
+      "score": 0.022,
+      "requirement_id": "REQ-c3d4e5f6a1b2",
+      "source_quote": "Organizations shall maintain audit logs for all system events for a minimum of 90 days.",
+      "source_ref": "2",
+      "source_pdf": "SYNTHETIC_TEST_DOC.pdf",
+      "document_id": "abc123def456ab01",
+      "description": "Audit logs covering all system events must be retained for at least 90 days.",
+      "domain_tags": ["audit-and-logging"],
+      "requirement_type": "technical-control"
+    }
+  ],
+  "metadata": {
+    "top_k": 20,
+    "result_count": 3,
+    "retrieval_ms": 42,
+    "synthesis": null
+  }
+}

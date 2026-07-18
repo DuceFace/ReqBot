@@ -8,8 +8,10 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 from google import genai
+from google.genai import errors as genai_errors
 
 MARKER = "<!-- gemini-review -->"
 
@@ -62,11 +64,21 @@ and improvements as **Suggestion**. If the change looks clean, say so explicitly
 
 def get_review(diff: str) -> str:
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=PROMPT_CONTEXT + "\nHere is the diff:\n" + diff,
-    )
-    return response.text
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=PROMPT_CONTEXT + "\nHere is the diff:\n" + diff,
+            )
+            return response.text
+        except genai_errors.ServerError as err:
+            if attempt == 2:
+                raise
+            print(
+                f"Gemini API unavailable (attempt {attempt + 1}/3), retrying in 5s: {err}",
+                file=sys.stderr,
+            )
+            time.sleep(5)
 
 
 def find_existing_comment(repo: str, pr_number: str) -> str | None:
@@ -116,7 +128,14 @@ def main() -> None:
     repo = os.environ["GITHUB_REPOSITORY"]
 
     print("Generating Gemini review...")
-    review_text = get_review(diff)
+    try:
+        review_text = get_review(diff)
+    except genai_errors.ServerError as err:
+        print(f"Gemini review unavailable after retries: {err}", file=sys.stderr)
+        review_text = (
+            "Gemini review could not be generated right now because the Gemini API "
+            "is temporarily unavailable (503). Please re-run this workflow."
+        )
     full_body = f"{MARKER}\n{review_text}"
 
     comment_id = find_existing_comment(repo, pr_number)

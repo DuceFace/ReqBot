@@ -1,0 +1,8 @@
+# ReqBot — development / test dependencies
+# Install: pip3 install --break-system-packages -r requirements-dev.txt
+# These are pinned to the versions verified working on 2026-07-18.
+# Do NOT add these to requirements.txt — they are not needed at runtime.
+
+pytest==9.1.1
+ruff==0.15.22
+pytest-cov==7.1.0

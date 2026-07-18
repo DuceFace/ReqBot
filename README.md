@@ -208,6 +208,9 @@ Defaults to `127.0.0.1:8000`. Opens a browser-accessible interface at `http://lo
 
 - **Search view** — query the corpus, filter by document, click through to trace
 - **Trace view** — full requirement detail: description, source quote, provenance, cross-framework matches, optional source context expansion
+- **Compare view** — side-by-side topic comparison across two documents (exact + semantic matches)
+- **Evidence view** — topic → requirements grouped by document, with optional LLM synthesis
+- **Docs view** — browse the indexed corpus; filter and sort; drill into a single document
 
 The API is always available at `/api/` regardless of whether the frontend build is present. Swagger UI at `/api-docs`.
 
@@ -355,5 +358,6 @@ Useful flags:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - module map and data flows
 - [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
-- [docs/PHASE13_REQUIREMENTS.md](docs/PHASE13_REQUIREMENTS.md) - Phase 13 extraction optimization plan
-- [docs/PHASE14_REQUIREMENTS.md](docs/PHASE14_REQUIREMENTS.md) - Phase 14 structure-aware chunking plan
+- [docs/PHASE20_REQUIREMENTS.md](docs/PHASE20_REQUIREMENTS.md) - Phase 20 plan (Domain Profile Foundation)
+- [docs/FORWARD_PLAN_P16-22.md](docs/FORWARD_PLAN_P16-22.md) - forward roadmap (Phases 16–22)
+- [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document

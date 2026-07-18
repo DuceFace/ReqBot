@@ -37,10 +37,12 @@ services/
 api/
   app.py         ← FastAPI application; registers routers; CORS for localhost GUI origins
   routes/
-    ask.py       ← POST /ask     → ask_service.ask(); validates AskRequest; RuntimeError → 503
-    docs.py      ← GET /docs     → docs_service.list_docs(); exceptions → 503
-    status.py    ← GET /status   → status_service.check(); exceptions → 503
-    trace.py     ← GET /trace/{req_id} → trace_service.trace(); ValueError → 404, RuntimeError → 503
+    ask.py       ← POST /ask              → ask_service.ask(); validates AskRequest; RuntimeError → 503
+    compare.py   ← POST /compare          → compare_service.compare(); RuntimeError → 503
+    evidence.py  ← POST /evidence         → evidence_service.evidence(); RuntimeError → 503
+    docs.py      ← GET /docs              → docs_service.list_docs(); exceptions → 503
+    status.py    ← GET /status            → status_service.check(); exceptions → 503
+    trace.py     ← GET /trace/{req_id}    → trace_service.trace(); ValueError → 404, RuntimeError → 503
   (Swagger UI at /api-docs; /docs reserved for the document-listing endpoint)
 
 pipeline/
@@ -73,22 +75,31 @@ models/            ← Shared data schemas (populated in Phase 16C+)
 
 frontend/          ← React + TypeScript + Tailwind web GUI (Phase 18+)
   package.json     ← dependencies: react, react-router-dom, tailwindcss
-  vite.config.ts   ← Vite bundler; dev proxy /api → :8000; no custom base:
+  vite.config.ts   ← Vite bundler; dev proxy /api → :8000; no custom base
   src/
-    App.tsx        ← BrowserRouter + Routes (/, /search, /trace/:reqId, *)
+    App.tsx        ← BrowserRouter + Routes (/, /search, /trace/:reqId, /compare, /evidence, /docs, *)
     api/
-      client.ts    ← typed fetch wrappers (ask, trace, docs, status)
-      types.ts     ← TypeScript types mirroring API contract (Phase 16C)
+      client.ts    ← typed fetch wrappers (ask, trace, docs, status, compare, evidence)
+      types.ts     ← TypeScript types mirroring API contract (Phase 16C+)
     views/
       SearchView.tsx   ← query + doc filter + results; URL-driven state (?q=&doc=)
       TraceView.tsx    ← full requirement detail + cross-matches + context expand
+      CompareView.tsx  ← two-doc topic comparison; three result sections; URL-driven state (?doc1=&doc2=&topic=)
+      EvidenceView.tsx ← topic → grouped requirements by document; synthesis; URL-driven state
+      DocsView.tsx     ← corpus browse; name filter + sort; "Search this doc" drill-down
       NotFoundView.tsx ← catch-all 404 view
     components/
       ResultCard.tsx   ← result row; passes router state for back-link preservation
       StatusDot.tsx    ← polls /api/status every 30s; green/red health indicator
+      ErrorBanner.tsx  ← shared inline error display
+      SynthesisBox.tsx ← shared LLM synthesis output block (elapsed timer, loading state)
+      NavBar.tsx       ← top navigation bar
       LoadingSpinner.tsx
+    hooks/
+      useSynthesis.ts  ← generation-counter race protection; run(fetcher) / reset(); elapsed timer
     utils/
-      ui.ts        ← shared helpers (pageRange)
+      ui.ts        ← docValue(doc): canonical doc identifier (prefers source_pdf, falls back to doc_key);
+                      pageRange(); other shared helpers
   dist/            ← Vite production build output (gitignored; served by reqbot serve)
 ```
 
@@ -133,10 +144,12 @@ api/app.py
   └── api.routes.status
   └── api.routes.trace
 
-api/routes/ask.py    → core.config, services.ask_service
-api/routes/docs.py   → core.config, services.docs_service
-api/routes/status.py → services.status_service
-api/routes/trace.py  → core.config, services.trace_service
+api/routes/ask.py      → core.config, services.ask_service
+api/routes/compare.py  → core.config, services.compare_service
+api/routes/evidence.py → core.config, services.evidence_service
+api/routes/docs.py     → core.config, services.docs_service
+api/routes/status.py   → services.status_service
+api/routes/trace.py    → core.config, services.trace_service
 
 pipeline/run_pipeline.py
   └── pipeline.extract_pdf_to_text  (in-process; legacy path only)
@@ -322,7 +335,7 @@ Top-K results from Qdrant grc_requirements
   │
   ├─▶ (if context=true / --context) Fetch surrounding chunks from Qdrant grc_context
   │
-  ▼ (if --synthesize; CLI only in Phase 18) synthesis.py
+  ▼ (if --synthesize CLI, or "Generate Answer" GUI button) synthesis.py
     ├─▶ Local: Ollama qwen2.5:14b
     └─▶ Remote: Anthropic claude-sonnet-4-6 or OpenAI gpt-4o
   │
@@ -330,10 +343,12 @@ Top-K results from Qdrant grc_requirements
   └─▶ GUI: JSON → SearchView results list → TraceView on click
 ```
 
-**GUI-specific flows (Phase 18):**
+**GUI-specific flows (Phase 18–19):**
 - `GET /api/trace/{req_id}` → `trace_service.trace()` → TraceView (full detail + cross-matches)
 - `GET /api/trace/{req_id}?context=true` → same service, triggers context window fetch from grc_context
-- `GET /api/docs` → `docs_service.list_docs()` → SearchView document filter dropdown
+- `POST /api/compare` → `compare_service.compare()` → CompareView (exact + semantic matches, three sections)
+- `POST /api/evidence` → `evidence_service.evidence()` → EvidenceView (grouped requirements + synthesis)
+- `GET /api/docs` → `docs_service.list_docs()` → DocsView (corpus browse) + SearchView doc filter dropdown
 - `GET /api/status` → `status_service.check()` → StatusDot (polls every 30s)
 
 ---

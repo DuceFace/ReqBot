@@ -108,6 +108,59 @@ def test_name_mismatch_raises_value_error(profile_dir):
 
 
 # ---------------------------------------------------------------------------
+# Loader contract — type validation
+# ---------------------------------------------------------------------------
+
+def test_non_object_json_raises_value_error(profile_dir):
+    (profile_dir / "test.json").write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+    with pytest.raises(ValueError, match="JSON object"):
+        load_profile("test")
+
+
+@pytest.mark.parametrize("field", ["obligation_verbs", "skip_sections", "domain_tags", "requirement_types"])
+def test_list_field_not_a_list_raises_value_error(profile_dir, field):
+    data = {**_MINIMAL_VALID, field: "not-a-list"}
+    _write_profile(profile_dir, data)
+    with pytest.raises(ValueError, match=field):
+        load_profile("test")
+
+
+@pytest.mark.parametrize("field", ["obligation_verbs", "skip_sections", "domain_tags", "requirement_types"])
+def test_list_field_contains_non_string_raises_value_error(profile_dir, field):
+    data = {**_MINIMAL_VALID, field: ["valid", 42]}
+    _write_profile(profile_dir, data)
+    with pytest.raises(ValueError, match=field):
+        load_profile("test")
+
+
+def test_checklist_guidance_not_dict_raises_value_error(profile_dir):
+    data = {**_MINIMAL_VALID, "checklist_guidance": ["not", "a", "dict"]}
+    _write_profile(profile_dir, data)
+    with pytest.raises(ValueError, match="checklist_guidance"):
+        load_profile("test")
+
+
+def test_checklist_guidance_evidence_categories_not_list_raises_value_error(profile_dir):
+    data = {**_MINIMAL_VALID, "checklist_guidance": {"evidence_categories": "policy"}}
+    _write_profile(profile_dir, data)
+    with pytest.raises(ValueError, match="evidence_categories"):
+        load_profile("test")
+
+
+def test_path_separator_in_name_raises_value_error(profile_dir):
+    with pytest.raises(ValueError, match="path separators"):
+        load_profile("../etc/passwd")
+
+
+def test_checklist_guidance_not_mutated_across_loads(profile_dir):
+    _write_profile(profile_dir, _MINIMAL_VALID)
+    result1 = load_profile("test")
+    result1["checklist_guidance"]["injected"] = True
+    result2 = load_profile("test")
+    assert "injected" not in result2["checklist_guidance"]
+
+
+# ---------------------------------------------------------------------------
 # Loader contract — optional field defaults
 # ---------------------------------------------------------------------------
 

@@ -303,3 +303,11 @@ The `skip_sections` field in `profiles/cybersecurity.json` (populated in WP-20.2
 the configuration source. Implementation belongs in Step B (`chunk_text.py`) for the
 structure-aware path and may require a separate handling decision for the legacy fixed-size
 chunker (which has no section-title awareness).
+
+### `REQBOT_PROFILE` Environment Variable (Phase 21+)
+
+Add `REQBOT_PROFILE` to the `REQBOT_*` env var layer in `core/config.py` so the active
+profile can be set without a CLI flag (useful for CI, scripted ingestion, and future API
+calls). Default remains `"cybersecurity"`. Natural follow-on once WP-20.3 wires the `--profile`
+CLI flag — the config layer precedence would be: hardcoded default → config.json → env var →
+CLI flag.

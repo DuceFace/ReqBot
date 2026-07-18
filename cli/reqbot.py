@@ -91,6 +91,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             max_chunks=args.max_chunks,
             layout_mode=args.layout_mode,
             skip_enrichment=args.skip_enrichment,
+            profile_name=args.profile,
         )
     except RuntimeError as e:
         log.error("%s", e)
@@ -1391,6 +1392,12 @@ def main() -> None:
         action="store_true",
         dest="skip_enrichment",
         help="Skip Pass 2 enrichment (description/tags/type). Index source_quote-only output directly.",
+    )
+    p_ingest.add_argument(
+        "--profile",
+        type=str,
+        default="cybersecurity",
+        help="Domain profile name (default: cybersecurity). Profile must exist in profiles/<name>.json.",
     )
     p_ingest.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
     p_ingest.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")

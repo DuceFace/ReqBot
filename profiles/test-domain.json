@@ -1,0 +1,20 @@
+{
+  "name": "test-domain",
+  "version": "0.1",
+  "description": "Minimal test profile for pipeline plumbing validation only. Not a real domain.",
+  "obligation_verbs": [
+    "shall",
+    "must"
+  ],
+  "skip_sections": [
+    "GLOSSARY"
+  ],
+  "domain_tags": [
+    "test-tag-alpha",
+    "test-tag-beta"
+  ],
+  "requirement_types": [
+    "policy",
+    "guidance"
+  ]
+}

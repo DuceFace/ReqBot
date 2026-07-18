@@ -47,6 +47,7 @@ def run(
     layout_mode: str = "pymupdf",
     pass1_only: bool = True,
     skip_enrichment: bool = False,
+    profile_name: str = "cybersecurity",
 ) -> str:
     """Run the full extraction pipeline (Steps A-E + optional enrichment) in-process.
 
@@ -68,6 +69,9 @@ def run(
         pass1_only:        Use Pass 1 prompt in Step C (source_quote + source_ref only).
                            Default True — enrichment (Step D.5) fills in description/tags/type.
         skip_enrichment:   Skip Step D.5 enrichment. Returns normalized JSONL path directly.
+        profile_name:      Domain profile name to load from profiles/<name>.json.
+                           Default 'cybersecurity'. Profile is loaded once and passed to
+                           Steps C and D.5.
 
     Returns:
         Path to requirements_enriched.jsonl if enrichment ran, else
@@ -76,6 +80,12 @@ def run(
     Raises:
         RuntimeError: If any pipeline step fails.
     """
+    from core.profiles import load_profile as _load_profile
+    try:
+        profile = _load_profile(profile_name)
+    except (FileNotFoundError, ValueError) as e:
+        raise RuntimeError(f"Failed to load profile '{profile_name}': {e}") from e
+
     from pipeline import extract_pdf_to_text
     from pipeline import chunk_text as chunk_text_mod
     from pipeline import llm_extract_requirements
@@ -181,6 +191,7 @@ def run(
                 model=extraction_model, ollama_url=ollama_url,
                 timeout=timeout, max_chunks=max_chunks,
                 pass1_only=pass1_only,
+                profile=profile,
             )
         except RuntimeError:
             raise
@@ -194,6 +205,7 @@ def run(
         try:
             parse_and_normalize.run(
                 str(reqs_path), str(chunks_path), str(pdf), str(out_dir),
+                profile=profile,
             )
         except Exception as e:
             raise RuntimeError(f"Step D failed: {e}") from e
@@ -214,6 +226,7 @@ def run(
             enrich_result = _enrich_mod.run(
                 str(norm_path), str(out_dir),
                 model=enrichment_model, ollama_url=ollama_url, timeout=timeout,
+                profile=profile,
             )
             index_path = Path(enrich_result)
         except Exception as e:

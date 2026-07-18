@@ -66,8 +66,7 @@ PASS1_PROMPT_TEMPLATE = """You are a requirements extraction system for cybersec
 Your ONLY task: identify and extract ACTIONABLE REQUIREMENTS from the text below.
 A requirement is something an organization MUST DO — it expresses obligation, mandate, or necessity.
 
-Extract statements containing: shall, must, required to, ensure, implement, establish, maintain, enforce,
-or equivalent mandatory language (e.g., "is responsible for", "will", "are to") when used as a mandate.
+Extract statements containing obligation or mandate language including: {obligation_verbs}
 
 DO NOT extract:
 - Definitions or glossary entries
@@ -112,7 +111,7 @@ PROMPT_TEMPLATE = """You are a requirements extraction system for cybersecurity 
 Your task: extract only ACTIONABLE REQUIREMENTS from the text below. A requirement is something an organization MUST DO — it implies obligation, mandate, or necessity.
 
 DO extract:
-- Statements that express obligation or mandate, including but not limited to: shall, must, required to, ensure, implement, establish, maintain, enforce, or equivalent language (e.g., "is responsible for", "will", "are to") when used as a mandate
+- Statements that express obligation or mandate, including: {obligation_verbs}
 - Technical controls an organization needs to implement
 - Policies or procedures an organization must define or follow
 - Security measures that are mandated or strongly recommended
@@ -131,13 +130,8 @@ If there are no actionable requirements in the text, return an empty array: []
 Each element must be a JSON object with exactly these keys:
 - "source_quote": (REQUIRED) The exact verbatim quote from the text that establishes this requirement (under 500 characters). Copy the text word-for-word — do not paraphrase or summarize. If you cannot find an exact verbatim quote for a requirement, do NOT include that requirement in the output.
 - "source_ref": The document-specific locator for this requirement (e.g., "AC-4", "Section 5.2.1", "Para 3.4.1") or "" if none is visible in the text. This is a traceability label, not a semantic tag — copy it exactly as written, do not infer or construct it.
-- "domain_tags": An array of 1-3 tags from this list ONLY: access-control, authentication-and-identity, audit-and-logging, configuration-management, contingency-and-recovery, data-protection-and-encryption, incident-response, maintenance, media-protection, network-security, personnel-security, physical-security, privacy, risk-management, security-assessment, supply-chain-security, system-integrity, training-and-awareness. If unsure, choose the single most relevant tag.
-- "requirement_type": One of these (with definitions):
-  * "policy" — a high-level organizational policy or directive
-  * "technical-control" — a specific technical measure to implement in a system
-  * "procedural-control" — a process, procedure, or practice humans must follow
-  * "assessment" — a requirement to evaluate, test, audit, or monitor
-  * "guidance" — a recommendation that is not strictly mandatory
+- "domain_tags": An array of 1-3 tags from this list ONLY: {domain_tags_list}. If unsure, choose the single most relevant tag.
+- "requirement_type": One of: {requirement_types_list}
 - "description": A single precise sentence summarizing what must be done. Preserve the exact subject, verb, and object of the obligation. Keep all technical terms, control identifiers, system names, numerical thresholds, and acronyms exactly as they appear in the source. Do NOT generalize or paraphrase. Maximum 120 words. May be "" if the source_quote is self-explanatory.
   GOOD: "Systems must enforce multi-factor authentication using PIV cards for all privileged access to CUI systems."
   GOOD: "Organizations must review and update system account lists within 24 hours of personnel termination per AC-2(3)."
@@ -414,7 +408,11 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
     return None
 
 
-def validate_requirement(req: dict) -> dict | None:
+def validate_requirement(
+    req: dict,
+    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
+    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
+) -> dict | None:
     """Validate and clean a single requirement dict.
 
     Returns the cleaned dict or None if invalid.
@@ -436,11 +434,11 @@ def validate_requirement(req: dict) -> dict | None:
     if isinstance(raw_tags, str):
         raw_tags = [raw_tags]
     domain_tags = [t.strip().lower() for t in raw_tags if isinstance(t, str)]
-    domain_tags = [t for t in domain_tags if t in VALID_DOMAIN_TAGS]
+    domain_tags = [t for t in domain_tags if t in valid_domain_tags]
 
     # If LLM gave no valid tags, leave empty — Step D can handle it
     # Validate requirement type
-    if req_type not in VALID_REQUIREMENT_TYPES:
+    if req_type not in valid_requirement_types:
         req_type = ""
 
     return {
@@ -459,6 +457,8 @@ def process_chunk(
     timeout: int,
     prompt_template: str = PROMPT_TEMPLATE,
     json_schema: dict | None = None,
+    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
+    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
 ) -> tuple[dict, list[dict], dict | None]:
     """Process a single chunk through the LLM.
 
@@ -467,6 +467,26 @@ def process_chunk(
     """
     chunk_id = chunk["chunk_id"]
     chunk_text = chunk["text"]
+
+    # Safety: run() always pre-renders profile placeholders before calling here.
+    # If called directly with the raw template (e.g. in tests or scripts), substitute
+    # with default profile values so the LLM never sees literal placeholder tokens.
+    if (
+        "{obligation_verbs}" in prompt_template
+        or "{domain_tags_list}" in prompt_template
+        or "{requirement_types_list}" in prompt_template
+    ):
+        # Use the caller's own validation lists for domain/type placeholders so that
+        # what the LLM is asked to produce matches what validate_requirement() accepts.
+        # obligation_verbs has no equivalent param here, so fall back to default profile.
+        from core.profiles import default_profile as _dp
+        _fallback_verbs = ", ".join(_dp()["obligation_verbs"])
+        prompt_template = (
+            prompt_template
+            .replace("{obligation_verbs}", _fallback_verbs)
+            .replace("{domain_tags_list}", ", ".join(valid_domain_tags))
+            .replace("{requirement_types_list}", ", ".join(valid_requirement_types))
+        )
 
     # P3: pre-scan for candidate source refs and inject as LLM hints
     ref_candidates = scan_source_refs(chunk_text)
@@ -527,7 +547,7 @@ def process_chunk(
     # Validate individual requirements
     valid_reqs = []
     for item in parsed:
-        cleaned = validate_requirement(item)
+        cleaned = validate_requirement(item, valid_domain_tags, valid_requirement_types)
         if cleaned:
             cleaned["chunk_id"] = chunk_id
             valid_reqs.append(cleaned)
@@ -555,6 +575,7 @@ def run(
     max_chunks: int | None = None,
     start_chunk: int = 0,
     pass1_only: bool = False,
+    profile: dict | None = None,
 ) -> str:
     """Extract requirements from chunks JSONL using a local LLM.
 
@@ -572,11 +593,30 @@ def run(
         pass1_only:   Use PASS1_PROMPT_TEMPLATE (source_quote + source_ref only).
                       Faster and higher-recall; description/tags/type left to Pass 2
                       enrichment. Default False (full single-pass extraction).
+        profile:      Validated profile dict from core.profiles.load_profile().
+                      When None, the cybersecurity default profile is loaded.
 
     Returns:
         Path to the extracted_requirements.jsonl file that was written (str).
     """
+    if profile is None:
+        from core.profiles import default_profile as _default_profile
+        profile = _default_profile()
+
+    valid_domain_tags: list[str] = profile["domain_tags"]
+    valid_requirement_types: list[str] = profile["requirement_types"]
+    obligation_verbs_str = ", ".join(profile["obligation_verbs"])
+    domain_tags_str = ", ".join(valid_domain_tags)
+
     template = PASS1_PROMPT_TEMPLATE if pass1_only else PROMPT_TEMPLATE
+    # Substitute profile vocabulary into the template once before per-chunk processing.
+    # When the cybersecurity profile is active this produces semantically identical
+    # prompts to the pre-Phase-20 hardcoded text.
+    template = template.replace("{obligation_verbs}", obligation_verbs_str)
+    if not pass1_only:
+        template = template.replace("{domain_tags_list}", domain_tags_str)
+        template = template.replace("{requirement_types_list}", ", ".join(valid_requirement_types))
+
     # Pass 1 uses Ollama constrained generation — eliminates parse failures
     # from preamble text and malformed bare arrays (Codex P1 fix).
     # Legacy full-extraction path (PROMPT_TEMPLATE) uses unconstrained generation.
@@ -613,59 +653,69 @@ def run(
 
     cached_hashes: set[str] = set()
     if raw_path.exists():
-        skipped_model_mismatch = 0
-        with open(raw_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        rec = json.loads(line)
-                        # Only accept cache entries produced by the same model (R-2.2 fix).
-                        # Switching --extraction-model must not reuse prior model's output.
-                        if rec.get("model") != model:
-                            skipped_model_mismatch += 1
-                            continue
-                        if ph := rec.get("prompt_hash"):
-                            cached_hashes.add(ph)
-                    except json.JSONDecodeError:
-                        pass
-        if skipped_model_mismatch:
+        # Non-default profiles always re-extract: extraction_profile is not tracked in
+        # cache records until WP-20.4, so cached records from one profile run could
+        # be mis-identified as compatible on a later run. Bypass explicitly for safety.
+        if profile["name"] != "cybersecurity":
             log.info(
-                "Skipped %d cached entries from a different model — will re-process with %s",
-                skipped_model_mismatch, model,
+                "Non-default profile '%s': bypassing Step C cache "
+                "(extraction_profile not tracked until WP-20.4)",
+                profile["name"],
             )
-        if cached_hashes:
-            log.info(
-                "Loaded %d cached prompt hashes (model=%s) — matching chunks will be skipped",
-                len(cached_hashes), model,
-            )
-            # Guard against stale cache after a prompt template change (e.g. structured
-            # output upgrade). If cached_hashes is non-empty but NO chunk's current
-            # prompt hash matches, opening files in append mode would duplicate every row.
-            # Scan chunks with early exit: if at least one hit exists the cache is valid;
-            # if none match, discard it so write_mode falls through to "w".
-            any_cache_hit = False
-            for _c in all_chunks:
-                _refs = scan_source_refs(_c["text"])
-                _hints = (
-                    "\nCandidate source references found in this text "
-                    "(use these for the \"source_ref\" field where applicable): "
-                    + ", ".join(_refs) + "\n"
-                ) if _refs else ""
-                _ph = compute_prompt_hash(
-                    template
-                    .replace("{source_ref_hints}", _hints)
-                    .replace("{chunk_text}", _c["text"])
+        else:
+            skipped_model_mismatch = 0
+            with open(raw_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            rec = json.loads(line)
+                            # Only accept cache entries produced by the same model (R-2.2 fix).
+                            # Switching --extraction-model must not reuse prior model's output.
+                            if rec.get("model") != model:
+                                skipped_model_mismatch += 1
+                                continue
+                            if ph := rec.get("prompt_hash"):
+                                cached_hashes.add(ph)
+                        except json.JSONDecodeError:
+                            pass
+            if skipped_model_mismatch:
+                log.info(
+                    "Skipped %d cached entries from a different model — will re-process with %s",
+                    skipped_model_mismatch, model,
                 )
-                if _ph in cached_hashes:
-                    any_cache_hit = True
-                    break
-            if not any_cache_hit:
-                log.warning(
-                    "Cached prompt hashes exist but none match the current template — "
-                    "prompt may have changed. Discarding stale cache and starting fresh write."
+            if cached_hashes:
+                log.info(
+                    "Loaded %d cached prompt hashes (model=%s) — matching chunks will be skipped",
+                    len(cached_hashes), model,
                 )
-                cached_hashes = set()
+                # Guard against stale cache after a prompt template change (e.g. structured
+                # output upgrade). If cached_hashes is non-empty but NO chunk's current
+                # prompt hash matches, opening files in append mode would duplicate every row.
+                # Scan chunks with early exit: if at least one hit exists the cache is valid;
+                # if none match, discard it so write_mode falls through to "w".
+                any_cache_hit = False
+                for _c in all_chunks:
+                    _refs = scan_source_refs(_c["text"])
+                    _hints = (
+                        "\nCandidate source references found in this text "
+                        "(use these for the \"source_ref\" field where applicable): "
+                        + ", ".join(_refs) + "\n"
+                    ) if _refs else ""
+                    _ph = compute_prompt_hash(
+                        template
+                        .replace("{source_ref_hints}", _hints)
+                        .replace("{chunk_text}", _c["text"])
+                    )
+                    if _ph in cached_hashes:
+                        any_cache_hit = True
+                        break
+                if not any_cache_hit:
+                    log.warning(
+                        "Cached prompt hashes exist but none match the current template — "
+                        "prompt may have changed. Discarding stale cache and starting fresh write."
+                    )
+                    cached_hashes = set()
 
     log.info("Processing %d chunks with model=%s, ollama=%s", len(chunks), model, ollama_url)
 
@@ -710,7 +760,11 @@ def run(
                 continue
 
             chunk_start = time.time()
-            raw_record, valid_reqs, failure = process_chunk(chunk, model, ollama_url, timeout, template, json_schema=schema)
+            raw_record, valid_reqs, failure = process_chunk(
+                chunk, model, ollama_url, timeout, template, json_schema=schema,
+                valid_domain_tags=valid_domain_tags,
+                valid_requirement_types=valid_requirement_types,
+            )
 
             append_jsonl(raw_record, raw_f)
 

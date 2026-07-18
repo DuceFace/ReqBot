@@ -126,7 +126,7 @@ def trace(req_id: str, qdrant_url: str, show_context: bool = False) -> dict:
             log.warning("No chunk_id or document_id — cannot retrieve context chunk")
 
     return {
-        "requirement": {**payload, "domain_profile": payload.get("domain_profile", "cybersecurity")},
+        "requirement": {**payload, "domain_profile": payload.get("domain_profile") or "cybersecurity"},
         "cross_matches": cross_matches,
         "context_text": context_text,
     }

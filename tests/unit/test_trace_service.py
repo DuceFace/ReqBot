@@ -99,6 +99,19 @@ def test_domain_profile_defaults_to_cybersecurity(mock_qdrant_cls):
 
 
 @patch("qdrant_client.QdrantClient")
+def test_domain_profile_null_falls_back_to_cybersecurity(mock_qdrant_cls):
+    mock_client = MagicMock()
+    mock_qdrant_cls.return_value = mock_client
+    payload = {**SAMPLE_PAYLOAD, "domain_profile": None}
+    mock_client.scroll.side_effect = [
+        ([_make_point(payload)], None),
+        ([], None),
+    ]
+    result = trace("REQ-abc123def456", "http://qdrant:6333")
+    assert result["requirement"]["domain_profile"] == "cybersecurity"
+
+
+@patch("qdrant_client.QdrantClient")
 def test_domain_profile_stored_value_returned(mock_qdrant_cls):
     mock_client = MagicMock()
     mock_qdrant_cls.return_value = mock_client

@@ -473,6 +473,18 @@ def process_chunk(
     chunk_id = chunk["chunk_id"]
     chunk_text = chunk["text"]
 
+    # Safety: run() always pre-renders profile placeholders before calling here.
+    # If called directly with the raw template (e.g. in tests or scripts), substitute
+    # with default profile values so the LLM never sees literal placeholder tokens.
+    if "{obligation_verbs}" in prompt_template or "{domain_tags_list}" in prompt_template:
+        from core.profiles import default_profile as _dp
+        _fallback = _dp()
+        prompt_template = (
+            prompt_template
+            .replace("{obligation_verbs}", ", ".join(_fallback["obligation_verbs"]))
+            .replace("{domain_tags_list}", ", ".join(_fallback["domain_tags"]))
+        )
+
     # P3: pre-scan for candidate source refs and inject as LLM hints
     ref_candidates = scan_source_refs(chunk_text)
     if ref_candidates:

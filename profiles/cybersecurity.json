@@ -1,0 +1,64 @@
+{
+  "name": "cybersecurity",
+  "version": "1.0",
+  "description": "Cybersecurity, RMF, and compliance requirements (DoD/NIST/CNSSI/AFI)",
+  "obligation_verbs": [
+    "shall",
+    "must",
+    "required to",
+    "ensure",
+    "implement",
+    "establish",
+    "maintain",
+    "enforce",
+    "is responsible for",
+    "will",
+    "are to"
+  ],
+  "skip_sections": [
+    "GLOSSARY",
+    "REFERENCES",
+    "ACRONYMS",
+    "DEFINITIONS",
+    "ABBREVIATIONS",
+    "TABLE OF CONTENTS"
+  ],
+  "domain_tags": [
+    "access-control",
+    "authentication-and-identity",
+    "audit-and-logging",
+    "configuration-management",
+    "contingency-and-recovery",
+    "data-protection-and-encryption",
+    "incident-response",
+    "maintenance",
+    "media-protection",
+    "network-security",
+    "personnel-security",
+    "physical-security",
+    "privacy",
+    "risk-management",
+    "security-assessment",
+    "supply-chain-security",
+    "system-integrity",
+    "training-and-awareness"
+  ],
+  "requirement_types": [
+    "policy",
+    "technical-control",
+    "procedural-control",
+    "assessment",
+    "guidance"
+  ],
+  "checklist_guidance": {
+    "evidence_categories": [
+      "policy",
+      "procedure",
+      "system_configuration",
+      "logs",
+      "tickets",
+      "interviews",
+      "training_records"
+    ]
+  }
+}

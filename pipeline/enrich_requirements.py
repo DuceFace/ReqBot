@@ -439,7 +439,8 @@ def run(
                         # Records without enrichment_model (pre-WP-2 cache) are treated
                         # as model-unknown and will be re-enriched.
                         cached_model = rec.get("enrichment_model")
-                        if cached_model != model:
+                        cached_profile = rec.get("enrichment_profile")
+                        if cached_model != model or cached_profile != profile["name"]:
                             skipped_model_mismatch += 1
                             continue
                         enriched_by_id[rid] = rec
@@ -447,8 +448,8 @@ def run(
                         pass
         if skipped_model_mismatch:
             log.info(
-                "Skipped %d cached enrichments from a different model — will re-enrich with %s",
-                skipped_model_mismatch, model,
+                "Skipped %d cached enrichments (model or profile changed) — will re-enrich with %s / %s",
+                skipped_model_mismatch, model, profile["name"],
             )
         log.info(
             "Loaded %d successfully-enriched requirements from cache (%s)",
@@ -501,7 +502,7 @@ def run(
         if batch_results is not None:
             # Batch succeeded
             for req, enrichment in zip(batch, batch_results):
-                enriched_req = {**req, **enrichment, "enrichment_model": model}
+                enriched_req = {**req, **enrichment, "enrichment_model": model, "enrichment_profile": profile["name"]}
                 enriched_by_id[req["requirement_id"]] = enriched_req
                 enriched_count += 1
             processed += len(batch)
@@ -526,7 +527,7 @@ def run(
                 )
                 processed += 1
                 if result is not None:
-                    enriched_req = {**req, **result, "enrichment_model": model}
+                    enriched_req = {**req, **result, "enrichment_model": model, "enrichment_profile": profile["name"]}
                     enriched_by_id[req["requirement_id"]] = enriched_req
                     enriched_count += 1
                 else:

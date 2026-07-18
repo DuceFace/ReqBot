@@ -205,6 +205,7 @@ def run(
         try:
             parse_and_normalize.run(
                 str(reqs_path), str(chunks_path), str(pdf), str(out_dir),
+                profile=profile,
             )
         except Exception as e:
             raise RuntimeError(f"Step D failed: {e}") from e

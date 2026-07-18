@@ -250,6 +250,7 @@ def run(
     output_dir: str,
     *,
     extraction_model: str = "llama3.1:8b-instruct-q4_K_M",
+    profile: dict | None = None,
 ) -> str:
     """Normalize and deduplicate extracted requirements and write output JSONL.
 
@@ -262,10 +263,19 @@ def run(
         source_pdf_path:    Path to original PDF (for document identity hash).
         output_dir:         Directory to write normalized JSONL into.
         extraction_model:   LLM name used in Step C (written to schema).
+        profile:            Validated profile dict from core.profiles.load_profile().
+                            When None, the cybersecurity default profile is loaded.
 
     Returns:
         Path to the requirements_normalized.jsonl file that was written (str).
     """
+    if profile is None:
+        from core.profiles import default_profile as _default_profile
+        profile = _default_profile()
+
+    _valid_domain_tags: frozenset[str] = frozenset(profile["domain_tags"])
+    _valid_requirement_types: frozenset[str] = frozenset(profile["requirement_types"])
+
     reqs_path = Path(requirements_jsonl).resolve()
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -338,9 +348,9 @@ def run(
         if isinstance(raw_tags, str):
             raw_tags = [raw_tags]
         domain_tags = [t.strip().lower() for t in raw_tags if isinstance(t, str)]
-        domain_tags = [t for t in domain_tags if t in VALID_DOMAIN_TAGS]
+        domain_tags = [t for t in domain_tags if t in _valid_domain_tags]
 
-        if req_type not in VALID_REQUIREMENT_TYPES:
+        if req_type not in _valid_requirement_types:
             req_type = ""
 
         page_start = None

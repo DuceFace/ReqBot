@@ -22,6 +22,9 @@ _OPTIONAL_DEFAULTS: dict = {
 }
 
 _LIST_OF_STRINGS_FIELDS = ("obligation_verbs", "skip_sections", "domain_tags", "requirement_types")
+# These fields drive LLM prompt content and validation — an empty list produces a broken prompt
+# or silently accepts/rejects everything. skip_sections is intentionally excluded (empty is valid).
+_NON_EMPTY_LIST_FIELDS = frozenset({"obligation_verbs", "domain_tags", "requirement_types"})
 
 
 def _validate_types(data: dict) -> None:
@@ -37,6 +40,8 @@ def _validate_types(data: dict) -> None:
                 raise ValueError(
                     f"Profile field '{field}[{i}]' must be a string, got {type(item).__name__}"
                 )
+        if field in _NON_EMPTY_LIST_FIELDS and not value:
+            raise ValueError(f"Profile field '{field}' must not be an empty list")
 
     for str_field in ("name", "description"):
         if str_field in data and not isinstance(data[str_field], str):

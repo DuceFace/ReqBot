@@ -131,12 +131,7 @@ Each element must be a JSON object with exactly these keys:
 - "source_quote": (REQUIRED) The exact verbatim quote from the text that establishes this requirement (under 500 characters). Copy the text word-for-word — do not paraphrase or summarize. If you cannot find an exact verbatim quote for a requirement, do NOT include that requirement in the output.
 - "source_ref": The document-specific locator for this requirement (e.g., "AC-4", "Section 5.2.1", "Para 3.4.1") or "" if none is visible in the text. This is a traceability label, not a semantic tag — copy it exactly as written, do not infer or construct it.
 - "domain_tags": An array of 1-3 tags from this list ONLY: {domain_tags_list}. If unsure, choose the single most relevant tag.
-- "requirement_type": One of these (with definitions):
-  * "policy" — a high-level organizational policy or directive
-  * "technical-control" — a specific technical measure to implement in a system
-  * "procedural-control" — a process, procedure, or practice humans must follow
-  * "assessment" — a requirement to evaluate, test, audit, or monitor
-  * "guidance" — a recommendation that is not strictly mandatory
+- "requirement_type": One of: {requirement_types_list}
 - "description": A single precise sentence summarizing what must be done. Preserve the exact subject, verb, and object of the obligation. Keep all technical terms, control identifiers, system names, numerical thresholds, and acronyms exactly as they appear in the source. Do NOT generalize or paraphrase. Maximum 120 words. May be "" if the source_quote is self-explanatory.
   GOOD: "Systems must enforce multi-factor authentication using PIV cards for all privileged access to CUI systems."
   GOOD: "Organizations must review and update system account lists within 24 hours of personnel termination per AC-2(3)."
@@ -476,13 +471,18 @@ def process_chunk(
     # Safety: run() always pre-renders profile placeholders before calling here.
     # If called directly with the raw template (e.g. in tests or scripts), substitute
     # with default profile values so the LLM never sees literal placeholder tokens.
-    if "{obligation_verbs}" in prompt_template or "{domain_tags_list}" in prompt_template:
+    if (
+        "{obligation_verbs}" in prompt_template
+        or "{domain_tags_list}" in prompt_template
+        or "{requirement_types_list}" in prompt_template
+    ):
         from core.profiles import default_profile as _dp
         _fallback = _dp()
         prompt_template = (
             prompt_template
             .replace("{obligation_verbs}", ", ".join(_fallback["obligation_verbs"]))
             .replace("{domain_tags_list}", ", ".join(_fallback["domain_tags"]))
+            .replace("{requirement_types_list}", ", ".join(_fallback["requirement_types"]))
         )
 
     # P3: pre-scan for candidate source refs and inject as LLM hints
@@ -612,6 +612,7 @@ def run(
     template = template.replace("{obligation_verbs}", obligation_verbs_str)
     if not pass1_only:
         template = template.replace("{domain_tags_list}", domain_tags_str)
+        template = template.replace("{requirement_types_list}", ", ".join(valid_requirement_types))
 
     # Pass 1 uses Ollama constrained generation — eliminates parse failures
     # from preamble text and malformed bare arrays (Codex P1 fix).

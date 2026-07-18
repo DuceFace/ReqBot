@@ -268,10 +268,12 @@ def test_run_pipeline_passes_profile_to_step_c(tmp_path):
 # Review-round fixes — Gemini: empty list validation in core/profiles.py
 # ---------------------------------------------------------------------------
 
-def test_empty_obligation_verbs_raises():
+def test_empty_obligation_verbs_raises(tmp_path):
     import json as _json
-    import tempfile
 
+    import pytest
+
+    import core.profiles as _profiles_mod
     from core.profiles import load_profile as _load
 
     bad = {
@@ -281,19 +283,11 @@ def test_empty_obligation_verbs_raises():
         "domain_tags": ["test-tag-alpha"],
         "requirement_types": ["policy"],
     }
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", dir="/home/coder/grc-ai-system/profiles",
-        delete=False, prefix="bad-profile"
-    ) as f:
-        _json.dump(bad, f)
-        tmp_name = Path(f.name).stem  # e.g. "bad-profileXXXXXX"
+    (tmp_path / "bad-profile.json").write_text(_json.dumps(bad), encoding="utf-8")
 
-    try:
-        import pytest
+    with patch.object(_profiles_mod, "_PROFILES_DIR", tmp_path):
         with pytest.raises(ValueError, match="obligation_verbs"):
-            _load(tmp_name)
-    finally:
-        Path(f.name).unlink(missing_ok=True)
+            _load("bad-profile")
 
 
 # ---------------------------------------------------------------------------
@@ -427,8 +421,9 @@ def test_enrichment_cache_bypassed_on_profile_change(tmp_path):
     assert len(enrich_calls) == 1, "Cache should be bypassed when profile changes"
     assert enrich_calls[0]["requirement_id"] == "REQ-cachetest000001"
 
+    # enrichment_profile is NOT written to output records (WP-20.4 owns schema changes)
     out_records = [json.loads(line) for line in enriched_file.read_text(encoding="utf-8").splitlines() if line.strip()]
-    assert out_records[0].get("enrichment_profile") == "test-domain"
+    assert "enrichment_profile" not in out_records[0]
 
 
 def test_enrichment_cache_honored_when_profile_matches(tmp_path):

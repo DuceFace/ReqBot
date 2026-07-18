@@ -476,13 +476,16 @@ def process_chunk(
         or "{domain_tags_list}" in prompt_template
         or "{requirement_types_list}" in prompt_template
     ):
+        # Use the caller's own validation lists for domain/type placeholders so that
+        # what the LLM is asked to produce matches what validate_requirement() accepts.
+        # obligation_verbs has no equivalent param here, so fall back to default profile.
         from core.profiles import default_profile as _dp
-        _fallback = _dp()
+        _fallback_verbs = ", ".join(_dp()["obligation_verbs"])
         prompt_template = (
             prompt_template
-            .replace("{obligation_verbs}", ", ".join(_fallback["obligation_verbs"]))
-            .replace("{domain_tags_list}", ", ".join(_fallback["domain_tags"]))
-            .replace("{requirement_types_list}", ", ".join(_fallback["requirement_types"]))
+            .replace("{obligation_verbs}", _fallback_verbs)
+            .replace("{domain_tags_list}", ", ".join(valid_domain_tags))
+            .replace("{requirement_types_list}", ", ".join(valid_requirement_types))
         )
 
     # P3: pre-scan for candidate source refs and inject as LLM hints

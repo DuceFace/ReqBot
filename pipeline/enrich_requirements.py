@@ -439,7 +439,9 @@ def run(
                         # Records without enrichment_model (pre-WP-2 cache) are treated
                         # as model-unknown and will be re-enriched.
                         cached_model = rec.get("enrichment_model")
-                        cached_profile = rec.get("enrichment_profile")
+                        # Treat records without enrichment_profile as "cybersecurity" — they
+                        # predate profile tracking, which only started in WP-20.3 caches.
+                        cached_profile = rec.get("enrichment_profile", "cybersecurity")
                         if cached_model != model or cached_profile != profile["name"]:
                             skipped_model_mismatch += 1
                             continue
@@ -502,7 +504,7 @@ def run(
         if batch_results is not None:
             # Batch succeeded
             for req, enrichment in zip(batch, batch_results):
-                enriched_req = {**req, **enrichment, "enrichment_model": model, "enrichment_profile": profile["name"]}
+                enriched_req = {**req, **enrichment, "enrichment_model": model}
                 enriched_by_id[req["requirement_id"]] = enriched_req
                 enriched_count += 1
             processed += len(batch)
@@ -527,7 +529,7 @@ def run(
                 )
                 processed += 1
                 if result is not None:
-                    enriched_req = {**req, **result, "enrichment_model": model, "enrichment_profile": profile["name"]}
+                    enriched_req = {**req, **result, "enrichment_model": model}
                     enriched_by_id[req["requirement_id"]] = enriched_req
                     enriched_count += 1
                 else:

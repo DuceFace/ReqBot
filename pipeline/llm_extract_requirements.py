@@ -66,8 +66,7 @@ PASS1_PROMPT_TEMPLATE = """You are a requirements extraction system for cybersec
 Your ONLY task: identify and extract ACTIONABLE REQUIREMENTS from the text below.
 A requirement is something an organization MUST DO — it expresses obligation, mandate, or necessity.
 
-Extract statements containing: shall, must, required to, ensure, implement, establish, maintain, enforce,
-or equivalent mandatory language (e.g., "is responsible for", "will", "are to") when used as a mandate.
+Extract statements containing obligation or mandate language including: {obligation_verbs}
 
 DO NOT extract:
 - Definitions or glossary entries
@@ -112,7 +111,7 @@ PROMPT_TEMPLATE = """You are a requirements extraction system for cybersecurity 
 Your task: extract only ACTIONABLE REQUIREMENTS from the text below. A requirement is something an organization MUST DO — it implies obligation, mandate, or necessity.
 
 DO extract:
-- Statements that express obligation or mandate, including but not limited to: shall, must, required to, ensure, implement, establish, maintain, enforce, or equivalent language (e.g., "is responsible for", "will", "are to") when used as a mandate
+- Statements that express obligation or mandate, including: {obligation_verbs}
 - Technical controls an organization needs to implement
 - Policies or procedures an organization must define or follow
 - Security measures that are mandated or strongly recommended
@@ -131,7 +130,7 @@ If there are no actionable requirements in the text, return an empty array: []
 Each element must be a JSON object with exactly these keys:
 - "source_quote": (REQUIRED) The exact verbatim quote from the text that establishes this requirement (under 500 characters). Copy the text word-for-word — do not paraphrase or summarize. If you cannot find an exact verbatim quote for a requirement, do NOT include that requirement in the output.
 - "source_ref": The document-specific locator for this requirement (e.g., "AC-4", "Section 5.2.1", "Para 3.4.1") or "" if none is visible in the text. This is a traceability label, not a semantic tag — copy it exactly as written, do not infer or construct it.
-- "domain_tags": An array of 1-3 tags from this list ONLY: access-control, authentication-and-identity, audit-and-logging, configuration-management, contingency-and-recovery, data-protection-and-encryption, incident-response, maintenance, media-protection, network-security, personnel-security, physical-security, privacy, risk-management, security-assessment, supply-chain-security, system-integrity, training-and-awareness. If unsure, choose the single most relevant tag.
+- "domain_tags": An array of 1-3 tags from this list ONLY: {domain_tags_list}. If unsure, choose the single most relevant tag.
 - "requirement_type": One of these (with definitions):
   * "policy" — a high-level organizational policy or directive
   * "technical-control" — a specific technical measure to implement in a system
@@ -414,7 +413,11 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
     return None
 
 
-def validate_requirement(req: dict) -> dict | None:
+def validate_requirement(
+    req: dict,
+    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
+    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
+) -> dict | None:
     """Validate and clean a single requirement dict.
 
     Returns the cleaned dict or None if invalid.
@@ -436,11 +439,11 @@ def validate_requirement(req: dict) -> dict | None:
     if isinstance(raw_tags, str):
         raw_tags = [raw_tags]
     domain_tags = [t.strip().lower() for t in raw_tags if isinstance(t, str)]
-    domain_tags = [t for t in domain_tags if t in VALID_DOMAIN_TAGS]
+    domain_tags = [t for t in domain_tags if t in valid_domain_tags]
 
     # If LLM gave no valid tags, leave empty — Step D can handle it
     # Validate requirement type
-    if req_type not in VALID_REQUIREMENT_TYPES:
+    if req_type not in valid_requirement_types:
         req_type = ""
 
     return {
@@ -459,6 +462,8 @@ def process_chunk(
     timeout: int,
     prompt_template: str = PROMPT_TEMPLATE,
     json_schema: dict | None = None,
+    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
+    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
 ) -> tuple[dict, list[dict], dict | None]:
     """Process a single chunk through the LLM.
 
@@ -527,7 +532,7 @@ def process_chunk(
     # Validate individual requirements
     valid_reqs = []
     for item in parsed:
-        cleaned = validate_requirement(item)
+        cleaned = validate_requirement(item, valid_domain_tags, valid_requirement_types)
         if cleaned:
             cleaned["chunk_id"] = chunk_id
             valid_reqs.append(cleaned)
@@ -555,6 +560,7 @@ def run(
     max_chunks: int | None = None,
     start_chunk: int = 0,
     pass1_only: bool = False,
+    profile: dict | None = None,
 ) -> str:
     """Extract requirements from chunks JSONL using a local LLM.
 
@@ -572,11 +578,29 @@ def run(
         pass1_only:   Use PASS1_PROMPT_TEMPLATE (source_quote + source_ref only).
                       Faster and higher-recall; description/tags/type left to Pass 2
                       enrichment. Default False (full single-pass extraction).
+        profile:      Validated profile dict from core.profiles.load_profile().
+                      When None, the cybersecurity default profile is loaded.
 
     Returns:
         Path to the extracted_requirements.jsonl file that was written (str).
     """
+    if profile is None:
+        from core.profiles import default_profile as _default_profile
+        profile = _default_profile()
+
+    valid_domain_tags: list[str] = profile["domain_tags"]
+    valid_requirement_types: list[str] = profile["requirement_types"]
+    obligation_verbs_str = ", ".join(profile["obligation_verbs"])
+    domain_tags_str = ", ".join(valid_domain_tags)
+
     template = PASS1_PROMPT_TEMPLATE if pass1_only else PROMPT_TEMPLATE
+    # Substitute profile vocabulary into the template once before per-chunk processing.
+    # When the cybersecurity profile is active this produces semantically identical
+    # prompts to the pre-Phase-20 hardcoded text.
+    template = template.replace("{obligation_verbs}", obligation_verbs_str)
+    if not pass1_only:
+        template = template.replace("{domain_tags_list}", domain_tags_str)
+
     # Pass 1 uses Ollama constrained generation — eliminates parse failures
     # from preamble text and malformed bare arrays (Codex P1 fix).
     # Legacy full-extraction path (PROMPT_TEMPLATE) uses unconstrained generation.
@@ -710,7 +734,11 @@ def run(
                 continue
 
             chunk_start = time.time()
-            raw_record, valid_reqs, failure = process_chunk(chunk, model, ollama_url, timeout, template, json_schema=schema)
+            raw_record, valid_reqs, failure = process_chunk(
+                chunk, model, ollama_url, timeout, template, json_schema=schema,
+                valid_domain_tags=valid_domain_tags,
+                valid_requirement_types=valid_requirement_types,
+            )
 
             append_jsonl(raw_record, raw_f)
 

@@ -236,7 +236,11 @@ def _extract_json_object(raw: str) -> dict | None:
     return None
 
 
-def _validate_enrichment(raw: dict) -> dict:
+def _validate_enrichment(
+    raw: dict,
+    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
+    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
+) -> dict:
     """Validate and clean a single enrichment result dict.
 
     Always returns a dict with all three enrichment keys — invalid/missing
@@ -248,10 +252,10 @@ def _validate_enrichment(raw: dict) -> dict:
     if isinstance(raw_tags, str):
         raw_tags = [raw_tags]
     domain_tags = [t.strip().lower() for t in raw_tags if isinstance(t, str)]
-    domain_tags = [t for t in domain_tags if t in VALID_DOMAIN_TAGS]
+    domain_tags = [t for t in domain_tags if t in valid_domain_tags]
 
     req_type = str(raw.get("requirement_type", "")).strip().lower()
-    if req_type not in VALID_REQUIREMENT_TYPES:
+    if req_type not in valid_requirement_types:
         req_type = ""
 
     return {
@@ -277,6 +281,10 @@ def _enrich_batch(
     model: str,
     ollama_url: str,
     timeout: int,
+    valid_tags_str: str = _VALID_TAGS_STR,
+    valid_types_str: str = _VALID_TYPES_STR,
+    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
+    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
 ) -> list[dict] | None:
     """Enrich a batch of requirements via a single LLM call.
 
@@ -286,8 +294,8 @@ def _enrich_batch(
     """
     prompt = ENRICH_BATCH_PROMPT_TEMPLATE.format(
         n=len(batch),
-        valid_tags=_VALID_TAGS_STR,
-        valid_types=_VALID_TYPES_STR,
+        valid_tags=valid_tags_str,
+        valid_types=valid_types_str,
         requirements=_build_batch_requirements_text(batch),
     )
 
@@ -309,7 +317,12 @@ def _enrich_batch(
         )
         return None
 
-    return [_validate_enrichment(item) if isinstance(item, dict) else _validate_enrichment({}) for item in parsed]
+    return [
+        _validate_enrichment(item, valid_domain_tags, valid_requirement_types)
+        if isinstance(item, dict)
+        else _validate_enrichment({}, valid_domain_tags, valid_requirement_types)
+        for item in parsed
+    ]
 
 
 def _enrich_single(
@@ -317,6 +330,10 @@ def _enrich_single(
     model: str,
     ollama_url: str,
     timeout: int,
+    valid_tags_str: str = _VALID_TAGS_STR,
+    valid_types_str: str = _VALID_TYPES_STR,
+    valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
+    valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
 ) -> dict | None:
     """Enrich a single requirement via a dedicated LLM call.
 
@@ -325,8 +342,8 @@ def _enrich_single(
     prompt = ENRICH_SINGLE_PROMPT_TEMPLATE.format(
         source_quote=req.get("source_quote", ""),
         source_ref=req.get("source_ref", "") or "unknown",
-        valid_tags=_VALID_TAGS_STR,
-        valid_types=_VALID_TYPES_STR,
+        valid_tags=valid_tags_str,
+        valid_types=valid_types_str,
     )
 
     try:
@@ -340,7 +357,7 @@ def _enrich_single(
         log.debug("Single response: failed to parse JSON object for %s", req.get("requirement_id"))
         return None
 
-    return _validate_enrichment(parsed)
+    return _validate_enrichment(parsed, valid_domain_tags, valid_requirement_types)
 
 
 def run(
@@ -352,6 +369,7 @@ def run(
     timeout: int = 120,
     batch_size: int = 10,
     max_reqs: int | None = None,
+    profile: dict | None = None,
 ) -> str:
     """Enrich normalized requirements with description, domain_tags, and requirement_type.
 
@@ -367,10 +385,20 @@ def run(
         batch_size:   Requirements per LLM call (default 10). Falls back to
                       individual calls if batch response cannot be parsed.
         max_reqs:     Limit enrichment to first N unenriched requirements (testing).
+        profile:      Validated profile dict from core.profiles.load_profile().
+                      When None, the cybersecurity default profile is loaded.
 
     Returns:
         Path to the requirements_enriched.jsonl file that was written (str).
     """
+    if profile is None:
+        from core.profiles import default_profile as _default_profile
+        profile = _default_profile()
+
+    valid_domain_tags: list[str] = profile["domain_tags"]
+    valid_requirement_types: list[str] = profile["requirement_types"]
+    valid_tags_str = ", ".join(valid_domain_tags)
+    valid_types_str = ", ".join(valid_requirement_types)
     norm_path = Path(norm_jsonl).resolve()
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -462,7 +490,13 @@ def run(
     for batch_start in range(0, len(to_enrich), batch_size):
         batch = to_enrich[batch_start:batch_start + batch_size]
 
-        batch_results = _enrich_batch(batch, model, ollama_url, timeout)
+        batch_results = _enrich_batch(
+            batch, model, ollama_url, timeout,
+            valid_tags_str=valid_tags_str,
+            valid_types_str=valid_types_str,
+            valid_domain_tags=valid_domain_tags,
+            valid_requirement_types=valid_requirement_types,
+        )
 
         if batch_results is not None:
             # Batch succeeded
@@ -483,7 +517,13 @@ def run(
                 batch_start + 1, batch_start + len(batch),
             )
             for req in batch:
-                result = _enrich_single(req, model, ollama_url, timeout)
+                result = _enrich_single(
+                    req, model, ollama_url, timeout,
+                    valid_tags_str=valid_tags_str,
+                    valid_types_str=valid_types_str,
+                    valid_domain_tags=valid_domain_tags,
+                    valid_requirement_types=valid_requirement_types,
+                )
                 processed += 1
                 if result is not None:
                     enriched_req = {**req, **result, "enrichment_model": model}

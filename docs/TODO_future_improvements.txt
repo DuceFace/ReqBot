@@ -170,6 +170,26 @@ ACTIVE BACKLOG (good ideas, not blocking)
     entirely so profiles/cybersecurity.json is the single authoritative source.
     Flagged by Gemini during WP-20.3 review (2026-07-18).
 
+21. DOMAIN_PROFILE FALLBACK SEMANTICS — DECIDE BEFORE SECOND PRODUCTION DOMAIN
+    embed_and_index.build_payload() currently returns "cybersecurity" when domain_profile
+    is missing from a record. This is factually correct for the existing corpus (all
+    pre-Phase-20 records were extracted using cybersecurity-profile assumptions), but the
+    pattern generalizes badly: if a future operator has a medical or housing-code corpus
+    with pre-profile records, the fallback would be wrong.
+    Before Phase 21 introduces a second production domain, decide:
+      1. Keep "cybersecurity" as the fallback only for explicitly-migrated deployments
+         (i.e., document that any new ReqBot deployment must run a one-time reindex
+         to stamp legacy records with the correct profile before enabling multi-domain).
+      2. Switch fallback to "unprofiled" / null to distinguish "missing metadata" from
+         "known cybersecurity" — then update downstream consumers (trace_service,
+         ask_service) to treat null/unprofiled as a valid state.
+      3. Add a reindex migration command (reqbot reindex --stamp-profile cybersecurity)
+         that explicitly assigns the field to all records currently missing it, making
+         the state machine explicit rather than relying on a silent fallback.
+    Current WP-20.4 behavior ("cybersecurity" fallback) is correct for ReqBot's existing
+    single-domain corpus. Do not change it until a second production domain is live.
+    Flagged by Codex during WP-20.4 review (2026-07-19).
+
 ================================================================
 DECIDED AGAINST
 ================================================================

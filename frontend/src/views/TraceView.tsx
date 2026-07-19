@@ -4,26 +4,12 @@ import { useParams, Link, useLocation } from 'react-router-dom'
 import * as api from '../api/client'
 import { NotFoundError } from '../api/client'
 import type { TraceResponse, Requirement } from '../api/types'
+import AppShell from '../components/AppShell'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
-import StatusDot from '../components/StatusDot'
 import { pageRange } from '../utils/ui'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function Header({ backTo, backLabel }: { backTo: string; backLabel: string }) {
-  return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <Link to={backTo} className="text-sm text-blue-600 hover:underline shrink-0">
-          {backLabel}
-        </Link>
-        <span className="text-xl font-bold text-gray-900">ReqBot</span>
-      </div>
-      <StatusDot />
-    </header>
-  )
-}
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -70,22 +56,27 @@ function CrossMatchCard({ match, from }: { match: Requirement; from: string }) {
   )
 }
 
+// ── Breadcrumb helpers ────────────────────────────────────────────────────────
+
+function backLabelFor(path: string): string {
+  if (path.startsWith('/compare')) return '← Back to compare'
+  if (path.startsWith('/evidence')) return '← Back to evidence'
+  if (path.startsWith('/corpus')) return '← Back to corpus'
+  return '← Back to search'
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function TraceView() {
   const { reqId } = useParams<{ reqId: string }>()
   const location = useLocation()
 
-  // Restore the full previous URL if ResultCard (or CrossMatchCard) passed it
-  // via router state. Falls back to /search for direct navigation.
-  // from now carries the full path (e.g. "/compare?doc1=...&q=..." or "/search?q=...").
+  // Derive back link from route state only — no hardcoded fallback.
+  // When Trace is reached via direct link or bookmark, backTo is null and no
+  // back link is shown; the sidebar provides navigation instead.
   const fromPath = (location.state as { from?: string } | null)?.from ?? ''
-  const backTo = fromPath || '/search'
-  const backLabel = backTo.startsWith('/compare')
-    ? '← Back to compare'
-    : backTo.startsWith('/evidence')
-    ? '← Back to evidence'
-    : '← Back to search'
+  const backTo = fromPath || null
+  const backLabel = backTo ? backLabelFor(backTo) : ''
 
   const [data, setData] = useState<TraceResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -137,8 +128,6 @@ export default function TraceView() {
 
   function handleExpandContext() {
     if (!reqId || contextLoading) return
-    // Capture reqId at the time of the request so we can discard the response
-    // if the user navigates to a different requirement before it returns.
     const capturedReqId = reqId
     setContextLoading(true)
     api
@@ -156,177 +145,177 @@ export default function TraceView() {
       })
   }
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header backTo={backTo} backLabel={backLabel} />
-        <main className="max-w-4xl mx-auto px-6 py-8">
-          <LoadingSpinner />
-        </main>
-      </div>
-    )
-  }
+  const req = data?.requirement
+  const pages = req ? pageRange(req.page_start, req.page_end) : null
 
-  // ── Not found ────────────────────────────────────────────────────────────────
-  if (notFound) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header backTo={backTo} backLabel={backLabel} />
-        <main className="max-w-4xl mx-auto px-6 py-8">
+  return (
+    <AppShell>
+      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+
+        {/* Breadcrumb — only shown when navigated from another view */}
+        {backTo && (
+          <div>
+            <Link to={backTo} className="text-sm text-blue-600 hover:underline">
+              {backLabel}
+            </Link>
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && <LoadingSpinner />}
+
+        {/* Not found */}
+        {!loading && notFound && (
           <div className="bg-yellow-50 border border-yellow-200 rounded p-6 text-center">
             <p className="text-gray-700 font-medium mb-1">Requirement not found</p>
             <p className="text-sm text-gray-500 mb-4">
               <span className="font-mono">{reqId}</span> does not exist in the index.
             </p>
-            <Link to={backTo} className="text-sm text-blue-600 underline">
-              {backLabel}
-            </Link>
+            {backTo && (
+              <Link to={backTo} className="text-sm text-blue-600 underline">
+                {backLabel}
+              </Link>
+            )}
           </div>
-        </main>
-      </div>
-    )
-  }
+        )}
 
-  // ── Error ────────────────────────────────────────────────────────────────────
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header backTo={backTo} backLabel={backLabel} />
-        <main className="max-w-4xl mx-auto px-6 py-8">
+        {/* Error */}
+        {!loading && !notFound && error && (
           <ErrorBanner message={error} onRetry={() => setRetries(r => r + 1)} />
-        </main>
-      </div>
-    )
-  }
+        )}
 
-  if (!data) return null
+        {/* Full detail */}
+        {!loading && !notFound && !error && req && (
+          <>
+            {/* ID + location */}
+            <div>
+              <h1 className="font-mono text-lg font-bold text-blue-700 break-all">
+                {req.requirement_id}
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                {req.source_pdf}
+                {req.section_title_path && <> · {req.section_title_path}</>}
+                {pages && <> · {pages}</>}
+              </p>
+            </div>
 
-  const req = data.requirement
-  const pages = pageRange(req.page_start, req.page_end)
-
-  // ── Full detail ──────────────────────────────────────────────────────────────
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Header backTo={backTo} backLabel={backLabel} />
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-
-        {/* ID + breadcrumb */}
-        <div>
-          <h1 className="font-mono text-lg font-bold text-blue-700 break-all">
-            {req.requirement_id}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {req.source_pdf}
-            {req.section_title_path && <> · {req.section_title_path}</>}
-            {pages && <> · {pages}</>}
-          </p>
-        </div>
-
-        {/* Description */}
-        <Section label="Description">
-          {req.description ? (
-            <p className="text-sm text-gray-700 leading-relaxed">{req.description}</p>
-          ) : (
-            <p className="text-sm text-gray-400">No description available.</p>
-          )}
-        </Section>
-
-        {/* Source quote */}
-        <Section label="Source Quote">
-          {req.source_quote ? (
-            <>
-              <blockquote className="border-l-4 border-blue-200 pl-4 text-sm text-gray-700 italic leading-relaxed">
-                {req.source_quote}
-              </blockquote>
-              {req.source_ref && (
-                <p className="mt-2 text-xs text-gray-400">{req.source_ref}</p>
+            {/* Description */}
+            <Section label="Description">
+              {req.description ? (
+                <p className="text-sm text-gray-700 leading-relaxed">{req.description}</p>
+              ) : (
+                <p className="text-sm text-gray-400">No description available.</p>
               )}
-            </>
-          ) : (
-            <p className="text-sm text-gray-400">No source quote available.</p>
-          )}
-        </Section>
+            </Section>
 
-        {/* Source context — hidden by default, fetched on demand */}
-        <Section label="Source Context">
-          {contextText === null ? (
-            <button
-              onClick={handleExpandContext}
-              disabled={contextLoading}
-              className="text-sm text-blue-600 underline hover:no-underline disabled:opacity-50"
-            >
-              {contextLoading ? 'Loading…' : 'Show source context'}
-            </button>
-          ) : (
-            <pre className="text-xs text-gray-600 bg-gray-100 rounded p-3 whitespace-pre-wrap leading-relaxed overflow-x-auto">
-              {contextText}
-            </pre>
-          )}
-        </Section>
+            {/* Source quote */}
+            <Section label="Source Quote">
+              {req.source_quote ? (
+                <>
+                  <blockquote className="border-l-4 border-blue-200 pl-4 text-sm text-gray-700 italic leading-relaxed">
+                    {req.source_quote}
+                  </blockquote>
+                  {req.source_ref && (
+                    <p className="mt-2 text-xs text-gray-400">{req.source_ref}</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">No source quote available.</p>
+              )}
+            </Section>
 
-        {/* Provenance */}
-        <Section label="Provenance">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-            <dt className="text-gray-400 whitespace-nowrap">Document ID</dt>
-            <dd className="text-gray-700 font-mono text-xs">{req.document_id}</dd>
+            {/* Source context — hidden by default, fetched on demand */}
+            <Section label="Source Context">
+              {contextText === null ? (
+                <button
+                  onClick={handleExpandContext}
+                  disabled={contextLoading}
+                  className="text-sm text-blue-600 underline hover:no-underline disabled:opacity-50"
+                >
+                  {contextLoading ? 'Loading…' : 'Show source context'}
+                </button>
+              ) : (
+                <pre className="text-xs text-gray-600 bg-gray-100 rounded p-3 whitespace-pre-wrap leading-relaxed overflow-x-auto">
+                  {contextText}
+                </pre>
+              )}
+            </Section>
 
-            <dt className="text-gray-400 whitespace-nowrap">Source PDF</dt>
-            <dd className="text-gray-700 text-xs break-all">{req.source_pdf}</dd>
+            {/* Provenance */}
+            <Section label="Provenance">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                <dt className="text-gray-400 whitespace-nowrap">Document ID</dt>
+                <dd className="text-gray-700 font-mono text-xs">{req.document_id}</dd>
 
-            <dt className="text-gray-400 whitespace-nowrap">Type</dt>
-            <dd className="text-gray-700">{req.requirement_type}</dd>
+                <dt className="text-gray-400 whitespace-nowrap">Source PDF</dt>
+                <dd className="text-gray-700 text-xs break-all">{req.source_pdf}</dd>
 
-            {req.domain_tags.length > 0 && (
-              <>
-                <dt className="text-gray-400 whitespace-nowrap">Domain tags</dt>
-                <dd className="text-gray-700">
-                  <div className="flex flex-wrap gap-1.5">
-                    {req.domain_tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="bg-blue-50 text-blue-700 text-xs rounded px-2 py-0.5"
-                      >
-                        {tag}
-                      </span>
+                <dt className="text-gray-400 whitespace-nowrap">Type</dt>
+                <dd className="text-gray-700">{req.requirement_type}</dd>
+
+                {req.domain_tags.length > 0 && (
+                  <>
+                    <dt className="text-gray-400 whitespace-nowrap">Domain tags</dt>
+                    <dd className="text-gray-700">
+                      <div className="flex flex-wrap gap-1.5">
+                        {req.domain_tags.map(tag => (
+                          <span
+                            key={tag}
+                            className="bg-blue-50 text-blue-700 text-xs rounded px-2 py-0.5"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </dd>
+                  </>
+                )}
+
+                {req.confidence != null && (
+                  <>
+                    <dt className="text-gray-400 whitespace-nowrap">Confidence</dt>
+                    <dd className="text-gray-700 tabular-nums">
+                      {req.confidence.toFixed(2)}
+                    </dd>
+                  </>
+                )}
+
+                {req.section_ref_path && (
+                  <>
+                    <dt className="text-gray-400 whitespace-nowrap">Section ref</dt>
+                    <dd className="text-gray-700 text-xs">{req.section_ref_path}</dd>
+                  </>
+                )}
+
+                {(req as { domain_profile?: string }).domain_profile && (
+                  <>
+                    <dt className="text-gray-400 whitespace-nowrap">Profile</dt>
+                    <dd className="text-gray-700 text-xs">
+                      {(req as { domain_profile?: string }).domain_profile}
+                    </dd>
+                  </>
+                )}
+              </dl>
+            </Section>
+
+            {/* Cross-framework matches */}
+            {data && (
+              <Section label={`Cross-Framework Matches (${data.cross_matches.length})`}>
+                {data.cross_matches.length === 0 ? (
+                  <p className="text-sm text-gray-400">No cross-framework matches found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {data.cross_matches.map(m => (
+                      <CrossMatchCard key={m.requirement_id} match={m} from={fromPath} />
                     ))}
                   </div>
-                </dd>
-              </>
+                )}
+              </Section>
             )}
-
-            {req.confidence != null && (
-              <>
-                <dt className="text-gray-400 whitespace-nowrap">Confidence</dt>
-                <dd className="text-gray-700 tabular-nums">
-                  {req.confidence.toFixed(2)}
-                </dd>
-              </>
-            )}
-
-            {req.section_ref_path && (
-              <>
-                <dt className="text-gray-400 whitespace-nowrap">Section ref</dt>
-                <dd className="text-gray-700 text-xs">{req.section_ref_path}</dd>
-              </>
-            )}
-          </dl>
-        </Section>
-
-        {/* Cross-framework matches */}
-        <Section label={`Cross-Framework Matches (${data.cross_matches.length})`}>
-          {data.cross_matches.length === 0 ? (
-            <p className="text-sm text-gray-400">No cross-framework matches found.</p>
-          ) : (
-            <div className="space-y-3">
-              {data.cross_matches.map(m => (
-                <CrossMatchCard key={m.requirement_id} match={m} from={fromPath} />
-              ))}
-            </div>
-          )}
-        </Section>
+          </>
+        )}
 
       </main>
-    </div>
+    </AppShell>
   )
 }

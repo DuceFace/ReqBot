@@ -388,7 +388,7 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 
 ### WP-21.5 - CLI Integration
 
-**Status:** COMPLETE 2026-07-19 — PR #73 merged; `cli/reqbot.py`; 14 unit tests; 213 total.
+**Status:** COMPLETE 2026-07-19 — implemented in PR #73; `cli/reqbot.py`; 14 unit tests; 213 total.
 
 **Goal:** Add `reqbot checklist` command.
 

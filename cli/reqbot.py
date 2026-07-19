@@ -893,7 +893,7 @@ def cmd_checklist(args: argparse.Namespace) -> int:
 
     try:
         checklist = checklist_service.generate(processed_dir, args.doc, args.profile)
-    except ValueError as e:
+    except (ValueError, FileNotFoundError) as e:
         log.error("%s", e)
         return 1
 

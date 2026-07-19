@@ -219,7 +219,7 @@ def test_invalid_profile_returns_1(tmp_path):
     mock_cfg.processed_dir_path.return_value = tmp_path
 
     with patch("cli.reqbot._cfg", mock_cfg), \
-         patch("services.checklist_service.generate", side_effect=ValueError("Profile not found: bad-profile")):
+         patch("services.checklist_service.generate", side_effect=FileNotFoundError("Profile not found: bad-profile")):
         rc = cmd_checklist(_args(profile="bad-profile"))
 
     assert rc == 1

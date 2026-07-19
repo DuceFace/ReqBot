@@ -376,6 +376,31 @@ def test_generate_enriched_domain_tags_suppress_review_flag(tmp_path):
     assert item["requires_human_review"] is False
 
 
+def test_generate_newer_normalized_beats_older_enriched(tmp_path):
+    """A newer run's normalized file must win over an older run's enriched file."""
+    import os
+
+    # Run 1 (older): has both normalized and enriched output
+    old_dir = tmp_path / "testdoc_20260101_120000"
+    old_dir.mkdir()
+    old_rec = {**COMPLETE_REQ, "requirement_id": "REQ-oldrun"}
+    _write_jsonl(old_dir / "testdoc_requirements_normalized.jsonl", [old_rec])
+    _write_jsonl(old_dir / "testdoc_requirements_enriched.jsonl", [old_rec])
+    for f in old_dir.glob("*.jsonl"):
+        os.utime(f, (1000.0, 1000.0))
+
+    # Run 2 (newer): has only normalized — enrichment not yet run
+    new_dir = tmp_path / "testdoc_20260201_120000"
+    new_dir.mkdir()
+    new_rec = {**COMPLETE_REQ, "requirement_id": "REQ-newrun"}
+    _write_jsonl(new_dir / "testdoc_requirements_normalized.jsonl", [new_rec])
+    for f in new_dir.glob("*.jsonl"):
+        os.utime(f, (2000.0, 2000.0))
+
+    result = generate(tmp_path, "testdoc", "cybersecurity")
+    assert result["items"][0]["requirement_ids"] == ["REQ-newrun"]
+
+
 # ---------------------------------------------------------------------------
 # generate() — error cases
 # ---------------------------------------------------------------------------

@@ -27,31 +27,32 @@ CONFIDENCE_REVIEW_THRESHOLD = 0.8
 
 
 def _resolve_doc_path(processed_dir: Path, doc_key: str) -> Path:
-    """Return the most-recently-modified requirements JSONL path for doc_key.
+    """Return the best requirements JSONL path for doc_key.
 
-    Prefers *_requirements_enriched.jsonl (Step D.5 output) so domain_tags,
-    description, and requirement_type are fully populated. Falls back to
-    *_requirements_normalized.jsonl (Step D output) when enriched output is absent.
+    Groups candidates by run directory (parent dir). Picks the most recent run
+    using the latest file mtime within each run, then prefers enriched over
+    normalized within that run. This prevents an older enriched file from a
+    previous run from beating a newer normalized file from a later run.
 
     Raises ValueError if no matching file is found.
     """
-    enriched = [
-        p for p in processed_dir.rglob("*_requirements_enriched.jsonl")
-        if p.stem.replace("_requirements_enriched", "") == doc_key
-    ]
-    if enriched:
-        return max(enriched, key=lambda p: p.stat().st_mtime)
+    runs: dict[Path, dict[str, Path]] = {}
+    for suffix in ("enriched", "normalized"):
+        for p in processed_dir.rglob(f"*_requirements_{suffix}.jsonl"):
+            if p.stem.replace(f"_requirements_{suffix}", "") == doc_key:
+                runs.setdefault(p.parent, {})[suffix] = p
 
-    normalized = [
-        p for p in processed_dir.rglob("*_requirements_normalized.jsonl")
-        if p.stem.replace("_requirements_normalized", "") == doc_key
-    ]
-    if normalized:
-        return max(normalized, key=lambda p: p.stat().st_mtime)
+    if not runs:
+        raise ValueError(
+            f"No requirements JSONL found for doc_key '{doc_key}' in {processed_dir}"
+        )
 
-    raise ValueError(
-        f"No requirements JSONL found for doc_key '{doc_key}' in {processed_dir}"
+    latest_run = max(
+        runs,
+        key=lambda d: max(p.stat().st_mtime for p in runs[d].values()),
     )
+    candidates = runs[latest_run]
+    return candidates.get("enriched") or candidates["normalized"]
 
 
 def _checklist_item_id(requirement_ids: list[str]) -> str:

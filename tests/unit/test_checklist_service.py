@@ -34,8 +34,18 @@ def _write_jsonl(path: Path, records: list[dict]) -> None:
 def _make_doc(tmp_path: Path, doc_key: str, records: list[dict]) -> Path:
     """Write a normalized JSONL for doc_key and return processed_dir."""
     run_dir = tmp_path / f"{doc_key}_20260101_120000"
-    run_dir.mkdir()
+    run_dir.mkdir(exist_ok=True)
     _write_jsonl(run_dir / f"{doc_key}_requirements_normalized.jsonl", records)
+    return tmp_path
+
+
+def _make_enriched_doc(tmp_path: Path, doc_key: str, records: list[dict]) -> Path:
+    """Write an enriched JSONL for doc_key alongside a normalized stub."""
+    run_dir = tmp_path / f"{doc_key}_20260101_120000"
+    run_dir.mkdir(exist_ok=True)
+    # Normalized file must exist (pipeline writes both); enriched is the preferred source
+    _write_jsonl(run_dir / f"{doc_key}_requirements_normalized.jsonl", records)
+    _write_jsonl(run_dir / f"{doc_key}_requirements_enriched.jsonl", records)
     return tmp_path
 
 
@@ -329,6 +339,41 @@ def test_generate_skipped_and_valid_mixed(tmp_path):
     result = generate(processed_dir, "testdoc", "cybersecurity")
     assert result["summary"]["total_items"] == 1
     assert result["items"][0]["requirement_ids"] == ["REQ-valid"]
+
+
+# ---------------------------------------------------------------------------
+# generate() — source file preference (enriched > normalized)
+# ---------------------------------------------------------------------------
+
+def test_generate_prefers_enriched_when_both_exist(tmp_path):
+    """When enriched and normalized files both exist, enriched must be used."""
+    run_dir = tmp_path / "testdoc_20260101_120000"
+    run_dir.mkdir()
+    # Normalized: record with no domain_tags (would trigger missing-domain-tags flag)
+    normalized_rec = {**COMPLETE_REQ, "domain_tags": []}
+    _write_jsonl(run_dir / "testdoc_requirements_normalized.jsonl", [normalized_rec])
+    # Enriched: same record with domain_tags populated
+    enriched_rec = {**COMPLETE_REQ, "domain_tags": ["access-control"]}
+    _write_jsonl(run_dir / "testdoc_requirements_enriched.jsonl", [enriched_rec])
+    item = generate(tmp_path, "testdoc", "cybersecurity")["items"][0]
+    assert item["domain_tags"] == ["access-control"]
+    assert "missing-domain-tags" not in item["review_reasons"]
+
+
+def test_generate_falls_back_to_normalized_when_no_enriched(tmp_path):
+    """When no enriched file exists, normalized JSONL is used without error."""
+    processed_dir = _make_doc(tmp_path, "testdoc", [COMPLETE_REQ])
+    result = generate(processed_dir, "testdoc", "cybersecurity")
+    assert result["summary"]["total_items"] == 1
+
+
+def test_generate_enriched_domain_tags_suppress_review_flag(tmp_path):
+    """Enriched domain_tags prevent the missing-domain-tags review flag."""
+    enriched_rec = {**COMPLETE_REQ, "domain_tags": ["audit-and-logging"]}
+    processed_dir = _make_enriched_doc(tmp_path, "testdoc", [enriched_rec])
+    item = generate(processed_dir, "testdoc", "cybersecurity")["items"][0]
+    assert "missing-domain-tags" not in item["review_reasons"]
+    assert item["requires_human_review"] is False
 
 
 # ---------------------------------------------------------------------------

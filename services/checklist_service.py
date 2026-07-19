@@ -1,4 +1,9 @@
-"""Checklist service — generates audit checklist items from normalized requirement records.
+"""Checklist service — generates audit checklist items from validated requirement records.
+
+Prefers enriched requirement output (*_requirements_enriched.jsonl, Step D.5) when
+available for a document, so checklist items reflect final domain_tags, description,
+and requirement_type. Falls back to normalized output (*_requirements_normalized.jsonl,
+Step D) when enriched output does not yet exist.
 
 Returns structured data; all display and export logic stays in cli/reqbot.py and
 pipeline/checklist_export.py (WP-21.4).
@@ -22,19 +27,31 @@ CONFIDENCE_REVIEW_THRESHOLD = 0.8
 
 
 def _resolve_doc_path(processed_dir: Path, doc_key: str) -> Path:
-    """Return the most-recently-modified normalized JSONL path for doc_key.
+    """Return the most-recently-modified requirements JSONL path for doc_key.
+
+    Prefers *_requirements_enriched.jsonl (Step D.5 output) so domain_tags,
+    description, and requirement_type are fully populated. Falls back to
+    *_requirements_normalized.jsonl (Step D output) when enriched output is absent.
 
     Raises ValueError if no matching file is found.
     """
-    candidates = [
+    enriched = [
+        p for p in processed_dir.rglob("*_requirements_enriched.jsonl")
+        if p.stem.replace("_requirements_enriched", "") == doc_key
+    ]
+    if enriched:
+        return max(enriched, key=lambda p: p.stat().st_mtime)
+
+    normalized = [
         p for p in processed_dir.rglob("*_requirements_normalized.jsonl")
         if p.stem.replace("_requirements_normalized", "") == doc_key
     ]
-    if not candidates:
-        raise ValueError(
-            f"No normalized JSONL found for doc_key '{doc_key}' in {processed_dir}"
-        )
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+    if normalized:
+        return max(normalized, key=lambda p: p.stat().st_mtime)
+
+    raise ValueError(
+        f"No requirements JSONL found for doc_key '{doc_key}' in {processed_dir}"
+    )
 
 
 def _checklist_item_id(requirement_ids: list[str]) -> str:

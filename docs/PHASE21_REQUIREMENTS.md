@@ -302,6 +302,8 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 
 ### WP-21.3 - Audit Question Field Strategy
 
+**Status:** COMPLETE 2026-07-19 — documented in PR #72; no code changes required.
+
 **Goal:** Document the Phase 21 decision to defer `audit_question` generation and define the rules governing the field.
 
 **Rationale:** Regulatory requirements span AFIs, DoDIs, laws, medical policies, housing codes, and more. Rule-based question generation would not generalize meaningfully across this variety, and a superficial transform ("Does the system ensure that [source_quote]?") adds less value than the verbatim `source_quote` itself. Requiring LLM interpretation introduces dependency and latency cost not justified for the Phase 21 MVP. The field is preserved in the schema for future use.
@@ -329,6 +331,8 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 
 ### WP-21.4 - CSV, JSON, and Markdown Export
 
+**Status:** COMPLETE 2026-07-19 — PR #72 merged; `pipeline/checklist_export.py`; 46 unit tests; 200 total.
+
 **Goal:** Export checklist output for spreadsheet, machine, and plain-text use.
 
 **Implementation rules:**
@@ -353,21 +357,32 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 - `domain_tags`: join array with `, ` separator.
 - `review_reasons`: join array with `; ` separator.
 
+**Key implementation facts:**
+
+- Module: `pipeline/checklist_export.py`; functions `to_csv(checklist) -> str`, `to_json(checklist) -> str`, `to_markdown(checklist) -> str`
+- CSV uses stdlib `csv.DictWriter`; column order: locate → ask → record → verify → trace (see table above)
+- Formula injection prevention: `_csv_safe()` prefixes cells whose effective first character is `=`, `+`, `-`, or `@` with `'`; applied to all string cells after array joining; non-string values (bool, float) pass through unchanged; JSON and Markdown exports unaffected
+- `confidence: null` guard in `_md_item()`: explicit `if conf is None: conf = 0.0` before `:.2f` formatting
+- JSON export: `json.dumps(checklist, indent=2)` — full envelope, no mutation
+- Markdown: section heading from `section_title_path` + page range; `⚠ Requires Review:` block for flagged items; `*(not generated)*` placeholder for blank `audit_question`
+
 **Tasks:**
 
-- Add CSV export as the primary human-usable MVP format. Use column order above.
-- Add JSON export (pretty-printed checklist envelope).
-- Add Markdown export.
-- Include requirement IDs, source references, section title paths, review reasons, and assessor-owned fields in all formats.
-- Add tests or golden fixtures for all formats.
+- Add CSV export as the primary human-usable MVP format. Use column order above. ✅
+- Add JSON export (pretty-printed checklist envelope). ✅
+- Add Markdown export. ✅
+- Include requirement IDs, source references, section title paths, review reasons, and assessor-owned fields in all formats. ✅
+- Add tests or golden fixtures for all formats. ✅
+- Prevent CSV formula injection from document-sourced text. ✅
 
 **Gate:**
 
-- CSV output opens cleanly in spreadsheet tools with the defined column order.
-- JSON output is parseable.
-- Markdown output is readable and source-backed.
-- No checklist item lacks provenance.
-- No XLSX dependency introduced.
+- ✅ CSV output opens cleanly in spreadsheet tools with the defined column order.
+- ✅ JSON output is parseable.
+- ✅ Markdown output is readable and source-backed.
+- ✅ No checklist item lacks provenance.
+- ✅ No XLSX dependency introduced.
+- ✅ CSV formula injection prevented for cells starting with `=`, `+`, `-`, `@` (including leading whitespace variants).
 
 ---
 
@@ -451,8 +466,8 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 |----|-------------|-----------------|
 | 21.1 | Checklist design audit | Field mapping and source-of-truth decisions documented |
 | 21.2 | Checklist service and schema | Valid source-backed checklist JSON from fixtures |
-| 21.3 | Audit question field strategy | Deferral rationale and field rules documented |
-| 21.4 | CSV, JSON, and Markdown export | Outputs are spreadsheet-friendly/readable/parseable |
+| 21.3 | Audit question field strategy ✅ | Deferral rationale and field rules documented |
+| 21.4 | CSV, JSON, and Markdown export ✅ | Outputs are spreadsheet-friendly/readable/parseable |
 | 21.5 | CLI integration | `reqbot checklist` works for document-scoped generation |
 | 21.6 | Integration gate | Checklist MVP passes without CLI regressions |
 

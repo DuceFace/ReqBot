@@ -7,7 +7,7 @@ import ResultCard from '../components/ResultCard'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 import SynthesisBox from '../components/SynthesisBox'
-import NavBar from '../components/NavBar'
+import AppShell from '../components/AppShell'
 import { useSynthesis } from '../hooks/useSynthesis'
 import { docValue } from '../utils/ui'
 
@@ -119,10 +119,7 @@ export default function SearchView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavBar />
-
-      {/* Main */}
+    <AppShell>
       <main className="max-w-4xl mx-auto px-6 py-8">
         {/* Search form */}
         <form onSubmit={handleSubmit} className="flex gap-2 mb-4">
@@ -225,6 +222,6 @@ export default function SearchView() {
           </>
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

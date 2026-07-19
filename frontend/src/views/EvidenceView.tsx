@@ -6,7 +6,7 @@ import type { EvidenceRequirement, EvidenceResponse } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 import SynthesisBox from '../components/SynthesisBox'
-import NavBar from '../components/NavBar'
+import AppShell from '../components/AppShell'
 import { useSynthesis } from '../hooks/useSynthesis'
 import { pageRange } from '../utils/ui'
 
@@ -110,9 +110,7 @@ export default function EvidenceView() {
   const fromPath = location.pathname + location.search
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavBar />
-
+    <AppShell>
       <main className="max-w-4xl mx-auto px-6 py-8">
         {/* Map form */}
         <form onSubmit={handleSubmit} className="flex gap-2 mb-8">
@@ -208,6 +206,6 @@ export default function EvidenceView() {
           </>
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

@@ -6,7 +6,7 @@ import * as api from '../api/client'
 import type { ComparePayload, CompareResponse, DocsEntry } from '../api/types'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
-import NavBar from '../components/NavBar'
+import AppShell from '../components/AppShell'
 
 // ── Result-splitting logic ────────────────────────────────────────────────────
 
@@ -239,9 +239,7 @@ export default function CompareView() {
   const totalCount = split ? split.both.length + split.doc1Only.length + split.doc2Only.length : 0
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavBar />
-
+    <AppShell>
       <main className="max-w-4xl mx-auto px-6 py-8">
         {/* Docs load error */}
         {docsError && (
@@ -390,6 +388,6 @@ export default function CompareView() {
           </>
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

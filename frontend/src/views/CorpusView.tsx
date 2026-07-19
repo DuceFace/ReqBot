@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import * as api from '../api/client'
 import type { DocsEntry, DocsResponse } from '../api/types'
+import AppShell from '../components/AppShell'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
-import NavBar from '../components/NavBar'
 import { docValue } from '../utils/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ function SortBtn({
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function DocsView() {
+export default function CorpusView() {
   const [data, setData] = useState<DocsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -120,9 +120,7 @@ export default function DocsView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavBar />
-
+    <AppShell>
       <main className="max-w-4xl mx-auto px-6 py-8">
         {/* Loading */}
         {loading && <LoadingSpinner />}
@@ -162,7 +160,7 @@ export default function DocsView() {
             {/* Row count */}
             <p className="text-xs text-gray-400 mb-3">
               {sorted.length} of {data.total_docs} document{data.total_docs !== 1 ? 's' : ''}
-              {filter.trim() ? ` matching “${filter.trim()}”` : ''}
+              {filter.trim() ? ` matching "${filter.trim()}"` : ''}
             </p>
 
             {/* Document list */}
@@ -179,7 +177,14 @@ export default function DocsView() {
             )}
           </>
         )}
+
+        {/* Empty corpus */}
+        {!loading && !error && data && data.total_docs === 0 && (
+          <p className="text-sm text-gray-500">
+            No documents indexed yet. Ingest documents via the CLI.
+          </p>
+        )}
       </main>
-    </div>
+    </AppShell>
   )
 }

@@ -38,7 +38,7 @@ After Phase 21:
 - A user can generate a checklist for a document or requirement set.
 - Checklist output is available in CSV, JSON, and Markdown.
 - Every checklist item includes source provenance.
-- Checklist items include clear audit questions.
+- Checklist items include verbatim source quotes as the primary assessor-facing prompt; `audit_question` is reserved for a future LLM-backed feature.
 - Low-confidence or incomplete source records are marked for human review.
 - Checklist generation consumes existing normalized requirements instead of bypassing the pipeline.
 
@@ -48,7 +48,7 @@ After Phase 21:
 
 1. **Validated requirements are the source of truth.** Checklist generation consumes normalized requirement records. It must not parse PDFs directly or re-extract obligations from raw chunks.
 2. **No orphan checklist items.** Every checklist item must reference at least one `requirement_id`. A record missing `requirement_id` or `source_quote` must not produce a checklist item — these are the hard provenance anchors. A record missing weaker provenance (`source_ref`, `section_title_path`, `page_refs`, `domain_tags`) produces an item flagged with `requires_human_review`.
-3. **No invented obligations.** The generator may rephrase a requirement as an audit question, but it must not add new duties, controls, or evidence claims that are not grounded in the source requirement. If it cannot produce a grounded rephrase, it must leave the generated field blank.
+3. **No invented obligations.** The generator must not add new duties, controls, or evidence claims not grounded in the source requirement. In Phase 21, `audit_question` defaults to `""` and is reserved for future LLM-backed generation (see WP-21.3). Blank `audit_question` is valid in Phase 21 and must not by itself trigger `requires_human_review`.
 4. **Profile-aware, not profile-hardcoded.** Checklist logic may consume `profile["checklist_guidance"]`, `domain_profile`, and requirement metadata. It must not hardcode cybersecurity-only evidence categories or assumptions.
 5. **Service layer first.** Core checklist logic belongs in a reusable service/module callable by CLI now and API/GUI later.
 6. **CLI is a thin wrapper.** `reqbot checklist` handles arguments, calls the service, and writes output.
@@ -115,7 +115,7 @@ Field rules:
 - `page_refs`: derived from `page_start`/`page_end` in source requirement; e.g. `[3]` or `[3, 4]` for cross-page items.
 - `section_title_path`: copied from source requirement metadata when present.
 - `source_quote`: copied from source requirement text or quote field when present.
-- `audit_question`: generated from the requirement text; blank if a grounded rephrase cannot be produced.
+- `audit_question`: reserved for future LLM-backed generation. Defaults to `""` in Phase 21. Blank is valid and does not trigger `requires_human_review`. Do not add `missing-audit-question` or `audit-question-not-generated` to `review_reasons` in Phase 21.
 - `evidence_to_request`: optional in Phase 21 MVP; blank/empty unless the requirement directly supports a conservative value.
 - `generation_notes`: generator-owned notes or caveats; blank by default.
 - `assessor_notes`: human-owned notes; always blank at generation time and never overwritten by regeneration.
@@ -262,7 +262,7 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 
 ### WP-21.2 - Checklist Service and Schema
 
-**Status:** COMPLETE 2026-07-19 — PR open (`feature/wp-21.2-checklist-service`); 48 unit tests; 148 total.
+**Status:** COMPLETE 2026-07-19 — PR #71 merged; 54 unit tests; 154 total.
 
 **Goal:** Implement core checklist item creation from normalized requirement records.
 
@@ -282,10 +282,11 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 - Source resolution: prefers `*_requirements_enriched.jsonl` (Step D.5) over `*_requirements_normalized.jsonl` (Step D) within the latest run directory; older enriched from a prior run never beats newer normalized from a later run
 - `CONFIDENCE_REVIEW_THRESHOLD = 0.8`; confidence < threshold → `review_reasons: ["low-confidence"]`
 - Deterministic ID: `CHK-` + sha256(`requirement_id`)[:16]; multi-req: sha256(sorted IDs joined by `|`)
-- `page_refs` derived from `page_start`/`page_end`; `[]` if `page_start` missing
+- `page_refs` derived from `page_start`/`page_end`; `[]` if `page_start` missing; string values cast with `int()`; inverted ranges (`end <= start`) return `[start]`; non-numeric values return `[]`
 - `assessor_notes`, `status` initialized to `""` / `"not-started"`; never overwritten by regeneration
-- `domain_profile` fallback: `req.get("domain_profile", "cybersecurity")` for pre-Phase-20 records; mismatch with `profile_name` → `review_reasons: ["profile-mismatch"]`
-- Profile loaded via `load_profile(profile_name)` for validation; content use reserved for WP-21.3
+- `domain_profile` fallback: `req.get("domain_profile") or "cybersecurity"` — handles both missing field and explicit JSON `null`; mismatch with `profile_name` → `review_reasons: ["profile-mismatch"]`
+- `confidence: null` guard: explicit `if confidence is None: confidence = 0.0` (`.get()` default doesn't handle explicit JSON null)
+- Profile loaded via `load_profile(profile_name)` for validation; content use reserved for WP-21.3+
 
 **Gate:**
 
@@ -299,23 +300,30 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 
 ---
 
-### WP-21.3 - Audit Question Generation
+### WP-21.3 - Audit Question Field Strategy
 
-**Goal:** Convert requirement text into clear audit questions.
+**Goal:** Document the Phase 21 decision to defer `audit_question` generation and define the rules governing the field.
+
+**Rationale:** Regulatory requirements span AFIs, DoDIs, laws, medical policies, housing codes, and more. Rule-based question generation would not generalize meaningfully across this variety, and a superficial transform ("Does the system ensure that [source_quote]?") adds less value than the verbatim `source_quote` itself. Requiring LLM interpretation introduces dependency and latency cost not justified for the Phase 21 MVP. The field is preserved in the schema for future use.
 
 **Tasks:**
 
-- Implement conservative question generation.
-- Prefer deterministic transformation first where possible.
-- Use LLM generation only if an existing project LLM helper pattern supports it cleanly.
-- Ensure the generated question remains grounded in the source requirement.
-- Add tests for representative obligation types.
+- Update PHASE21_REQUIREMENTS.md to state deferral and field rules (this WP). ✅
+- Confirm `audit_question` defaults to `""` in `checklist_service.py` (already true — no code change needed). ✅
+- Confirm no `missing-audit-question` or `audit-question-not-generated` review reason exists in code (already true — no code change needed). ✅
+
+**Decided rules for `audit_question`:**
+
+- Defaults to `""` in Phase 21. Blank is valid and correct.
+- Must not trigger `requires_human_review` by itself.
+- `missing-audit-question` and `audit-question-not-generated` are not valid `review_reasons` in Phase 21.
+- Reserved for a future LLM-backed, explicitly user-triggered feature (likely behind a flag). That feature must still satisfy Architecture Rule 3 — no invented obligations, blank if grounded wording cannot be produced.
 
 **Gate:**
 
-- Every generated question maps back to source requirement text.
-- The generator does not introduce obligations absent from the source.
-- Low-confidence or ungrounded generation is marked for human review with a reason.
+- ✅ PHASE21_REQUIREMENTS.md updated with deferral rationale and field rules.
+- ✅ `checklist_service.py` emits `audit_question: ""` with no review reason for blank.
+- ✅ No rule-based or LLM question generation code added in Phase 21.
 
 ---
 
@@ -323,21 +331,43 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 
 **Goal:** Export checklist output for spreadsheet, machine, and plain-text use.
 
+**Implementation rules:**
+
+- Use Python stdlib `csv` for CSV export. No XLSX in Phase 21 — that requires a dependency (`openpyxl` / `XlsxWriter`) and is a separate build-vs-borrow decision.
+- CSV must be Excel-friendly (UTF-8 with BOM or standard UTF-8, quoted strings, no binary). Cannot provide workbook styling (frozen panes, dropdowns, column widths) — that is an XLSX concern.
+- Polished XLSX export is a post-Phase-21 feature.
+
+**CSV column order** (locate → ask → record → verify → trace):
+
+| Group | Columns |
+|-------|---------|
+| Locate | `source_ref`, `section_title_path`, `page_refs` |
+| Ask | `source_quote`, `audit_question` |
+| Record | `status`, `assessor_notes` |
+| Verify | `requires_human_review`, `review_reasons`, `confidence` |
+| Trace | `checklist_item_id`, `requirement_ids`, `domain_tags` |
+
+- `section_title_path`: join array with ` > ` separator.
+- `page_refs`: join array with `, ` separator.
+- `requirement_ids`: join array with `, ` separator.
+- `domain_tags`: join array with `, ` separator.
+- `review_reasons`: join array with `; ` separator.
+
 **Tasks:**
 
-- Add CSV export as the primary human-usable MVP format.
-- Add JSON export.
+- Add CSV export as the primary human-usable MVP format. Use column order above.
+- Add JSON export (pretty-printed checklist envelope).
 - Add Markdown export.
 - Include requirement IDs, source references, section title paths, review reasons, and assessor-owned fields in all formats.
 - Add tests or golden fixtures for all formats.
 
 **Gate:**
 
-- CSV output opens cleanly in spreadsheet tools.
+- CSV output opens cleanly in spreadsheet tools with the defined column order.
 - JSON output is parseable.
 - Markdown output is readable and source-backed.
 - No checklist item lacks provenance.
-- CSV columns follow locate -> ask -> record -> verify -> trace order.
+- No XLSX dependency introduced.
 
 ---
 
@@ -408,7 +438,7 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 3. Every checklist item references one or more source requirements.
 4. Source references, source quotes, and section title paths are preserved when available.
 5. Low-confidence or incomplete items are marked `requires_human_review` with `review_reasons`.
-6. Generated fields are blank when grounded wording cannot be produced.
+6. `audit_question` is blank (`""`) throughout Phase 21. Blank is valid and correct; it does not trigger `requires_human_review`.
 7. `status` and `assessor_notes` are assessor-owned fields and are not generated as findings.
 8. Existing CLI behavior is not regressed.
 9. The architecture is ready for Phase 22 evidence request and test step refinement.
@@ -421,7 +451,7 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 |----|-------------|-----------------|
 | 21.1 | Checklist design audit | Field mapping and source-of-truth decisions documented |
 | 21.2 | Checklist service and schema | Valid source-backed checklist JSON from fixtures |
-| 21.3 | Audit question generation | Questions are grounded and tested |
+| 21.3 | Audit question field strategy | Deferral rationale and field rules documented |
 | 21.4 | CSV, JSON, and Markdown export | Outputs are spreadsheet-friendly/readable/parseable |
 | 21.5 | CLI integration | `reqbot checklist` works for document-scoped generation |
 | 21.6 | Integration gate | Checklist MVP passes without CLI regressions |

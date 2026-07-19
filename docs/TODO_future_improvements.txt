@@ -1,182 +1,291 @@
-GRC Pipeline - Future Improvements
-================================================================
-Last updated: 2026-05-17
-Reviews incorporated: ChatGPT, Claude, Gemini
-
-================================================================
-COMPLETED
+ReqBot Future Improvements and Experiment Backlog
 ================================================================
 
-P1. HYBRID SEARCH: DENSE + SPARSE VECTORS ✅ DONE
-   grc_requirements now uses dense (nomic-embed-text, 768-dim cosine) +
-   sparse (BM25 via fastembed) vectors. ask.py uses RRF fusion.
-   grcai reindex uses atomic alias swap.
+Purpose
+----------------------------------------------------------------
+This file is a parking lot for useful ideas that should not be lost.
+It is not a phase tracker, release plan, or source of truth for current
+implementation status.
 
-P2. QUERY REWRITING / PRE-RETRIEVAL OPTIMIZATION ✅ DONE
-   ask.py pre-processes queries via 8b LLM before embedding:
-   expands query, extracts control IDs for boosting, auto-detects domain tags.
-   Graceful fallback to original query if LLM call fails.
+Use this document for:
 
-P3. PRE-SCAN CHUNKS FOR CANDIDATE SOURCE_REFS ✅ DONE
-   llm_extract_requirements.py regex-scans each chunk before LLM call.
-   Patterns: NIST/STIG control IDs (AC-3(4)), Section refs, Para refs,
-   numbered hierarchies. Injected as non-coercive hints in prompt.
-   Key: uses (?!\w) not \b to correctly capture trailing parentheses.
+- good ideas that are out of scope for the current work package
+- experiments worth trying before committing to a feature
+- cleanup items that are real but not urgent
+- decisions we do not want to re-debate without new evidence
 
-P4. DUAL INDEX: RAW CONTEXT ALONGSIDE REQUIREMENTS ✅ DONE
-   embed_context_index.py indexes Step B chunks into grc_context collection.
-   ask.py --context does O(1) UUID lookup (no second vector search).
-   Windowed context extraction centered on source_quote (300 chars each side).
-   ingest --index and batch auto-run context indexing.
+When an item becomes active work, move the detailed requirements into the
+appropriate phase or work-package document. Keep this file short enough that
+it remains useful.
 
-P5. LAYOUT-AWARE CHUNKING FOR TABLES ✅ DONE
-   extract_pdf_to_text.py --layout-mode pdfplumber: vertical crop sweep
-   preserves reading order; tables wrapped in <<<TABLE_START>>>/<<<TABLE_END>>>
-   sentinels. chunk_text.py --table-aware: splits pushed past table ends,
-   overlap snap prevents table-tail artifacts. PyMuPDF remains default.
 
 ================================================================
-ACTIVE BACKLOG (good ideas, not blocking)
+ACTIVE BACKLOG
 ================================================================
 
-1. RETRY/BACKOFF ON OLLAMA CALLS ✅ DONE
-   call_ollama() now retries up to 3 times with exponential backoff (2s, 4s, 8s)
-   before raising. This prevents transient Ollama hiccups from being permanently
-   cached as failures by the prompt_hash cache (backlog #2). Made mandatory by
-   the cache implementation — a cached ERROR record skips a chunk forever.
+1. Step C concurrency
+   Explore a small worker pool for LLM extraction. This could reduce long ingest
+   times, but it must be tested carefully because local Ollama/GPU setups may
+   become unstable with concurrent generation requests.
 
-2. PROMPT_HASH CACHING IN STEP C ✅ DONE
-   llm_extract_requirements.py loads cached_hashes from existing raw_responses.jsonl
-   before the run. Chunks whose prompt_hash is already present are skipped (O(1) set
-   lookup). Output files open in append mode on resume, write mode on fresh start.
-   Summary log reports processed vs skipped counts.
+   Experiment gate:
+   - measurable ingest-time improvement
+   - no increase in malformed or partial LLM output
+   - graceful behavior on single-GPU machines
 
-3. CONCURRENCY (2-4 WORKERS) IN STEP C
-   Parallelize LLM calls with a small worker pool. Caution: Ollama can
-   be unstable with concurrent requests on single GPU. Test carefully.
-   Could cut full-run time from 70 min to ~20 min.
+2. Streaming write in Step A
+   For very large PDFs, write page records incrementally instead of buffering all
+   pages in memory. Current documents do not appear to require this, but it is a
+   useful scalability hardening item.
 
-4. STREAMING WRITE IN STEP A
-   For very large PDFs (1000+ pages), write pages to JSONL incrementally
-   during extraction instead of buffering all in memory. Not needed for
-   current 500-page docs (~1.6MB text fits easily in RAM).
+3. Low-text page detection / OCR warning
+   Flag pages with unusually low extracted text counts. These pages may be image
+   scans or otherwise OCR-dependent.
 
-5. LOG LOW-TEXT PAGES (OCR DETECTION)
-   In Step A, flag pages with very low character counts. These likely
-   contain scanned images and may need OCR in the future.
+   Keep this as detection first. Actual OCR support should be a separate
+   build-vs-borrow decision.
 
-6. FLAG TRUNCATED JSON RECOVERIES
-   When Strategy 3 (truncated array recovery) fires in Step C, add a
-   field like "recovered_truncated": true to affected requirements so
-   downstream steps can treat them with caution.
+4. Truncated JSON recovery flag
+   When Step C recovers a truncated JSON array, add a field such as
+   "recovered_truncated": true to affected output so downstream steps can mark
+   those records for caution or review.
 
-7. VALIDATE PAGE_NUM CONTIGUITY IN STEP B
-   Check that page numbers are contiguous and start at 1. Missing or
-   duplicate page numbers could indicate upstream extraction issues.
+5. Page number contiguity validation
+   Validate that Step A page numbers are contiguous and start at 1 before Step B
+   chunks them. Missing or duplicate page numbers may indicate extraction bugs.
 
-8. ASSERT OVERLAP < CHUNK_SIZE IN STEP B
-   Guard against infinite loop if overlap >= chunk_size.
+6. Chunk overlap guard
+   Assert that overlap is smaller than chunk_size in Step B. This prevents an
+   infinite-loop class of bug if a bad caller or config value is introduced.
 
-9. CHECK OLLAMA finish_reason / TOKEN METADATA
-   Ollama generate API returns metadata beyond just "response". Could
-   detect truncation more reliably by checking token count vs num_predict.
+7. Ollama finish_reason / token metadata
+   Investigate whether Ollama response metadata can detect truncation more
+   reliably than JSON parse failure alone.
 
-10. REINDEX CONTEXT FOR EXISTING DOCUMENTS ✅ DONE
-    Bulk-ran embed_context_index.py against all *_chunks.jsonl files via:
-    find documents/processed -name "*_chunks.jsonl" -exec python3 embed_context_index.py {} \;
-    grc_context now has 4,042 points covering all 45 indexed documents.
+8. Remove duplicate profile vocabulary constants
+   Step C and Step D.5 still keep module-level VALID_DOMAIN_TAGS and
+   VALID_REQUIREMENT_TYPES constants that mirror profiles/cybersecurity.json.
+   They remain useful for compatibility today, but they are a second source of
+   truth. Consider deriving fallback defaults from core.profiles when the profile
+   plumbing is stable enough.
 
-11. OSCAL OUTPUT FORMAT (BACKBURNER — NO IMMEDIATE NEED)
-    OSCAL (Open Security Controls Assessment Language) is the NIST-standardized
-    machine-readable format for compliance data. GRC platforms like Archer and
-    ServiceNow can ingest OSCAL natively.
-    Decision: BACKBURNER. Implement only if a concrete integration target
-    (Archer, ServiceNow, external handoff) emerges. Not applicable to
-    AFI/SOP/non-GRC documents.
+9. Profile-based skip-section filtering
+   profiles/*.json includes skip_sections, but the chunking pipeline does not yet
+   consume that field. This is useful behavior, especially across different
+   document domains, but it should be implemented as a planned feature because
+   it changes extraction behavior.
 
-12. RERANKER SPIKE (WP-15.5) — DEFERRED POST-PHASE 18
-    Add a local reranker stage after RRF fusion for precision improvement.
-    Candidates: FlashRank (fast), cross-encoder (higher quality).
-    Architecture: retrieve top-N → reranker scores each → return top-k reordered.
-    Gate: Precision@5 improvement, no regressions, acceptable latency.
-    Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
+10. Checklist GUI
+    Add a browser screen for generating and reviewing checklists. The CLI and
+    service path are now stable (Phase 21 complete), so this is unblocked.
 
-13. MULTI-VECTOR RETRIEVAL (WP-15.8) — DEFERRED POST-PHASE 18
-    Index multiple semantic surfaces per requirement (description + source_quote)
-    to improve recall across different query styles.
-    Critical rule: collapse to unique requirement_id before reranking to prevent
-    crowding. Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
+    Likely first version:
+    - choose document
+    - choose output format
+    - show generated checklist preview
+    - export CSV/JSON/Markdown
 
-14. HYPE + RETRIEVAL DEPTH (WP-15.6) — DEFERRED POST-PHASE 18
-    Pre-embed hypothetical questions per requirement at ingest time (HyPE).
-    Expose retrieval depth as a CLI flag: --depth fast|normal|deep.
-    HyPE = free query-time recall; HyDE = runtime query-specific hypothesis.
-    Complementary, not competing. Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
+11. Polished XLSX checklist export
+    CSV is good for portability, but assessors often expect Excel workbooks.
+    Do not hand-roll XLSX. Use openpyxl or XlsxWriter after approving the new
+    dependency.
 
-15. CORRECTIVE RETRIEVAL GATE (WP-15.9) — DEFERRED POST-PHASE 18
-    Confidence-aware recovery: if reranker scores are weak, retry once with a
-    targeted rewrite, then return low-confidence warning if still weak.
-    Depends on WP-15.5 reranker being calibrated first.
-    Full spec: docs/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md
+    Useful workbook features:
+    - frozen locate/ask/record/verify/trace columns
+    - filters enabled
+    - wrapped source_quote cells
+    - data validation for status
+    - clear columns for assessor-owned notes
 
-16. VITE MAJOR VERSION UPGRADE (5 → 8) — DEFERRED POST-PHASE 18
-    Dependabot flagged GHSA-67mh-4wv8-2f99 (esbuild dev-server CORS) and
-    proposed bumping vite from 5.4.21 to 8.0.13. Codex reviewed and deferred:
-    the advisory only affects the Vite dev server, not the built static files
-    shipped via `reqbot serve`. Vite 8 also raises the Node requirement to
-    ^20.19.0 || >=22.12.0 and changes the underlying bundling stack — this is
-    a toolchain migration, not a narrow patch. Handle as an intentional upgrade
-    task once Phase 18 stabilises; verify @vitejs/plugin-react and Tailwind
-    postcss integration still work after the jump.
-    Flagged: 2026-05-17. Advisory: GHSA-67mh-4wv8-2f99.
+12. Optional LLM-backed audit question generation
+    Phase 21 intentionally leaves audit_question blank. A future opt-in feature
+    may use an LLM to generate human-friendly audit questions, but it must not be
+    default behavior.
 
-17. ZOD RUNTIME VALIDATION FOR FRONTEND API RESPONSES — DEFERRED POST-PHASE 18
-    TypeScript types in frontend/src/api/types.ts only protect at compile time.
-    If the Python backend returns an unexpected shape (null where a string is
-    expected, missing field, etc.) the frontend silently misbehaves.
-    Zod would validate /api/ask, /api/trace, /api/docs, /api/status responses
-    at runtime and surface contract drift as a clear error rather than a silent
-    UI bug. Worth adding when: (a) the API surface grows significantly in
-    Phase 19+, (b) a second team is writing against the API, or (c) contract
-    drift has caused a real debugging session.
-    Recommended by Codex during WP-18.3 review (2026-05-17).
+    Guardrails:
+    - explicit user flag or UI toggle
+    - source_quote remains primary
+    - no invented obligations
+    - blank is better than an unsupported rephrase
+    - generated questions should be marked as generated text
 
-18. EVIDENCE VIEW: CONFIGURABLE top_k — DEFERRED POST-WP-19.3
-    POST /api/evidence currently called with hardcoded top_k=20. A dropdown
-    or input in the Evidence view would let users tune result depth (e.g.
-    5 / 10 / 20 / 50). Low priority until users hit the 20-result ceiling
-    in practice. The EvidenceRequest type already has top_k?: number so
-    no API change needed.
-    Flagged by Gemini during WP-19.3 review (2026-05-17).
+13. MCP tool surface
+    Expose ReqBot as a tool server so external assistants can query a self-hosted
+    ReqBot instance.
 
-19. EVIDENCE VIEW: EXPANDABLE SOURCES AND CONTEXT PER GROUP — DEFERRED POST-WP-19.3
-    Each evidence group currently shows only the representative requirement.
-    groups[ref].sources holds all matched requirements for the group, and
-    groups[ref].context_text holds the raw chunk window. An expandable
-    "Show N more sources" section per group would expose the full evidence
-    depth, and showing context_text would give auditors the verbatim
-    surrounding text. Hold until synthesis (WP-19.5) lands — the layout
-    will change once a synthesis panel is above the groups.
-    Flagged by Gemini during WP-19.3 review (2026-05-17).
+    Useful first tools:
+    - search requirements
+    - trace requirement
+    - list documents
+    - generate checklist
+    - build evidence pack
 
-20. REMOVE HARDCODED VOCABULARY CONSTANTS FROM STEP C / D.5 — DEFERRED POST-PHASE-20
-    pipeline/llm_extract_requirements.py and pipeline/enrich_requirements.py each
-    define module-level VALID_DOMAIN_TAGS and VALID_REQUIREMENT_TYPES constants
-    mirroring profiles/cybersecurity.json. These constants are kept for parity-test
-    compatibility and as fallback defaults for helper functions, but they are a
-    second source of truth alongside core/profiles.py.
-    Once profile plumbing is stable (Phase 20 complete), consider deriving these
-    values from core.profiles.default_profile() at import time or removing them
-    entirely so profiles/cybersecurity.json is the single authoritative source.
-    Flagged by Gemini during WP-20.3 review (2026-07-18).
+    Architecture rule: MCP must call the same service layer as CLI and GUI.
+
+14. Runtime validation for frontend API responses
+    TypeScript types only protect at compile time. Runtime validation could catch
+    backend/frontend contract drift before it becomes confusing UI behavior.
+
+    Candidate library: Zod.
+
+    Revisit when:
+    - API surface grows further
+    - external clients consume the API
+    - contract drift causes a real debugging issue
+
+15. Evidence view configurable result depth
+    EvidenceView currently calls the API with a fixed top_k value. Add a simple
+    control when users need to tune evidence depth.
+
+16. Evidence view expandable sources and context
+    Evidence groups currently emphasize the representative requirement. The API
+    also returns all sources per group and context_text. A future UI can expose
+    "show more sources" and surrounding context per group.
+
+17. Checklist assessor-note preservation on regeneration
+    Running generate() for a document that was already exported and annotated
+    will silently reset assessor_notes and status to their initial values
+    ("" / "not-started"). Any assessor work done against the exported CSV or
+    JSON is lost unless the user saved the file.
+
+    A future enhancement should detect a prior checklist export for the same
+    doc_key and merge assessor_notes and status back in by checklist_item_id
+    before writing output. Deterministic IDs make this possible without
+    requiring the user to manage filenames.
+
+    Design constraint:
+    - merge must be opt-in or clearly documented, not silent
+    - IDs are stable across re-runs for the same requirement_id, so a
+      re-ingested document that produces the same requirement_ids will
+      correctly re-associate assessor notes
+
 
 ================================================================
-DECIDED AGAINST
+RETRIEVAL EXPERIMENTS
 ================================================================
-- Remove description field (keep both description + source_quote, they serve different purposes)
-- Deterministic requirement_id hashing (IDs get reassigned in Step D anyway)
-- Lower num_predict (already hitting truncation at 4096, don't make it worse)
-- Sort chunks by chunk_id (already in order from Step B)
-- OSCAL as default output format (backburner — implement only if concrete integration target exists)
-- Docling/Marker for layout parsing (too heavy; GPU dependency; pdfplumber covers the need)
-- "unprofiled" as a domain_profile value — every ingest goes through a named profile (default: cybersecurity); unprofiled records are a brief historical artifact handled by the "cybersecurity" fallback in build_payload(), not a forward-going state to design for
+
+These are quality experiments, not guaranteed product work.
+
+1. Reranker spike
+   Add a local reranker stage after RRF fusion for precision improvement.
+
+   Candidate approaches:
+   - FlashRank for fast local reranking
+   - cross-encoder for higher quality with more cost
+
+   Gate:
+   - Precision@5 improvement
+   - no regression on known good queries
+   - acceptable latency on target hardware
+
+2. Multi-vector retrieval
+   Index multiple semantic surfaces per requirement, such as description and
+   source_quote, to improve recall across different query styles.
+
+   Critical rule:
+   Collapse to unique requirement_id before reranking or display so one
+   requirement cannot crowd out the result set.
+
+3. HyDE promotion from spike to CLI flag
+   The HyDE (hypothetical document embedding) spike lives on core/ask.py only
+   and is not wired into cli/reqbot.py. Promote it as reqbot ask --hyde after
+   confirming the gate results from WP-15.4 still hold on the current corpus.
+
+   Before wiring:
+   - re-run the 5-query gate with the current 45-document corpus
+   - confirm no regression on exact control-ID queries (BM25 leg handles those)
+   - acceptable latency on target hardware
+
+4. HyPE / hypothetical question indexing (separate from HyDE)
+   Pre-generate likely user questions for each requirement at ingest time and
+   index those as an additional retrieval surface.
+
+   This may improve query-time recall, but it adds generated text to the index
+   and should be clearly separated from source-grounded fields.
+
+5. Corrective retrieval gate
+   If retrieval confidence is weak, retry once with a targeted rewrite or
+   alternate retrieval strategy, then surface a low-confidence warning if the
+   result is still weak.
+
+   Depends on having calibrated reranking or confidence signals.
+
+
+================================================================
+DEPENDENCY / TOOLCHAIN BACKLOG
+================================================================
+
+1. Vite major upgrade
+   Current main uses Vite 5.x. Dependabot has proposed a Vite 8.x upgrade.
+   Treat this as a frontend toolchain migration, not a tiny dependency patch.
+
+   Before merging:
+   - confirm GitHub Actions Node version supports Vite 8
+   - confirm local developer Node version guidance is current
+   - run frontend build
+   - verify @vitejs/plugin-react, TypeScript, Tailwind, and PostCSS integration
+
+   Note:
+   The original security concern involved the Vite dev server. ReqBot production
+   static files served through reqbot serve are a different risk surface.
+
+2. React Router maintenance updates
+   Same-major React Router updates are generally lower risk than Vite major
+   upgrades. Merge when CI passes unless release notes show a relevant behavior
+   change.
+
+
+================================================================
+BACKBURNER
+================================================================
+
+1. OSCAL output
+   OSCAL is a NIST-standardized machine-readable format for compliance data.
+   It may be useful for integration with tools such as Archer or ServiceNow.
+
+   Keep on backburner until a concrete integration target exists. Do not make
+   OSCAL the default checklist format.
+
+2. OCR support
+   Useful if low-text page detection proves scanned PDFs are common. This should
+   be a separate design decision because OCR can add heavy dependencies and
+   operational complexity.
+
+3. Authentication / multi-user hosting
+   ReqBot currently fits self-hosted and local/air-gapped use well. Auth and
+   multi-user hosting should be planned only when there is a deployment target
+   that needs it.
+
+
+================================================================
+DECISIONS AND GUARDRAILS
+================================================================
+
+1. Keep description and source_quote
+   They serve different purposes. source_quote is provenance; description is a
+   readable normalized summary.
+
+2. Do not use deterministic requirement_id hashing as the only ID strategy
+   Requirement IDs can be assigned during normalization. Checklist item IDs may
+   be deterministic from requirement IDs.
+
+3. Do not lower num_predict casually
+   The extraction path has already seen truncation risk. Lower output limits may
+   make malformed JSON more likely.
+
+4. Do not sort chunks by chunk_id as a "fix"
+   Chunks already originate in document order. If ordering breaks, find the real
+   upstream cause.
+
+5. Do not design for forward-going "unprofiled" data
+   New ingests should use a named profile. Legacy records without domain_profile
+   may use compatibility fallbacks, but unprofiled should not become a new
+   intended state.
+
+6. Do not build separate logic for CLI, GUI, API, and MCP
+   Core behavior belongs in services. CLI, GUI, API, and MCP should be thin
+   interfaces over the same service layer.
+
+7. Marker remains decided against for now
+   Docling has been adopted as an optional structure-aware path. Marker remains
+   out unless a specific need beats its dependency and operational cost.

@@ -214,7 +214,9 @@ def test_to_markdown_review_flag_shown_for_flagged_item():
 
 
 def test_to_markdown_no_review_flag_for_clean_item():
-    result = to_markdown({"items": [COMPLETE_ITEM], **EMPTY_ENVELOPE})
+    result = to_markdown({**EMPTY_ENVELOPE, "items": [COMPLETE_ITEM]})
+    # Verify the item itself rendered (not just an empty list)
+    assert "The system shall enforce MFA" in result
     assert "Requires Review" not in result
 
 
@@ -246,3 +248,10 @@ def test_to_markdown_no_source_pdf_falls_back_to_document_id():
     checklist = {**EMPTY_ENVELOPE, "document": {"document_id": "abc123", "source_pdf": ""}}
     result = to_markdown(checklist)
     assert "abc123" in result
+
+
+def test_to_markdown_null_confidence_renders_as_zero():
+    item = {**COMPLETE_ITEM, "confidence": None}
+    checklist = {**EMPTY_ENVELOPE, "items": [item]}
+    result = to_markdown(checklist)
+    assert "0.00" in result

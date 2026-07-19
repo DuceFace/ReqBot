@@ -348,7 +348,7 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 | Trace | `checklist_item_id`, `requirement_ids`, `domain_tags` |
 
 - `section_title_path`: join array with ` > ` separator.
-- `page_refs`: join array with `, ` separator.
+- `page_refs`: join array with `, ` separator. The export module receives `page_refs` as a pre-processed list of integers from `checklist_service.py` (`_page_refs()`) and only formats it — no range derivation in the export layer.
 - `requirement_ids`: join array with `, ` separator.
 - `domain_tags`: join array with `, ` separator.
 - `review_reasons`: join array with `; ` separator.

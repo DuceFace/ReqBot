@@ -82,7 +82,9 @@ def _md_item(item: dict, index: int) -> str:
     tags = _join(item.get("domain_tags") or [], ", ")
     if tags:
         lines.append(f"**Domain Tags:** {tags}  ")
-    conf = item.get("confidence", 0.0)
+    conf = item.get("confidence")
+    if conf is None:
+        conf = 0.0
     lines.append(f"**Confidence:** {conf:.2f}  ")
     lines.append("")
 

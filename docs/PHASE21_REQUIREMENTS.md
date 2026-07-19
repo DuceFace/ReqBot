@@ -126,10 +126,10 @@ Field rules:
 
 Profile rules:
 
-- The JSON envelope `profile` field records the selected checklist generation profile.
+- The JSON envelope `profile` field records the selected checklist generation profile. It is set from the `--profile` CLI argument (or `profile_name` service parameter) — it is not read from individual source records.
+- Each source record's `domain_profile` is read at the item level (with `"cybersecurity"` fallback for pre-Phase-20 records that lack the field). If `domain_profile` conflicts with the selected `profile_name`, the item is flagged `requires_human_review: True` with `"profile-mismatch"` in `review_reasons`. This check runs in the service layer (WP-21.2), not deferred to CLI.
 - Checklist item `domain_tags` record topical tags from the source requirement.
 - Do not collapse `domain_tags` into `domain_profile`.
-- If a source requirement's `domain_profile` conflicts with the selected checklist profile, the item must be flagged or the command must fail clearly.
 
 Assessor-owned fields:
 
@@ -262,7 +262,7 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 
 ### WP-21.2 - Checklist Service and Schema
 
-**Status:** COMPLETE 2026-07-19 — PR open (`feature/wp-21.2-checklist-service`); 45 unit tests; 145 total.
+**Status:** COMPLETE 2026-07-19 — PR open (`feature/wp-21.2-checklist-service`); 48 unit tests; 148 total.
 
 **Goal:** Implement core checklist item creation from normalized requirement records.
 
@@ -273,7 +273,8 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 - Generate deterministic `checklist_item_id` values. ✅
 - Copy provenance fields from source requirements. ✅
 - Mark low-confidence or incomplete provenance items with `requires_human_review`. ✅
-- Add unit tests for schema, provenance, low-confidence handling, review reasons, assessor-owned fields, and no-orphan behavior. ✅
+- Flag items where source record `domain_profile` conflicts with selected `profile_name`. ✅
+- Add unit tests for schema, provenance, low-confidence handling, review reasons, assessor-owned fields, no-orphan behavior, and profile mismatch. ✅
 
 **Key implementation facts:**
 
@@ -283,7 +284,8 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 - Deterministic ID: `CHK-` + sha256(`requirement_id`)[:16]; multi-req: sha256(sorted IDs joined by `|`)
 - `page_refs` derived from `page_start`/`page_end`; `[]` if `page_start` missing
 - `assessor_notes`, `status` initialized to `""` / `"not-started"`; never overwritten by regeneration
-- Profile loaded via `load_profile(profile_name)`; reserved for WP-21.3 content generation
+- `domain_profile` fallback: `req.get("domain_profile", "cybersecurity")` for pre-Phase-20 records; mismatch with `profile_name` → `review_reasons: ["profile-mismatch"]`
+- Profile loaded via `load_profile(profile_name)` for validation; content use reserved for WP-21.3
 
 **Gate:**
 
@@ -293,6 +295,7 @@ Qdrant may be used later for interactive or query-scoped checklist generation, b
 - ✅ Records missing weaker provenance (`source_ref`, `section_title_path`, `page_refs`, `domain_tags`) produce a flagged item, not a skipped one.
 - ✅ Low confidence (below threshold) triggers `requires_human_review: true` with a reason.
 - ✅ `status` and `assessor_notes` are initialized for assessor use and treated as human-owned fields.
+- ✅ Source record `domain_profile` mismatch with selected profile flags the item with `"profile-mismatch"`; missing `domain_profile` falls back to `"cybersecurity"` with no flag when running `--profile cybersecurity`.
 
 ---
 

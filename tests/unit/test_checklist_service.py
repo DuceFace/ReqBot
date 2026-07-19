@@ -311,6 +311,34 @@ def test_generate_does_not_crash_on_missing_domain_profile(tmp_path):
     assert len(result["items"]) == 1
 
 
+def test_generate_matching_domain_profile_no_mismatch_flag(tmp_path):
+    """Record with domain_profile matching profile_name must not get a mismatch flag."""
+    rec = {**COMPLETE_REQ, "domain_profile": "cybersecurity"}
+    processed_dir = _make_doc(tmp_path, "testdoc", [rec])
+    item = generate(processed_dir, "testdoc", "cybersecurity")["items"][0]
+    assert "profile-mismatch" not in item["review_reasons"]
+    assert item["requires_human_review"] is False
+
+
+def test_generate_missing_domain_profile_fallback_matches_cybersecurity(tmp_path):
+    """Records without domain_profile fall back to 'cybersecurity'; running with
+    --profile cybersecurity must not produce a mismatch flag."""
+    rec = {k: v for k, v in COMPLETE_REQ.items() if k != "domain_profile"}
+    processed_dir = _make_doc(tmp_path, "testdoc", [rec])
+    item = generate(processed_dir, "testdoc", "cybersecurity")["items"][0]
+    assert "profile-mismatch" not in item["review_reasons"]
+    assert item["requires_human_review"] is False
+
+
+def test_generate_domain_profile_mismatch_flags_review(tmp_path):
+    """Record extracted under a different profile must be flagged for review."""
+    rec = {**COMPLETE_REQ, "domain_profile": "test-domain"}
+    processed_dir = _make_doc(tmp_path, "testdoc", [rec])
+    item = generate(processed_dir, "testdoc", "cybersecurity")["items"][0]
+    assert item["requires_human_review"] is True
+    assert "profile-mismatch" in item["review_reasons"]
+
+
 # ---------------------------------------------------------------------------
 # generate() — multiple items, ordering, ID stability
 # ---------------------------------------------------------------------------

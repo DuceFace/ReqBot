@@ -120,6 +120,8 @@ def generate(processed_dir: Path, doc_key: str, profile_name: str) -> dict:
             domain_tags = req.get("domain_tags") or []
             confidence = req.get("confidence", 0.0)
 
+            source_profile = req.get("domain_profile", "cybersecurity")
+
             review_reasons: list[str] = []
             if not source_ref:
                 review_reasons.append("missing-source-ref")
@@ -131,6 +133,8 @@ def generate(processed_dir: Path, doc_key: str, profile_name: str) -> dict:
                 review_reasons.append("missing-domain-tags")
             if confidence < CONFIDENCE_REVIEW_THRESHOLD:
                 review_reasons.append("low-confidence")
+            if source_profile != profile_name:
+                review_reasons.append("profile-mismatch")
 
             items.append({
                 "checklist_item_id": _checklist_item_id([req_id]),

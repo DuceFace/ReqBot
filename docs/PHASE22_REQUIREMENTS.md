@@ -32,7 +32,7 @@ Phase 21 already built, in the browser.
 - A non-technical user can generate a checklist for a document from the browser.
 - A non-technical user can preview the generated checklist, grouped Locate/Ask/Record/Verify/Trace.
 - A non-technical user can export the checklist as CSV, JSON, or Markdown from the browser,
-  byte-for-byte equivalent to what the CLI produces.
+  content-equivalent to what the CLI produces.
 - The browser UI gains a persistent sidebar and a `/corpus/:docId` / `/system` foundation so the
   checklist screens (and future screens) have a stable home.
 - CLI behavior is completely unchanged. Killing `reqbot serve` has zero effect on CLI checklist
@@ -52,7 +52,7 @@ Explicitly out of scope for Phase 22:
 - Merge-on-regeneration / assessor-note persistence (TODO #17) — undesigned, stays undesigned.
 - Ingest UI, upload forms, or browser-triggered pipeline runs.
 - XLSX export.
-- Profile management UI (create/edit/list-beyond-known-names).
+- Profile management UI (create/edit/delete). A read-only `GET /api/profiles` endpoint for picker options is in scope (see Section 5); creating, editing, or deleting profiles is not.
 - Job history, export history.
 - Authentication, multi-user, hosted/SaaS deployment.
 - MCP tool surface (separate future phase; noted in TODO #13).
@@ -156,10 +156,10 @@ frontend. An unknown `profile` in any checklist endpoint → 400 (maps the exist
 
 **Foundation (prerequisite, no backend dependency):**
 - `AppShell` + `SidebarNav` replacing the current top `NavBar`, with items: Search, Compare,
-  Evidence, Checklists (disabled until WP-22.3), Corpus, System.
+  Evidence, Checklists (disabled until WP-22.4, when the generate screen exists), Corpus, System.
 - Rename `DocsView`/`/docs` route and label to Corpus/`/corpus`.
 - `/corpus/:docId` — document metadata + quick-action links (Search this doc, Compare from
-  here; Generate checklist link present but disabled until WP-22.3 lands).
+  here; Generate checklist link present but disabled until WP-22.5 lands).
 - `/system` — health page from existing `/api/status`; StatusDot links here.
 - Shared `SourceQuoteBlock` and `ProvenanceMeta` extracted from current result/detail UI and
   applied across Search, Compare, Evidence, Trace (visual consistency, no behavior change).
@@ -190,8 +190,8 @@ inline editing of any checklist field.
 - Add `AppShell` and `SidebarNav` components.
 - Replace top `NavBar` usage across all views.
 - Rename `/docs` route and nav label to `/corpus` / "Corpus".
-- Add "Checklists" nav item, disabled/greyed with a tooltip ("Available after WP-22.3") until
-  WP-22.3 lands.
+- Add "Checklists" nav item, disabled/greyed with a tooltip ("Available after checklist screens ship") until
+  WP-22.4 lands.
 
 **Gate:** All existing views (Search, Trace, Compare, Evidence, Corpus) render through the new
 shell with no regressions. No new API calls introduced. Existing frontend unit tests pass.
@@ -380,8 +380,9 @@ Phase 22 is complete when:
   small it seems once the checklist screens exist.
 - **Do not add XLSX export.** Requires an unapproved dependency (`openpyxl`/`XlsxWriter`);
   stays CSV/JSON/Markdown only.
-- **Do not add profile management UI.** `ProfilePicker` uses known static profile names; do
-  not add create/edit/delete or a dynamic profile-listing endpoint this phase.
+- **Do not add profile management UI.** `ProfilePicker` must use `GET /api/profiles` (added
+  in WP-22.3) to populate its options — do not hardcode profile names. Create/edit/delete
+  profile UI is out of scope.
 - **Do not let the API route call the CLI.** `api/routes/checklist.py` calls
   `checklist_service.generate()` and `pipeline/checklist_export.py` directly, in-process —
   never subprocess or shell out to `reqbot`.

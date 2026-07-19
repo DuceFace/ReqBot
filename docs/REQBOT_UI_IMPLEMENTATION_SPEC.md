@@ -445,7 +445,9 @@ ProfilePicker
 
   Must use GET /api/profiles — do not hardcode profile names. Default value is
   "cybersecurity". If the endpoint is loading, render a disabled picker with
-  "cybersecurity" pre-filled so the form remains usable.
+  "cybersecurity" visually pre-filled and keep the Generate button disabled until
+  the endpoint succeeds. If GET /api/profiles fails, show ErrorBanner — do not
+  submit using a hardcoded fallback.
 
 ChecklistTable
   Dense checklist data grid.

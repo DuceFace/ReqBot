@@ -1,0 +1,156 @@
+"""Checklist service — generates audit checklist items from normalized requirement records.
+
+Returns structured data; all display and export logic stays in cli/reqbot.py and
+pipeline/checklist_export.py (WP-21.4).
+"""
+import hashlib
+import json
+import logging
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from core.profiles import load_profile
+
+log = logging.getLogger(__name__)
+
+CONFIDENCE_REVIEW_THRESHOLD = 0.8
+
+
+def _resolve_doc_path(processed_dir: Path, doc_key: str) -> Path:
+    """Return the most-recently-modified normalized JSONL path for doc_key.
+
+    Raises ValueError if no matching file is found.
+    """
+    candidates = [
+        p for p in processed_dir.rglob("*_requirements_normalized.jsonl")
+        if p.stem.replace("_requirements_normalized", "") == doc_key
+    ]
+    if not candidates:
+        raise ValueError(
+            f"No normalized JSONL found for doc_key '{doc_key}' in {processed_dir}"
+        )
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _checklist_item_id(requirement_ids: list[str]) -> str:
+    """Derive a stable deterministic CHK- ID from one or more requirement IDs."""
+    key = "|".join(sorted(requirement_ids))
+    return "CHK-" + hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
+def _page_refs(req: dict) -> list[int]:
+    """Derive page reference list from page_start / page_end fields."""
+    start = req.get("page_start")
+    end = req.get("page_end")
+    if start is None:
+        return []
+    if end is not None and end != start:
+        return list(range(start, end + 1))
+    return [start]
+
+
+def generate(processed_dir: Path, doc_key: str, profile_name: str) -> dict:
+    """Generate a checklist envelope dict from normalized requirements for doc_key.
+
+    Raises FileNotFoundError if processed_dir does not exist.
+    Raises ValueError if doc_key is not found in processed_dir.
+    Raises ValueError if profile_name is not a valid profile.
+    """
+    if not processed_dir.exists():
+        raise FileNotFoundError(f"processed_dir not found: {processed_dir}")
+
+    load_profile(profile_name)  # validate profile exists and is well-formed; reserved for WP-21.3 content
+    jsonl_path = _resolve_doc_path(processed_dir, doc_key)
+
+    items = []
+    document_id = ""
+    source_pdf = ""
+    skipped = 0
+
+    with open(jsonl_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+            except json.JSONDecodeError:
+                log.warning("Skipping malformed JSON line in %s", jsonl_path)
+                continue
+
+            if not document_id:
+                document_id = req.get("document_id", "")
+                source_pdf = req.get("source_pdf", "")
+
+            req_id = req.get("requirement_id", "")
+            source_quote = req.get("source_quote", "")
+
+            # Hard provenance anchors — missing either means no checklist item
+            if not req_id or not source_quote:
+                skipped += 1
+                log.debug("Skipping record — missing requirement_id or source_quote")
+                continue
+
+            page_refs = _page_refs(req)
+            source_ref = req.get("source_ref") or ""
+            section_title_path = req.get("section_title_path") or []
+            domain_tags = req.get("domain_tags") or []
+            confidence = req.get("confidence", 0.0)
+
+            review_reasons: list[str] = []
+            if not source_ref:
+                review_reasons.append("missing-source-ref")
+            if not section_title_path:
+                review_reasons.append("missing-section-title-path")
+            if not page_refs:
+                review_reasons.append("missing-page-refs")
+            if not domain_tags:
+                review_reasons.append("missing-domain-tags")
+            if confidence < CONFIDENCE_REVIEW_THRESHOLD:
+                review_reasons.append("low-confidence")
+
+            items.append({
+                "checklist_item_id": _checklist_item_id([req_id]),
+                "requirement_ids": [req_id],
+                "domain_tags": domain_tags,
+                "source_ref": source_ref,
+                "page_refs": page_refs,
+                "section_title_path": section_title_path,
+                "source_quote": source_quote,
+                "audit_question": "",
+                "evidence_to_request": [],
+                "generation_notes": "",
+                "assessor_notes": "",
+                "status": "not-started",
+                "confidence": confidence,
+                "requires_human_review": bool(review_reasons),
+                "review_reasons": review_reasons,
+            })
+
+    if skipped:
+        log.info("Skipped %d record(s) missing requirement_id or source_quote", skipped)
+
+    return {
+        "format": "reqbot-checklist",
+        "format_version": "1.0",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generator": {
+            "tool": "reqbot",
+            "command": f"reqbot checklist --doc {doc_key} --profile {profile_name}",
+        },
+        "document": {
+            "document_id": document_id,
+            "source_pdf": source_pdf,
+        },
+        "profile": profile_name,
+        "summary": {
+            "total_items": len(items),
+            "items_requiring_review": sum(1 for i in items if i["requires_human_review"]),
+        },
+        "items": items,
+    }

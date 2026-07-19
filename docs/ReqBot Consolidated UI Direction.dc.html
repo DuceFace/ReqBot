@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
+<style>
+body{margin:0;background:#f0eee9;font-family:'Patrick Hand',system-ui,sans-serif;color:#1a1a1a}
+.wrap{max-width:980px;margin:0 auto;padding:40px 44px 80px}
+h1{font-size:26px;margin:0 0 4px}
+.sub{font:400 13px system-ui,sans-serif;color:#666;margin:0 0 32px}
+h2{font-size:20px;border-bottom:2px solid #1a1a1a;padding-bottom:6px;margin:44px 0 16px}
+h3{font-size:15px;margin:0 0 8px}
+p,li{font:400 13px/1.6 system-ui,sans-serif;color:#333}
+.decision{background:#fff;border:2px solid #1a1a1a;border-radius:4px;padding:16px 18px;box-shadow:4px 4px 0 rgba(0,0,0,.08);margin-bottom:14px}
+.tag{display:inline-block;font:600 10px ui-monospace,Menlo,monospace;padding:3px 8px;border-radius:10px;margin-bottom:8px}
+.tag.p22{background:#1a1a1a;color:#fff}
+.tag.existing{background:#e4e4e4;color:#333;border:1px solid #999}
+.tag.future{background:#f2b544;color:#3a2600;border:1px solid #7a5200}
+.screen{margin-bottom:36px}
+.shell{display:flex;border:2px solid #1a1a1a;border-radius:2px;box-shadow:4px 4px 0 rgba(0,0,0,.1);background:#fff;overflow:hidden}
+.sidebar{width:150px;flex:none;border-right:2px dashed #999;padding:12px 8px;display:flex;flex-direction:column;gap:4px}
+.sidebar .item{font-size:13px;padding:6px 8px;border-radius:4px}
+.sidebar .item.active{background:#1a1a1a;color:#fff}
+.body-col{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:2px dashed #999;font:400 11px system-ui,sans-serif;color:#666}
+.content{padding:14px 16px;font-size:13px;overflow:auto}
+.crumb{color:#777}
+.statuspill{display:flex;align-items:center;gap:5px}
+.dot{width:8px;height:8px;border-radius:50%;background:#2ea36b;display:inline-block}
+.field{border:2px solid #1a1a1a;border-radius:4px;padding:6px 9px;margin-bottom:8px;background:#fafafa;font-size:13px;display:flex;justify-content:space-between}
+.field .car{opacity:.5}
+.btn{display:inline-block;border:2px solid #1a1a1a;border-radius:4px;padding:6px 13px;background:#2a78d6;color:#fff;font-size:13px;text-align:center}
+.btn.gh{background:#fff;color:#1a1a1a}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.chip{border:2px solid #1a1a1a;border-radius:20px;padding:3px 9px;font-size:11px}
+.scrib{background:repeating-linear-gradient(90deg,#1a1a1a,#1a1a1a 60%,transparent 60%,transparent 100%);height:7px;border-radius:3px;opacity:.15}
+.quote{border:1px dashed #1a1a1a;background:#f5f5f0;padding:7px;font-style:italic;font-size:12px;border-radius:3px}
+.flagchip{background:#f2b544;border:1px solid #7a5200;color:#3a2600;font-size:10px;border-radius:10px;padding:2px 7px}
+.rescard{border:1px solid #1a1a1a;border-radius:4px;padding:8px;margin-bottom:8px;background:#fff}
+table.t{width:100%;border-collapse:collapse;font-size:11px}
+table.t th{text-align:left;font-size:9px;text-transform:uppercase;color:#777;border-bottom:2px solid #1a1a1a;padding:4px 5px}
+table.t td{border-bottom:1px dashed #ccc;padding:5px}
+table.t tr.flag td{background:#fff3d6}
+.gsep{border-left:2px dashed #999}
+.pill{border:1px solid #1a1a1a;border-radius:10px;padding:1px 7px;font-size:10px}
+.info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.info .blk{background:#fff;border:1px solid #1a1a1a;border-radius:4px;padding:10px 12px}
+.info .blk h4{font:600 11px system-ui,sans-serif;margin:0 0 6px;text-transform:uppercase;letter-spacing:.03em;color:#555}
+.info .blk ul{margin:0;padding-left:16px}
+.info .blk li{margin-bottom:3px}
+.swatchrow{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.swatch{background:#fff;border:2px solid #1a1a1a;border-radius:4px;padding:12px;box-shadow:3px 3px 0 rgba(0,0,0,.08);width:230px}
+.swatch .lbl{font:600 11px system-ui,sans-serif;margin-bottom:8px;color:#333}
+.boundary{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}
+.boundary .col{background:#fff;border:2px solid #1a1a1a;border-radius:4px;padding:14px 16px}
+.boundary .col h3{margin-top:0}
+.boundary li{margin-bottom:4px}
+</style>
+</helmet>
+
+<div class="wrap">
+<h1>ReqBot — Consolidated UI Design Direction</h1>
+<p class="sub">One app shell, one home behavior, one wireframe per screen. Phase 22 scope and future-only work are labeled throughout.</p>
+
+<h2>1. App Shell</h2>
+<div class="decision">
+<h3>Persistent left sidebar, icon+label, 6 items — no top nav bar</h3>
+<p>Search, Compare, Evidence, Checklists, Corpus, System. Trace, Corpus document detail, and Checklist preview are drill-in routes reached by clicking through — they never appear in the sidebar. A sidebar scales cleanly as sections grow and keeps the work area wide, which matters for dense tables and side-by-side comparisons.</p>
+<p><b>Status placement:</b> a small status pill (dot + label) sits in the top-right of a thin top strip, present on every screen, linking to <code>/system</code>. It is always visible without competing with page content.</p>
+<p><b>Breadcrumb behavior:</b> the top strip shows a breadcrumb only on drill-in routes (e.g. <code>Corpus / afi17-101.pdf</code>, <code>Corpus / afi17-101.pdf / Generate Checklist</code>). Top-level sidebar destinations show no breadcrumb, just the page title in the content area — no redundant "Search / Search."</p>
+<p><b>Route layout:</b> <code>/search</code>, <code>/trace/:reqId</code>, <code>/compare</code>, <code>/evidence</code>, <code>/corpus</code>, <code>/corpus/:docId</code>, <code>/checklists</code>, <code>/checklists/:docId</code>, <code>/system</code>. (Future-only: <code>/corpus/:docId/ingest-status</code>, <code>/jobs</code> — see Future section.)</p>
+</div>
+
+<h2>2. Home / Root Behavior</h2>
+<div class="decision">
+<h3>Root redirects straight to Search — no dashboard</h3>
+<p>Search is the highest-frequency task and the flagship CLI command (<code>reqbot ask</code>). A dashboard would either duplicate counts already on Corpus/System or invent metrics the service doesn't track. Redirecting <code>/</code> → <code>/search</code> means one fewer screen to design, build, and keep truthful, and it matches how a CLI-first tool's users already think: they open ReqBot to find something, not to look at a summary.</p>
+</div>
+
+<h2>3. Screens</h2>
+
+<div class="screen">
+<span class="tag existing">EXISTING — foundation touched in Phase 22 (WP-22.1/22.2)</span>
+<h3>Search — <code>/search</code></h3>
+<div class="shell" style="height:340px">
+<div class="sidebar">
+<div class="item active">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item">Checklists</div><div class="item">Corpus</div><div class="item">System</div>
+</div>
+<div class="body-col">
+<div class="topbar"><span class="crumb"></span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="field" style="margin-bottom:10px">Search requirements… <span class="car">⏎</span></div>
+<div class="toolbar"><span class="chip">Doc: any</span><span class="chip">Domain tag: any</span><span class="chip">☐ Generate answer</span></div>
+<div class="rescard"><div class="quote">"Systems shall enforce access control for all privileged accounts…"</div><div style="font-size:10px;color:#777;margin-top:5px">afi17-101.pdf · §4.2 p.12 · <span class="pill">cybersecurity</span> · score 0.91</div></div>
+<div class="rescard"><div class="quote">"Audit logs shall be retained for a minimum of…"</div><div style="font-size:10px;color:#777;margin-top:5px">dodi8500.pdf · §3.1 p.6 · <span class="pill">cybersecurity</span> · score 0.87</div></div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Query field + toolbar (filters, answer toggle)</li><li>Result card list, full width</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>Query input</li><li>Doc / domain-tag filters</li><li>"Generate answer" toggle</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>RequirementResultCard list (quote, provenance, score)</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Empty: "No results — try removing filters"</li><li>Loading: skeleton cards</li><li>Error: banner above list</li></ul></div>
+</div>
+<p><b>Key interactions:</b> type + enter to search; toggle filters; click a card to open Trace; back returns to the same query/scroll state.</p>
+</div>
+
+<div class="screen">
+<span class="tag existing">EXISTING</span>
+<h3>Trace — <code>/trace/:reqId</code></h3>
+<div class="shell" style="height:320px">
+<div class="sidebar">
+<div class="item">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item">Checklists</div><div class="item">Corpus</div><div class="item">System</div>
+</div>
+<div class="body-col">
+<div class="topbar"><span class="crumb">Search / Trace</span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="quote" style="font-size:14px;padding:12px">"Systems shall enforce access control for all privileged accounts, verified at least quarterly."</div>
+<div style="font-size:10px;color:#777;margin:8px 0">afi17-101.pdf · §4.2, p.12 · <span class="pill">cybersecurity</span> · tags: access-control, audit</div>
+<div class="btn gh" style="width:fit-content;margin-bottom:8px">Expand context ▾</div>
+<div style="font-size:10px;color:#777">Related: REQ-014, REQ-091 (cross-framework match)</div>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Single-column detail: quote → provenance → context → related</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>Expand/collapse context</li><li>Back to search</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>SourceQuoteBlock, ProvenanceMeta, domain_profile, cross-framework matches</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>404 for unknown id → NotFound</li><li>Loading: skeleton detail</li><li>Error: banner, back-link still works</li></ul></div>
+</div>
+<p><b>Key interactions:</b> expand context inline; click a related requirement to re-trace.</p>
+</div>
+
+<div class="screen">
+<span class="tag existing">EXISTING</span>
+<h3>Compare — <code>/compare</code></h3>
+<div class="shell" style="height:320px">
+<div class="sidebar"><div class="item">Search</div><div class="item active">Compare</div><div class="item">Evidence</div><div class="item">Checklists</div><div class="item">Corpus</div><div class="item">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb"></span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div style="display:flex;gap:8px;margin-bottom:8px">
+<div class="field" style="flex:1">Doc 1 <span class="car">▾ afi17-101</span></div>
+<div class="field" style="flex:1">Doc 2 <span class="car">▾ dodi8500</span></div>
+<div class="field" style="flex:1">Topic <span class="car">access control</span></div>
+</div>
+<div style="display:flex;gap:10px">
+<div style="flex:1"><div style="font-size:10px;color:#777;margin-bottom:4px">Exact match</div><div class="scrib" style="width:90%;margin-bottom:6px"></div><div class="scrib" style="width:70%"></div></div>
+<div style="flex:1;border-left:2px dashed #999;padding-left:8px"><div style="font-size:10px;color:#777;margin-bottom:4px">Doc 1 only</div><div class="scrib" style="width:80%"></div></div>
+<div style="flex:1;border-left:2px dashed #999;padding-left:8px"><div style="font-size:10px;color:#777;margin-bottom:4px">Doc 2 only</div><div class="scrib" style="width:75%"></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Two doc pickers + topic input, top</li><li>3-column result: exact / doc1-only / doc2-only</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>DocPicker ×2, topic input, Compare button</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>RequirementResultCards grouped into 3 columns</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Empty: "Pick two documents and a topic"</li><li>Loading: spinner over columns</li><li>Error: banner</li></ul></div>
+</div>
+<p><b>Key interactions:</b> click any card → Trace.</p>
+</div>
+
+<div class="screen">
+<span class="tag existing">EXISTING</span>
+<h3>Evidence — <code>/evidence</code></h3>
+<div class="shell" style="height:320px">
+<div class="sidebar"><div class="item">Search</div><div class="item">Compare</div><div class="item active">Evidence</div><div class="item">Checklists</div><div class="item">Corpus</div><div class="item">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb"></span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="field" style="margin-bottom:8px">Topic <span class="car">audit logging</span></div>
+<div class="toolbar"><span class="chip">☐ Generate synthesis</span><span class="chip">Depth: standard ▾</span></div>
+<div style="font-size:10px;color:#777;margin-bottom:4px">Domain tag: audit</div>
+<div class="rescard"><div class="quote">"Audit logs shall be retained for a minimum of…"</div><div style="font-size:10px;color:#777;margin-top:5px">dodi8500.pdf · §3.1 p.6</div></div>
+<div style="font-size:10px;color:#777;margin-bottom:4px">Domain tag: access-control</div>
+<div class="rescard"><div class="quote">"Access attempts shall be logged with timestamp and identity…"</div><div style="font-size:10px;color:#777;margin-top:5px">afi17-101.pdf · §4.5 p.14</div></div>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Topic input + controls, top</li><li>Results grouped by domain tag</li><li>Optional synthesis panel above groups, clearly labeled "AI synthesis"</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>Topic input, synthesis toggle, result-depth control</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>Grouped RequirementResultCards, optional synthesis text (never replacing source cards)</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Empty: "Enter a topic to build an evidence map"</li><li>Loading: spinner</li><li>Error: banner</li></ul></div>
+</div>
+<p><b>Key interactions:</b> click card → Trace; expand context per card.</p>
+</div>
+
+<div class="screen">
+<span class="tag p22">PHASE 22 — WP-22.1/22.2 (rename + shell)</span>
+<h3>Corpus — <code>/corpus</code></h3>
+<div class="shell" style="height:300px">
+<div class="sidebar"><div class="item">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item">Checklists</div><div class="item active">Corpus</div><div class="item">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb"></span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="toolbar"><div class="field" style="flex:1">Filter by name…</div><span class="chip">Sort: name ▾</span></div>
+<table class="t">
+<tr><th>Document</th><th>Requirements</th><th>Profile</th><th>Indexed</th></tr>
+<tr><td>afi17-101.pdf</td><td>212</td><td>cybersecurity</td><td>2026-06-02</td></tr>
+<tr><td>dodi8500.pdf</td><td>318</td><td>cybersecurity</td><td>2026-06-14</td></tr>
+<tr><td>nist800-53.pdf</td><td>640</td><td>cybersecurity</td><td>2026-07-01</td></tr>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Filter/sort toolbar</li><li>DocumentRow table</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>Name filter, sort</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>DocumentRow: name, req count, profile, indexed date</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Empty: "No documents indexed yet. Ingest documents via the CLI."</li><li>Loading: skeleton rows</li><li>Error: banner</li></ul></div>
+</div>
+<p><b>Key interactions:</b> click a row → Corpus document detail.</p>
+</div>
+
+<div class="screen">
+<span class="tag p22">PHASE 22 — WP-22.2 (new)</span>
+<h3>Corpus document detail — <code>/corpus/:docId</code></h3>
+<div class="shell" style="height:300px">
+<div class="sidebar"><div class="item">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item">Checklists</div><div class="item active">Corpus</div><div class="item">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb">Corpus / afi17-101.pdf</span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="info" style="margin-top:0;margin-bottom:10px">
+<div class="blk"><h4>Metadata</h4><ul><li>212 requirements</li><li>Profile: cybersecurity</li><li>Indexed 2026-06-02</li><li>Mode: full-text + embeddings</li></ul></div>
+<div class="blk"><h4>Quick actions</h4><div style="display:flex;flex-direction:column;gap:6px;margin-top:4px"><span class="btn gh">Search this doc</span><span class="btn gh">Compare from here</span><span class="btn gh">Generate checklist</span></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Metadata block + quick-action buttons</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>Search this doc / Compare from here / Generate checklist</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>Doc metadata (from existing /api/docs, filtered client-side)</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>404 for unknown docId</li><li>Loading: skeleton</li><li>Error: banner</li></ul></div>
+</div>
+<p><b>Key interactions:</b> each quick action navigates to Search/Compare/Checklists with this doc pre-filled.</p>
+</div>
+
+<div class="screen">
+<span class="tag p22">PHASE 22 — WP-22.4</span>
+<h3>Checklists generate — <code>/checklists</code></h3>
+<div class="shell" style="height:280px">
+<div class="sidebar"><div class="item">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item active">Checklists</div><div class="item">Corpus</div><div class="item">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb"></span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="field">Document <span class="car">▾ choose a document</span></div>
+<div class="field">Profile <span class="car">▾ cybersecurity (default)</span></div>
+<div class="btn" style="width:fit-content">Generate</div>
+<div style="font-size:10px;color:#777;margin-top:8px">Pick a document to begin.</div>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Single form: doc + profile pickers + submit</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>DocPicker, ProfilePicker (default cybersecurity)</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>None until generated</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Empty: prompt to pick doc</li><li>Loading: "Generating checklist…" spinner</li><li>Error: banner</li></ul></div>
+</div>
+<p><b>Key interactions:</b> from Corpus detail, doc is pre-filled and fixed; submit navigates to Checklist preview. Calls <code>POST /api/checklist</code> → <code>checklist_service.generate()</code>.</p>
+</div>
+
+<div class="screen">
+<span class="tag p22">PHASE 22 — WP-22.5</span>
+<h3>Checklist preview / export — <code>/checklists/:docId</code></h3>
+<div class="shell" style="height:340px">
+<div class="sidebar"><div class="item">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item active">Checklists</div><div class="item">Corpus</div><div class="item">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb">Checklists / afi17-101.pdf</span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="toolbar" style="justify-content:space-between">
+<div><b>afi17-101.pdf</b> <span class="pill">cybersecurity</span> <span style="font-size:10px;color:#777">42 items · 6 flagged</span></div>
+<div style="display:flex;gap:6px"><span class="chip">☐ Flagged only</span><span class="btn gh" style="padding:4px 9px">CSV</span><span class="btn gh" style="padding:4px 9px">JSON</span><span class="btn gh" style="padding:4px 9px">MD</span></div>
+</div>
+<table class="t">
+<tr><th>Locate</th><th>Ask</th><th class="gsep">Record</th><th class="gsep">Verify</th><th class="gsep">Trace</th></tr>
+<tr><td>§4.2, p.12</td><td><div class="scrib" style="width:65px"></div></td><td class="gsep"><i>status: —</i> (read-only)</td><td class="gsep">0.91</td><td class="gsep">REQ-014</td></tr>
+<tr class="flag"><td>§4.3, p.13</td><td><div class="scrib" style="width:75px"></div></td><td class="gsep"><i>status: —</i></td><td class="gsep"><span class="flagchip">flagged</span></td><td class="gsep">REQ-015</td></tr>
+<tr><td>§5.1, p.15</td><td><div class="scrib" style="width:60px"></div></td><td class="gsep"><i>status: —</i></td><td class="gsep">0.88</td><td class="gsep">REQ-016</td></tr>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Header (doc, profile, counts) + toolbar (filter, export)</li><li>ChecklistTable, column groups Locate/Ask/Record/Verify/Trace</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>Flagged-only toggle (client-side filter only), ExportButtonGroup</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>Checklist items; status/assessor_notes rendered read-only</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Empty: "No requirements had sufficient provenance to generate checklist items"</li><li>Loading: table skeleton</li><li>Error: banner</li></ul></div>
+</div>
+<p><b>Key interactions:</b> toggle flagged-only; export triggers <code>POST /api/checklist/export</code> and downloads server-formatted CSV/JSON/MD — no client-side formatting. No inputs on status/notes.</p>
+</div>
+
+<div class="screen">
+<span class="tag p22">PHASE 22 — WP-22.2</span>
+<h3>System — <code>/system</code></h3>
+<div class="shell" style="height:260px">
+<div class="sidebar"><div class="item">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item">Checklists</div><div class="item">Corpus</div><div class="item active">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb"></span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="toolbar" style="justify-content:flex-end"><span class="btn gh" style="padding:4px 10px">Refresh</span></div>
+<table class="t">
+<tr><th>Service</th><th>Status</th><th>Detail</th></tr>
+<tr><td>Ollama</td><td><span class="dot"></span> reachable</td><td>localhost:11434</td></tr>
+<tr><td>Qdrant</td><td><span class="dot"></span> reachable</td><td>localhost:6333</td></tr>
+<tr><td>Embedding model</td><td><span class="dot"></span> present</td><td>nomic-embed-text</td></tr>
+<tr><td>Synthesis model</td><td><span class="dot" style="background:#c94b4b"></span> missing</td><td>llama3.1 not pulled</td></tr>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>Refresh control + SystemHealthPanel rows</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>Manual refresh</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>Service reachability, models present vs required, from existing /api/status</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Loading: skeleton panel</li><li>Error: "Status check failed" banner, rest of app unaffected</li></ul></div>
+</div>
+</div>
+
+<div class="screen">
+<span class="tag future">FUTURE ONLY — needs a job abstraction in the service layer; not Phase 22</span>
+<h3>Ingest &amp; job history — future <code>/corpus</code> "+ Add documents" and <code>/jobs</code></h3>
+<div class="shell" style="height:300px">
+<div class="sidebar"><div class="item">Search</div><div class="item">Compare</div><div class="item">Evidence</div><div class="item">Checklists</div><div class="item active">Corpus</div><div class="item">System</div></div>
+<div class="body-col">
+<div class="topbar"><span class="crumb">Corpus</span><span class="statuspill"><span class="dot"></span>healthy</span></div>
+<div class="content">
+<div class="toolbar" style="justify-content:space-between"><b>Corpus</b><span class="btn" style="padding:4px 12px">+ Add documents</span></div>
+<div style="border:1px dashed #999;border-radius:6px;padding:8px;margin-bottom:8px;font-size:10px;color:#777">1 job running: dodi8500.pdf — embedding (step 4/5) · <a href="#" style="color:#2a78d6">view job history</a></div>
+<table class="t"><tr><th>Document</th><th>Requirements</th><th>Status</th></tr><tr><td>afi17-101.pdf</td><td>212</td><td>indexed</td></tr><tr><td>dodi8500.pdf</td><td>—</td><td>processing…</td></tr></table>
+</div>
+</div>
+</div>
+</div>
+<div class="info">
+<div class="blk"><h4>Layout regions</h4><ul><li>"+ Add documents" entry on Corpus; inline job banner; separate Job History table</li></ul></div>
+<div class="blk"><h4>Primary controls</h4><ul><li>File dropzone, profile picker, ingest submit (future)</li></ul></div>
+<div class="blk"><h4>Primary data</h4><ul><li>Job status/progress, job history log</li></ul></div>
+<div class="blk"><h4>States</h4><ul><li>Job failed → error detail with CLI log reference</li><li>Empty job history: "No jobs run yet"</li></ul></div>
+</div>
+<p><b>Why future-only:</b> requires a job/task abstraction in the service layer (queueing, progress, failure surfacing) that doesn't exist yet — building this now would put UI-invented logic ahead of the backend, which breaks the thin-wrapper rule. CLI remains the only ingest path until this is designed.</p>
+</div>
+
+<h2>4. Reusable Visual Patterns</h2>
+<div class="swatchrow">
+<div class="swatch"><div class="lbl">SourceQuoteBlock</div><div class="quote">"Verbatim document text, always in this dashed/tinted treatment."</div></div>
+<div class="swatch"><div class="lbl">ProvenanceMeta</div><div style="font-size:10px;color:#777">afi17-101.pdf · §4.2 p.12 · <span class="pill">cybersecurity</span> · tags: access-control</div></div>
+<div class="swatch"><div class="lbl">RequirementResultCard</div><div class="rescard" style="margin:0"><div class="quote">"Quote line…"</div><div style="font-size:10px;color:#777;margin-top:5px">doc · section · score</div></div></div>
+<div class="swatch"><div class="lbl">ReviewFlagBadge</div><span class="flagchip">flagged</span> <span style="font-size:10px;color:#777">+ tooltip: review_reasons</span></div>
+<div class="swatch"><div class="lbl">SystemHealthPanel row</div><div style="font-size:11px"><span class="dot"></span> Ollama reachable — localhost:11434</div></div>
+<div class="swatch"><div class="lbl">DocumentRow</div><div style="font-size:11px">afi17-101.pdf · 212 reqs · cybersecurity · 2026-06-02</div></div>
+<div class="swatch"><div class="lbl">ChecklistTable column group</div><table class="t" style="font-size:10px"><tr><th>Locate</th><th class="gsep">Verify</th></tr><tr><td>§4.2</td><td class="gsep">0.91</td></tr></table></div>
+</div>
+<p>One consistent "verbatim" treatment (dashed border, tinted background, distinct type) is used for source quotes everywhere — Search, Trace, Evidence, Checklist — so users learn at a glance which box is the document's actual text.</p>
+
+<h2>5. Implementation Boundary</h2>
+<div class="boundary">
+<div class="col">
+<h3>Phase 22</h3>
+<ul>
+<li>App shell: sidebar, topbar, breadcrumb, status pill (WP-22.1)</li>
+<li>Corpus rename + list (WP-22.1/22.2)</li>
+<li>Corpus document detail (WP-22.2)</li>
+<li>System health page (WP-22.2)</li>
+<li>Checklist API — thin wrapper (WP-22.3)</li>
+<li>Checklists generate screen (WP-22.4)</li>
+<li>Checklist preview / export screen, read-only fields (WP-22.5)</li>
+<li>Integration gate across all of the above (WP-22.6)</li>
+</ul>
+</div>
+<div class="col">
+<h3>Future-only</h3>
+<ul>
+<li>Ingest / upload UI ("+ Add documents")</li>
+<li>Job queue + job history screens</li>
+<li>Editable checklist status/assessor_notes (blocked on regeneration/merge design)</li>
+<li>Export history</li>
+<li>XLSX export</li>
+<li>Profile management UI (create/edit)</li>
+<li>MCP tool surface (separate track, same nav concepts)</li>
+</ul>
+</div>
+</div>
+</div>
+
+</x-dc>
+</body>
+</html>

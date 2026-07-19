@@ -5,6 +5,7 @@ import json
 from pipeline.checklist_export import (
     _CSV_COLUMNS,
     _csv_row,
+    _csv_safe,
     to_csv,
     to_json,
     to_markdown,
@@ -255,3 +256,83 @@ def test_to_markdown_null_confidence_renders_as_zero():
     checklist = {**EMPTY_ENVELOPE, "items": [item]}
     result = to_markdown(checklist)
     assert "0.00" in result
+
+
+# --- _csv_safe (formula injection prevention) ---
+
+def test_csv_safe_equals_prefix_escaped():
+    assert _csv_safe("=SUM(A1:A10)") == "'=SUM(A1:A10)"
+
+
+def test_csv_safe_plus_prefix_escaped():
+    assert _csv_safe("+1234") == "'+1234"
+
+
+def test_csv_safe_minus_prefix_escaped():
+    assert _csv_safe("-DROP TABLE") == "'-DROP TABLE"
+
+
+def test_csv_safe_at_prefix_escaped():
+    assert _csv_safe("@user") == "'@user"
+
+
+def test_csv_safe_whitespace_then_formula_escaped():
+    assert _csv_safe("  =dangerous") == "'  =dangerous"
+
+
+def test_csv_safe_tab_then_formula_escaped():
+    assert _csv_safe("\t=foo") == "'\t=foo"
+
+
+def test_csv_safe_normal_text_unchanged():
+    assert _csv_safe("Systems must enforce MFA.") == "Systems must enforce MFA."
+
+
+def test_csv_safe_empty_string_unchanged():
+    assert _csv_safe("") == ""
+
+
+def test_csv_safe_whitespace_only_unchanged():
+    assert _csv_safe("   ") == "   "
+
+
+def test_csv_safe_nonstring_bool_unchanged():
+    assert _csv_safe(True) is True
+
+
+def test_csv_safe_nonstring_float_unchanged():
+    assert _csv_safe(0.9) == 0.9
+
+
+# --- CSV formula injection integration ---
+
+def test_to_csv_formula_source_quote_escaped():
+    item = {**COMPLETE_ITEM, "source_quote": "=HYPERLINK(\"http://evil.example\",\"click\")"}
+    checklist = {**EMPTY_ENVELOPE, "items": [item]}
+    result = to_csv(checklist)
+    assert "'=HYPERLINK" in result
+
+
+def test_to_csv_formula_source_ref_escaped():
+    item = {**COMPLETE_ITEM, "source_ref": "+1.2.3"}
+    checklist = {**EMPTY_ENVELOPE, "items": [item]}
+    result = to_csv(checklist)
+    assert "'+1.2.3" in result
+
+
+def test_to_json_formula_value_not_escaped():
+    """JSON export must not mutate the checklist envelope."""
+    item = {**COMPLETE_ITEM, "source_quote": "=dangerous"}
+    checklist = {**EMPTY_ENVELOPE, "items": [item]}
+    result = to_json(checklist)
+    parsed = json.loads(result)
+    assert parsed["items"][0]["source_quote"] == "=dangerous"
+
+
+def test_to_markdown_formula_value_not_escaped():
+    """Markdown export must not apply CSV escaping."""
+    item = {**COMPLETE_ITEM, "source_quote": "=Systems shall enforce MFA."}
+    checklist = {**EMPTY_ENVELOPE, "items": [item]}
+    result = to_markdown(checklist)
+    assert "=Systems shall enforce MFA." in result
+    assert "'=Systems" not in result

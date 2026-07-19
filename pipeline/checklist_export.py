@@ -27,12 +27,29 @@ _CSV_COLUMNS = [
 ]
 
 
+_FORMULA_CHARS = frozenset("=+-@")
+
+
 def _join(values: list, sep: str) -> str:
     return sep.join(str(v) for v in values)
 
 
+def _csv_safe(value: object) -> object:
+    """Prefix formula-like string cells with a single quote to block spreadsheet injection.
+
+    Excel and LibreOffice treat cells whose effective first character is =, +, -, or @
+    as formulas regardless of CSV quoting. Prefixing with ' is the standard mitigation.
+    Non-string values (bool, float) are returned unchanged.
+    """
+    if isinstance(value, str):
+        stripped = value.lstrip()
+        if stripped and stripped[0] in _FORMULA_CHARS:
+            return "'" + value
+    return value
+
+
 def _csv_row(item: dict) -> dict:
-    return {
+    raw = {
         "source_ref": item.get("source_ref", ""),
         "section_title_path": _join(item.get("section_title_path") or [], " > "),
         "page_refs": _join(item.get("page_refs") or [], ", "),
@@ -47,6 +64,7 @@ def _csv_row(item: dict) -> dict:
         "requirement_ids": _join(item.get("requirement_ids") or [], ", "),
         "domain_tags": _join(item.get("domain_tags") or [], ", "),
     }
+    return {k: _csv_safe(v) for k, v in raw.items()}
 
 
 def to_csv(checklist: dict) -> str:

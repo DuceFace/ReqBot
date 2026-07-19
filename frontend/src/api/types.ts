@@ -32,6 +32,7 @@ export interface Requirement {
   section_ref_path?: string
   parent_context?: string
   chunk_id?: number
+  domain_profile?: string     // Phase 20+; pre-Phase-20 records return "cybersecurity" via fallback
 }
 
 // ─── Ask ─────────────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export interface DocsEntry {
   count: number
   mode: string
   run_date: string
+  profile?: string    // Phase 22.2+; "cybersecurity" fallback for pre-Phase-20 records
 }
 
 export interface DocsResponse {

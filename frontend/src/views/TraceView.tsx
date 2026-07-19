@@ -287,12 +287,10 @@ export default function TraceView() {
                   </>
                 )}
 
-                {(req as { domain_profile?: string }).domain_profile && (
+                {req.domain_profile && (
                   <>
                     <dt className="text-gray-400 whitespace-nowrap">Profile</dt>
-                    <dd className="text-gray-700 text-xs">
-                      {(req as { domain_profile?: string }).domain_profile}
-                    </dd>
+                    <dd className="text-gray-700 text-xs">{req.domain_profile}</dd>
                   </>
                 )}
               </dl>

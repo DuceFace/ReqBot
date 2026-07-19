@@ -4,6 +4,8 @@ import TraceView from './views/TraceView'
 import CompareView from './views/CompareView'
 import EvidenceView from './views/EvidenceView'
 import CorpusView from './views/CorpusView'
+import CorpusDetailView from './views/CorpusDetailView'
+import SystemView from './views/SystemView'
 import NotFoundView from './views/NotFoundView'
 
 export default function App() {
@@ -15,6 +17,8 @@ export default function App() {
         <Route path="/compare" element={<CompareView />} />
         <Route path="/evidence" element={<EvidenceView />} />
         <Route path="/corpus" element={<CorpusView />} />
+        <Route path="/corpus/:docId" element={<CorpusDetailView />} />
+        <Route path="/system" element={<SystemView />} />
         {/* Redirect legacy /docs bookmarks to /corpus */}
         <Route path="/docs" element={<Navigate to="/corpus" replace />} />
         <Route path="/trace/:reqId" element={<TraceView />} />

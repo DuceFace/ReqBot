@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { status } from '../api/client'
 
 /**
  * Polls /api/status on mount and every 30 s.
  * Green dot = Ollama + Qdrant both reachable; red = either down.
  * Renders nothing until the first check completes.
+ * Links to /system for the full health detail page.
  */
 export default function StatusDot() {
   const [healthy, setHealthy] = useState<boolean | null>(null)
@@ -38,14 +40,15 @@ export default function StatusDot() {
   if (healthy === null) return null
 
   return (
-    <div
-      className="flex items-center gap-2 text-sm text-gray-500"
+    <Link
+      to="/system"
+      className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
       title={label}
     >
       <span
-        className={`w-2.5 h-2.5 rounded-full ${healthy ? 'bg-green-500' : 'bg-red-500'}`}
+        className={`w-2.5 h-2.5 rounded-full shrink-0 ${healthy ? 'bg-green-500' : 'bg-red-500'}`}
       />
       <span className="hidden sm:inline">{label}</span>
-    </div>
+    </Link>
   )
 }

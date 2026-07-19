@@ -6,12 +6,12 @@ const NAV_ITEMS = [
   { to: '/compare', label: 'Compare' },
   { to: '/evidence', label: 'Evidence' },
   { to: '/corpus', label: 'Corpus' },
+  { to: '/system', label: 'System' },
 ]
 
-// Checklists enabled WP-22.4; System enabled WP-22.2
+// Checklists enabled WP-22.4
 const DISABLED_ITEMS = [
   { label: 'Checklists', title: 'Available after checklist screens ship' },
-  { label: 'System', title: 'Available in the next update' },
 ]
 
 export default function SidebarNav() {

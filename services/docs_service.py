@@ -39,6 +39,7 @@ def list_docs(processed_dir: Path) -> dict:
 
     for doc_key, path in sorted(latest.items()):
         source_pdf = ""
+        domain_profile = "cybersecurity"
         count = 0
         first_record = True
         try:
@@ -47,7 +48,9 @@ def list_docs(processed_dir: Path) -> dict:
                     if _line.strip():
                         if first_record:
                             try:
-                                source_pdf = json.loads(_line).get("source_pdf", "")
+                                rec = json.loads(_line)
+                                source_pdf = rec.get("source_pdf", "")
+                                domain_profile = rec.get("domain_profile") or "cybersecurity"
                             except Exception:
                                 pass
                             first_record = False
@@ -81,6 +84,7 @@ def list_docs(processed_dir: Path) -> dict:
             "count": count,
             "mode": mode,
             "run_date": run_date,
+            "profile": domain_profile,
         })
 
     return {

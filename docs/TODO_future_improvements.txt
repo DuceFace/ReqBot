@@ -159,6 +159,17 @@ ACTIVE BACKLOG (good ideas, not blocking)
     will change once a synthesis panel is above the groups.
     Flagged by Gemini during WP-19.3 review (2026-05-17).
 
+20. REMOVE HARDCODED VOCABULARY CONSTANTS FROM STEP C / D.5 — DEFERRED POST-PHASE-20
+    pipeline/llm_extract_requirements.py and pipeline/enrich_requirements.py each
+    define module-level VALID_DOMAIN_TAGS and VALID_REQUIREMENT_TYPES constants
+    mirroring profiles/cybersecurity.json. These constants are kept for parity-test
+    compatibility and as fallback defaults for helper functions, but they are a
+    second source of truth alongside core/profiles.py.
+    Once profile plumbing is stable (Phase 20 complete), consider deriving these
+    values from core.profiles.default_profile() at import time or removing them
+    entirely so profiles/cybersecurity.json is the single authoritative source.
+    Flagged by Gemini during WP-20.3 review (2026-07-18).
+
 ================================================================
 DECIDED AGAINST
 ================================================================
@@ -168,3 +179,4 @@ DECIDED AGAINST
 - Sort chunks by chunk_id (already in order from Step B)
 - OSCAL as default output format (backburner — implement only if concrete integration target exists)
 - Docling/Marker for layout parsing (too heavy; GPU dependency; pdfplumber covers the need)
+- "unprofiled" as a domain_profile value — every ingest goes through a named profile (default: cybersecurity); unprofiled records are a brief historical artifact handled by the "cybersecurity" fallback in build_payload(), not a forward-going state to design for

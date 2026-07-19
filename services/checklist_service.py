@@ -38,8 +38,10 @@ def _resolve_doc_path(processed_dir: Path, doc_key: str) -> Path:
     """
     runs: dict[Path, dict[str, Path]] = {}
     for suffix in ("enriched", "normalized"):
-        for p in processed_dir.rglob(f"*_requirements_{suffix}.jsonl"):
-            if p.stem.replace(f"_requirements_{suffix}", "") == doc_key:
+        suffix_str = f"_requirements_{suffix}"
+        for p in processed_dir.rglob(f"*{suffix_str}.jsonl"):
+            stem = p.stem
+            if stem.endswith(suffix_str) and stem[: -len(suffix_str)] == doc_key:
                 runs.setdefault(p.parent, {})[suffix] = p
 
     if not runs:
@@ -63,13 +65,19 @@ def _checklist_item_id(requirement_ids: list[str]) -> str:
 
 def _page_refs(req: dict) -> list[int]:
     """Derive page reference list from page_start / page_end fields."""
-    start = req.get("page_start")
-    end = req.get("page_end")
-    if start is None:
+    try:
+        start = req.get("page_start")
+        if start is None:
+            return []
+        start = int(start)
+        end = req.get("page_end")
+        if end is not None:
+            end = int(end)
+            if end > start:
+                return list(range(start, end + 1))
+        return [start]
+    except (ValueError, TypeError):
         return []
-    if end is not None and end != start:
-        return list(range(start, end + 1))
-    return [start]
 
 
 def generate(processed_dir: Path, doc_key: str, profile_name: str) -> dict:
@@ -118,9 +126,11 @@ def generate(processed_dir: Path, doc_key: str, profile_name: str) -> dict:
             source_ref = req.get("source_ref") or ""
             section_title_path = req.get("section_title_path") or []
             domain_tags = req.get("domain_tags") or []
-            confidence = req.get("confidence", 0.0)
+            confidence = req.get("confidence")
+            if confidence is None:
+                confidence = 0.0
 
-            source_profile = req.get("domain_profile", "cybersecurity")
+            source_profile = req.get("domain_profile") or "cybersecurity"
 
             review_reasons: list[str] = []
             if not source_ref:

@@ -95,6 +95,21 @@ def test_page_refs_no_end():
     assert _page_refs({"page_start": 4}) == [4]
 
 
+def test_page_refs_string_values():
+    """String page numbers from JSON are cast to int."""
+    assert _page_refs({"page_start": "3", "page_end": "5"}) == [3, 4, 5]
+
+
+def test_page_refs_inverted_range_falls_back_to_start():
+    """page_end < page_start returns [start] rather than an empty list."""
+    assert _page_refs({"page_start": 5, "page_end": 3}) == [5]
+
+
+def test_page_refs_non_numeric_returns_empty():
+    """Non-numeric page values return [] without crashing."""
+    assert _page_refs({"page_start": "N/A"}) == []
+
+
 # ---------------------------------------------------------------------------
 # generate() — envelope structure
 # ---------------------------------------------------------------------------
@@ -298,6 +313,15 @@ def test_generate_missing_confidence_treated_as_zero(tmp_path):
     assert "low-confidence" in item["review_reasons"]
 
 
+def test_generate_null_confidence_treated_as_zero(tmp_path):
+    """JSON null confidence must not crash — treated as 0.0 and flagged low-confidence."""
+    rec = {**COMPLETE_REQ, "confidence": None}
+    processed_dir = _make_doc(tmp_path, "testdoc", [rec])
+    item = generate(processed_dir, "testdoc", "cybersecurity")["items"][0]
+    assert item["confidence"] == 0.0
+    assert "low-confidence" in item["review_reasons"]
+
+
 # ---------------------------------------------------------------------------
 # generate() — domain_profile fallback (pre-Phase-20 records)
 # ---------------------------------------------------------------------------
@@ -465,4 +489,22 @@ def test_generate_blank_lines_skipped(tmp_path):
     content = "\n\n" + json.dumps(COMPLETE_REQ) + "\n\n"
     (run_dir / "testdoc_requirements_normalized.jsonl").write_text(content)
     result = generate(tmp_path, "testdoc", "cybersecurity")
+    assert result["summary"]["total_items"] == 1
+
+
+def test_generate_null_domain_profile_no_mismatch_flag(tmp_path):
+    """JSON null domain_profile falls back to 'cybersecurity' — no spurious mismatch flag."""
+    rec = {**COMPLETE_REQ, "domain_profile": None}
+    processed_dir = _make_doc(tmp_path, "testdoc", [rec])
+    item = generate(processed_dir, "testdoc", "cybersecurity")["items"][0]
+    assert "profile-mismatch" not in item["review_reasons"]
+
+
+def test_resolve_doc_key_containing_requirements_substring(tmp_path):
+    """doc_key that itself contains '_requirements_normalized' resolves correctly."""
+    tricky_key = "doc_requirements_normalized_extra"
+    run_dir = tmp_path / f"{tricky_key}_20260101_120000"
+    run_dir.mkdir()
+    _write_jsonl(run_dir / f"{tricky_key}_requirements_normalized.jsonl", [COMPLETE_REQ])
+    result = generate(tmp_path, tricky_key, "cybersecurity")
     assert result["summary"]["total_items"] == 1

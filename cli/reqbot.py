@@ -549,6 +549,7 @@ def cmd_trace(args: argparse.Namespace) -> int:
     print(f"  {'Document:':<14} {payload.get('source_pdf', '—')}")
     print(f"  {'Source ref:':<14} {source_ref or '—'}")
     print(f"  {'Page:':<14} {page_str}")
+    print(f"  {'Domain profile:':<14} {payload.get('domain_profile', 'cybersecurity')}")
     print(f"  {'Extracted by:':<14} {payload.get('extraction_model', 'unknown')}")
     print(f"  {'Run date:':<14} {payload.get('run_timestamp', 'unknown')}")
     _auth_weight = _cfg.authority_weight(payload.get("source_pdf", ""))

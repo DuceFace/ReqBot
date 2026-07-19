@@ -413,26 +413,28 @@ Low-confidence requirements should not be silently included as authoritative che
 
 ## 9. Suggested Implementation Phases
 
-### Phase 19 — Domain Profile Foundation
+### Phase 20 — Domain Profile Foundation ✅ COMPLETE 2026-07-19
 
 Goal: Generalize ReqBot beyond cybersecurity hardcoding.
 
 Deliverables:
 
-- Domain profile config format
-- Cybersecurity profile
-- Profile-aware extraction settings
-- Profile-aware skip sections
-- Generalized requirement schema review
+- Domain profile config format (`profiles/cybersecurity.json`, `profiles/test-domain.json`)
+- Strict profile loader (`core/profiles.py`)
+- Profile-aware extraction, enrichment, and normalization (Steps C, D, D.5)
+- `--profile` flag on `reqbot ingest`; default `"cybersecurity"` with zero behavior change
+- `domain_profile` field in normalized JSONL and Qdrant payload; `"cybersecurity"` fallback for pre-Phase-20 records
+- `domain_profile` surfaced in `reqbot trace` Provenance block
 
 Gate:
 
-- Existing cybersecurity workflow still works
-- No regression in current corpus extraction
+- Existing cybersecurity workflow still works ✅
+- No regression in current corpus extraction ✅
+- PRs: #66 (WP-20.2), #67 (WP-20.3), #68 (WP-20.4), #69 (WP-20.5)
 
 ---
 
-### Phase 20 — Checklist Generator MVP
+### Phase 21 — Checklist Generator MVP
 
 Goal: Generate a usable audit checklist from extracted requirements.
 
@@ -452,7 +454,7 @@ Gate:
 
 ---
 
-### Phase 21 — Evidence Request and Test Step Refinement
+### Phase 22 — Evidence Request and Test Step Refinement
 
 Goal: Improve checklist usefulness.
 

@@ -881,6 +881,43 @@ def cmd_evidence(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_checklist(args: argparse.Namespace) -> int:
+    """Generate an audit checklist from validated requirements for a document."""
+    from services import checklist_service
+    from pipeline import checklist_export
+
+    processed_dir = _cfg.processed_dir_path()
+    if not processed_dir.exists():
+        log.error("Processed documents directory not found: %s", processed_dir)
+        return 1
+
+    try:
+        checklist = checklist_service.generate(processed_dir, args.doc, args.profile)
+    except (ValueError, FileNotFoundError) as e:
+        log.error("%s", e)
+        return 1
+
+    fmt = args.format
+    if fmt == "json":
+        output_text = checklist_export.to_json(checklist)
+    elif fmt == "md":
+        output_text = checklist_export.to_markdown(checklist)
+    else:
+        output_text = checklist_export.to_csv(checklist)
+
+    if args.output:
+        try:
+            Path(args.output).expanduser().write_text(output_text, encoding="utf-8")
+            print(f"Checklist written to: {args.output}")
+        except OSError as e:
+            log.error("Could not write to file: %s", e)
+            return 1
+    else:
+        print(output_text, end="")
+
+    return 0
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     """Interactive setup wizard — writes ~/.config/reqbot/config.json."""
     print("\nReqBot Setup")
@@ -1534,6 +1571,28 @@ def main() -> None:
     p_evidence.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")
     p_evidence.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
 
+    # checklist
+    p_checklist = subparsers.add_parser(
+        "checklist",
+        help="Generate an audit checklist from validated requirements for a document",
+    )
+    p_checklist.add_argument(
+        "--doc", type=str, required=True,
+        help="Document key (PDF stem, e.g. afi17-101) — same identifier shown by reqbot docs",
+    )
+    p_checklist.add_argument(
+        "--format", type=str, choices=["csv", "json", "md"], default="csv",
+        help="Output format: csv (default), json, or md",
+    )
+    p_checklist.add_argument(
+        "--output", type=str, default=None,
+        help="Write output to FILE instead of printing to stdout",
+    )
+    p_checklist.add_argument(
+        "--profile", type=str, default="cybersecurity",
+        help="Domain profile name (default: cybersecurity)",
+    )
+
     # trace
     p_trace = subparsers.add_parser("trace", help="Trace full provenance of a requirement by ID")
     p_trace.add_argument("requirement_id", type=str, help="Requirement ID (e.g. REQ-a3f2c1d4e5b6)")
@@ -1585,6 +1644,7 @@ def main() -> None:
         "index-context": cmd_index_context,
         "ask": cmd_ask,
         "batch": cmd_batch,
+        "checklist": cmd_checklist,
         "docs": cmd_docs,
         "reindex": cmd_reindex,
         "status": cmd_status,

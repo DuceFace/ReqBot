@@ -20,6 +20,7 @@ export default function ChecklistPreviewView() {
 
   useEffect(() => {
     if (!docId) return
+    setFlaggedOnly(false)
     setLoading(true)
     setError(null)
     setData(null)

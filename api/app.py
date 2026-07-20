@@ -86,6 +86,11 @@ app.include_router(checklist.router, prefix="/api")
 _INDEX_HTML = _DIST_DIR / "index.html"
 _DIST_DIR_RESOLVED = _DIST_DIR.resolve()
 
+# SPA route prefixes whose dynamic path segments may contain dots (e.g. doc_key
+# values like "NIST.SP.800-53r5"). These must always serve index.html so that
+# direct navigation and browser refresh work in the packaged app.
+_SPA_PREFIXES = ("checklists/", "corpus/", "trace/")
+
 if _INDEX_HTML.exists():
     from fastapi import HTTPException as _HTTPException
     from fastapi.responses import FileResponse as _FileResponse
@@ -95,11 +100,12 @@ if _INDEX_HTML.exists():
         candidate = (_DIST_DIR / full_path).resolve()
         if candidate.is_file() and candidate.is_relative_to(_DIST_DIR_RESOLVED):
             return _FileResponse(str(candidate))
-        # Requests that look like static asset paths (have a file extension) but
-        # have no matching file under dist/ return 404 rather than index.html.
-        # This surfaces broken asset references as real errors instead of silently
-        # serving HTML to the browser.  Bare paths (/search, /trace/REQ-123)
-        # have no suffix and fall through to the SPA entry point.
+        # Known SPA routes with dotted path params always get index.html.
+        if any(full_path.startswith(p) for p in _SPA_PREFIXES):
+            return _FileResponse(str(_INDEX_HTML))
+        # Other paths with a file extension (assets/*.js, assets/*.css) that have
+        # no matching file under dist/ return 404 — surfaces broken asset refs.
+        # Bare paths (/search, /evidence) fall through to the SPA entry point.
         if Path(full_path).suffix:
             raise _HTTPException(status_code=404, detail="Not found")
         return _FileResponse(str(_INDEX_HTML))

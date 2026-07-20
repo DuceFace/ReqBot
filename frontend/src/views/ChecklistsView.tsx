@@ -46,7 +46,11 @@ export default function ChecklistsView() {
     )
   }
 
-  const canSubmit = docKey !== '' && profile !== '' && profilesLoaded
+  const canSubmit =
+    docKey !== '' &&
+    profile !== '' &&
+    profilesLoaded &&
+    profileOptions.length > 0
 
   return (
     <AppShell>
@@ -98,18 +102,20 @@ export default function ChecklistsView() {
               id="profile-select"
               value={profile}
               onChange={e => setProfile(e.target.value)}
-              disabled={!profilesLoaded}
+              disabled={!profilesLoaded || profileOptions.length === 0}
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
             >
-              {profilesLoaded ? (
-                profileOptions.map(p => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))
-              ) : (
+              {!profilesLoaded && (
                 <option value="cybersecurity">cybersecurity</option>
               )}
+              {profilesLoaded && profileOptions.length === 0 && (
+                <option value="">No profiles available</option>
+              )}
+              {profilesLoaded && profileOptions.map(p => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
 

@@ -38,41 +38,41 @@ export default function ChecklistTable({ items }: Props) {
         <thead>
           {/* Group header row */}
           <tr className="bg-gray-100 border-b border-gray-200">
-            <th colSpan={3} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
+            <th scope="colgroup" colSpan={3} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
               Locate
             </th>
-            <th colSpan={2} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
+            <th scope="colgroup" colSpan={2} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
               Ask
             </th>
-            <th colSpan={2} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
+            <th scope="colgroup" colSpan={2} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
               Record
             </th>
-            <th colSpan={3} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
+            <th scope="colgroup" colSpan={3} className={`${GROUP_HEADER_CLASS} border-r border-gray-300`}>
               Verify
             </th>
-            <th colSpan={3} className={GROUP_HEADER_CLASS}>
+            <th scope="colgroup" colSpan={3} className={GROUP_HEADER_CLASS}>
               Trace
             </th>
           </tr>
           {/* Column header row */}
           <tr>
-            <th className={`${COL_HEADER_CLASS} min-w-[100px]`}>Ref</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[160px]`}>Section</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[72px] border-r border-gray-200`}>Pages</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[100px]`}>Ref</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[160px]`}>Section</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[72px] border-r border-gray-200`}>Pages</th>
 
-            <th className={`${COL_HEADER_CLASS} min-w-[220px]`}>Source quote</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[140px] border-r border-gray-200`}>Audit question</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[220px]`}>Source quote</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[140px] border-r border-gray-200`}>Audit question</th>
 
-            <th className={`${COL_HEADER_CLASS} min-w-[100px]`}>Status</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[140px] border-r border-gray-200`}>Notes</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[100px]`}>Status</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[140px] border-r border-gray-200`}>Notes</th>
 
-            <th className={`${COL_HEADER_CLASS} min-w-[110px]`}>Flag</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[120px]`}>Reasons</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[72px] border-r border-gray-200`}>Conf.</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[110px]`}>Flag</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[120px]`}>Reasons</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[72px] border-r border-gray-200`}>Conf.</th>
 
-            <th className={`${COL_HEADER_CLASS} min-w-[170px]`}>Item ID</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[130px]`}>Req IDs</th>
-            <th className={`${COL_HEADER_CLASS} min-w-[120px]`}>Tags</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[170px]`}>Item ID</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[130px]`}>Req IDs</th>
+            <th scope="col" className={`${COL_HEADER_CLASS} min-w-[120px]`}>Tags</th>
           </tr>
         </thead>
         <tbody>
@@ -91,7 +91,9 @@ export default function ChecklistTable({ items }: Props) {
 
                 {/* Ask */}
                 <td className={cell}>
-                  <span className="break-words">{item.source_quote || '—'}</span>
+                  {item.source_quote
+                    ? <span className="break-words">{item.source_quote}</span>
+                    : <span className="break-words text-amber-700 font-medium">[MISSING SOURCE QUOTE]</span>}
                 </td>
                 <td className={`${borderR}`}>
                   {item.audit_question || <span className="text-gray-400">—</span>}

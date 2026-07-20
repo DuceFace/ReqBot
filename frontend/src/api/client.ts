@@ -13,6 +13,9 @@ import type {
   CompareResponse,
   EvidenceRequest,
   EvidenceResponse,
+  ChecklistRequest,
+  ChecklistEnvelope,
+  ProfilesResponse,
 } from './types'
 
 const BASE = '/api'
@@ -83,6 +86,25 @@ export async function evidence(req: EvidenceRequest): Promise<EvidenceResponse> 
     throw new Error(detail || `evidence failed: ${res.status} ${res.statusText}`)
   }
   return res.json() as Promise<EvidenceResponse>
+}
+
+export async function profiles(): Promise<ProfilesResponse> {
+  const res = await fetch(`${BASE}/profiles`)
+  if (!res.ok) throw new Error(`profiles failed: ${res.status} ${res.statusText}`)
+  return res.json() as Promise<ProfilesResponse>
+}
+
+export async function checklist(req: ChecklistRequest): Promise<ChecklistEnvelope> {
+  const res = await fetch(`${BASE}/checklist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) {
+    const detail = await res.json().then((b: { detail?: string }) => b.detail ?? '').catch(() => '')
+    throw new Error(detail || `checklist failed: ${res.status} ${res.statusText}`)
+  }
+  return res.json() as Promise<ChecklistEnvelope>
 }
 
 /** Thrown by trace() when the requirement ID is not found (HTTP 404). */

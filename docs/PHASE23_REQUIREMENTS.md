@@ -1,44 +1,55 @@
-# ReqBot — Phase 23: Checklist Assessor Workflow
+# ReqBot — Phase 23: Checklist Output Polish + Trust Hardening
 
-**Status:** Shell / Draft — Codex to flesh out
+**Status:** Draft
 **Date:** 2026-07-20
 **Preceded by:** Phase 22 (Browser Checklist Workflow — COMPLETE)
-**Followed by:** TBD
+**Followed by:** Phase 24 candidate: MCP Tool Surface
 
 ---
 
 ## 1. Phase Framing
 
 Phase 22 delivered a working browser checklist workflow: generate, preview, and export
-(CSV/JSON/Markdown). An assessor can now use the browser end-to-end without the CLI.
+CSV/JSON/Markdown. A non-CLI user can now create a checklist from the browser.
 
-**Phase 23 makes the workflow production-usable for a real assessor.** It addresses four gaps
-identified in the Phase 22 integration gate:
+**Phase 23 should make the current product easier to trust and easier to try.** ReqBot does
+not yet have real user adoption, so this phase should avoid advanced workflow features that
+only matter after assessors are already living in generated checklists. Instead, Phase 23
+focuses on the parts that help someone evaluate the MVP today:
 
-1. **Preview polish** — the checklist table overflows without a visible scrollbar on some
-   browser/OS combinations; the three flat export buttons should become a single dropdown.
-2. **XLSX export** — assessors live in Excel. CSV is portable, but Excel workbooks with frozen
-   headers, column filters, and wrapped cells are what auditors actually use.
-3. **Audit question generation** — `audit_question` has been blank since Phase 21. An opt-in
-   LLM step can generate plain-language audit questions grounded in `source_quote`.
-4. **Assessor note preservation** — re-running generate for a document already annotated
-   silently resets all `assessor_notes` and `status` fields. Deterministic `checklist_item_id`
-   makes merge-on-regeneration possible.
+1. **Checklist preview polish** — the browser checklist table needs reliable horizontal
+   scrolling, and export should be a single scalable dropdown instead of several flat buttons.
+2. **XLSX export** — Excel/LibreOffice output is the most practical assessor-facing format.
+   CSV is portable, but a polished workbook is easier for normal users to inspect and use.
+3. **Extraction quality warnings** — ReqBot should make extraction problems visible instead
+   of letting downstream checklist/retrieval behavior look mysteriously wrong.
+4. **Profile skip-section filtering** — profiles already define `skip_sections`, but the
+   chunking pipeline does not consume them. Threading that field through can reduce avoidable
+   noise from glossaries, references, acronym lists, and similar non-requirement sections.
 
-Phase 23 does not add new document types, ingest UI, profile management, authentication, or
-MCP surface. It deepens the checklist path only.
+Audit-question generation and assessor-note preservation remain useful ideas, but they are
+not the right next build target. Audit questions are compute-heavy and can amplify noisy
+requirements. Note preservation matters after users are actively annotating and regenerating
+checklists. Both stay in the backlog until there is stronger evidence they are worth building.
+
+MCP remains strategically important and is a strong Phase 24 candidate. It is not included in
+Phase 23 so this phase can stay focused on making current ReqBot outputs more usable and more
+trustworthy.
 
 ---
 
 ## 2. Goals
 
 - Fix the checklist preview table so horizontal scrolling works without text-drag workarounds.
-- Replace three flat export buttons with a single dropdown that accommodates future formats.
-- Assessors can export a checklist as an Excel workbook (XLSX) from the browser and CLI.
-- Assessors can generate checklists with plain-language audit questions via an opt-in flag.
-- Re-running generate for a previously exported document offers to merge saved
-  `assessor_notes` and `status` back in by `checklist_item_id` rather than silently resetting.
-- No CLI regressions; all Phase 18/19/21/22 tests pass after each WP.
+- Replace the flat export buttons with a single export dropdown that can hold additional
+  formats cleanly.
+- Add XLSX checklist export from the CLI and browser using the same backend export path.
+- Add lightweight extraction-quality warnings/flags for conditions that can undermine trust in
+  downstream requirements, retrieval, and checklist output.
+- Implement profile-based skip-section filtering in the chunking path, using existing profile
+  configuration rather than hardcoded section names.
+- Keep CLI, API, and GUI behavior aligned through the service/export/pipeline layers.
+- No regressions to Phase 18/19/21/22 behavior.
 
 ---
 
@@ -46,150 +57,292 @@ MCP surface. It deepens the checklist path only.
 
 Explicitly out of scope for Phase 23:
 
-- Editable `status`/`assessor_notes` fields in the browser (read-only display only).
-- Profile management UI (create/edit/delete profiles).
-- Ingest UI, upload forms, or browser-triggered pipeline runs.
-- MCP tool surface.
+- Audit-question generation.
+- Evidence-to-request, test-step, pass-criteria, or failure-indicator generation.
+- Editable `status` or `assessor_notes` fields in the browser.
+- Assessor-note preservation or merge-on-regeneration.
+- Server-side persistence of checklist runs or assessor annotations.
+- MCP tool surface. Candidate for Phase 24.
+- Profile management UI.
+- Ingest UI, upload forms, job queue, or browser-triggered pipeline runs.
 - Authentication, multi-user, hosted/SaaS deployment.
-- OCR support.
+- Full OCR support.
 - OSCAL output.
-- Retrieval quality experiments (HyDE, reranker, HyPE).
-- Any new pip/npm dependency not listed in Section 4 below.
+- Retrieval quality experiments such as HyDE, reranker, HyPE, or multi-vector indexing.
+- Any new pip/npm dependency not listed in Section 4.
 
 ---
 
 ## 4. Approved New Dependencies
 
-- **`openpyxl`** — XLSX write support for WP-23.2. No other new pip or npm dependencies
-  without explicit discussion.
+- **`openpyxl`** — approved only for XLSX write support in WP-23.2.
+
+No other pip or npm dependency is approved in this phase without explicit discussion. In
+particular:
+
+- Do not add a frontend menu/dropdown package for WP-23.1.
+- Do not add OCR dependencies for WP-23.3. Low-text detection is warning-only.
 
 ---
 
 ## 5. Architecture Rules
 
-All Phase 18/19/21/22 architecture rules carry forward unchanged:
+All Phase 18/19/20/21/22 architecture rules carry forward:
 
-1. Frontend is a client only. Checklist logic lives in `services/checklist_service.py` and
-   `pipeline/checklist_export.py`. The browser calls the API; it never formats or reshapes
+1. **Frontend is a client only.** Checklist generation, export formatting, review reasons,
+   confidence handling, extraction warnings, and skip-section behavior live in services or
+   pipeline code. React renders returned data and sends user requests.
+2. **API routes are thin.** `api/routes/*` validates request shape, calls services/export
+   functions, maps known exceptions to HTTP responses, and returns results. No checklist or
+   extraction business logic lives in the route layer.
+3. **CLI and GUI share backend paths.** If the browser can export XLSX, the CLI must call the
+   same export function.
+4. **No client-side export formatting.** React never builds CSV, Markdown, JSON, or XLSX
    checklist content.
-2. API routes are thin. No formatting, grouping, or filtering logic in `api/routes/`.
-3. CLI and GUI share the same backend paths.
-4. No new checklist logic in the route layer or React components.
-5. One WP at a time. Codex/Gemini review after each before proceeding.
+5. **Profiles drive domain assumptions.** Skip-section names must come from the active profile,
+   not from new hardcoded cybersecurity-specific constants.
+6. **Quality warnings are warnings, not silent behavior changes.** If the pipeline detects a
+   potential issue, expose it in artifacts and logs where useful. Do not discard content unless
+   the WP explicitly says so.
+7. **One WP at a time.** Get Codex/Gemini review after each WP before proceeding.
+
+**Safety test:**
+- Can you kill the API server and still run `reqbot checklist` normally? -> **Yes**
+- Can you change checklist UI presentation without touching checklist generation/export
+  logic? -> **Yes**
+- Do CLI and API call the same service/export functions for the same checklist operation?
+  -> **Yes**
+- Do extraction warnings preserve traceability instead of hiding source data? -> **Yes**
+- Does skip-section filtering use the active profile instead of hardcoded section names?
+  -> **Yes**
+
+If any answer becomes no, the design has drifted.
 
 ---
 
 ## 6. Work Packages
 
-### WP-23.1 — Preview Polish
+### WP-23.1 — Checklist Preview Polish
 
-**Goal:** Fix horizontal scrolling on the checklist preview table and replace the three flat
-export buttons with a single dropdown control.
+**Goal:** Improve the existing browser checklist preview without backend changes.
 
-**Horizontal scroll:**
-- Diagnose why `overflow-x: auto` on `ChecklistTable`'s container div is not producing a
-  visible scrollbar on average-width screens. Root cause is likely a parent container in
-  `AppShell` or `ChecklistPreviewView` that is constraining width or hiding overflow.
-- Fix so the table scrolls horizontally within its container without requiring text-drag.
-- Page body must never scroll horizontally.
+**Scope:**
+- Fix horizontal scrolling for `ChecklistTable`.
+- Replace the current flat export buttons with a single dropdown/popup menu.
+- Keep all export calls routed through the existing API client and backend export endpoint.
 
-**Export dropdown:**
-- Replace `ExportButtonGroup` (three flat buttons) with a single "Export ▾" control.
-- Clicking opens a small menu/popover with the format options (CSV, JSON, Markdown — XLSX
-  added in WP-23.2, so the dropdown must be extensible).
-- Loading and error state behavior is unchanged from WP-22.5.
-- No new npm dependency for the dropdown; implement with existing Tailwind + React state.
+**Horizontal scroll requirements:**
+- The checklist table must scroll horizontally inside its own container on a normal laptop
+  viewport.
+- The page body must not horizontally scroll.
+- Users must not need to drag-select table text to reach hidden columns.
+- The scrollbar or scroll affordance must remain discoverable on common browser/OS
+  combinations where overlay scrollbars are hidden by default.
+- The fix should address layout containment in the smallest responsible place, likely
+  `ChecklistPreviewView`, `ChecklistTable`, or `AppShell`. Avoid broad visual redesign.
 
-**Deliverables:** modified `ChecklistTable.tsx`, `ExportButtonGroup.tsx` (or replacement),
-`ChecklistPreviewView.tsx` as needed. No backend changes.
+**Export dropdown requirements:**
+- Replace the three visible export buttons with one `Export` control.
+- The menu contains CSV, JSON, Markdown initially; XLSX is added in WP-23.2.
+- The dropdown uses existing React state and Tailwind classes only.
+- The menu closes after selection, on outside click or blur where practical, and on `Escape`.
+- Loading/error behavior remains equivalent to WP-22.5.
+- Disabled/loading states must prevent duplicate export requests.
+- Keep the export implementation server-side. This WP must not introduce client-side
+  formatting.
+
+**Tests / verification:**
+- Frontend build passes.
+- Existing frontend tests pass, if present.
+- Manual browser smoke:
+  1. Open `/checklists/:docId?profile=cybersecurity`.
+  2. Confirm the table scrolls horizontally via scrollbar/trackpad/mouse wheel gesture.
+  3. Confirm the body itself does not scroll horizontally.
+  4. Confirm each dropdown option still downloads the same server-produced file as WP-22.5.
+
+**Gate:** no backend changes; export behavior unchanged; checklist table is usable on an
+average-width screen.
 
 ---
 
 ### WP-23.2 — XLSX Export
 
-**Goal:** Add Excel workbook export to the backend and expose it in the browser and CLI.
+**Goal:** Add Excel workbook export through the same service/export path used by CLI and GUI.
 
 **Backend (`pipeline/checklist_export.py`):**
-- Add `to_xlsx(items: list[ChecklistItem]) -> bytes` using `openpyxl`.
-- Workbook features (Codex to specify exact implementation):
-  - Frozen header rows (group row + column row).
-  - Auto-filter on all columns.
-  - Wrapped text in `source_quote` cells; all other cells top-aligned.
-  - Data validation dropdown for `status` column (valid values from schema).
-  - Clear visual separation of column groups (fill color matches table group headers).
-  - Formula injection prevention consistent with `to_csv()` approach.
+- Add an XLSX export function that returns `bytes`.
+- Use `openpyxl`; do not hand-roll XLSX files.
+- Preserve the existing checklist column order and Locate / Ask / Record / Verify / Trace
+  grouping.
+- Workbook requirements:
+  - One worksheet named `Checklist`.
+  - Group header row and column header row.
+  - Freeze panes below the header rows and after the core locate/ask columns, if practical.
+  - Auto-filter enabled for the column header row.
+  - Wrapped text for `source_quote`, `audit_question`, and notes columns.
+  - Top alignment for all data cells.
+  - Reasonable fixed column widths so the workbook opens usefully without manual resizing.
+  - Status column data validation using the checklist schema's allowed status values.
+  - Flagged rows visually distinct but not loud.
+  - Clear group-header styling for Locate / Ask / Record / Verify / Trace.
+  - Formula-injection protection equivalent to the CSV export path for every user/source text
+    cell that could be interpreted as a formula by spreadsheet software.
 
 **API (`api/routes/checklist.py`):**
-- Extend `POST /api/checklist/export` format enum to include `'xlsx'`.
-- `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
-- `Content-Disposition: attachment; filename="checklist_<doc_key>.xlsx"`.
+- Extend the checklist export format enum to include `xlsx`.
+- Return XLSX as binary content.
+- Use content type:
+  `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+- Return `Content-Disposition: attachment` with a deterministic `.xlsx` filename.
+- Keep the route thin: call `checklist_service.generate()` and the XLSX export function.
 
-**CLI (`cli/reqbot.py` / `cmd_checklist`):**
-- Add `--format xlsx` option.
+**CLI (`cli/reqbot.py`):**
+- Add `--format xlsx`.
+- Write binary output correctly when `--output` is provided.
+- If stdout output for binary formats is not appropriate, fail clearly and require
+  `--output` for `xlsx`.
 
 **Frontend:**
-- Add XLSX to the export dropdown introduced in WP-23.1.
-- Add `'xlsx'` to `ChecklistExportRequest['format']` in `api/types.ts`.
-- Filename handling: `.xlsx` extension extracted from `Content-Disposition` or derived from
-  format, consistent with existing pattern in `api/client.ts`.
+- Add XLSX to the export dropdown from WP-23.1.
+- Add `xlsx` to the frontend export format type.
+- Use the same fetch/blob download pattern from WP-22.5.
+- Do not inspect or build workbook contents client-side.
 
-**Deliverables:** `pipeline/checklist_export.py`, `api/routes/checklist.py`, CLI, types, client,
-export dropdown. Unit tests for `to_xlsx()` covering column order, formula injection
-prevention, and freeze/filter configuration.
+**Tests / verification:**
+- Unit tests for XLSX export:
+  - workbook opens with `openpyxl.load_workbook`;
+  - expected sheet name;
+  - expected column order;
+  - freeze panes set;
+  - auto-filter set;
+  - status data validation exists;
+  - formula-like source text is escaped/protected;
+  - flagged row styling exists for flagged sample item.
+- API tests:
+  - `format: "xlsx"` returns binary response with correct content type/disposition;
+  - unsupported format still returns 400;
+  - existing CSV/JSON/Markdown export tests still pass.
+- CLI tests:
+  - `reqbot checklist --format xlsx --output <file>` writes a readable workbook;
+  - existing CSV/JSON/Markdown CLI behavior unchanged.
+- Frontend build passes.
 
----
-
-### WP-23.3 — Audit Question Generation (Opt-In)
-
-**Goal:** Add an opt-in LLM step that generates a plain-language audit question for each
-checklist item, grounded in `source_quote`. `audit_question` has been blank since Phase 21.
-
-**Design constraints (non-negotiable):**
-- Off by default. Must be explicitly requested via CLI flag and browser toggle.
-- Generated questions are marked: a field such as `audit_question_generated: true` should
-  accompany any LLM-produced question so downstream tooling can distinguish generated from
-  human-authored text.
-- Blank is better than an unsupported rephrase. If the LLM returns a low-quality or
-  irrelevant question, the field stays blank; do not surface a bad question.
-- `source_quote` remains primary. The audit question is a human-convenience rephrasing only;
-  it must not be treated as a source of truth.
-- Same Ollama model used elsewhere; no new model dependency.
-
-**Codex to design:**
-- Where in the pipeline this runs (new step in `checklist_service.generate()` or a separate
-  enrichment pass).
-- Prompt design and quality gate.
-- CLI flag name and UI toggle placement.
-- How `audit_question_generated` flows through the schema, API, and frontend table.
-
-**Deliverables:** updated service/pipeline, CLI flag, API schema addition, frontend column
-renders `audit_question` when present. Unit tests for the generation path.
+**Gate:** browser and CLI XLSX exports are content-equivalent for the same document/profile,
+and all existing export formats still work.
 
 ---
 
-### WP-23.4 — Assessor Note Preservation on Re-Generation
+### WP-23.3 — Extraction Quality Warnings
 
-**Goal:** When a user re-generates a checklist for a document they have already annotated,
-offer to merge saved `assessor_notes` and `status` back in by `checklist_item_id` rather
-than silently resetting all assessor work.
+**Goal:** Add lightweight pipeline warnings for extraction conditions that can make downstream
+requirements/checklists less trustworthy. This is a trust-hardening WP, not an OCR or recovery
+rewrite.
+
+**Scope:**
+Implement small, deterministic checks from the TODO backlog where they fit naturally in the
+existing pipeline:
+
+1. **Low-text page detection / OCR warning**
+   - Detect pages with unusually low extracted text counts after Step A parsing.
+   - Surface a warning that the page may be scanned/image-heavy or otherwise OCR-dependent.
+   - Do not add OCR. Do not fail ingest solely because a low-text page exists.
+
+2. **Page number contiguity validation**
+   - Validate that Step A page records are monotonically increasing with no gaps or duplicates
+     before Step B chunking. Do not assert on the starting page number — some PDFs begin at 0
+     or have unconventional front-matter numbering.
+   - Missing or duplicate page numbers should produce a clear warning or validation error,
+     depending on how severe the existing pipeline treats malformed page records.
+
+3. **Chunk overlap guard**
+   - Assert that overlap is smaller than chunk size in Step B.
+   - This prevents an infinite-loop class of bug if a bad caller/config value is introduced.
+
+4. **Truncated JSON recovery flag**
+   - When Step C recovers a truncated JSON array, add a field such as
+     `recovered_truncated: true` to affected raw extraction output.
+   - Downstream steps should preserve or translate this into review/warning metadata where
+     current schemas allow it.
+
+**Optional investigation only:**
+- Ollama `finish_reason` / token metadata may help detect truncation earlier. Investigate only
+  if it is quick and the current Ollama client response exposes the metadata cleanly. Do not
+  block WP-23.3 on this.
+
+**Output requirements:**
+- Warnings should be visible in logs/CLI output and persisted in the most appropriate existing
+  artifact when practical.
+- Do not break existing JSONL consumers with unplanned schema changes. Additive fields are OK
+  where downstream code already tolerates them.
+- Low-text warnings must not become compliance findings or checklist review reasons unless a
+  later WP explicitly defines that behavior.
+- Keep warnings domain-neutral. These are structural/extraction-quality checks, not
+  cybersecurity vocabulary checks.
+
+**Tests / verification:**
+- Unit tests for low-text detection thresholds using synthetic page records.
+- Unit tests for page contiguity success/failure cases.
+- Unit tests for overlap guard rejecting invalid chunk settings.
+- Unit tests for recovered truncated extraction records carrying the new flag.
+- Existing ingest/checklist/retrieval tests continue to pass.
+
+**Gate:** quality issues are easier to see, but normal valid documents still ingest without
+behavioral regression.
+
+---
+
+### WP-23.4 — Profile-Based Skip-Section Filtering
+
+**Goal:** Make the existing `skip_sections` profile field affect chunking so non-requirement
+sections can be filtered by profile instead of hardcoded logic.
+
+**Context:**
+Phase 20 introduced profile files with `skip_sections`, but the chunking pipeline does not yet
+consume that field. This was identified earlier as useful behavior that should be implemented
+as a planned feature because it changes extraction behavior.
+
+**Scope:**
+- Thread the active profile's `skip_sections` list into Step B/chunking.
+- Detect section headings that match configured skip-section names.
+- Exclude the skipped section's body from requirement extraction chunks, while preserving
+  enough logging/metadata for users to understand what was skipped.
+- Keep existing structural ToC filtering separate from profile skip-section filtering.
 
 **Design constraints:**
-- Merge must be opt-in. Silent merging is not acceptable.
-- `checklist_item_id` is deterministic from `requirement_id`, so a re-ingested document that
-  produces the same requirement IDs will correctly re-associate notes.
-- The merge source is a prior export file (CSV or JSON). ReqBot does not maintain a server-side
-  database of assessor annotations.
+- Section names come from the active profile only.
+- Matching should be case-insensitive and whitespace-normalized.
+- Do not hardcode cybersecurity-specific skipped sections in `chunk_text.py`.
+- Do not skip arbitrary text merely because a word appears inside a paragraph. This should be
+  section-heading based, not substring filtering across body text.
+- If section hierarchy boundaries are ambiguous, choose the conservative behavior that avoids
+  accidentally dropping real requirements.
+- Emit a summary such as skipped section names and approximate page/chunk ranges where
+  practical.
 
-**Codex to design:**
-- Where the merge flag/option lives (CLI and browser).
-- How the prior export is supplied (file path on CLI; upload or stored reference in browser).
-- Schema for the merge operation.
-- What happens when a `checklist_item_id` from the prior export no longer exists in the new
-  checklist (item dropped from re-ingest) — warn, skip, or surface as orphaned.
-- Unit tests for merge logic covering: exact match, dropped item, new item, changed item.
+**Risk note:**
+This WP can become large if heading detection is weak. Stop and convert WP-23.4 into a
+design/spike instead of forcing a risky behavior change if any of the following are true:
+- Implementation requires touching hierarchy or ancestry logic across more than one pipeline
+  step.
+- The heading-detection approach requires non-additive schema changes to existing JSONL
+  artifacts.
+- Reliable section boundary detection requires restructuring how `chunk_text.py` reads its
+  input.
 
-**Deliverables:** merge logic in service layer, CLI option, API endpoint or extension, browser
-surface. Tests per above.
+**Tests / verification:**
+- Unit tests with synthetic structured text covering:
+  - exact heading match;
+  - case-insensitive match;
+  - heading with numbering/punctuation;
+  - body text mentioning a skipped term without being skipped;
+  - skipped section ending when the next peer/higher heading starts;
+  - no configured skip sections.
+- Integration smoke on at least one real-ish document sample confirming glossary/reference-like
+  content is skipped and normal requirement sections remain.
+- Existing chunking and extraction tests continue to pass.
+
+**Gate:** configured skip sections reduce obvious non-requirement noise without dropping normal
+requirement sections.
 
 ---
 
@@ -199,36 +352,54 @@ surface. Tests per above.
 has regressed.
 
 **Prerequisites:**
-- Re-ingest the corpus under the current Phase 21 profile to produce fresh enriched data.
-  Validate that flagging noise (almost every item flagged for missing domain tags / low
-  confidence / missing source_ref) resolves after re-ingest. If noise persists, diagnose
-  before declaring the gate passed.
+- Re-ingest or use a known-good processed corpus with current Phase 21+ profile metadata.
+- Confirm checklist review noise is explainable. If nearly every item is flagged for missing
+  domain tags, low confidence, or missing `source_ref`, diagnose the processed data before
+  declaring Phase 23 complete.
 
-**Demo walkthrough (Codex to expand into a full checklist):**
-1. Generate checklist; land on preview; scroll the table horizontally via scrollbar (not drag).
-2. Use the export dropdown; download all four formats (CSV, JSON, Markdown, XLSX).
-3. Open the XLSX in Excel or LibreOffice; confirm frozen headers, filters, and wrapped quotes.
-4. Re-generate for a previously annotated document; confirm merge prompt appears; confirm
-   notes survive.
-5. Generate with audit questions enabled; confirm `audit_question` column populates.
-6. Confirm all Phase 22 gates still pass.
-7. Confirm CLI — `reqbot checklist --format xlsx` and `reqbot checklist --audit-questions`
-   work as expected.
+**Demo walkthrough:**
+1. Open ReqBot browser UI.
+2. Generate a checklist for a known document/profile.
+3. Confirm the preview table scrolls horizontally inside its container.
+4. Use the export dropdown to download CSV, JSON, Markdown, and XLSX.
+5. Open XLSX in Excel or LibreOffice and confirm:
+   - header rows are frozen;
+   - filters are enabled;
+   - source quotes wrap;
+   - status dropdown exists;
+   - flagged rows are visually distinct.
+6. Confirm CSV/JSON/Markdown exports still match Phase 22 behavior.
+7. Confirm `reqbot checklist --format xlsx --output <file>` writes a valid workbook.
+8. Run or inspect an ingest where quality warnings should trigger; confirm warnings are visible
+   and valid documents still process normally.
+9. Run or inspect an ingest with configured `skip_sections`; confirm skipped sections are
+   logged and ordinary requirement sections remain.
+10. Confirm `reqbot checklist`, `reqbot ask`, `reqbot trace`, `reqbot compare`,
+    `reqbot evidence`, `reqbot docs`, and `reqbot serve` still work.
 
-**Gate:** all above steps complete without errors. All unit tests pass. No new unapproved
-dependencies.
+**Gate:** all implemented features pass, all unit tests pass, frontend build passes, and no
+unapproved dependencies were introduced.
 
 ---
 
 ## 7. Test Expectations
 
-Codex to fill in detailed test expectations per WP. Baseline:
+Baseline:
 
-- All 255 Phase 22 unit tests continue to pass after each WP.
-- New tests added per WP for: XLSX export (column order, freeze, filter, injection prevention);
-  audit question generation (on/off behavior, blank-on-bad-quality gate); merge logic
-  (match, orphan, new-item cases).
-- Manual smoke after each WP before proceeding.
+- All Phase 22 unit tests continue to pass after each implementation WP.
+- Frontend TypeScript/build checks continue to pass after each frontend WP.
+- Manual smoke is required after each WP before proceeding.
+
+WP-specific expectations:
+
+- **WP-23.1:** frontend build; browser smoke for scroll containment and dropdown export.
+- **WP-23.2:** unit/API/CLI tests for XLSX behavior; regression tests for existing export
+  formats; workbook inspection with `openpyxl`.
+- **WP-23.3:** unit tests for low-text warning, page contiguity validation, chunk overlap
+  guard, and truncated JSON recovery flag. Additive warning metadata only.
+- **WP-23.4:** unit tests for profile-driven skip-section matching and conservative boundary
+  handling. Integration smoke on representative document text.
+- **WP-23.5:** full regression smoke across CLI/API/browser.
 
 ---
 
@@ -236,14 +407,34 @@ Codex to fill in detailed test expectations per WP. Baseline:
 
 Phase 23 is complete when:
 
-1. Horizontal scrollbar is visible and functional on the checklist preview table on an
+1. Horizontal checklist table scrolling is visible/discoverable and functional on an
    average-width screen without text-drag workarounds.
-2. A single export dropdown replaces the three flat buttons; all four formats download correctly.
-3. `reqbot checklist --format xlsx` produces a valid Excel workbook; browser XLSX export
-   matches it content-equivalent.
-4. `reqbot checklist --audit-questions` populates `audit_question` for each item; blank
-   fallback when LLM output is low quality.
-5. Re-generating a checklist for a previously annotated document offers merge; assessor notes
-   and status survive for matching `checklist_item_id` values.
-6. All Phase 18/19/21/22 CLI commands and unit tests pass unchanged.
-7. No new pip/npm dependency other than `openpyxl` was introduced.
+2. A single export dropdown replaces the flat export buttons.
+3. CSV, JSON, Markdown, and XLSX download correctly from the browser.
+4. `reqbot checklist --format xlsx --output <file>` produces a valid Excel workbook.
+5. Browser XLSX export and CLI XLSX export are content-equivalent for the same
+   document/profile.
+6. Existing CSV/JSON/Markdown exports are not regressed.
+7. Extraction-quality warnings exist for the WP-23.3 checks and do not break normal ingest.
+8. Profile-based skip-section filtering uses active profile config and does not hardcode domain
+   section names.
+9. All Phase 18/19/21/22 CLI/API/GUI capabilities continue to work.
+10. No new pip/npm dependency other than `openpyxl` was introduced.
+
+---
+
+## 9. Deferred After Phase 23
+
+These remain valuable, but they are not part of Phase 23 unless explicitly re-scoped:
+
+- MCP tool surface. Strong Phase 24 candidate.
+- Audit-question generation.
+- Assessor-note preservation and browser editing.
+- Evidence-to-request generation.
+- Test-step/pass-criteria/failure-indicator generation.
+- XLSX import or round-trip editing.
+- Server-side saved checklist runs.
+- Profile management UI.
+- Ingest UI and job history.
+- Runtime API response validation.
+- OCR support beyond low-text warnings.

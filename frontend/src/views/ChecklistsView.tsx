@@ -5,7 +5,6 @@ import { docValue } from '../utils/ui'
 import * as api from '../api/client'
 import type { DocsEntry } from '../api/types'
 import AppShell from '../components/AppShell'
-import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 
 export default function ChecklistsView() {
@@ -16,12 +15,10 @@ export default function ChecklistsView() {
   const [docKey, setDocKey] = useState(searchParams.get('doc') ?? '')
   const [docsError, setDocsError] = useState(false)
 
-  const [profileOptions, setProfileOptions] = useState<string[]>(['cybersecurity'])
+  const [profileOptions, setProfileOptions] = useState<string[]>([])
   const [profile, setProfile] = useState('cybersecurity')
+  const [profilesLoaded, setProfilesLoaded] = useState(false)
   const [profilesError, setProfilesError] = useState(false)
-
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.docs()
@@ -33,31 +30,23 @@ export default function ChecklistsView() {
     api.profiles()
       .then(p => {
         setProfileOptions(p.profiles)
-        // keep 'cybersecurity' if present; otherwise fall back to first item
         if (p.profiles.length > 0 && !p.profiles.includes('cybersecurity')) {
           setProfile(p.profiles[0])
         }
+        setProfilesLoaded(true)
       })
       .catch(() => setProfilesError(true))
   }, [])
 
-  async function handleGenerate(e: FormEvent<HTMLFormElement>) {
+  function handleGenerate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!docKey || !profile || loading) return
-    setLoading(true)
-    setError(null)
-    try {
-      await api.checklist({ doc_key: docKey, profile })
-      navigate(
-        `/checklists/${encodeURIComponent(docKey)}?profile=${encodeURIComponent(profile)}`,
-      )
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Checklist generation failed')
-      setLoading(false)
-    }
+    if (!canSubmit) return
+    navigate(
+      `/checklists/${encodeURIComponent(docKey)}?profile=${encodeURIComponent(profile)}`,
+    )
   }
 
-  const canSubmit = docKey !== '' && profile !== '' && !loading
+  const canSubmit = docKey !== '' && profile !== '' && profilesLoaded
 
   return (
     <AppShell>
@@ -71,7 +60,7 @@ export default function ChecklistsView() {
         )}
         {profilesError && (
           <div className="mb-4">
-            <ErrorBanner message="Could not load profiles. Using default." />
+            <ErrorBanner message="Could not load profiles. Checklist generation is unavailable until profiles load." />
           </div>
         )}
 
@@ -109,13 +98,18 @@ export default function ChecklistsView() {
               id="profile-select"
               value={profile}
               onChange={e => setProfile(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={!profilesLoaded}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
             >
-              {profileOptions.map(p => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+              {profilesLoaded ? (
+                profileOptions.map(p => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))
+              ) : (
+                <option value="cybersecurity">cybersecurity</option>
+              )}
             </select>
           </div>
 
@@ -124,21 +118,9 @@ export default function ChecklistsView() {
             disabled={!canSubmit}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded text-sm font-medium transition-colors"
           >
-            {loading ? 'Generating checklist…' : 'Generate'}
+            Generate
           </button>
         </form>
-
-        {loading && (
-          <div className="mt-6">
-            <LoadingSpinner />
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="mt-4">
-            <ErrorBanner message={error} />
-          </div>
-        )}
       </main>
     </AppShell>
   )

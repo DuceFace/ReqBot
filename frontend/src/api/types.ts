@@ -231,6 +231,44 @@ export interface EvidenceResponse {
   synthesis_text: string
 }
 
+// ─── Checklist ───────────────────────────────────────────────────────────────
+
+export interface ChecklistRequest {
+  doc_key: string
+  profile?: string
+}
+
+export interface ChecklistItem {
+  checklist_item_id: string
+  requirement_ids: string[]
+  source_quote: string
+  source_ref: string
+  section_title_path: string[]
+  page_refs: number[]
+  domain_tags: string[]
+  confidence: number
+  audit_question: string
+  status: string
+  assessor_notes: string
+  requires_human_review: boolean
+  review_reasons: string[]
+}
+
+export interface ChecklistEnvelope {
+  format: string
+  format_version: string
+  generated_at: string
+  generator: { tool: string; command: string }
+  document: { document_id: string; source_pdf: string }
+  profile: string
+  summary: { total_items: number; items_requiring_review: number }
+  items: ChecklistItem[]
+}
+
+export interface ProfilesResponse {
+  profiles: string[]
+}
+
 // ─── Status ──────────────────────────────────────────────────────────────────
 
 /**

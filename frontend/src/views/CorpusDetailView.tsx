@@ -83,12 +83,12 @@ export default function CorpusDetailView() {
               >
                 Compare from here
               </Link>
-              <div
-                title="Available after checklist screens ship (WP-22.4)"
-                className="px-4 py-2 text-sm bg-white border border-gray-200 text-gray-300 rounded-lg cursor-not-allowed select-none"
+              <Link
+                to={`/checklists?doc=${encodeURIComponent(doc.doc_key)}`}
+                className="px-4 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Generate checklist
-              </div>
+              </Link>
             </div>
           </>
         )}

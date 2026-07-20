@@ -5,13 +5,9 @@ const NAV_ITEMS = [
   { to: '/search', label: 'Search' },
   { to: '/compare', label: 'Compare' },
   { to: '/evidence', label: 'Evidence' },
+  { to: '/checklists', label: 'Checklists' },
   { to: '/corpus', label: 'Corpus' },
   { to: '/system', label: 'System' },
-]
-
-// Checklists enabled WP-22.4
-const DISABLED_ITEMS = [
-  { label: 'Checklists', title: 'Available after checklist screens ship' },
 ]
 
 export default function SidebarNav() {
@@ -37,18 +33,6 @@ export default function SidebarNav() {
             {label}
           </NavLink>
         ))}
-
-        <div className="pt-1 border-t border-gray-100 mt-1">
-          {DISABLED_ITEMS.map(({ label, title }) => (
-            <div
-              key={label}
-              title={title}
-              className="block px-3 py-2 rounded-md text-sm font-medium text-gray-300 cursor-not-allowed select-none"
-            >
-              {label}
-            </div>
-          ))}
-        </div>
       </nav>
 
       <div className="px-5 py-3 border-t border-gray-100">

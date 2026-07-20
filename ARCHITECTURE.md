@@ -25,24 +25,37 @@ core/
   constants.py   ← Shared constants (CONTEXT_UUID_NS namespace UUID)
   synthesis.py   ← LLM synthesis abstraction (local Ollama or remote API)
   ask.py         ← Standalone query module: hybrid search + RRF + query rewrite + HyDE
+  profiles.py    ← list_profiles() → sorted list of profile names from profiles/*.json (Phase 22)
 
 services/
-  status_service.py   ← Ollama + Qdrant health checks; processed-doc listing
-  docs_service.py     ← JSONL directory scan; document listing with counts/mode/date
-  trace_service.py    ← Requirement lookup by ID; cross-framework matches; context window
-  compare_service.py  ← Exact control-ID match + hybrid semantic search; grouped results
-  evidence_service.py ← Hybrid search + grouping + context retrieval + LLM synthesis
-  ask_service.py      ← Thin orchestration over core/ask.retrieve(); returns canonical API shape
+  status_service.py     ← Ollama + Qdrant health checks; processed-doc listing
+  docs_service.py       ← JSONL directory scan; document listing with counts/mode/date;
+                           reads domain_profile from first JSONL record per doc
+  trace_service.py      ← Requirement lookup by ID; cross-framework matches; context window
+  compare_service.py    ← Exact control-ID match + hybrid semantic search; grouped results
+  evidence_service.py   ← Hybrid search + grouping + context retrieval + LLM synthesis
+  ask_service.py        ← Thin orchestration over core/ask.retrieve(); returns canonical API shape
+  checklist_service.py  ← generate(processed_dir, doc_key, profile_name) → ChecklistEnvelope dict;
+                           source resolution: prefers *_requirements_enriched.jsonl (Step D.5) within
+                           latest run dir; CONFIDENCE_REVIEW_THRESHOLD = 0.8; deterministic
+                           checklist_item_id derived from requirement_id (Phase 21)
 
 api/
   app.py         ← FastAPI application; registers routers; CORS for localhost GUI origins
+                   _SPA_PREFIXES = ("checklists/", "corpus/", "trace/") — prefix check before
+                   Path.suffix guard in spa_fallback so dotted doc_keys (e.g. NIST.SP.800-53r5)
+                   don't 404 on direct load/refresh
   routes/
-    ask.py       ← POST /ask              → ask_service.ask(); validates AskRequest; RuntimeError → 503
-    compare.py   ← POST /compare          → compare_service.compare(); RuntimeError → 503
-    evidence.py  ← POST /evidence         → evidence_service.evidence(); RuntimeError → 503
-    docs.py      ← GET /docs              → docs_service.list_docs(); exceptions → 503
-    status.py    ← GET /status            → status_service.check(); exceptions → 503
-    trace.py     ← GET /trace/{req_id}    → trace_service.trace(); ValueError → 404, RuntimeError → 503
+    ask.py       ← POST /api/ask              → ask_service.ask(); validates AskRequest; RuntimeError → 503
+    compare.py   ← POST /api/compare          → compare_service.compare(); RuntimeError → 503
+    evidence.py  ← POST /api/evidence         → evidence_service.evidence(); RuntimeError → 503
+    docs.py      ← GET /api/docs              → docs_service.list_docs(); exceptions → 503
+    status.py    ← GET /api/status            → status_service.check(); exceptions → 503
+    trace.py     ← GET /api/trace/{req_id}    → trace_service.trace(); ValueError → 404, RuntimeError → 503
+    checklist.py ← GET /api/profiles          → core.profiles.list_profiles(); exceptions → 503
+                   POST /api/checklist        → checklist_service.generate(); FileNotFoundError → 400/503, ValueError → 404
+                   POST /api/checklist/export → checklist_export.to_{format}(); format: csv/json/markdown;
+                                                Content-Disposition: attachment
   (Swagger UI at /api-docs; /docs reserved for the document-listing endpoint)
 
 pipeline/
@@ -70,6 +83,9 @@ pipeline/
                                         stats.json includes hierarchy coverage (with_section_path, with_parent_context)
   embed_and_index.py           Step F:  normalized/enriched JSONL → Qdrant grc_requirements
   embed_context_index.py       Step F2: chunks JSONL              → Qdrant grc_context
+  checklist_export.py          (Phase 21): to_csv() / to_json() / to_markdown() from ChecklistItem list;
+                                           formula injection prevention via _csv_safe() (prefixes =,+,-,@);
+                                           CSV column order: locate → ask → record → verify → trace
 
 models/            ← Shared data schemas (populated in Phase 16C+)
 
@@ -77,23 +93,58 @@ frontend/          ← React + TypeScript + Tailwind web GUI (Phase 18+)
   package.json     ← dependencies: react, react-router-dom, tailwindcss
   vite.config.ts   ← Vite bundler; dev proxy /api → :8000; no custom base
   src/
-    App.tsx        ← BrowserRouter + Routes (/, /search, /trace/:reqId, /compare, /evidence, /docs, *)
+    App.tsx        ← BrowserRouter + Routes:
+                      /                     → redirect to /search
+                      /search               → SearchView
+                      /compare              → CompareView
+                      /evidence             → EvidenceView
+                      /corpus               → CorpusView
+                      /corpus/:docId        → CorpusDetailView
+                      /system               → SystemView
+                      /checklists           → ChecklistsView
+                      /checklists/:docId    → ChecklistPreviewView  (?profile= query param)
+                      /docs                 → redirect to /corpus   (legacy bookmark compat)
+                      /trace/:reqId         → TraceView
+                      *                     → NotFoundView
     api/
-      client.ts    ← typed fetch wrappers (ask, trace, docs, status, compare, evidence)
-      types.ts     ← TypeScript types mirroring API contract (Phase 16C+)
+      client.ts    ← typed fetch wrappers: ask, trace, docs, status, compare, evidence,
+                      profiles(), checklist(), checklistExport() (Phase 22)
+      types.ts     ← TypeScript types mirroring API contract; Phase 22 additions:
+                      ChecklistRequest, ChecklistItem, ChecklistEnvelope,
+                      ProfilesResponse, ChecklistExportRequest, DocsEntry.profile
     views/
-      SearchView.tsx   ← query + doc filter + results; URL-driven state (?q=&doc=)
-      TraceView.tsx    ← full requirement detail + cross-matches + context expand
-      CompareView.tsx  ← two-doc topic comparison; three result sections; URL-driven state (?doc1=&doc2=&topic=)
-      EvidenceView.tsx ← topic → grouped requirements by document; synthesis; URL-driven state
-      DocsView.tsx     ← corpus browse; name filter + sort; "Search this doc" drill-down
-      NotFoundView.tsx ← catch-all 404 view
+      SearchView.tsx        ← query + doc filter + results; URL-driven state (?q=&doc=)
+      TraceView.tsx         ← full requirement detail + cross-matches + context expand;
+                               back-link derives label from route state (not hardcoded)
+      CompareView.tsx       ← two-doc topic comparison; three result sections; URL-driven (?doc1=&doc2=&topic=)
+      EvidenceView.tsx      ← topic → grouped requirements by document; synthesis; URL-driven
+      CorpusView.tsx        ← corpus browse; name filter + sort; rows link to /corpus/:docId
+                               (renamed from DocsView.tsx in Phase 22; /docs redirects here)
+      CorpusDetailView.tsx  ← single-doc detail; Search/Compare quick actions;
+                               "Generate checklist" link → /checklists?doc=<docId> (Phase 22)
+      SystemView.tsx        ← renders /api/status as Ollama/Qdrant readiness rows (Phase 22)
+      ChecklistsView.tsx    ← /checklists generate screen; DocPicker + ProfilePicker;
+                               ProfilePicker populated from GET /api/profiles (never hardcoded);
+                               profilesLoaded bool gates canSubmit; navigate-only on submit (Phase 22)
+      ChecklistPreviewView.tsx ← /checklists/:docId preview screen; fetches POST /api/checklist
+                                  on mount from URL params (refresh-safe); flaggedOnly toggle
+                                  resets on docId/profile change; separate empty states (Phase 22)
+      NotFoundView.tsx      ← catch-all 404 view
     components/
-      ResultCard.tsx   ← result row; passes router state for back-link preservation
-      StatusDot.tsx    ← polls /api/status every 30s; green/red health indicator
-      ErrorBanner.tsx  ← shared inline error display
-      SynthesisBox.tsx ← shared LLM synthesis output block (elapsed timer, loading state)
-      NavBar.tsx       ← top navigation bar
+      AppShell.tsx          ← flex layout wrapper: sticky SidebarNav + flex-1 content area (Phase 22)
+      SidebarNav.tsx        ← w-52 sticky sidebar; active: Search/Compare/Evidence/Checklists/Corpus/System
+                               (replaces NavBar.tsx which was deleted in Phase 22)
+      ChecklistTable.tsx    ← 13-column table; 5 group headers (Locate/Ask/Record/Verify/Trace);
+                               overflow-x: auto; flagged rows bg-amber-50; source_quote missing →
+                               amber [MISSING SOURCE QUOTE] warning; scope attrs for accessibility (Phase 22)
+      ExportButtonGroup.tsx ← CSV/JSON/Markdown export buttons; fetch+Blob+anchor click;
+                               filename from Content-Disposition; per-format loading state (Phase 22)
+      ReviewFlagBadge.tsx   ← amber "Review needed" badge + reasons list (Phase 22)
+      SystemHealthPanel.tsx ← renders Ollama/Qdrant status rows from /api/status (Phase 22)
+      ResultCard.tsx        ← result row; passes router state for back-link preservation
+      StatusDot.tsx         ← polls /api/status every 30s; links to /system page
+      ErrorBanner.tsx       ← shared inline error display
+      SynthesisBox.tsx      ← shared LLM synthesis output block (elapsed timer, loading state)
       LoadingSpinner.tsx
     hooks/
       useSynthesis.ts  ← generation-counter race protection; run(fetcher) / reset(); elapsed timer
@@ -120,17 +171,19 @@ cli/console.py
 
 cli/reqbot.py
   └── core.config
-  └── services.status_service   (lazy, status + setup commands)
-  └── services.docs_service     (lazy, docs command)
-  └── services.trace_service    (lazy, trace command)
-  └── services.compare_service  (lazy, compare command)
-  └── services.evidence_service (lazy, evidence command)
-  └── pipeline.run_pipeline       (lazy, ingest/batch commands)
-  └── pipeline.embed_and_index    (lazy, ingest/index/batch/reindex commands)
+  └── services.status_service      (lazy, status + setup commands)
+  └── services.docs_service        (lazy, docs command)
+  └── services.trace_service       (lazy, trace command)
+  └── services.compare_service     (lazy, compare command)
+  └── services.evidence_service    (lazy, evidence command)
+  └── services.checklist_service   (lazy, checklist command)
+  └── pipeline.checklist_export    (lazy, checklist command — to_csv/to_json/to_markdown/to_xlsx)
+  └── pipeline.run_pipeline        (lazy, ingest/batch commands)
+  └── pipeline.embed_and_index     (lazy, ingest/index/batch/reindex commands)
   └── pipeline.embed_context_index (lazy, ingest/batch/index-context commands)
-  └── core.ask                    (lazy, ask command)
-  └── core.synthesis              (lazy, when --synthesize is used)
-  └── api.app + uvicorn           (lazy, serve command — ImportError-guarded)
+  └── core.ask                     (lazy, ask command)
+  └── core.synthesis               (lazy, when --synthesize is used)
+  └── api.app + uvicorn            (lazy, serve command — ImportError-guarded)
 
 services/*.py
   └── (no cross-service imports)
@@ -143,13 +196,16 @@ api/app.py
   └── api.routes.docs
   └── api.routes.status
   └── api.routes.trace
+  └── api.routes.checklist
 
-api/routes/ask.py      → core.config, services.ask_service
-api/routes/compare.py  → core.config, services.compare_service
-api/routes/evidence.py → core.config, services.evidence_service
-api/routes/docs.py     → core.config, services.docs_service
-api/routes/status.py   → services.status_service
-api/routes/trace.py    → core.config, services.trace_service
+api/routes/ask.py          → core.config, services.ask_service
+api/routes/compare.py      → core.config, services.compare_service
+api/routes/evidence.py     → core.config, services.evidence_service
+api/routes/docs.py         → core.config, services.docs_service
+api/routes/status.py       → services.status_service
+api/routes/trace.py        → core.config, services.trace_service
+api/routes/checklist.py    → core.config, services.checklist_service,
+                             pipeline.checklist_export, core.profiles
 
 pipeline/run_pipeline.py
   └── pipeline.extract_pdf_to_text  (in-process; legacy path only)
@@ -348,8 +404,14 @@ Top-K results from Qdrant grc_requirements
 - `GET /api/trace/{req_id}?context=true` → same service, triggers context window fetch from grc_context
 - `POST /api/compare` → `compare_service.compare()` → CompareView (exact + semantic matches, three sections)
 - `POST /api/evidence` → `evidence_service.evidence()` → EvidenceView (grouped requirements + synthesis)
-- `GET /api/docs` → `docs_service.list_docs()` → DocsView (corpus browse) + SearchView doc filter dropdown
-- `GET /api/status` → `status_service.check()` → StatusDot (polls every 30s)
+- `GET /api/docs` → `docs_service.list_docs()` → CorpusView (corpus browse) + SearchView doc filter dropdown
+- `GET /api/status` → `status_service.check()` → StatusDot (polls every 30s) + SystemView health panel
+
+**GUI-specific flows (Phase 22 — checklist workflow):**
+- `GET /api/profiles` → `core.profiles.list_profiles()` → ChecklistsView ProfilePicker
+- `POST /api/checklist` → `checklist_service.generate()` → ChecklistPreviewView table render
+- `POST /api/checklist/export` → `checklist_export.to_{format}()` → file download via fetch+Blob+anchor click
+  (format: csv / json / markdown; filename from Content-Disposition header; never window.location.href)
 
 ---
 
@@ -424,4 +486,7 @@ Optional files loaded at startup:
 | `pipeline/run_pipeline.py` return value | `cli/reqbot.py` cmd_ingest, cmd_batch | Returns path to normalized/enriched JSONL; change breaks auto-index |
 | `pipeline/section_parser.py` output fields | `pipeline/chunk_text.py` `run_structure_aware()` | AncestryResult fields (item_ancestry, doc) must stay stable; chunk_text reads both |
 | `pipeline/chunk_text.py` chunk fields (docling) | `pipeline/parse_and_normalize.py` `build_chunk_hierarchy_map()` | Hierarchy field names (section_ref_path etc.) must match what Step D reads from chunks.jsonl |
+| `pipeline/checklist_export.py` column order / field names | `api/routes/checklist.py`, `cli/reqbot.py` cmd_checklist | CSV column order and JSON field names are part of the export contract; changing them breaks existing assessor tooling |
+| `services/checklist_service.py` return shape (ChecklistEnvelope) | `api/routes/checklist.py`, `cli/reqbot.py` cmd_checklist | `items`, `summary`, `doc_key`, `profile` keys are consumed by both route and CLI; `checklist_item_id` must remain deterministic from `requirement_id` |
+| `core/profiles.py` `list_profiles()` | `api/routes/checklist.py` GET /api/profiles | ProfilePicker in ChecklistsView is populated entirely from this response; an empty list blocks checklist generation in the browser |
 | Service return schemas | `cli/reqbot.py` cmd_* display logic | Services return structured dicts; CLI display code unpacks specific keys — adding/renaming keys is safe, removing is breaking |

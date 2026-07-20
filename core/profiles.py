@@ -117,3 +117,8 @@ def load_profile(name: str) -> dict:
 def default_profile() -> dict:
     """Return the cybersecurity profile. Used when --profile is not specified."""
     return load_profile("cybersecurity")
+
+
+def list_profiles() -> list[str]:
+    """Return sorted names of all profiles found in the profiles/ directory."""
+    return sorted(p.stem for p in _PROFILES_DIR.glob("*.json") if p.is_file())

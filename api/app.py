@@ -1,14 +1,17 @@
-"""ReqBot FastAPI application — Phase 19: compare + evidence endpoints added.
+"""ReqBot FastAPI application — Phase 22: checklist API endpoints added.
 
 Start with: reqbot serve [--host 0.0.0.0] [--port 8000]
 
 Endpoints (all prefixed /api/):
-  GET  /api/status           — Ollama + Qdrant health checks + processed doc listing
-  POST /api/ask              — Hybrid vector search with optional synthesis
-  GET  /api/trace/{req_id}   — Full requirement provenance by ID
-  GET  /api/docs             — Indexed document listing
-  POST /api/compare          — Cross-framework comparison for two documents on a topic
-  POST /api/evidence         — Evidence mapping for a topic, grouped by control ID
+  GET  /api/status              — Ollama + Qdrant health checks + processed doc listing
+  POST /api/ask                 — Hybrid vector search with optional synthesis
+  GET  /api/trace/{req_id}      — Full requirement provenance by ID
+  GET  /api/docs                — Indexed document listing
+  POST /api/compare             — Cross-framework comparison for two documents on a topic
+  POST /api/evidence            — Evidence mapping for a topic, grouped by control ID
+  GET  /api/profiles            — List available domain profile names
+  POST /api/checklist           — Generate a checklist for a document and profile
+  POST /api/checklist/export    — Export a checklist as CSV, JSON, or Markdown
 
 GUI (when frontend/dist/ is built):
   GET  /{any}                — catch-all: serves real file if it exists in dist/,
@@ -28,7 +31,7 @@ if str(_ROOT) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import ask, compare, docs, evidence, status, trace
+from api.routes import ask, checklist, compare, docs, evidence, status, trace
 
 log = logging.getLogger(__name__)
 
@@ -68,6 +71,7 @@ app.include_router(trace.router, prefix="/api")
 app.include_router(docs.router, prefix="/api")
 app.include_router(compare.router, prefix="/api")
 app.include_router(evidence.router, prefix="/api")
+app.include_router(checklist.router, prefix="/api")
 
 # SPA static file serving — only when the frontend build exists.
 # Registered after all /api/ routes so it never shadows an API endpoint.

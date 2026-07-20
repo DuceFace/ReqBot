@@ -175,7 +175,7 @@ reqbot evidence "topic or control" [--domain-tag T] [--requirement-type T]
 Generate a compliance checklist for an indexed document.
 
 ```bash
-reqbot checklist --doc <doc_key> --profile <profile> [--format {csv,json,markdown}] [--output FILE]
+reqbot checklist --doc <doc_key> --profile <profile> [--format {csv,json,md,xlsx}] [--output FILE]
 ```
 
 Options:
@@ -229,7 +229,7 @@ Defaults to `127.0.0.1:8000`. Opens a browser-accessible interface at `http://lo
 - **Compare** — side-by-side topic comparison across two documents (exact + semantic matches)
 - **Evidence** — topic → requirements grouped by document, with optional LLM synthesis
 - **Corpus** — browse the indexed corpus; filter and sort; drill into a single document; launch checklist generation from a document detail page
-- **Checklists** — pick a document and profile, generate a checklist, preview all items in a grouped table (Locate / Ask / Record / Verify / Trace), and export as CSV, JSON, or Markdown
+- **Checklists** — pick a document and profile, generate a checklist, preview all items in a grouped table (Locate / Ask / Record / Verify / Trace), and export as CSV, JSON, Markdown, or XLSX
 - **System** — Ollama and Qdrant health status
 
 The API is always available at `/api/` regardless of whether the frontend build is present. Swagger UI at `/api-docs`.

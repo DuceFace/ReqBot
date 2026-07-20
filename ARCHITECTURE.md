@@ -137,8 +137,8 @@ frontend/          ← React + TypeScript + Tailwind web GUI (Phase 18+)
       ChecklistTable.tsx    ← 13-column table; 5 group headers (Locate/Ask/Record/Verify/Trace);
                                overflow-x: auto; flagged rows bg-amber-50; source_quote missing →
                                amber [MISSING SOURCE QUOTE] warning; scope attrs for accessibility (Phase 22)
-      ExportButtonGroup.tsx ← CSV/JSON/Markdown export buttons; fetch+Blob+anchor click;
-                               filename from Content-Disposition; per-format loading state (Phase 22)
+      ExportButtonGroup.tsx ← "Export ▾" dropdown (CSV/JSON/Markdown/XLSX); fetch+Blob+anchor click;
+                               filename from Content-Disposition; per-format loading state (Phase 22/23)
       ReviewFlagBadge.tsx   ← amber "Review needed" badge + reasons list (Phase 22)
       SystemHealthPanel.tsx ← renders Ollama/Qdrant status rows from /api/status (Phase 22)
       ResultCard.tsx        ← result row; passes router state for back-link preservation

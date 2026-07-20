@@ -69,7 +69,7 @@ def post_checklist(req: ChecklistRequest) -> dict:
 
 @router.post("/checklist/export")
 def post_checklist_export(req: ChecklistExportRequest) -> Response:
-    """Generate and export a checklist as CSV, JSON, or Markdown.
+    """Generate and export a checklist as CSV, JSON, Markdown, or XLSX.
 
     Returns the file content with Content-Disposition: attachment for browser download.
     """

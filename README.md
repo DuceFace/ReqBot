@@ -13,7 +13,8 @@ Run `reqbot serve` to start the web interface. Run `reqbot docs` to see your ind
 - Separates extraction and enrichment models so each stage can be tuned independently.
 - Supports hybrid retrieval over requirements plus optional raw chunk context lookup.
 - Rebuilds Qdrant from existing JSONL without re-running extraction.
-- Serves a web GUI (`reqbot serve`) — search, filter, and drill into full requirement provenance in a browser.
+- Generates compliance checklists from indexed documents — via CLI or browser.
+- Serves a web GUI (`reqbot serve`) — search, trace, compare, generate checklists, and export in a browser.
 
 ## Requirements
 
@@ -169,6 +170,23 @@ Generate evidence mappings for a topic or control.
 reqbot evidence "topic or control" [--domain-tag T] [--requirement-type T]
 ```
 
+### `checklist`
+
+Generate a compliance checklist for an indexed document.
+
+```bash
+reqbot checklist --doc <doc_key> --profile <profile> [--format {csv,json,markdown}] [--output FILE]
+```
+
+Options:
+
+- `--doc` - document key (from `reqbot docs`)
+- `--profile` - profile name (e.g. `cybersecurity`)
+- `--format` - output format; default `csv`
+- `--output` - write to file instead of stdout
+
+The same checklist is available from the browser via the Checklists screen.
+
 ### `setup`
 
 Automated first-run setup (Docker, Qdrant, Ollama, models, config).
@@ -206,11 +224,13 @@ reqbot serve [--host H] [--port P]
 
 Defaults to `127.0.0.1:8000`. Opens a browser-accessible interface at `http://localhost:8000`:
 
-- **Search view** — query the corpus, filter by document, click through to trace
-- **Trace view** — full requirement detail: description, source quote, provenance, cross-framework matches, optional source context expansion
-- **Compare view** — side-by-side topic comparison across two documents (exact + semantic matches)
-- **Evidence view** — topic → requirements grouped by document, with optional LLM synthesis
-- **Docs view** — browse the indexed corpus; filter and sort; drill into a single document
+- **Search** — query the corpus, filter by document, click through to trace
+- **Trace** — full requirement detail: description, source quote, provenance, cross-framework matches, optional source context expansion
+- **Compare** — side-by-side topic comparison across two documents (exact + semantic matches)
+- **Evidence** — topic → requirements grouped by document, with optional LLM synthesis
+- **Corpus** — browse the indexed corpus; filter and sort; drill into a single document; launch checklist generation from a document detail page
+- **Checklists** — pick a document and profile, generate a checklist, preview all items in a grouped table (Locate / Ask / Record / Verify / Trace), and export as CSV, JSON, or Markdown
+- **System** — Ollama and Qdrant health status
 
 The API is always available at `/api/` regardless of whether the frontend build is present. Swagger UI at `/api-docs`.
 
@@ -358,6 +378,7 @@ Useful flags:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - module map and data flows
 - [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
-- [docs/PHASE20_REQUIREMENTS.md](docs/PHASE20_REQUIREMENTS.md) - Phase 20 plan (Domain Profile Foundation)
-- [docs/FORWARD_PLAN_P16-22.md](docs/FORWARD_PLAN_P16-22.md) - forward roadmap (Phases 16–22)
+- [docs/PHASE22_REQUIREMENTS.md](docs/PHASE22_REQUIREMENTS.md) - Phase 22 plan (Browser Checklist Workflow)
+- [docs/PHASE23_REQUIREMENTS.md](docs/PHASE23_REQUIREMENTS.md) - Phase 23 plan (Checklist Assessor Workflow)
 - [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document
+- [archive/](archive/) - completed phase plans (Phases 14–21)

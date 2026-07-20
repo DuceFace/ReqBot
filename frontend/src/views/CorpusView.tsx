@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api/client'
 import type { DocsEntry, DocsResponse } from '../api/types'
 import AppShell from '../components/AppShell'
@@ -14,15 +14,28 @@ type SortKey = 'name' | 'count' | 'date'
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function DocRow({ entry }: { entry: DocsEntry }) {
+  const navigate = useNavigate()
   const displayName = entry.source_pdf || entry.doc_key
+  const detailPath = `/corpus/${encodeURIComponent(entry.doc_key)}`
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
+    <div
+      className="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-300 hover:shadow-sm transition-all"
+      onClick={() => navigate(detailPath)}
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
+          <Link
+            to={detailPath}
+            onClick={e => e.stopPropagation()}
+            className="text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline truncate block"
+          >
+            {displayName}
+          </Link>
           <p className="text-xs text-gray-400 mt-1">
             {entry.count.toLocaleString()} requirement{entry.count !== 1 ? 's' : ''}
+            {' · '}
+            {entry.profile || 'cybersecurity'}
             {' · '}
             {entry.mode}
             {' · '}
@@ -31,9 +44,10 @@ function DocRow({ entry }: { entry: DocsEntry }) {
         </div>
         <Link
           to={`/search?doc=${encodeURIComponent(docValue(entry))}`}
+          onClick={e => e.stopPropagation()}
           className="shrink-0 text-sm text-blue-600 hover:underline whitespace-nowrap"
         >
-          Search this doc ↗
+          Search ↗
         </Link>
       </div>
     </div>

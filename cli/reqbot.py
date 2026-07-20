@@ -898,6 +898,19 @@ def cmd_checklist(args: argparse.Namespace) -> int:
         return 1
 
     fmt = args.format
+    if fmt == "xlsx":
+        if not args.output:
+            log.error("--output FILE is required for --format xlsx (binary format cannot be written to stdout)")
+            return 1
+        xlsx_bytes = checklist_export.to_xlsx(checklist)
+        try:
+            Path(args.output).expanduser().write_bytes(xlsx_bytes)
+            print(f"Checklist written to: {args.output}")
+        except OSError as e:
+            log.error("Could not write to file: %s", e)
+            return 1
+        return 0
+
     if fmt == "json":
         output_text = checklist_export.to_json(checklist)
     elif fmt == "md":
@@ -1581,8 +1594,8 @@ def main() -> None:
         help="Document key (PDF stem, e.g. afi17-101) — same identifier shown by reqbot docs",
     )
     p_checklist.add_argument(
-        "--format", type=str, choices=["csv", "json", "md"], default="csv",
-        help="Output format: csv (default), json, or md",
+        "--format", type=str, choices=["csv", "json", "md", "xlsx"], default="csv",
+        help="Output format: csv (default), json, md, or xlsx (requires --output)",
     )
     p_checklist.add_argument(
         "--output", type=str, default=None,

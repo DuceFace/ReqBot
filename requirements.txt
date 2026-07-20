@@ -11,6 +11,9 @@ qdrant-client==1.17.0
 ollama==0.6.1
 requests==2.33.0
 
+# XLSX export (WP-23.2)
+openpyxl==3.1.5
+
 # Serve (reqbot serve — added Phase 16C)
 fastapi==0.115.12
 uvicorn==0.34.3

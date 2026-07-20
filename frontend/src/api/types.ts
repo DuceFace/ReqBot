@@ -241,7 +241,7 @@ export interface ChecklistRequest {
 export interface ChecklistExportRequest {
   doc_key: string
   profile?: string
-  format: 'csv' | 'json' | 'markdown'
+  format: 'csv' | 'json' | 'markdown' | 'xlsx'
 }
 
 export interface ChecklistItem {

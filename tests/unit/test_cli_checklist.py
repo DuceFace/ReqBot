@@ -1,4 +1,4 @@
-"""Unit tests for the reqbot checklist CLI command (WP-21.5).
+"""Unit tests for the reqbot checklist CLI command (WP-21.5 / WP-23.2).
 
 Tests call cmd_checklist() directly with a constructed argparse.Namespace,
 patching the service and export layers so no filesystem or LLM access is needed.
@@ -252,3 +252,49 @@ def test_returns_0_on_success(tmp_path):
         rc = cmd_checklist(_args())
 
     assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# XLSX format (WP-23.2)
+# ---------------------------------------------------------------------------
+
+def test_format_xlsx_without_output_returns_1(tmp_path, capsys):
+    """xlsx to stdout is not supported; --output is required."""
+    mock_cfg = MagicMock()
+    mock_cfg.processed_dir_path.return_value = tmp_path
+
+    with patch("cli.reqbot._cfg", mock_cfg), \
+         patch("services.checklist_service.generate", return_value=MOCK_CHECKLIST):
+        rc = cmd_checklist(_args(fmt="xlsx", output=None))
+
+    assert rc == 1
+
+
+def test_format_xlsx_calls_to_xlsx_and_writes_bytes(tmp_path, capsys):
+    out_file = tmp_path / "checklist.xlsx"
+    mock_cfg = MagicMock()
+    mock_cfg.processed_dir_path.return_value = tmp_path
+    fake_bytes = b"PK\x03\x04fakexlsx"
+
+    with patch("cli.reqbot._cfg", mock_cfg), \
+         patch("services.checklist_service.generate", return_value=MOCK_CHECKLIST), \
+         patch("pipeline.checklist_export.to_xlsx", return_value=fake_bytes) as mock_xlsx:
+        rc = cmd_checklist(_args(fmt="xlsx", output=str(out_file)))
+
+    assert rc == 0
+    mock_xlsx.assert_called_once_with(MOCK_CHECKLIST)
+    assert out_file.read_bytes() == fake_bytes
+    assert str(out_file) in capsys.readouterr().out
+
+
+def test_format_xlsx_write_error_returns_1(tmp_path):
+    mock_cfg = MagicMock()
+    mock_cfg.processed_dir_path.return_value = tmp_path
+    unwritable = "/root/no_permission/checklist.xlsx"
+
+    with patch("cli.reqbot._cfg", mock_cfg), \
+         patch("services.checklist_service.generate", return_value=MOCK_CHECKLIST), \
+         patch("pipeline.checklist_export.to_xlsx", return_value=b"fake"):
+        rc = cmd_checklist(_args(fmt="xlsx", output=unwritable))
+
+    assert rc == 1

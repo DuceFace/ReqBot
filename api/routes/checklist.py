@@ -36,14 +36,16 @@ class ChecklistExportRequest(BaseModel):
 def _generate(doc_key: str, profile: str) -> dict:
     """Call checklist_service.generate(), mapping exceptions to HTTP errors."""
     cfg = _config.load()
-    processed_dir = cfg.processed_dir_path
+    processed_dir = cfg.processed_dir_path()
     try:
         return checklist_service.generate(processed_dir, doc_key, profile)
     except FileNotFoundError as e:
         msg = str(e)
-        if "Profile not found" in msg or "processed_dir not found" not in msg:
+        if "Profile not found" in msg:
             raise HTTPException(status_code=400, detail=msg)
-        raise HTTPException(status_code=503, detail=f"Server configuration error: {msg}")
+        if "processed_dir not found" in msg:
+            raise HTTPException(status_code=503, detail=f"Server configuration error: {msg}")
+        raise HTTPException(status_code=503, detail=f"Internal server error: {msg}")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

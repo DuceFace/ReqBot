@@ -5,7 +5,7 @@ All service and export calls are mocked — no filesystem or LLM access.
 """
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -91,9 +91,21 @@ def test_post_checklist_default_profile():
     with patch(_GENERATE_PATH, return_value=MOCK_CHECKLIST) as mock_gen:
         resp = client.post("/api/checklist", json={"doc_key": "afi17-101"})
     assert resp.status_code == 200
-    _, call_kwargs = mock_gen.call_args
-    # profile arg is positional — check via args
     assert mock_gen.call_args.args[2] == "cybersecurity"
+
+
+def test_post_checklist_passes_resolved_path_to_service(tmp_path):
+    """cfg.processed_dir_path() is called as a method and its return value reaches generate()."""
+    mock_cfg = MagicMock()
+    mock_cfg.processed_dir_path.return_value = tmp_path
+    with patch("api.routes.checklist._config.load", return_value=mock_cfg):
+        with patch(_GENERATE_PATH, return_value=MOCK_CHECKLIST) as mock_gen:
+            resp = client.post(
+                "/api/checklist",
+                json={"doc_key": "afi17-101", "profile": "cybersecurity"},
+            )
+    assert resp.status_code == 200
+    assert mock_gen.call_args.args[0] == tmp_path
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +135,16 @@ def test_post_checklist_invalid_profile_returns_400():
 
 def test_post_checklist_missing_processed_dir_returns_503():
     with patch(_GENERATE_PATH, side_effect=FileNotFoundError("processed_dir not found: /missing")):
+        resp = client.post(
+            "/api/checklist",
+            json={"doc_key": "afi17-101", "profile": "cybersecurity"},
+        )
+    assert resp.status_code == 503
+
+
+def test_post_checklist_generic_fnfe_returns_503():
+    """Any FileNotFoundError that is not profile-related is a server-side failure (503)."""
+    with patch(_GENERATE_PATH, side_effect=FileNotFoundError("Intermediate file missing")):
         resp = client.post(
             "/api/checklist",
             json={"doc_key": "afi17-101", "profile": "cybersecurity"},

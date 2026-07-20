@@ -238,6 +238,12 @@ export interface ChecklistRequest {
   profile?: string
 }
 
+export interface ChecklistExportRequest {
+  doc_key: string
+  profile?: string
+  format: 'csv' | 'json' | 'markdown'
+}
+
 export interface ChecklistItem {
   checklist_item_id: string
   requirement_ids: string[]

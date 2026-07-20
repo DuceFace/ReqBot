@@ -14,6 +14,7 @@ import type {
   EvidenceRequest,
   EvidenceResponse,
   ChecklistRequest,
+  ChecklistExportRequest,
   ChecklistEnvelope,
   ProfilesResponse,
 } from './types'
@@ -92,6 +93,26 @@ export async function profiles(): Promise<ProfilesResponse> {
   const res = await fetch(`${BASE}/profiles`)
   if (!res.ok) throw new Error(`profiles failed: ${res.status} ${res.statusText}`)
   return res.json() as Promise<ProfilesResponse>
+}
+
+export async function checklistExport(
+  req: ChecklistExportRequest,
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(`${BASE}/checklist/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) {
+    const detail = await res.json().then((b: { detail?: string }) => b.detail ?? '').catch(() => '')
+    throw new Error(detail || `export failed: ${res.status} ${res.statusText}`)
+  }
+  const disposition = res.headers.get('content-disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const ext = req.format === 'markdown' ? 'md' : req.format
+  const filename = match?.[1] ?? `checklist_${req.doc_key}.${ext}`
+  const blob = await res.blob()
+  return { blob, filename }
 }
 
 export async function checklist(req: ChecklistRequest): Promise<ChecklistEnvelope> {

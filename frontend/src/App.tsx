@@ -7,7 +7,7 @@ import CorpusView from './views/CorpusView'
 import CorpusDetailView from './views/CorpusDetailView'
 import SystemView from './views/SystemView'
 import ChecklistsView from './views/ChecklistsView'
-import ChecklistPreviewStub from './views/ChecklistPreviewStub'
+import ChecklistPreviewView from './views/ChecklistPreviewView'
 import NotFoundView from './views/NotFoundView'
 
 export default function App() {
@@ -22,7 +22,7 @@ export default function App() {
         <Route path="/corpus/:docId" element={<CorpusDetailView />} />
         <Route path="/system" element={<SystemView />} />
         <Route path="/checklists" element={<ChecklistsView />} />
-        <Route path="/checklists/:docId" element={<ChecklistPreviewStub />} />
+        <Route path="/checklists/:docId" element={<ChecklistPreviewView />} />
         {/* Redirect legacy /docs bookmarks to /corpus */}
         <Route path="/docs" element={<Navigate to="/corpus" replace />} />
         <Route path="/trace/:reqId" element={<TraceView />} />

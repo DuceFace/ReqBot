@@ -26,6 +26,9 @@ focuses on the parts that help someone evaluate the MVP today:
 4. **Profile skip-section filtering** — profiles already define `skip_sections`, but the
    chunking pipeline does not consume them. Threading that field through can reduce avoidable
    noise from glossaries, references, acronym lists, and similar non-requirement sections.
+5. **Step C truncation recovery flag** — when the LLM output is truncated and the existing
+   recovery path activates, tag affected records with `recovered_truncated: true` so
+   downstream stages can surface a caution signal without requiring new recovery logic.
 
 Audit-question generation and assessor-note preservation remain useful ideas, but they are
 not the right next build target. Audit questions are compute-heavy and can amplify noisy
@@ -48,6 +51,8 @@ trustworthy.
   downstream requirements, retrieval, and checklist output.
 - Implement profile-based skip-section filtering in the chunking path, using existing profile
   configuration rather than hardcoded section names.
+- Tag raw extraction records with `recovered_truncated: true` when Step C's existing
+  truncation recovery path activates; do not set the flag on normal extractions.
 - Keep CLI, API, and GUI behavior aligned through the service/export/pipeline layers.
 - No regressions to Phase 18/19/21/22 behavior.
 
@@ -232,15 +237,13 @@ and all existing export formats still work.
 
 ---
 
-### WP-23.3 — Extraction Quality Warnings
+### WP-23.3 — Pipeline Structural Guardrails
 
-**Goal:** Add lightweight pipeline warnings for extraction conditions that can make downstream
-requirements/checklists less trustworthy. This is a trust-hardening WP, not an OCR or recovery
-rewrite.
+**Goal:** Add lightweight, deterministic pipeline checks for structural conditions that can make
+downstream requirements/checklists less trustworthy. This is a trust-hardening WP, not an OCR
+or LLM-recovery rewrite.
 
 **Scope:**
-Implement small, deterministic checks from the TODO backlog where they fit naturally in the
-existing pipeline:
 
 1. **Low-text page detection / OCR warning**
    - Detect pages with unusually low extracted text counts after Step A parsing.
@@ -251,29 +254,19 @@ existing pipeline:
    - Validate that Step A page records are monotonically increasing with no gaps or duplicates
      before Step B chunking. Do not assert on the starting page number — some PDFs begin at 0
      or have unconventional front-matter numbering.
-   - Missing or duplicate page numbers should produce a clear warning or validation error,
-     depending on how severe the existing pipeline treats malformed page records.
+   - Missing or duplicate page numbers produce a clear warning; ingest continues.
 
 3. **Chunk overlap guard**
-   - Assert that overlap is smaller than chunk size in Step B.
+   - Raise a ValueError when overlap is greater than or equal to chunk size in Step B.
    - This prevents an infinite-loop class of bug if a bad caller/config value is introduced.
 
-4. **Truncated JSON recovery flag**
-   - When Step C recovers a truncated JSON array, add a field such as
-     `recovered_truncated: true` to affected raw extraction output.
-   - Downstream steps should preserve or translate this into review/warning metadata where
-     current schemas allow it.
-
-**Optional investigation only:**
-- Ollama `finish_reason` / token metadata may help detect truncation earlier. Investigate only
-  if it is quick and the current Ollama client response exposes the metadata cleanly. Do not
-  block WP-23.3 on this.
+**Out of scope for WP-23.3:**
+- Truncated JSON recovery flag (Step C LLM output tagging) — deferred; see Section 9.
+- Ollama `finish_reason` / token metadata investigation — deferred with truncated JSON work.
 
 **Output requirements:**
-- Warnings should be visible in logs/CLI output and persisted in the most appropriate existing
-  artifact when practical.
-- Do not break existing JSONL consumers with unplanned schema changes. Additive fields are OK
-  where downstream code already tolerates them.
+- Warnings are visible in logs/CLI output; no new artifact files required.
+- Do not break existing JSONL consumers. No schema changes in this WP.
 - Low-text warnings must not become compliance findings or checklist review reasons unless a
   later WP explicitly defines that behavior.
 - Keep warnings domain-neutral. These are structural/extraction-quality checks, not
@@ -281,9 +274,8 @@ existing pipeline:
 
 **Tests / verification:**
 - Unit tests for low-text detection thresholds using synthetic page records.
-- Unit tests for page contiguity success/failure cases.
+- Unit tests for page contiguity success/failure cases (gaps, duplicates, non-standard start).
 - Unit tests for overlap guard rejecting invalid chunk settings.
-- Unit tests for recovered truncated extraction records carrying the new flag.
 - Existing ingest/checklist/retrieval tests continue to pass.
 
 **Gate:** quality issues are easier to see, but normal valid documents still ingest without
@@ -346,7 +338,50 @@ requirement sections.
 
 ---
 
-### WP-23.5 — Integration Gate
+### WP-23.5 — Step C Truncation Recovery Flag
+
+**Goal:** When Step C's existing truncated JSON recovery path activates, tag the affected raw
+extraction records with `recovered_truncated: true` so downstream stages can preserve a
+caution signal. This is a flag-only WP — no new recovery algorithm.
+
+**Background:**
+Step C already contains a fallback that attempts to salvage a truncated JSON array from partial
+LLM output. Currently that recovery is silent: if it succeeds, the records proceed identically
+to non-truncated records. This WP makes the recovery visible in the output artifacts.
+
+**In scope:**
+- Detect the existing recovery code path in `pipeline/llm_extract_requirements.py`.
+- Add `recovered_truncated: true` to each record produced from a recovered (truncated) chunk.
+- Normal extraction records must not carry `recovered_truncated` or must carry
+  `recovered_truncated: false` — whichever is less invasive to downstream consumers.
+- Preserve the flag through `pipeline/parse_and_normalize.py` if the change is purely
+  additive (pass-through of an unknown field); do not propagate if it requires schema changes.
+- Unit tests covering: recovery path sets the flag; normal path does not set the flag.
+
+**Out of scope:**
+- New truncation recovery algorithm or retry logic.
+- Ollama `finish_reason` / token metadata investigation.
+- Re-prompting or multi-attempt extraction.
+- Checklist review reasons driven by `recovered_truncated`.
+- Confidence score changes.
+- Any UI or API surface for the flag in this WP.
+
+**Output requirements:**
+- `recovered_truncated: true` appears in the raw extraction JSONL for affected records.
+- No behavioral change to the extraction process itself; only the output record is augmented.
+- No new pip dependencies.
+
+**Tests / verification:**
+- Unit tests with synthetic chunk data exercising the recovery branch and the normal branch.
+- Confirm flag is present on recovered records and absent (or false) on normal records.
+- Existing Step C and normalization tests continue to pass.
+
+**Gate:** `recovered_truncated` flag appears in affected raw records; no regression to
+extraction behavior or downstream pipeline steps.
+
+---
+
+### WP-23.6 — Integration Gate
 
 **Goal:** Confirm all Phase 23 features work end-to-end and no Phase 18/19/21/22 capability
 has regressed.
@@ -372,9 +407,11 @@ has regressed.
 7. Confirm `reqbot checklist --format xlsx --output <file>` writes a valid workbook.
 8. Run or inspect an ingest where quality warnings should trigger; confirm warnings are visible
    and valid documents still process normally.
-9. Run or inspect an ingest with configured `skip_sections`; confirm skipped sections are
-   logged and ordinary requirement sections remain.
-10. Confirm `reqbot checklist`, `reqbot ask`, `reqbot trace`, `reqbot compare`,
+9. If a truncated-recovery ingest is available, confirm `recovered_truncated: true` appears in
+   the raw extraction JSONL for affected records and is absent from normal records.
+10. Run or inspect an ingest with configured `skip_sections`; confirm skipped sections are
+    logged and ordinary requirement sections remain.
+11. Confirm `reqbot checklist`, `reqbot ask`, `reqbot trace`, `reqbot compare`,
     `reqbot evidence`, `reqbot docs`, and `reqbot serve` still work.
 
 **Gate:** all implemented features pass, all unit tests pass, frontend build passes, and no
@@ -395,11 +432,13 @@ WP-specific expectations:
 - **WP-23.1:** frontend build; browser smoke for scroll containment and dropdown export.
 - **WP-23.2:** unit/API/CLI tests for XLSX behavior; regression tests for existing export
   formats; workbook inspection with `openpyxl`.
-- **WP-23.3:** unit tests for low-text warning, page contiguity validation, chunk overlap
-  guard, and truncated JSON recovery flag. Additive warning metadata only.
+- **WP-23.3:** unit tests for low-text warning, page contiguity validation (gaps, duplicates,
+  non-standard start), and chunk overlap guard. Warning-only; no schema changes.
 - **WP-23.4:** unit tests for profile-driven skip-section matching and conservative boundary
   handling. Integration smoke on representative document text.
-- **WP-23.5:** full regression smoke across CLI/API/browser.
+- **WP-23.5:** unit tests for `recovered_truncated` flag — recovery path sets the flag;
+  normal extraction path does not. Flag preserved (or safely absent) through parse/normalize.
+- **WP-23.6:** full regression smoke across CLI/API/browser.
 
 ---
 
@@ -418,8 +457,10 @@ Phase 23 is complete when:
 7. Extraction-quality warnings exist for the WP-23.3 checks and do not break normal ingest.
 8. Profile-based skip-section filtering uses active profile config and does not hardcode domain
    section names.
-9. All Phase 18/19/21/22 CLI/API/GUI capabilities continue to work.
-10. No new pip/npm dependency other than `openpyxl` was introduced.
+9. `recovered_truncated: true` is set on raw extraction records when Step C's existing recovery
+   path activates; it is not set on normal extractions.
+10. All Phase 18/19/21/22 CLI/API/GUI capabilities continue to work.
+11. No new pip/npm dependency other than `openpyxl` was introduced.
 
 ---
 
@@ -438,3 +479,6 @@ These remain valuable, but they are not part of Phase 23 unless explicitly re-sc
 - Ingest UI and job history.
 - Runtime API response validation.
 - OCR support beyond low-text warnings.
+- **Ollama finish_reason / token metadata** — investigate whether Ollama exposes
+  `finish_reason` or token-count metadata that could detect truncation upstream of the
+  JSON recovery step. Explicitly out of scope for WP-23.5; schedule separately if valuable.

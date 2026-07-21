@@ -29,6 +29,41 @@ log = logging.getLogger(__name__)
 TABLE_START_SENTINEL = "<<<TABLE_START>>>"
 TABLE_END_SENTINEL = "<<<TABLE_END>>>"
 
+# Pages with fewer stripped characters than this threshold are flagged as
+# potentially scanned/image-heavy or otherwise OCR-dependent.
+_LOW_TEXT_THRESHOLD = 100
+
+
+def warn_low_text_pages(pages: list[dict]) -> int:
+    """Log a warning for each page whose stripped text length is below _LOW_TEXT_THRESHOLD.
+
+    Pages may have low text because they are scanned/image-heavy and require OCR, or
+    because they are intentionally minimal (cover page, blank separator, etc.).
+    This is a diagnostic warning only — ingest continues regardless.
+
+    Returns the count of low-text pages.
+    """
+    low_count = 0
+    for page in pages:
+        text_len = len(page.get("text", "").strip())
+        if text_len < _LOW_TEXT_THRESHOLD:
+            low_count += 1
+            log.warning(
+                "Page %s has very low text content (%d chars) — "
+                "may be scanned/image-heavy or OCR-dependent",
+                page.get("page_num", "?"),
+                text_len,
+            )
+    if low_count:
+        log.warning(
+            "Low-text summary: %d of %d page(s) have fewer than %d chars. "
+            "Consider whether OCR is needed for this document.",
+            low_count,
+            len(pages),
+            _LOW_TEXT_THRESHOLD,
+        )
+    return low_count
+
 
 def extract_pages(pdf_path: Path) -> list[dict]:
     """Extract text from each page of a PDF using PyMuPDF.
@@ -177,6 +212,7 @@ def run(pdf_path: str, output_path: str, *, layout_mode: str = "pymupdf") -> str
         len(pages), non_empty, elapsed, total_chars,
     )
 
+    warn_low_text_pages(pages)
     write_jsonl(pages, out)
     log.info("Wrote %s", out)
     return str(out)

@@ -232,15 +232,13 @@ and all existing export formats still work.
 
 ---
 
-### WP-23.3 — Extraction Quality Warnings
+### WP-23.3 — Pipeline Structural Guardrails
 
-**Goal:** Add lightweight pipeline warnings for extraction conditions that can make downstream
-requirements/checklists less trustworthy. This is a trust-hardening WP, not an OCR or recovery
-rewrite.
+**Goal:** Add lightweight, deterministic pipeline checks for structural conditions that can make
+downstream requirements/checklists less trustworthy. This is a trust-hardening WP, not an OCR
+or LLM-recovery rewrite.
 
 **Scope:**
-Implement small, deterministic checks from the TODO backlog where they fit naturally in the
-existing pipeline:
 
 1. **Low-text page detection / OCR warning**
    - Detect pages with unusually low extracted text counts after Step A parsing.
@@ -251,29 +249,19 @@ existing pipeline:
    - Validate that Step A page records are monotonically increasing with no gaps or duplicates
      before Step B chunking. Do not assert on the starting page number — some PDFs begin at 0
      or have unconventional front-matter numbering.
-   - Missing or duplicate page numbers should produce a clear warning or validation error,
-     depending on how severe the existing pipeline treats malformed page records.
+   - Missing or duplicate page numbers produce a clear warning; ingest continues.
 
 3. **Chunk overlap guard**
-   - Assert that overlap is smaller than chunk size in Step B.
+   - Raise a ValueError when overlap is greater than or equal to chunk size in Step B.
    - This prevents an infinite-loop class of bug if a bad caller/config value is introduced.
 
-4. **Truncated JSON recovery flag**
-   - When Step C recovers a truncated JSON array, add a field such as
-     `recovered_truncated: true` to affected raw extraction output.
-   - Downstream steps should preserve or translate this into review/warning metadata where
-     current schemas allow it.
-
-**Optional investigation only:**
-- Ollama `finish_reason` / token metadata may help detect truncation earlier. Investigate only
-  if it is quick and the current Ollama client response exposes the metadata cleanly. Do not
-  block WP-23.3 on this.
+**Out of scope for WP-23.3:**
+- Truncated JSON recovery flag (Step C LLM output tagging) — deferred; see Section 9.
+- Ollama `finish_reason` / token metadata investigation — deferred with truncated JSON work.
 
 **Output requirements:**
-- Warnings should be visible in logs/CLI output and persisted in the most appropriate existing
-  artifact when practical.
-- Do not break existing JSONL consumers with unplanned schema changes. Additive fields are OK
-  where downstream code already tolerates them.
+- Warnings are visible in logs/CLI output; no new artifact files required.
+- Do not break existing JSONL consumers. No schema changes in this WP.
 - Low-text warnings must not become compliance findings or checklist review reasons unless a
   later WP explicitly defines that behavior.
 - Keep warnings domain-neutral. These are structural/extraction-quality checks, not
@@ -281,9 +269,8 @@ existing pipeline:
 
 **Tests / verification:**
 - Unit tests for low-text detection thresholds using synthetic page records.
-- Unit tests for page contiguity success/failure cases.
+- Unit tests for page contiguity success/failure cases (gaps, duplicates, non-standard start).
 - Unit tests for overlap guard rejecting invalid chunk settings.
-- Unit tests for recovered truncated extraction records carrying the new flag.
 - Existing ingest/checklist/retrieval tests continue to pass.
 
 **Gate:** quality issues are easier to see, but normal valid documents still ingest without
@@ -395,8 +382,8 @@ WP-specific expectations:
 - **WP-23.1:** frontend build; browser smoke for scroll containment and dropdown export.
 - **WP-23.2:** unit/API/CLI tests for XLSX behavior; regression tests for existing export
   formats; workbook inspection with `openpyxl`.
-- **WP-23.3:** unit tests for low-text warning, page contiguity validation, chunk overlap
-  guard, and truncated JSON recovery flag. Additive warning metadata only.
+- **WP-23.3:** unit tests for low-text warning, page contiguity validation (gaps, duplicates,
+  non-standard start), and chunk overlap guard. Warning-only; no schema changes.
 - **WP-23.4:** unit tests for profile-driven skip-section matching and conservative boundary
   handling. Integration smoke on representative document text.
 - **WP-23.5:** full regression smoke across CLI/API/browser.
@@ -438,3 +425,10 @@ These remain valuable, but they are not part of Phase 23 unless explicitly re-sc
 - Ingest UI and job history.
 - Runtime API response validation.
 - OCR support beyond low-text warnings.
+- **Truncated JSON recovery flag** — when Step C recovers a truncated JSON array, tag
+  affected raw extraction output with `recovered_truncated: true` and propagate the flag
+  where downstream schemas allow. Deferred from WP-23.3 because it requires touching
+  `llm_extract_requirements.py` and warrants its own focused review.
+- **Ollama finish_reason / token metadata** — investigate whether Ollama exposes
+  `finish_reason` or token-count metadata that could detect truncation upstream of the
+  JSON recovery step. Pair with truncated JSON recovery work when scheduled.

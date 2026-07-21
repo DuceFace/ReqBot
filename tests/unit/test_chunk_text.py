@@ -88,6 +88,16 @@ def test_contiguity_missing_page_num_warns(caplog):
     assert caplog.text == ""  # single-page returns early before per-page check
 
 
+def test_contiguity_duplicate_does_not_also_warn_gap(caplog):
+    # A duplicate page number should warn "duplicate", not also warn "gap"
+    # (duplicate means pnum == prev_pnum, so pnum > prev_pnum + 1 is false)
+    pages = [_page(1), _page(2), _page(2), _page(3)]
+    with caplog.at_level(logging.WARNING, logger="pipeline.chunk_text"):
+        validate_page_contiguity(pages)
+    assert "duplicate" in caplog.text.lower()
+    assert "gap" not in caplog.text.lower()
+
+
 def test_contiguity_missing_page_num_in_middle_warns(caplog):
     pages = [_page(1), {"text": "no page_num"}, _page(3)]
     with caplog.at_level(logging.WARNING, logger="pipeline.chunk_text"):

@@ -159,7 +159,7 @@ def validate_page_contiguity(pages: list[dict]) -> None:
         seen.add(pnum)
         if i > 0:
             prev_pnum = pages[i - 1].get("page_num")
-            if prev_pnum is not None and pnum != prev_pnum + 1:
+            if prev_pnum is not None and pnum > prev_pnum + 1:
                 log.warning(
                     "Page number gap: page %d follows page %d (gap of %d) — "
                     "some pages may be missing from Step A output",

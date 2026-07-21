@@ -14,11 +14,13 @@ _EXPORT_CONTENT_TYPES = {
     "csv": "text/csv",
     "json": "application/json",
     "markdown": "text/markdown",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 _EXPORT_EXTENSIONS = {
     "csv": "csv",
     "json": "json",
     "markdown": "md",
+    "xlsx": "xlsx",
 }
 
 
@@ -67,7 +69,7 @@ def post_checklist(req: ChecklistRequest) -> dict:
 
 @router.post("/checklist/export")
 def post_checklist_export(req: ChecklistExportRequest) -> Response:
-    """Generate and export a checklist as CSV, JSON, or Markdown.
+    """Generate and export a checklist as CSV, JSON, Markdown, or XLSX.
 
     Returns the file content with Content-Disposition: attachment for browser download.
     """
@@ -75,15 +77,17 @@ def post_checklist_export(req: ChecklistExportRequest) -> Response:
     if fmt not in _EXPORT_CONTENT_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported format '{req.format}'. Valid values: csv, json, markdown.",
+            detail=f"Unsupported format '{req.format}'. Valid values: csv, json, markdown, xlsx.",
         )
 
     checklist = _generate(req.doc_key, req.profile)
 
     if fmt == "csv":
-        content = checklist_export.to_csv(checklist)
+        content: str | bytes = checklist_export.to_csv(checklist)
     elif fmt == "json":
         content = checklist_export.to_json(checklist)
+    elif fmt == "xlsx":
+        content = checklist_export.to_xlsx(checklist)
     else:
         content = checklist_export.to_markdown(checklist)
 

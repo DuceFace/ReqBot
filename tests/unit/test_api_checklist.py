@@ -198,13 +198,26 @@ def test_export_markdown_returns_attachment():
     assert "# Checklist" in resp.text
 
 
+def test_export_xlsx_returns_attachment():
+    with patch(_GENERATE_PATH, return_value=MOCK_CHECKLIST):
+        resp = client.post(
+            "/api/checklist/export",
+            json={"doc_key": "afi17-101", "profile": "cybersecurity", "format": "xlsx"},
+        )
+    assert resp.status_code == 200
+    assert "spreadsheetml" in resp.headers["content-type"]
+    assert "attachment" in resp.headers["content-disposition"]
+    assert "afi17-101_cybersecurity.xlsx" in resp.headers["content-disposition"]
+    assert len(resp.content) > 0
+
+
 def test_export_unsupported_format_returns_400():
     resp = client.post(
         "/api/checklist/export",
-        json={"doc_key": "afi17-101", "profile": "cybersecurity", "format": "xlsx"},
+        json={"doc_key": "afi17-101", "profile": "cybersecurity", "format": "pdf"},
     )
     assert resp.status_code == 400
-    assert "xlsx" in resp.json()["detail"]
+    assert "pdf" in resp.json()["detail"]
 
 
 # ---------------------------------------------------------------------------

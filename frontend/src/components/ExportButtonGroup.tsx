@@ -14,6 +14,7 @@ const FORMATS: { label: string; value: Format }[] = [
   { label: 'CSV', value: 'csv' },
   { label: 'JSON', value: 'json' },
   { label: 'Markdown', value: 'markdown' },
+  { label: 'Excel (XLSX)', value: 'xlsx' },
 ]
 
 function triggerDownload(blob: Blob, filename: string) {

@@ -2,6 +2,8 @@ import csv
 import io
 import json
 
+import openpyxl
+
 from pipeline.checklist_export import (
     _CSV_COLUMNS,
     _csv_row,
@@ -9,6 +11,7 @@ from pipeline.checklist_export import (
     to_csv,
     to_json,
     to_markdown,
+    to_xlsx,
 )
 
 # Minimal fully-populated checklist item for fixture use
@@ -336,3 +339,135 @@ def test_to_markdown_formula_value_not_escaped():
     result = to_markdown(checklist)
     assert "=Systems shall enforce MFA." in result
     assert "'=Systems" not in result
+
+
+# --- to_xlsx ---
+
+def _load_xlsx(data: bytes):
+    """Helper: load xlsx bytes as an openpyxl workbook."""
+    return openpyxl.load_workbook(io.BytesIO(data))
+
+
+def test_to_xlsx_returns_bytes():
+    result = to_xlsx(ENVELOPE)
+    assert isinstance(result, bytes)
+    assert len(result) > 0
+
+
+def test_to_xlsx_opens_as_workbook():
+    result = to_xlsx(ENVELOPE)
+    wb = _load_xlsx(result)
+    assert wb is not None
+
+
+def test_to_xlsx_sheet_name():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    assert "Checklist" in wb.sheetnames
+
+
+def test_to_xlsx_group_headers_in_row_1():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    row1_values = [ws.cell(row=1, column=c).value for c in range(1, 14)]
+    assert "Locate" in row1_values
+    assert "Ask" in row1_values
+    assert "Record" in row1_values
+    assert "Verify" in row1_values
+    assert "Trace" in row1_values
+
+
+def test_to_xlsx_column_order():
+    expected_headers = [
+        "Ref", "Section", "Pages",
+        "Source Quote", "Audit Question",
+        "Status", "Notes",
+        "Flag", "Reasons", "Conf.",
+        "Item ID", "Req IDs", "Tags",
+    ]
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    actual = [ws.cell(row=2, column=c).value for c in range(1, 14)]
+    assert actual == expected_headers
+
+
+def test_to_xlsx_freeze_panes():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    assert ws.freeze_panes == "D3"
+
+
+def test_to_xlsx_auto_filter_covers_data_rows():
+    # ENVELOPE has 2 items → 2 header rows + 2 data rows = max_row 4; filter must end at row 4
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    assert ws.auto_filter.ref is not None
+    assert ws.auto_filter.ref.endswith("4"), f"expected filter to row 4, got {ws.auto_filter.ref}"
+
+
+def test_to_xlsx_auto_filter_empty_checklist_ends_at_row_2():
+    wb = _load_xlsx(to_xlsx(EMPTY_ENVELOPE))
+    ws = wb["Checklist"]
+    assert ws.auto_filter.ref is not None
+    assert ws.auto_filter.ref.endswith("2"), f"expected filter to row 2, got {ws.auto_filter.ref}"
+
+
+def test_to_xlsx_status_data_validation_exists():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    assert len(ws.data_validations.dataValidation) > 0
+
+
+def test_to_xlsx_row_count():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    # 2 header rows + 2 data rows
+    assert ws.max_row == 4
+
+
+def test_to_xlsx_source_quote_present():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    all_values = [ws.cell(row=r, column=4).value for r in range(3, ws.max_row + 1)]
+    assert any("enforce MFA" in str(v) for v in all_values if v)
+
+
+def test_to_xlsx_empty_items_no_crash():
+    result = to_xlsx(EMPTY_ENVELOPE)
+    wb = _load_xlsx(result)
+    ws = wb["Checklist"]
+    assert ws.max_row == 2  # only 2 header rows
+
+
+def test_to_xlsx_flagged_row_has_fill():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    # REVIEW_ITEM is second data row (row 4); COMPLETE_ITEM is row 3
+    flagged_fill = ws.cell(row=4, column=1).fill
+    clean_fill = ws.cell(row=3, column=1).fill
+    assert flagged_fill.patternType == "solid"
+    assert flagged_fill.fgColor.rgb != clean_fill.fgColor.rgb
+
+
+def test_to_xlsx_confidence_percentage_format():
+    wb = _load_xlsx(to_xlsx(ENVELOPE))
+    ws = wb["Checklist"]
+    conf_cell = ws.cell(row=3, column=10)
+    assert conf_cell.number_format == "0%"
+
+
+def test_to_xlsx_formula_injection_protection():
+    item = {**COMPLETE_ITEM, "source_quote": "=HYPERLINK(\"http://evil.example\",\"click\")"}
+    checklist = {**EMPTY_ENVELOPE, "items": [item]}
+    wb = _load_xlsx(to_xlsx(checklist))
+    ws = wb["Checklist"]
+    value = ws.cell(row=3, column=4).value
+    assert value is not None
+    assert str(value).startswith("'")
+
+
+def test_to_xlsx_sparse_item_no_crash():
+    sparse = {"requirement_ids": ["REQ-001"], "source_quote": "Minimal requirement."}
+    checklist = {**EMPTY_ENVELOPE, "items": [sparse]}
+    result = to_xlsx(checklist)
+    wb = _load_xlsx(result)
+    assert wb["Checklist"].max_row == 3

@@ -5,7 +5,6 @@ import pytest
 
 from pipeline.chunk_text import chunk_text, validate_page_contiguity
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

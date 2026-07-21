@@ -34,6 +34,46 @@ if str(_ROOT) not in sys.path:
 TABLE_START_SENTINEL = "<<<TABLE_START>>>"
 TABLE_END_SENTINEL = "<<<TABLE_END>>>"
 
+# Strips leading numbering or common section-label prefixes from a heading before
+# matching against skip_sections.  Examples removed: "Attachment 1 - ", "A. ", "1.2.3 ".
+_HEADING_PREFIX_RE = re.compile(
+    r"^(?:"
+    r"(?:appendix|attachment|annex|section|chapter|part|addendum|enclosure|exhibit)"
+    r"\s+[\w.-]+\s*[-–—:.]?\s*"  # named prefix + identifier
+    r"|[\d]+(?:\.[\d]+)*\.?\s+"             # numeric: "1.2.3 "
+    r"|[A-Za-z]\.\s+"                       # lettered: "A. "
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _normalize_heading(text: str) -> str:
+    """Lowercase, collapse whitespace, and strip common numbering prefixes."""
+    text = re.sub(r"\s+", " ", text.strip()).lower()
+    text = _HEADING_PREFIX_RE.sub("", text).strip()
+    return text
+
+
+def _should_skip_section(section_title_path: list[str], skip_sections: list[str]) -> bool:
+    """Return True if any heading in section_title_path matches a skip_sections entry.
+
+    Checks every element in the path (parent and child headings) so nested glossary
+    or reference sections are caught regardless of nesting depth.  Matching is
+    case-insensitive, whitespace-normalized, and prefix-stripped; a heading matches
+    if it equals or starts with a skip phrase.
+    """
+    if not skip_sections or not section_title_path:
+        return False
+    normalized_skips = [v for v in (re.sub(r"\s+", " ", s.strip()).lower() for s in skip_sections) if v]
+    if not normalized_skips:
+        return False
+    for heading in section_title_path:
+        normalized = _normalize_heading(heading)
+        for skip in normalized_skips:
+            if normalized == skip or normalized.startswith(skip):
+                return True
+    return False
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -382,10 +422,56 @@ def _chunk_raw_text(chunk: object) -> str:
     return "\n".join(parts) if parts else (chunk.text or "")
 
 
+def _chunk_body_items(chunk: object) -> list:
+    """Return non-heading doc_items from a DocChunk.
+
+    Excludes TitleItem and SectionHeaderItem so only content-bearing items
+    are considered when deciding whether a chunk falls in a skipped section.
+    Falls back to all items when docling_core is not importable.
+    """
+    try:
+        from docling_core.types.doc import SectionHeaderItem, TitleItem
+    except ImportError:
+        return list(chunk.meta.doc_items)
+    return [
+        item for item in chunk.meta.doc_items
+        if not isinstance(item, (TitleItem, SectionHeaderItem))
+    ]
+
+
+def _should_skip_chunk(chunk: object, item_ancestry: dict, skip_sections: list[str]) -> bool:
+    """Return True only when every body item with known ancestry is in a skipped section.
+
+    Conservative by design: if any body item is under a non-skipped heading, has
+    no self_ref, or has no entry in item_ancestry, the chunk is kept.  This prevents
+    silently discarding valid requirements from chunks that straddle a section boundary
+    (e.g. the last paragraph of Access Control followed by the first line of Glossary).
+    """
+    if not skip_sections:
+        return False
+    body_items = _chunk_body_items(chunk)
+    if not body_items:
+        return False
+    found_skippable = False
+    for item in body_items:
+        self_ref = getattr(item, "self_ref", None)
+        if not self_ref:
+            return False  # no ref → can't determine → keep
+        ancestry = item_ancestry.get(self_ref)
+        if ancestry is None:
+            return False  # missing ancestry → keep (conservative)
+        path = ancestry.get("section_title_path") or []
+        if not _should_skip_section(path, skip_sections):
+            return False  # at least one body item is in a non-skipped section → keep
+        found_skippable = True
+    return found_skippable  # True only if every body item was under a skipped heading
+
+
 def run_structure_aware(
     output_path: str,
     *,
     ancestry_result: object,
+    skip_sections: list[str] | None = None,
 ) -> str:
     """Chunk a DoclingDocument with HybridChunker and inject WP-14.1 ancestry breadcrumbs.
 
@@ -433,9 +519,19 @@ def run_structure_aware(
     elapsed_chunk = round(time.time() - t0, 2)
     log.info("HybridChunker produced %d raw chunks in %.2fs", len(all_chunks), elapsed_chunk)
 
+    skip_sections = skip_sections or []
+    if skip_sections:
+        log.info(
+            "Skip-section filtering active: %d configured section(s): %s",
+            len(skip_sections),
+            ", ".join(repr(s) for s in skip_sections),
+        )
+
     records: list[dict] = []
     toc_filtered = 0
     empty_filtered = 0
+    skip_filtered = 0
+    skip_examples: list[list[str]] = []
     chunk_id = 0
 
     for chunk in all_chunks:
@@ -455,9 +551,20 @@ def run_structure_aware(
 
         page_start, page_end = _chunk_page_range(chunk)
         ancestry = _best_ancestry(chunk, item_ancestry)
+        section_title_path = ancestry.get("section_title_path") or []
+
+        # Filter 3: skip only when every body item is under a skipped heading.
+        # Uses per-item ancestry rather than the single best-ancestry path so that
+        # chunks straddling a section boundary (e.g. valid req + first line of
+        # Glossary) are kept rather than silently dropped.
+        if _should_skip_chunk(chunk, item_ancestry, skip_sections):
+            skip_filtered += 1
+            if len(skip_examples) < 5:
+                skip_examples.append(section_title_path)
+            continue
 
         breadcrumb = _format_breadcrumb(
-            ancestry.get("section_title_path") or [],
+            section_title_path,
             ancestry.get("parent_header_text"),
         )
 
@@ -475,16 +582,23 @@ def run_structure_aware(
             "breadcrumb": breadcrumb,
             "text": text,
             "section_ref_path": ancestry.get("section_ref_path") or [],
-            "section_title_path": ancestry.get("section_title_path") or [],
+            "section_title_path": section_title_path,
             "parent_header_text": ancestry.get("parent_header_text"),
             "parent_context": ancestry.get("parent_context"),
         })
         chunk_id += 1
 
     log.info(
-        "Structure-aware chunking: %d chunks kept, %d ToC filtered, %d empty filtered",
-        len(records), toc_filtered, empty_filtered,
+        "Structure-aware chunking: %d chunks kept, %d ToC filtered, "
+        "%d empty filtered, %d skip-section filtered",
+        len(records), toc_filtered, empty_filtered, skip_filtered,
     )
+    if skip_filtered and skip_examples:
+        log.info(
+            "Skip-section examples (first %d of %d skipped): %s",
+            len(skip_examples), skip_filtered,
+            "; ".join(str(p) for p in skip_examples),
+        )
 
     if records:
         chunk_sizes = [len(r["raw_text"]) for r in records]
@@ -513,6 +627,7 @@ def run(
     chunk_size: int = 3000,
     overlap: int = 200,
     table_aware: bool = False,
+    skip_sections: list[str] | None = None,
 ) -> str:
     """Chunk pages JSONL into overlapping text segments and write chunks JSONL.
 
@@ -532,6 +647,12 @@ def run(
     pages_path = Path(pages_jsonl).resolve()
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
+
+    if skip_sections:
+        log.warning(
+            "Profile skip_sections configured, but legacy chunking has no section hierarchy; "
+            "skip-section filtering applies only in docling mode."
+        )
 
     log.info("Loading pages from: %s", pages_path)
     pages = load_pages(pages_path)

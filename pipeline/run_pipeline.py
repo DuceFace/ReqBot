@@ -152,6 +152,7 @@ def run(
                 chunk_text_mod.run_structure_aware(
                     str(chunks_path),
                     ancestry_result=ancestry_result,
+                    skip_sections=profile.get("skip_sections", []),
                 )
             except Exception as e:
                 raise RuntimeError(f"Step B (Docling) failed: {e}") from e
@@ -176,6 +177,7 @@ def run(
                     str(pages_path), str(chunks_path),
                     chunk_size=chunk_size, overlap=overlap,
                     table_aware=(layout_mode == "pdfplumber"),
+                    skip_sections=profile.get("skip_sections", []),
                 )
             except Exception as e:
                 raise RuntimeError(f"Step B failed: {e}") from e

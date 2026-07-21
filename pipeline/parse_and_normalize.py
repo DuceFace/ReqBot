@@ -409,6 +409,7 @@ def run(
             "parent_section_ref": parent_section_ref,
             "parent_context": parent_context,
             "child_section_refs": child_section_refs,
+            "recovered_truncated": req.get("recovered_truncated", False),
             "domain_profile": profile["name"],
             "document_id": doc_identity["document_id"],
             "document_hash_full": doc_identity["document_hash_full"],

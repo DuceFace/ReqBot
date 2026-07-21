@@ -34,6 +34,44 @@ if str(_ROOT) not in sys.path:
 TABLE_START_SENTINEL = "<<<TABLE_START>>>"
 TABLE_END_SENTINEL = "<<<TABLE_END>>>"
 
+# Strips leading numbering or common section-label prefixes from a heading before
+# matching against skip_sections.  Examples removed: "Attachment 1 - ", "A. ", "1.2.3 ".
+_HEADING_PREFIX_RE = re.compile(
+    r"^(?:"
+    r"(?:appendix|attachment|annex|section|chapter|part|addendum|enclosure|exhibit)"
+    r"\s+[\w.-]+\s*[-–—:.]?\s*"  # named prefix + identifier
+    r"|[\d]+(?:\.[\d]+)*\.?\s+"             # numeric: "1.2.3 "
+    r"|[A-Za-z]\.\s+"                       # lettered: "A. "
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _normalize_heading(text: str) -> str:
+    """Lowercase, collapse whitespace, and strip common numbering prefixes."""
+    text = re.sub(r"\s+", " ", text.strip()).lower()
+    text = _HEADING_PREFIX_RE.sub("", text).strip()
+    return text
+
+
+def _should_skip_section(section_title_path: list[str], skip_sections: list[str]) -> bool:
+    """Return True if any heading in section_title_path matches a skip_sections entry.
+
+    Checks every element in the path (parent and child headings) so nested glossary
+    or reference sections are caught regardless of nesting depth.  Matching is
+    case-insensitive, whitespace-normalized, and prefix-stripped; a heading matches
+    if it equals or starts with a skip phrase.
+    """
+    if not skip_sections or not section_title_path:
+        return False
+    normalized_skips = [re.sub(r"\s+", " ", s.strip()).lower() for s in skip_sections]
+    for heading in section_title_path:
+        normalized = _normalize_heading(heading)
+        for skip in normalized_skips:
+            if normalized == skip or normalized.startswith(skip):
+                return True
+    return False
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -386,6 +424,7 @@ def run_structure_aware(
     output_path: str,
     *,
     ancestry_result: object,
+    skip_sections: list[str] | None = None,
 ) -> str:
     """Chunk a DoclingDocument with HybridChunker and inject WP-14.1 ancestry breadcrumbs.
 
@@ -433,9 +472,19 @@ def run_structure_aware(
     elapsed_chunk = round(time.time() - t0, 2)
     log.info("HybridChunker produced %d raw chunks in %.2fs", len(all_chunks), elapsed_chunk)
 
+    skip_sections = skip_sections or []
+    if skip_sections:
+        log.info(
+            "Skip-section filtering active: %d configured section(s): %s",
+            len(skip_sections),
+            ", ".join(repr(s) for s in skip_sections),
+        )
+
     records: list[dict] = []
     toc_filtered = 0
     empty_filtered = 0
+    skip_filtered = 0
+    skip_examples: list[list[str]] = []
     chunk_id = 0
 
     for chunk in all_chunks:
@@ -455,9 +504,17 @@ def run_structure_aware(
 
         page_start, page_end = _chunk_page_range(chunk)
         ancestry = _best_ancestry(chunk, item_ancestry)
+        section_title_path = ancestry.get("section_title_path") or []
+
+        # Filter 3: drop chunks in sections the profile has configured to skip
+        if skip_sections and _should_skip_section(section_title_path, skip_sections):
+            skip_filtered += 1
+            if len(skip_examples) < 5:
+                skip_examples.append(section_title_path)
+            continue
 
         breadcrumb = _format_breadcrumb(
-            ancestry.get("section_title_path") or [],
+            section_title_path,
             ancestry.get("parent_header_text"),
         )
 
@@ -475,16 +532,23 @@ def run_structure_aware(
             "breadcrumb": breadcrumb,
             "text": text,
             "section_ref_path": ancestry.get("section_ref_path") or [],
-            "section_title_path": ancestry.get("section_title_path") or [],
+            "section_title_path": section_title_path,
             "parent_header_text": ancestry.get("parent_header_text"),
             "parent_context": ancestry.get("parent_context"),
         })
         chunk_id += 1
 
     log.info(
-        "Structure-aware chunking: %d chunks kept, %d ToC filtered, %d empty filtered",
-        len(records), toc_filtered, empty_filtered,
+        "Structure-aware chunking: %d chunks kept, %d ToC filtered, "
+        "%d empty filtered, %d skip-section filtered",
+        len(records), toc_filtered, empty_filtered, skip_filtered,
     )
+    if skip_filtered and skip_examples:
+        log.info(
+            "Skip-section examples (first %d of %d skipped): %s",
+            len(skip_examples), skip_filtered,
+            "; ".join(str(p) for p in skip_examples),
+        )
 
     if records:
         chunk_sizes = [len(r["raw_text"]) for r in records]
@@ -513,6 +577,7 @@ def run(
     chunk_size: int = 3000,
     overlap: int = 200,
     table_aware: bool = False,
+    skip_sections: list[str] | None = None,
 ) -> str:
     """Chunk pages JSONL into overlapping text segments and write chunks JSONL.
 

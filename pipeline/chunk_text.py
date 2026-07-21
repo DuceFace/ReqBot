@@ -241,7 +241,14 @@ def chunk_text(
             chunk_id += 1
 
         # Advance position, applying overlap
-        pos = end - overlap if end < text_len else text_len
+        next_pos = end - overlap if end < text_len else text_len
+        if next_pos <= pos:
+            raise ValueError(
+                f"overlap ({overlap}) prevents forward progress at position {pos}; "
+                f"effective chunk length after word-boundary adjustment is {end - pos}. "
+                "Reduce overlap or increase chunk_size."
+            )
+        pos = next_pos
 
         # Don't let the overlap pull us back inside a table we just finished.
         # If pos lands inside a table span, snap forward to the table end so

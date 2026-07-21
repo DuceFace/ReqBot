@@ -141,3 +141,13 @@ def test_overlap_guard_error_message_includes_both_values():
         chunk_text("text", [], chunk_size=50, overlap=50)
     msg = str(exc_info.value)
     assert "50" in msg
+
+
+def test_overlap_guard_forward_progress_when_word_boundary_shrinks_chunk():
+    # chunk_size=10, overlap=9 passes the entry guard (9 < 10) but the word-boundary
+    # pullback reduces the effective chunk well below overlap, so next_pos goes
+    # backward. The in-loop forward-progress guard must catch this.
+    text = "hello world foo bar baz"
+    page_index = [(0, len(text), 1)]
+    with pytest.raises(ValueError, match="forward progress"):
+        chunk_text(text, page_index, chunk_size=10, overlap=9)

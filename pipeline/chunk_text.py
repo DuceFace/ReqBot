@@ -598,6 +598,12 @@ def run(
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    if skip_sections:
+        log.warning(
+            "Profile skip_sections configured, but legacy chunking has no section hierarchy; "
+            "skip-section filtering applies only in docling mode."
+        )
+
     log.info("Loading pages from: %s", pages_path)
     pages = load_pages(pages_path)
     log.info("Loaded %d pages", len(pages))

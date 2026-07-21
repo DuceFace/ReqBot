@@ -198,9 +198,6 @@ def to_xlsx(checklist: dict) -> bytes:
     # Freeze panes below both header rows, after Locate group (3 cols)
     ws.freeze_panes = "D3"
 
-    # Auto-filter anchored to column header row
-    ws.auto_filter.ref = f"A2:{get_column_letter(len(_COLS))}2"
-
     # Status column data validation (dropdown)
     dv = DataValidation(
         type="list",
@@ -246,6 +243,9 @@ def to_xlsx(checklist: dict) -> bytes:
         ws.cell(row=row_num, column=10).number_format = "0%"
         # Status: register with data validation
         dv.add(ws.cell(row=row_num, column=6))
+
+    # Auto-filter: set after rows are written so range covers all data rows
+    ws.auto_filter.ref = f"A2:{get_column_letter(len(_COLS))}{ws.max_row}"
 
     buf = io.BytesIO()
     wb.save(buf)

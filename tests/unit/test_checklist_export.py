@@ -396,10 +396,19 @@ def test_to_xlsx_freeze_panes():
     assert ws.freeze_panes == "D3"
 
 
-def test_to_xlsx_auto_filter_set():
+def test_to_xlsx_auto_filter_covers_data_rows():
+    # ENVELOPE has 2 items → 2 header rows + 2 data rows = max_row 4; filter must end at row 4
     wb = _load_xlsx(to_xlsx(ENVELOPE))
     ws = wb["Checklist"]
     assert ws.auto_filter.ref is not None
+    assert ws.auto_filter.ref.endswith("4"), f"expected filter to row 4, got {ws.auto_filter.ref}"
+
+
+def test_to_xlsx_auto_filter_empty_checklist_ends_at_row_2():
+    wb = _load_xlsx(to_xlsx(EMPTY_ENVELOPE))
+    ws = wb["Checklist"]
+    assert ws.auto_filter.ref is not None
+    assert ws.auto_filter.ref.endswith("2"), f"expected filter to row 2, got {ws.auto_filter.ref}"
 
 
 def test_to_xlsx_status_data_validation_exists():

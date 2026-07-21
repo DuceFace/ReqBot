@@ -64,7 +64,9 @@ def _should_skip_section(section_title_path: list[str], skip_sections: list[str]
     """
     if not skip_sections or not section_title_path:
         return False
-    normalized_skips = [re.sub(r"\s+", " ", s.strip()).lower() for s in skip_sections]
+    normalized_skips = [v for v in (re.sub(r"\s+", " ", s.strip()).lower() for s in skip_sections) if v]
+    if not normalized_skips:
+        return False
     for heading in section_title_path:
         normalized = _normalize_heading(heading)
         for skip in normalized_skips:
@@ -420,6 +422,51 @@ def _chunk_raw_text(chunk: object) -> str:
     return "\n".join(parts) if parts else (chunk.text or "")
 
 
+def _chunk_body_items(chunk: object) -> list:
+    """Return non-heading doc_items from a DocChunk.
+
+    Excludes TitleItem and SectionHeaderItem so only content-bearing items
+    are considered when deciding whether a chunk falls in a skipped section.
+    Falls back to all items when docling_core is not importable.
+    """
+    try:
+        from docling_core.types.doc import SectionHeaderItem, TitleItem
+    except ImportError:
+        return list(chunk.meta.doc_items)
+    return [
+        item for item in chunk.meta.doc_items
+        if not isinstance(item, (TitleItem, SectionHeaderItem))
+    ]
+
+
+def _should_skip_chunk(chunk: object, item_ancestry: dict, skip_sections: list[str]) -> bool:
+    """Return True only when every body item with known ancestry is in a skipped section.
+
+    Conservative by design: if any body item is under a non-skipped heading, has
+    no self_ref, or has no entry in item_ancestry, the chunk is kept.  This prevents
+    silently discarding valid requirements from chunks that straddle a section boundary
+    (e.g. the last paragraph of Access Control followed by the first line of Glossary).
+    """
+    if not skip_sections:
+        return False
+    body_items = _chunk_body_items(chunk)
+    if not body_items:
+        return False
+    found_skippable = False
+    for item in body_items:
+        self_ref = getattr(item, "self_ref", None)
+        if not self_ref:
+            return False  # no ref → can't determine → keep
+        ancestry = item_ancestry.get(self_ref)
+        if ancestry is None:
+            return False  # missing ancestry → keep (conservative)
+        path = ancestry.get("section_title_path") or []
+        if not _should_skip_section(path, skip_sections):
+            return False  # at least one body item is in a non-skipped section → keep
+        found_skippable = True
+    return found_skippable  # True only if every body item was under a skipped heading
+
+
 def run_structure_aware(
     output_path: str,
     *,
@@ -506,8 +553,11 @@ def run_structure_aware(
         ancestry = _best_ancestry(chunk, item_ancestry)
         section_title_path = ancestry.get("section_title_path") or []
 
-        # Filter 3: drop chunks in sections the profile has configured to skip
-        if skip_sections and _should_skip_section(section_title_path, skip_sections):
+        # Filter 3: skip only when every body item is under a skipped heading.
+        # Uses per-item ancestry rather than the single best-ancestry path so that
+        # chunks straddling a section boundary (e.g. valid req + first line of
+        # Glossary) are kept rather than silently dropped.
+        if _should_skip_chunk(chunk, item_ancestry, skip_sections):
             skip_filtered += 1
             if len(skip_examples) < 5:
                 skip_examples.append(section_title_path)

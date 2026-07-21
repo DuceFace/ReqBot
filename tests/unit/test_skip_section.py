@@ -1,7 +1,11 @@
-"""Unit tests for WP-23.4 skip-section helpers: _normalize_heading and _should_skip_section."""
+"""Unit tests for WP-23.4 skip-section helpers."""
 import pytest
 
-from pipeline.chunk_text import _normalize_heading, _should_skip_section
+from pipeline.chunk_text import (
+    _normalize_heading,
+    _should_skip_chunk,
+    _should_skip_section,
+)
 
 # ---------------------------------------------------------------------------
 # _normalize_heading
@@ -157,3 +161,88 @@ def test_none_skip_sections_treated_as_empty():
 ])
 def test_parametrized_common_headings(heading, expected):
     assert _should_skip_section([heading], CYBERSECURITY_SKIPS) == expected
+
+
+# ---------------------------------------------------------------------------
+# P2 — blank skip-section entries must not match everything
+# ---------------------------------------------------------------------------
+
+def test_empty_string_entry_does_not_skip():
+    assert not _should_skip_section(["Access Control"], [""])
+
+
+def test_whitespace_only_entry_does_not_skip():
+    assert not _should_skip_section(["Access Control"], ["   "])
+
+
+def test_mixed_blank_and_valid_entry_still_matches_valid():
+    # The blank entry is dropped; "GLOSSARY" still matches
+    assert _should_skip_section(["Glossary"], ["", "GLOSSARY"])
+
+
+def test_all_blank_entries_never_skip():
+    assert not _should_skip_section(["Glossary"], ["", "   "])
+
+
+# ---------------------------------------------------------------------------
+# P1 — _should_skip_chunk: per-item ancestry, conservative bias
+# ---------------------------------------------------------------------------
+
+class _MockItem:
+    def __init__(self, self_ref):
+        self.self_ref = self_ref
+
+
+class _MockChunk:
+    class _Meta:
+        def __init__(self, items):
+            self.doc_items = items
+    def __init__(self, items):
+        self.meta = self._Meta(items)
+
+
+def _anc(section_title_path):
+    return {
+        "section_title_path": section_title_path,
+        "section_ref_path": [],
+        "parent_header_text": None,
+        "parent_context": None,
+    }
+
+
+def test_skip_chunk_all_body_in_glossary():
+    chunk = _MockChunk([_MockItem("#/1"), _MockItem("#/2")])
+    ancestry = {"#/1": _anc(["Glossary"]), "#/2": _anc(["Glossary"])}
+    assert _should_skip_chunk(chunk, ancestry, ["GLOSSARY"])
+
+
+def test_skip_chunk_mixed_sections_keeps_chunk():
+    # One body item is under Access Control (not skipped) → keep the whole chunk
+    chunk = _MockChunk([_MockItem("#/1"), _MockItem("#/2")])
+    ancestry = {"#/1": _anc(["Access Control"]), "#/2": _anc(["Glossary"])}
+    assert not _should_skip_chunk(chunk, ancestry, ["GLOSSARY"])
+
+
+def test_skip_chunk_missing_ancestry_keeps_chunk():
+    # #/2 not in item_ancestry → conservative: keep
+    chunk = _MockChunk([_MockItem("#/1"), _MockItem("#/2")])
+    ancestry = {"#/1": _anc(["Glossary"])}
+    assert not _should_skip_chunk(chunk, ancestry, ["GLOSSARY"])
+
+
+def test_skip_chunk_item_without_self_ref_keeps_chunk():
+    class _NoRef:
+        self_ref = None
+    chunk = _MockChunk([_NoRef()])
+    assert not _should_skip_chunk(chunk, {}, ["GLOSSARY"])
+
+
+def test_skip_chunk_empty_body_items_keeps_chunk():
+    chunk = _MockChunk([])
+    assert not _should_skip_chunk(chunk, {}, ["GLOSSARY"])
+
+
+def test_skip_chunk_no_skip_sections_never_skips():
+    chunk = _MockChunk([_MockItem("#/1")])
+    ancestry = {"#/1": _anc(["Glossary"])}
+    assert not _should_skip_chunk(chunk, ancestry, [])

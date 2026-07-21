@@ -1,6 +1,6 @@
 # ReqBot — Phase 23: Checklist Output Polish + Trust Hardening
 
-**Status:** Draft
+**Status:** WP-23.6 In Progress (WP-23.1 through WP-23.5 complete)
 **Date:** 2026-07-20
 **Preceded by:** Phase 22 (Browser Checklist Workflow — COMPLETE)
 **Followed by:** Phase 24 candidate: MCP Tool Surface

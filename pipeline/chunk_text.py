@@ -134,6 +134,41 @@ def table_span_at(pos: int, table_spans: list[tuple[int, int]]) -> tuple[int, in
     return None
 
 
+def validate_page_contiguity(pages: list[dict]) -> None:
+    """Warn if Step A page records have gaps or duplicate page numbers.
+
+    Pages are expected to be sorted by page_num (load_pages guarantees this).
+    Does not assert on the starting page number — some PDFs begin at 0 or have
+    unconventional front-matter numbering. Gaps and duplicates are warnings,
+    not hard failures; ingest continues.
+    """
+    if len(pages) <= 1:
+        return
+    seen: set[int] = set()
+    for i, page in enumerate(pages):
+        pnum = page.get("page_num")
+        if pnum is None:
+            log.warning("Page record at index %d has no page_num field", i)
+            continue
+        if pnum in seen:
+            log.warning(
+                "Duplicate page number %d in Step A output — "
+                "page contiguity check failed; downstream chunk-to-page mapping may be unreliable",
+                pnum,
+            )
+        seen.add(pnum)
+        if i > 0:
+            prev_pnum = pages[i - 1].get("page_num")
+            if prev_pnum is not None and pnum != prev_pnum + 1:
+                log.warning(
+                    "Page number gap: page %d follows page %d (gap of %d) — "
+                    "some pages may be missing from Step A output",
+                    pnum,
+                    prev_pnum,
+                    pnum - prev_pnum - 1,
+                )
+
+
 def chunk_text(
     full_text: str,
     page_index: list[tuple[int, int, int]],
@@ -158,6 +193,12 @@ def chunk_text(
     Returns:
         List of chunk dicts.
     """
+    if overlap >= chunk_size:
+        raise ValueError(
+            f"overlap ({overlap}) must be less than chunk_size ({chunk_size}); "
+            "this configuration would prevent forward progress and cause an infinite loop"
+        )
+
     table_spans = find_table_spans(full_text) if table_aware else []
 
     chunks = []
@@ -489,6 +530,7 @@ def run(
     pages = load_pages(pages_path)
     log.info("Loaded %d pages", len(pages))
 
+    validate_page_contiguity(pages)
     page_index = build_page_index(pages)
     full_text = "".join(p["text"] for p in pages)
     log.info("Total text length: %d chars", len(full_text))

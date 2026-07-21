@@ -292,15 +292,17 @@ def call_ollama(
             time.sleep(backoff)
 
 
-def extract_json_array(raw_response: str) -> list[dict] | None:
+def extract_json_array(raw_response: str) -> tuple[list[dict] | None, bool]:
     """Attempt to extract a JSON array from a raw LLM response.
 
     Tries multiple strategies in order:
     1. Strip markdown code fences and parse directly
     2. Find the outermost [ ... ] with bounded (non-greedy) matching
-    3. Try line-by-line brace-counting to find the array boundaries
+    3. Walk forward from '[' to recover objects from a truncated array (LLM token limit)
 
-    Returns None if no valid JSON array can be extracted.
+    Returns:
+        (result, recovered_truncated) where result is the parsed list or None, and
+        recovered_truncated is True only when Strategy 3 (truncation recovery) was used.
     """
     text = raw_response.strip()
 
@@ -312,10 +314,10 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
     try:
         result = json.loads(text_clean)
         if isinstance(result, list):
-            return result
+            return result, False
         # Unwrap Ollama structured-output response: {"requirements": [...]}
         if isinstance(result, dict) and isinstance(result.get("requirements"), list):
-            return result["requirements"]
+            return result["requirements"], False
     except json.JSONDecodeError:
         pass
 
@@ -357,7 +359,7 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
                         "non-bare response (%d chars prefix before '[')",
                         start_idx,
                     )
-                    return result
+                    return result, False
             except json.JSONDecodeError:
                 pass
 
@@ -401,11 +403,11 @@ def extract_json_array(raw_response: str) -> list[dict] | None:
                         "Recovered %d objects from truncated JSON array",
                         len(result),
                     )
-                    return result
+                    return result, True
             except json.JSONDecodeError:
                 pass
 
-    return None
+    return None, False
 
 
 def validate_requirement(
@@ -531,7 +533,7 @@ def process_chunk(
         return raw_record, [], failure
 
     # Parse response
-    parsed = extract_json_array(raw_response)
+    parsed, recovered_truncated = extract_json_array(raw_response)
     if parsed is None:
         log.warning(
             "Chunk %d: Failed to parse JSON from response (%d chars)",
@@ -550,6 +552,8 @@ def process_chunk(
         cleaned = validate_requirement(item, valid_domain_tags, valid_requirement_types)
         if cleaned:
             cleaned["chunk_id"] = chunk_id
+            if recovered_truncated:
+                cleaned["recovered_truncated"] = True
             valid_reqs.append(cleaned)
 
     if not parsed and not valid_reqs:

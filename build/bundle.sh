@@ -40,6 +40,8 @@ APP_FILES=(
     core/constants.py
     core/synthesis.py
     core/ask.py
+    core/profiles.py
+    core/artifact_resolver.py
     core/__init__.py
     pipeline/run_pipeline.py
     pipeline/extract_pdf_to_text.py
@@ -51,6 +53,7 @@ APP_FILES=(
     pipeline/aggregate_and_export.py
     pipeline/embed_and_index.py
     pipeline/embed_context_index.py
+    pipeline/checklist_export.py
     pipeline/__init__.py
     services/__init__.py
     services/ask_service.py
@@ -59,6 +62,7 @@ APP_FILES=(
     services/trace_service.py
     services/compare_service.py
     services/evidence_service.py
+    services/checklist_service.py
     api/__init__.py
     api/app.py
     api/routes/__init__.py
@@ -66,6 +70,9 @@ APP_FILES=(
     api/routes/docs.py
     api/routes/status.py
     api/routes/trace.py
+    api/routes/compare.py
+    api/routes/evidence.py
+    api/routes/checklist.py
     models/__init__.py
 )
 
@@ -127,6 +134,8 @@ echo "[3/6] Installing Python dependencies..."
     "fastapi==0.115.12" \
     "uvicorn==0.34.3" \
     "aiofiles==25.1.0" \
+    "openpyxl==3.1.5" \
+    "docling==2.84.0" \
     --quiet --disable-pip-version-check
 
 echo "  Dependencies installed"
@@ -163,6 +172,19 @@ for f in "${APP_FILES[@]}"; do
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
     echo "  + $f"
+done
+
+# core/profiles.py resolves _PROFILES_DIR as Path(__file__).parent.parent / "profiles" —
+# at install time that's $BUNDLE_DIR/app/profiles, matching how frontend/dist is placed below.
+# Ship real profiles only — test-*.json fixtures are for the unit suite, not end users
+# (they'd otherwise show up as selectable options in reqbot checklist / the browser picker).
+mkdir -p "$BUNDLE_DIR/app/profiles"
+for f in "$ROOT_DIR"/profiles/*.json; do
+    case "$(basename "$f")" in
+        test-*.json) continue ;;
+    esac
+    cp "$f" "$BUNDLE_DIR/app/profiles/"
+    echo "  + profiles/$(basename "$f")"
 done
 
 # ---------------------------------------------------------------

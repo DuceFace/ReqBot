@@ -87,27 +87,25 @@ After rebuilding, **reload the browser tab** — the running server picks up new
 ```bash
 cd ~/grc-ai-system
 
-# Standard ingest (most NIST/AFI/DAF docs)
-python3 pipeline/run_pipeline.py \
-  --pdf ~/path/to/doc.pdf \
+# Standard ingest + index in one command (most NIST/AFI/DAF docs)
+python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
+  --index \
   --ollama-url http://192.168.90.100:11434
 
-# Table-heavy docs (DODIs)
-python3 pipeline/run_pipeline.py \
-  --pdf ~/path/to/dodi.pdf \
+# Table-heavy docs (DODIs) — pdfplumber handles tables better
+python3 cli/reqbot.py ingest ~/path/to/dodi.pdf \
+  --index \
   --layout-mode pdfplumber \
   --ollama-url http://192.168.90.100:11434
-
-# Then index into Qdrant
-python3 cli/reqbot.py index --dir ~/documents/processed/<doc_run_dir>
 ```
 
-Output goes to `~/documents/processed/<doc_stem>_<timestamp>/`.
+Output goes to `~/documents/processed/<doc_stem>_<timestamp>/`. The `--index` flag runs
+embedding and Qdrant indexing automatically after extraction.
 
 To resume a killed Step C job (do NOT start a new run — you lose the prompt hash cache):
 ```bash
 python3 pipeline/run_pipeline.py \
-  --pdf ~/path/to/doc.pdf \
+  ~/path/to/doc.pdf \
   --output-dir ~/documents/processed/<existing_run_dir> \
   --skip-to C \
   --ollama-url http://192.168.90.100:11434
@@ -117,13 +115,21 @@ python3 pipeline/run_pipeline.py \
 
 ## Rebuilding Qdrant from Existing JSONL
 
-Re-indexes all documents in `~/documents/processed/` without re-running extraction:
+`reindex` rebuilds the **requirements collection** from all normalized JSONL files in
+`~/documents/processed/` without re-running extraction:
 
 ```bash
 python3 cli/reqbot.py reindex
 ```
 
-Useful after: adding a new field to normalized JSONL, or after restoring from backup.
+The **context chunks collection** (`grc_context`) is separate and must be rebuilt independently:
+
+```bash
+python3 pipeline/embed_context_index.py --processed-dir ~/documents/processed/
+```
+
+Run both after adding a new field to normalized JSONL, after a corpus refresh, or after
+restoring from backup.
 
 ---
 
@@ -136,10 +142,10 @@ To start fresh (e.g., after a corpus refresh with newly ingested docs):
 curl -X DELETE http://192.168.30.153:6333/collections/grc_requirements_1775409441
 curl -X DELETE http://192.168.30.153:6333/collections/grc_context
 
-# 2. Reindex from scratch
+# 2. Rebuild requirements collection
 python3 cli/reqbot.py reindex
 
-# 3. Re-index context chunks
+# 3. Rebuild context chunks collection
 python3 pipeline/embed_context_index.py --processed-dir ~/documents/processed/
 ```
 

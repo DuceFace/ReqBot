@@ -109,7 +109,7 @@ ACTIVE BACKLOG
     - blank is better than an unsupported rephrase
     - generated questions should be marked as generated text
 
-13. MCP tool surface
+13. MCP tool surface (Phase 25 candidate — see docs/FUTURE_MCP_IDEA.md)
     Expose ReqBot as a tool server so external assistants can query a self-hosted
     ReqBot instance.
 

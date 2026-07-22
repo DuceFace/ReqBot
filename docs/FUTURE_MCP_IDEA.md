@@ -13,12 +13,10 @@ Core idea
   and structurally.
 
   Phase concept
-  I would treat this as a future phase after GUI expansion and domain
-  profiles:
-
-  - Phase 19: GUI capability expansion (search, compare, evidence, docs)
-  - Phase 20: domain profile foundation
-  - Phase 21 or 22: ReqBot as composable tool server
+  MCP is a Phase 25 candidate (see docs/PHASE24_REQUIREMENTS.md) — it does not
+  fit Phase 24's cleanup/defaults theme, and waits until setup, indexing
+  defaults, and the corpus refresh are settled. GUI expansion (Phase 19) and
+  domain profiles (Phase 20) are already done.
 
   Domain profiles (Phase 20) should land before the MCP surface. Once
   list_documents can return semantic metadata (authority type, domain,

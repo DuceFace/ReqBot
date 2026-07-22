@@ -310,6 +310,9 @@ reqbot ingest "NIST.SP.800-53r5.pdf" --layout-mode docling
 - attaches `parent_context` (first ~600 chars of the parent section body) to each requirement
 - filters table-of-contents noise automatically
 - produces schema v2.0 records with full hierarchy fields
+- **required** for profile `skip_sections` filtering to take effect — legacy `pymupdf`/
+  `pdfplumber` chunking has no section hierarchy to filter on, so `skip_sections` is a no-op
+  under those two modes
 
 ## Qdrant Collections
 

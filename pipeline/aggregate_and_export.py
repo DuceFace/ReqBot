@@ -69,7 +69,8 @@ def run(requirements_jsonl: str, output_dir: str, source_pdf: str = "") -> dict:
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    stem = reqs_path.stem.replace("_requirements_normalized", "")
+    from core.artifact_resolver import doc_key_from_requirements_path
+    stem = doc_key_from_requirements_path(reqs_path)
 
     pages_path = reqs_path.parent / f"{stem}_pages.jsonl"
     chunks_path = reqs_path.parent / f"{stem}_chunks.jsonl"

@@ -45,7 +45,6 @@ def run(
     timeout: int = 120,
     skip_to: str = "A",
     layout_mode: str = "pymupdf",
-    pass1_only: bool = True,
     skip_enrichment: bool = False,
     profile_name: str = "cybersecurity",
 ) -> str:
@@ -66,8 +65,6 @@ def run(
         timeout:           Per-request LLM timeout in seconds.
         skip_to:           Skip to step ('A'-'E'). Requires prior artifacts.
         layout_mode:       PDF extraction backend ('pymupdf' or 'pdfplumber').
-        pass1_only:        Use Pass 1 prompt in Step C (source_quote + source_ref only).
-                           Default True — enrichment (Step D.5) fills in description/tags/type.
         skip_enrichment:   Skip Step D.5 enrichment. Returns normalized JSONL path directly.
         profile_name:      Domain profile name to load from profiles/<name>.json.
                            Default 'cybersecurity'. Profile is loaded once and passed to
@@ -184,7 +181,7 @@ def run(
 
     if "C" in steps_to_run:
         log.info("=" * 60)
-        log.info("Starting Step C (LLM Extraction%s)", " — Pass 1 mode" if pass1_only else "")
+        log.info("Starting Step C (LLM Extraction — Pass 1 mode)")
         log.info("Step C — extraction model: %s", extraction_model)
         log.info("=" * 60)
         try:
@@ -192,7 +189,6 @@ def run(
                 str(chunks_path), str(out_dir),
                 model=extraction_model, ollama_url=ollama_url,
                 timeout=timeout, max_chunks=max_chunks,
-                pass1_only=pass1_only,
                 profile=profile,
             )
         except RuntimeError:
@@ -352,13 +348,6 @@ def main() -> None:
         dest="skip_enrichment",
         help="Skip Step D.5 enrichment (Pass 2). Index normalized JSONL directly without adding description/tags/type.",
     )
-    parser.add_argument(
-        "--full-extraction",
-        action="store_true",
-        dest="full_extraction",
-        help="Use legacy single-pass Step C prompt (description+tags+type in one LLM call). "
-             "Default is Pass 1 mode (source_quote+source_ref only, enriched separately).",
-    )
     args = parser.parse_args()
 
     pdf_path = Path(args.pdf_path).resolve()
@@ -393,7 +382,6 @@ def main() -> None:
             timeout=args.timeout,
             skip_to=args.skip_to,
             layout_mode=args.layout_mode,
-            pass1_only=not args.full_extraction,
             skip_enrichment=args.skip_enrichment,
         )
     except RuntimeError as e:

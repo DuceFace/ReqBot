@@ -8,11 +8,48 @@ same document ("latest run wins").
 Reused by services/checklist_service.py (single doc_key lookup) and
 cli/reqbot.py's cmd_reindex (bulk enumeration across all documents) so the
 enriched-preference/latest-run-wins rule is defined in exactly one place.
+
+Also home to doc_key_from_extracted_path(), used by parse_and_normalize.py.
+Every stem-stripping helper here is anchored (str.endswith + slice), never a
+broad str.replace() — a PDF whose own stem happens to contain one of these
+suffixes as a substring (e.g. "policy_requirements_normalized_v1.pdf") would
+otherwise have that substring collapsed everywhere it appears, producing a
+mangled doc_key that no longer matches the real *_chunks.jsonl file and
+silently breaking context indexing downstream (Codex PR #92 review).
 """
 from pathlib import Path
 
 _ENRICHED_SUFFIX = "_requirements_enriched"
 _NORMALIZED_SUFFIX = "_requirements_normalized"
+_EXTRACTED_SUFFIX = "_extracted_requirements"
+
+
+def _strip_suffix(stem: str, *suffixes: str) -> str:
+    """Strip the first matching suffix from stem (anchored — not a substring
+    replace). Returns stem unchanged if none match."""
+    for suffix in suffixes:
+        if stem.endswith(suffix):
+            return stem[: -len(suffix)]
+    return stem
+
+
+def doc_key_from_requirements_path(path: Path) -> str:
+    """Strip the _requirements_enriched/_requirements_normalized suffix from a
+    requirements JSONL path's stem to get the canonical doc_key.
+
+    Falls back to the bare stem if neither suffix matches (defensive — every
+    requirements JSONL the pipeline produces has one of these two suffixes).
+    """
+    return _strip_suffix(path.stem, _ENRICHED_SUFFIX, _NORMALIZED_SUFFIX)
+
+
+def doc_key_from_extracted_path(path: Path) -> str:
+    """Strip the _extracted_requirements suffix from a Step C output path's
+    stem (extracted_requirements.jsonl) to get the canonical doc_key.
+
+    Falls back to the bare stem if the suffix doesn't match.
+    """
+    return _strip_suffix(path.stem, _EXTRACTED_SUFFIX)
 
 
 def resolve_latest_requirement_files(processed_dir: Path) -> dict[str, Path]:
@@ -29,10 +66,7 @@ def resolve_latest_requirement_files(processed_dir: Path) -> dict[str, Path]:
 
     for suffix, key in ((_ENRICHED_SUFFIX, "enriched"), (_NORMALIZED_SUFFIX, "normalized")):
         for p in processed_dir.rglob(f"*{suffix}.jsonl"):
-            stem = p.stem
-            if not stem.endswith(suffix):
-                continue
-            doc_key = stem[: -len(suffix)]
+            doc_key = doc_key_from_requirements_path(p)
             by_doc.setdefault(doc_key, {}).setdefault(p.parent, {})[key] = p
 
     result: dict[str, Path] = {}

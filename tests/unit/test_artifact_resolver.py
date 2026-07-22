@@ -6,10 +6,16 @@ services/checklist_service.py (single doc_key) and cli/reqbot.py's cmd_reindex
 """
 import os
 import time
+from pathlib import Path
 
 import pytest
 
-from core.artifact_resolver import resolve_latest_requirement_files, resolve_requirement_file
+from core.artifact_resolver import (
+    doc_key_from_extracted_path,
+    doc_key_from_requirements_path,
+    resolve_latest_requirement_files,
+    resolve_requirement_file,
+)
 
 
 def _write(path, document_id="doc-hash-abc"):
@@ -86,3 +92,32 @@ def test_resolve_requirement_file_returns_matching_path(tmp_path):
 def test_resolve_requirement_file_raises_for_unknown_doc_key(tmp_path):
     with pytest.raises(ValueError, match="no_such_doc"):
         resolve_requirement_file(tmp_path, "no_such_doc")
+
+
+# ---------------------------------------------------------------------------
+# doc_key_from_requirements_path / doc_key_from_extracted_path — anchored
+# suffix stripping, not a broad substring replace (Codex PR #92 review)
+# ---------------------------------------------------------------------------
+
+def test_doc_key_from_requirements_path_handles_embedded_suffix_substring():
+    # PDF literally named "policy_requirements_normalized_v1.pdf" — the
+    # substring "_requirements_normalized" appears once mid-stem and once as
+    # the real trailing suffix. Only the trailing one may be stripped.
+    path = Path("policy_requirements_normalized_v1_requirements_normalized.jsonl")
+    assert doc_key_from_requirements_path(path) == "policy_requirements_normalized_v1"
+
+
+def test_doc_key_from_requirements_path_enriched_suffix():
+    path = Path("AFI17-101_requirements_enriched.jsonl")
+    assert doc_key_from_requirements_path(path) == "AFI17-101"
+
+
+def test_doc_key_from_extracted_path_handles_embedded_suffix_substring():
+    # PDF literally named "policy_extracted_requirements_v1.pdf".
+    path = Path("policy_extracted_requirements_v1_extracted_requirements.jsonl")
+    assert doc_key_from_extracted_path(path) == "policy_extracted_requirements_v1"
+
+
+def test_doc_key_from_extracted_path_normal_case():
+    path = Path("AFI17-101_extracted_requirements.jsonl")
+    assert doc_key_from_extracted_path(path) == "AFI17-101"

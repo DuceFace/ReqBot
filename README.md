@@ -70,8 +70,8 @@ reqbot ask "encryption at rest" --synthesize --context
 reqbot docs
 reqbot status
 
-# Ingest a PDF and index it
-reqbot ingest path/to/doc.pdf --index
+# Ingest a PDF (indexes into Qdrant by default)
+reqbot ingest path/to/doc.pdf
 ```
 
 ## Core Commands
@@ -87,7 +87,7 @@ reqbot ask "question" [options]
 Common options:
 
 - `--synthesize` - generate an LLM answer instead of retrieval-only output
-- `--context` - attach surrounding raw chunk text from `grc_context`
+- `--context` - include surrounding raw chunk text from `grc_context` (retrieval-time only; does not affect indexing)
 - `--top-k N` - number of results
 - `--min-score F` - minimum RRF score threshold
 - `--model M` - synthesis model
@@ -100,7 +100,8 @@ Common options:
 
 ### `ingest`
 
-Run the extraction pipeline on a single PDF.
+Run the extraction pipeline on a single PDF. Indexes into Qdrant (both
+`grc_requirements` and `grc_context`) by default.
 
 ```bash
 reqbot ingest <pdf> [options]
@@ -108,7 +109,7 @@ reqbot ingest <pdf> [options]
 
 Important options:
 
-- `--index` - also embed and index into Qdrant after extraction
+- `--no-index` - skip indexing, write pipeline artifacts only (debug/inspection)
 - `--layout-mode {pymupdf,pdfplumber,docling}` - PDF extraction backend
 - `--output-dir DIR` - write artifacts to a specific directory
 - `--extraction-model M` - Step C model
@@ -269,12 +270,12 @@ Default behavior:
 - Step C runs in Pass 1 mode and extracts `source_quote` + `source_ref`.
 - Step D validates and deduplicates.
 - Step D.5 enriches with `description`, `domain_tags`, and `requirement_type`.
-- `reqbot ingest --index` indexes both requirements and chunk context after the pipeline completes.
+- `reqbot ingest` indexes both requirements and chunk context after the pipeline completes;
+  `--no-index` skips indexing for artifact-only/debug runs.
 
-Advanced/legacy behavior:
+Advanced behavior:
 
 - `--skip-enrichment` keeps the pipeline in Pass 1 only.
-- standalone `run_pipeline.py --full-extraction` uses the older single-pass extraction path.
 
 ## Layout-Aware Extraction
 
@@ -285,7 +286,7 @@ ReqBot supports three PDF extraction backends via `--layout-mode`.
 **`pdfplumber`** — table-aware extraction for documents with structured tables (DODIs, DoDMs):
 
 ```bash
-reqbot ingest "DODI 5200.01_vol2.pdf" --index --layout-mode pdfplumber
+reqbot ingest "DODI 5200.01_vol2.pdf" --layout-mode pdfplumber
 ```
 
 - extracts tables as structured rows
@@ -295,7 +296,7 @@ reqbot ingest "DODI 5200.01_vol2.pdf" --index --layout-mode pdfplumber
 **`docling`** — structure-aware chunking that preserves section hierarchy:
 
 ```bash
-reqbot ingest "NIST.SP.800-53r5.pdf" --index --layout-mode docling
+reqbot ingest "NIST.SP.800-53r5.pdf" --layout-mode docling
 ```
 
 - parses document structure with Docling's `DocumentConverter`
@@ -375,7 +376,6 @@ Useful flags:
 
 - `--skip-to {A,B,C,D,E}` - resume from an existing output directory
 - `--skip-enrichment` - stop after Step D
-- `--full-extraction` - use the legacy single-pass Step C prompt
 - `--layout-mode {pymupdf,pdfplumber,docling}` - PDF extraction backend
 - `--extraction-model M`
 - `--enrichment-model M`

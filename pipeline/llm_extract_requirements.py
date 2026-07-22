@@ -106,42 +106,6 @@ Text:
 {chunk_text}"""
 
 
-PROMPT_TEMPLATE = """You are a requirements extraction system for cybersecurity and compliance documents.
-
-Your task: extract only ACTIONABLE REQUIREMENTS from the text below. A requirement is something an organization MUST DO — it implies obligation, mandate, or necessity.
-
-DO extract:
-- Statements that express obligation or mandate, including: {obligation_verbs}
-- Technical controls an organization needs to implement
-- Policies or procedures an organization must define or follow
-- Security measures that are mandated or strongly recommended
-
-DO NOT extract:
-- Definitions or glossary entries
-- Document change logs or errata (e.g., "Change X to Y")
-- Tables of contents or section headings
-- Cross-references to other controls or documents (e.g., "Related controls: AC-2, IA-1")
-- General background, context, or informational text
-- Summaries of what a document covers
-
-Return ONLY a valid JSON array. No markdown code fences. No text before or after the array.
-If there are no actionable requirements in the text, return an empty array: []
-
-Each element must be a JSON object with exactly these keys:
-- "source_quote": (REQUIRED) The exact verbatim quote from the text that establishes this requirement (under 500 characters). Copy the text word-for-word — do not paraphrase or summarize. If you cannot find an exact verbatim quote for a requirement, do NOT include that requirement in the output.
-- "source_ref": The document-specific locator for this requirement (e.g., "AC-4", "Section 5.2.1", "Para 3.4.1") or "" if none is visible in the text. This is a traceability label, not a semantic tag — copy it exactly as written, do not infer or construct it.
-- "domain_tags": An array of 1-3 tags from this list ONLY: {domain_tags_list}. If unsure, choose the single most relevant tag.
-- "requirement_type": One of: {requirement_types_list}
-- "description": A single precise sentence summarizing what must be done. Preserve the exact subject, verb, and object of the obligation. Keep all technical terms, control identifiers, system names, numerical thresholds, and acronyms exactly as they appear in the source. Do NOT generalize or paraphrase. Maximum 120 words. May be "" if the source_quote is self-explanatory.
-  GOOD: "Systems must enforce multi-factor authentication using PIV cards for all privileged access to CUI systems."
-  GOOD: "Organizations must review and update system account lists within 24 hours of personnel termination per AC-2(3)."
-  BAD: "Organizations must implement authentication controls." (too vague — lost PIV, MFA, CUI, and privileged access specifics)
-  BAD: "Ensure proper security measures are in place." (meaningless — no subject, no object, no specifics)
-{source_ref_hints}
-Text:
-{chunk_text}"""
-
-
 def compute_prompt_hash(prompt: str) -> str:
     """SHA-256 hash of the prompt for deduplication/caching."""
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
@@ -172,7 +136,6 @@ _MAX_HINT_REFS = 20  # cap to avoid bloating the prompt
 # caused by preamble text, markdown fences, or malformed bare arrays.
 # The response will always be {"requirements": [...]}, which extract_json_array()
 # unwraps before the existing fallback strategies.
-# NOTE: this constant is not used by the legacy PROMPT_TEMPLATE path (--full-extraction).
 _PASS1_FORMAT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -251,8 +214,9 @@ def call_ollama(
         json_schema: Optional Ollama object-wrapped JSON Schema for constrained
             generation (passed as the "format" field). When provided, the model
             output is guaranteed to match the schema — eliminates parse failures
-            from preamble text and malformed JSON. Pass None for unconstrained
-            generation (legacy PROMPT_TEMPLATE / --full-extraction path).
+            from preamble text and malformed JSON. This module's own run() always
+            passes one; None remains supported for other/future callers that want
+            unconstrained generation.
 
     Returns:
         The raw text response from the model.
@@ -457,7 +421,7 @@ def process_chunk(
     model: str,
     base_url: str,
     timeout: int,
-    prompt_template: str = PROMPT_TEMPLATE,
+    prompt_template: str = PASS1_PROMPT_TEMPLATE,
     json_schema: dict | None = None,
     valid_domain_tags: list[str] = VALID_DOMAIN_TAGS,
     valid_requirement_types: list[str] = VALID_REQUIREMENT_TYPES,
@@ -470,25 +434,14 @@ def process_chunk(
     chunk_id = chunk["chunk_id"]
     chunk_text = chunk["text"]
 
-    # Safety: run() always pre-renders profile placeholders before calling here.
-    # If called directly with the raw template (e.g. in tests or scripts), substitute
-    # with default profile values so the LLM never sees literal placeholder tokens.
-    if (
-        "{obligation_verbs}" in prompt_template
-        or "{domain_tags_list}" in prompt_template
-        or "{requirement_types_list}" in prompt_template
-    ):
-        # Use the caller's own validation lists for domain/type placeholders so that
-        # what the LLM is asked to produce matches what validate_requirement() accepts.
-        # obligation_verbs has no equivalent param here, so fall back to default profile.
+    # Safety: run() always pre-renders the {obligation_verbs} placeholder before
+    # calling here. If called directly with the raw template (e.g. in tests or
+    # scripts), substitute with the default profile's verbs so the LLM never
+    # sees a literal placeholder token.
+    if "{obligation_verbs}" in prompt_template:
         from core.profiles import default_profile as _dp
         _fallback_verbs = ", ".join(_dp()["obligation_verbs"])
-        prompt_template = (
-            prompt_template
-            .replace("{obligation_verbs}", _fallback_verbs)
-            .replace("{domain_tags_list}", ", ".join(valid_domain_tags))
-            .replace("{requirement_types_list}", ", ".join(valid_requirement_types))
-        )
+        prompt_template = prompt_template.replace("{obligation_verbs}", _fallback_verbs)
 
     # P3: pre-scan for candidate source refs and inject as LLM hints
     ref_candidates = scan_source_refs(chunk_text)
@@ -578,13 +531,16 @@ def run(
     timeout: int = 120,
     max_chunks: int | None = None,
     start_chunk: int = 0,
-    pass1_only: bool = False,
     profile: dict | None = None,
 ) -> str:
     """Extract requirements from chunks JSONL using a local LLM.
 
     Callable interface for in-process use by run_pipeline.py.
     Standalone CLI usage is unchanged via main() / __main__.
+
+    Uses PASS1_PROMPT_TEMPLATE (source_quote + source_ref only) with Ollama
+    structured output; description/domain_tags/requirement_type are filled in
+    separately by Step D.5 enrichment.
 
     Args:
         chunks_jsonl: Path to chunks.jsonl from Step B.
@@ -594,9 +550,6 @@ def run(
         timeout:      Per-request timeout in seconds.
         max_chunks:   Process only first N chunks (for testing).
         start_chunk:  Start from this chunk_id (for resuming).
-        pass1_only:   Use PASS1_PROMPT_TEMPLATE (source_quote + source_ref only).
-                      Faster and higher-recall; description/tags/type left to Pass 2
-                      enrichment. Default False (full single-pass extraction).
         profile:      Validated profile dict from core.profiles.load_profile().
                       When None, the cybersecurity default profile is loaded.
 
@@ -610,29 +563,22 @@ def run(
     valid_domain_tags: list[str] = profile["domain_tags"]
     valid_requirement_types: list[str] = profile["requirement_types"]
     obligation_verbs_str = ", ".join(profile["obligation_verbs"])
-    domain_tags_str = ", ".join(valid_domain_tags)
 
-    template = PASS1_PROMPT_TEMPLATE if pass1_only else PROMPT_TEMPLATE
     # Substitute profile vocabulary into the template once before per-chunk processing.
     # When the cybersecurity profile is active this produces semantically identical
     # prompts to the pre-Phase-20 hardcoded text.
-    template = template.replace("{obligation_verbs}", obligation_verbs_str)
-    if not pass1_only:
-        template = template.replace("{domain_tags_list}", domain_tags_str)
-        template = template.replace("{requirement_types_list}", ", ".join(valid_requirement_types))
+    template = PASS1_PROMPT_TEMPLATE.replace("{obligation_verbs}", obligation_verbs_str)
 
-    # Pass 1 uses Ollama constrained generation — eliminates parse failures
-    # from preamble text and malformed bare arrays (Codex P1 fix).
-    # Legacy full-extraction path (PROMPT_TEMPLATE) uses unconstrained generation.
-    schema = _PASS1_FORMAT_SCHEMA if pass1_only else None
-    if pass1_only:
-        log.info("Using Pass 1 prompt (source_quote + source_ref only) with structured output")
+    # Ollama constrained generation — eliminates parse failures from preamble
+    # text and malformed bare arrays (Codex P1 fix).
+    schema = _PASS1_FORMAT_SCHEMA
+    log.info("Using Pass 1 prompt (source_quote + source_ref only) with structured output")
 
     chunks_path = Path(chunks_jsonl).resolve()
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    stem = chunks_path.stem.replace("_chunks", "")
+    stem = chunks_path.stem.removesuffix("_chunks")
     raw_path = out_dir / f"{stem}_raw_responses.jsonl"
     reqs_path = out_dir / f"{stem}_extracted_requirements.jsonl"
     fail_path = out_dir / f"{stem}_parse_failures.jsonl"

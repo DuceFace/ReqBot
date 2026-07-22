@@ -70,8 +70,9 @@ pipeline/
                                                    Output fields: raw_text, text (breadcrumb+raw_text), breadcrumb,
                                                    section_ref_path, section_title_path, parent_header_text, parent_context
   llm_extract_requirements.py  Step C:  chunks JSONL → extracted requirements JSONL  [Ollama: extraction_model]
-                                        Pass 1 (default): source_quote + source_ref only
-                                        Full mode (--full-extraction): adds description/tags/type
+                                        Pass 1 (only mode): source_quote + source_ref only —
+                                        description/domain_tags/requirement_type come from
+                                        Step D.5 enrichment, not Step C
   parse_and_normalize.py       Step D:  normalize, validate, deduplicate → normalized JSONL (schema v2.0)
                                         Derives hierarchy fields from chunks.jsonl:
                                         section_ref_path, section_title_path, parent_section_ref,

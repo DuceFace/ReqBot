@@ -95,20 +95,19 @@ After rebuilding, **reload the browser tab** — the running server picks up new
 ```bash
 cd ~/grc-ai-system
 
-# Standard ingest + index in one command (most NIST/AFI/DAF docs)
+# Standard ingest (most NIST/AFI/DAF docs) — indexes into Qdrant by default
 python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
-  --index \
   --ollama-url http://192.168.90.100:11434
 
 # Table-heavy docs (DODIs) — pdfplumber handles tables better
 python3 cli/reqbot.py ingest ~/path/to/dodi.pdf \
-  --index \
   --layout-mode pdfplumber \
   --ollama-url http://192.168.90.100:11434
 ```
 
-Output goes to `~/documents/processed/<doc_stem>_<timestamp>/`. The `--index` flag runs
-embedding and Qdrant indexing automatically after extraction.
+Output goes to `~/documents/processed/<doc_stem>_<timestamp>/`. Indexing (both
+`grc_requirements` and `grc_context`) runs automatically after extraction; add `--no-index`
+for artifact-only/debug runs.
 
 To resume a killed Step C job (do NOT start a new run — you lose the prompt hash cache):
 ```bash

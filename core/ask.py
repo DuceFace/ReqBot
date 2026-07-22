@@ -682,6 +682,12 @@ def run(
                         "is not set — falling back to local"
                     )
                     syn_backend = "local"
+            elif syn_backend == "none":
+                print(
+                    "[!] Synthesis is disabled for this setup (retrieval-only). "
+                    "Run 'reqbot init' to enable it."
+                )
+                synthesize = False
         except Exception:
             pass  # config unavailable — use local defaults
 

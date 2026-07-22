@@ -4,6 +4,7 @@
 Supports:
   - Local Ollama (default, always available, nothing sent externally)
   - Remote providers: Anthropic (Claude), OpenAI (GPT)
+  - None (retrieval-only — synthesis is disabled entirely, no call is made)
 
 Security model:
   - Local is default and never changes without explicit configuration
@@ -17,7 +18,7 @@ Usage:
     answer = synthesize(
         question="What are the password requirements?",
         evidence="[1] (NIST SP 800-53r5 IA-5(1)) ...",
-        backend="local",           # or "remote"
+        backend="local",           # "local", "remote", or "none"
         model="qwen2.5:14b",       # local model or remote model name
         ollama_url="http://...",    # used by local backend only
         provider="anthropic",      # used by remote backend only
@@ -191,7 +192,8 @@ def synthesize(
     Args:
         question:   The user's original question.
         evidence:   Formatted evidence string (from format_evidence()).
-        backend:    "local" (default) or "remote".
+        backend:    "local" (default), "remote", or "none" (retrieval-only —
+                    returns "" without calling any model).
         model:      Local Ollama model name, or remote model ID.
         ollama_url: Ollama base URL (local backend only).
         provider:   Remote provider name ("anthropic" or "openai").
@@ -199,8 +201,10 @@ def synthesize(
         raw_prompt: If provided, sent directly to the model (bypasses SYNTHESIS_PROMPT template).
 
     Returns:
-        Synthesized answer string.
+        Synthesized answer string, or "" if backend is "none".
     """
+    if backend == "none":
+        return ""
     if backend == "remote":
         return synthesize_remote(
             question=question,

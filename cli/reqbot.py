@@ -28,6 +28,8 @@ except ImportError:
 import argparse
 import json
 import logging
+import subprocess
+import time
 import uuid
 from datetime import datetime as _dt
 
@@ -931,8 +933,194 @@ def cmd_checklist(args: argparse.Namespace) -> int:
     return 0
 
 
+def _test_ollama(url: str) -> tuple[bool, str, list[str]]:
+    """Test Ollama connectivity. Returns (ok, message, model_names_list)."""
+    try:
+        resp = requests.get(f"{url}/api/tags", timeout=5)
+        resp.raise_for_status()
+        models = resp.json().get("models", [])
+        names = [m["name"] for m in models]
+        count = len(names)
+        return True, f"OK ({count} model{'s' if count != 1 else ''} found)", names
+    except requests.RequestException as e:
+        return False, f"FAILED — {e}", []
+
+
+def _test_qdrant(url: str) -> tuple[bool, str]:
+    """Test Qdrant connectivity. Returns (ok, message)."""
+    try:
+        resp = requests.get(f"{url}/collections", timeout=5)
+        resp.raise_for_status()
+        count = len(resp.json().get("result", {}).get("collections", []))
+        return True, f"OK ({count} collection{'s' if count != 1 else ''})"
+    except requests.RequestException as e:
+        return False, f"FAILED — {e}"
+
+
+def _bootstrap_qdrant_local() -> tuple[bool, str]:
+    """Docker check + start/create the reqbot-qdrant container. Returns (ok, url)."""
+    print("Checking for Docker...")
+    try:
+        docker_info = subprocess.run(["docker", "info"], capture_output=True, text=True)
+    except FileNotFoundError:
+        print("[-] Docker is not running or not installed.")
+        print("    Install Docker:  https://docs.docker.com/engine/install/")
+        return False, ""
+    if docker_info.returncode != 0:
+        print("[-] Docker is not running or not installed.")
+        print("    Install Docker:  https://docs.docker.com/engine/install/")
+        return False, ""
+    ver = subprocess.run(["docker", "--version"], capture_output=True, text=True)
+    docker_ver = ver.stdout.strip() if ver.returncode == 0 else "Docker"
+    print(f"  OK — {docker_ver}")
+
+    print("Starting Qdrant...")
+    running = subprocess.run(
+        ["docker", "ps", "--filter", "name=reqbot-qdrant", "--format", "{{.Names}}"],
+        capture_output=True, text=True,
+    )
+    running_names = [n.strip() for n in running.stdout.splitlines() if n.strip()]
+
+    if "reqbot-qdrant" in running_names:
+        print("  Already running.")
+    else:
+        stopped = subprocess.run(
+            ["docker", "ps", "-a", "--filter", "name=reqbot-qdrant", "--format", "{{.Names}}"],
+            capture_output=True, text=True,
+        )
+        stopped_names = [n.strip() for n in stopped.stdout.splitlines() if n.strip()]
+        if "reqbot-qdrant" in stopped_names:
+            start = subprocess.run(
+                ["docker", "start", "reqbot-qdrant"], capture_output=True, text=True
+            )
+            if start.returncode != 0:
+                print(f"[-] Failed to start Qdrant container: {start.stderr.strip()}")
+                return False, ""
+            print("  Container reqbot-qdrant started.")
+        else:
+            qdrant_data = Path.home() / ".local" / "share" / "reqbot" / "qdrant"
+            qdrant_data.mkdir(parents=True, exist_ok=True)
+            run_result = subprocess.run(
+                [
+                    "docker", "run", "-d",
+                    "--name", "reqbot-qdrant",
+                    "--restart", "unless-stopped",
+                    "-p", "6333:6333",
+                    "-v", f"{qdrant_data}:/qdrant/storage",
+                    "qdrant/qdrant",
+                ],
+                capture_output=True, text=True,
+            )
+            if run_result.returncode != 0:
+                print(f"[-] Failed to start Qdrant container: {run_result.stderr.strip()}")
+                return False, ""
+            print("  Container reqbot-qdrant started.")
+
+    print("  Waiting for Qdrant to accept connections...")
+    qdrant_ready = False
+    for _ in range(10):
+        try:
+            resp = requests.get("http://localhost:6333/collections", timeout=5)
+            if resp.status_code == 200:
+                qdrant_ready = True
+                break
+        except requests.RequestException:
+            pass
+        time.sleep(1)
+
+    if not qdrant_ready:
+        print("[-] Qdrant did not become ready in time.")
+        print("    Check container logs: docker logs reqbot-qdrant")
+        return False, ""
+    print("  OK — Qdrant ready (http://localhost:6333)")
+    return True, "http://localhost:6333"
+
+
+def _bootstrap_ollama_local() -> bool:
+    """Ollama install-check (+ installer) and core model pull. Returns ok."""
+    print("Checking for Ollama...")
+    try:
+        ollama_ver = subprocess.run(["ollama", "--version"], capture_output=True, text=True)
+        ollama_found = ollama_ver.returncode == 0
+        version_str = ollama_ver.stdout.strip() if ollama_found else ""
+    except FileNotFoundError:
+        ollama_found = False
+        version_str = ""
+
+    if ollama_found:
+        try:
+            resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+            resp.raise_for_status()
+            print(f"  Found {version_str} — reachable at http://localhost:11434")
+        except requests.RequestException:
+            print("[-] Ollama is installed but not reachable at http://localhost:11434.")
+            print("    Ensure the Ollama service is running and try again.")
+            return False
+    else:
+        print("  Not found. Installing Ollama via official installer...")
+        install = subprocess.run(
+            ["sh", "-c", "curl -fsSL https://ollama.ai/install.sh | sh"]
+        )
+        if install.returncode != 0:
+            print("[-] Ollama install failed.")
+            print("    Try installing manually: https://ollama.ai/")
+            return False
+
+        # Poll for reachability after install — verify /api/tags, not just the root,
+        # so we confirm it's Ollama and not an unrelated service on port 11434.
+        ollama_ready = False
+        for _ in range(10):
+            try:
+                resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+                if resp.status_code == 200:
+                    ollama_ready = True
+                    break
+            except requests.RequestException:
+                pass
+            time.sleep(1)
+
+        if not ollama_ready:
+            print("[-] Ollama was installed but the service is not yet reachable at http://localhost:11434.")
+            print("    Try: systemctl start ollama   (or your init system's equivalent)")
+            return False
+        print("  Ollama installed and reachable at http://localhost:11434")
+
+    print("Pulling core models...")
+    CORE_MODELS = [
+        ("nomic-embed-text", "~274 MB"),
+        ("llama3.1:8b-instruct-q4_K_M", "~4.7 GB"),
+    ]
+
+    try:
+        list_result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+        pulled_output = list_result.stdout if list_result.returncode == 0 else ""
+    except FileNotFoundError:
+        pulled_output = ""
+
+    for model_name, size in CORE_MODELS:
+        if model_name in pulled_output:
+            print(f"  {model_name:<40} Already pulled")
+        else:
+            print(f"  {model_name:<40} Pulling... ({size})")
+            try:
+                pull = subprocess.run(["ollama", "pull", model_name])
+            except FileNotFoundError:
+                print(f"[-] ollama binary not found — cannot pull {model_name}")
+                return False
+            if pull.returncode != 0:
+                print(f"[-] Model pull failed: {model_name}")
+                return False
+
+    return True
+
+
 def cmd_init(args: argparse.Namespace) -> int:
-    """Interactive setup wizard — writes ~/.config/reqbot/config.json."""
+    """Guided first-run setup.
+
+    Asks, per service (Qdrant, Ollama), whether to use an existing instance or
+    bootstrap one locally, then configures models and synthesis, and writes
+    ~/.config/reqbot/config.json.
+    """
     print("\nReqBot Setup")
     print("============")
 
@@ -941,50 +1129,74 @@ def cmd_init(args: argparse.Namespace) -> int:
         val = input(f"{label} [{default}]: ").strip()
         return val if val else default
 
-    def _test_ollama(url: str) -> tuple[bool, str, list[str]]:
-        """Returns (ok, message, model_names_list)."""
-        try:
-            resp = requests.get(f"{url}/api/tags", timeout=5)
-            resp.raise_for_status()
-            models = resp.json().get("models", [])
-            names = [m["name"] for m in models]
-            count = len(names)
-            return True, f"OK ({count} model{'s' if count != 1 else ''} found)", names
-        except requests.RequestException as e:
-            return False, f"FAILED — {e}", []
-
-    def _test_qdrant(url: str) -> tuple[bool, str]:
-        try:
-            resp = requests.get(f"{url}/collections", timeout=5)
-            resp.raise_for_status()
-            count = len(resp.json().get("result", {}).get("collections", []))
-            return True, f"OK ({count} collection{'s' if count != 1 else ''})"
-        except requests.RequestException as e:
-            return False, f"FAILED — {e}"
+    def _prompt_choice(label: str, options: list[str], default: int = 1) -> int:
+        """Print a numbered menu; return the 1-based choice (default on empty input)."""
+        print(f"\n{label}")
+        for i, opt in enumerate(options, 1):
+            print(f"  [{i}] {opt}")
+        while True:
+            raw = input(f"Choice [{default}]: ").strip()
+            if not raw:
+                return default
+            try:
+                choice = int(raw)
+                if 1 <= choice <= len(options):
+                    return choice
+            except ValueError:
+                pass
+            print(f"  Enter a number from 1 to {len(options)}.")
 
     try:
-        # Ollama URL — loop until connection succeeds or user accepts failure
-        available_models: list[str] = []
-        while True:
-            ollama_url = _prompt("Ollama URL", _cfg.ollama_url).rstrip("/")
-            connected, msg, available_models = _test_ollama(ollama_url)
-            print(f"  Testing connection... {msg}")
-            if connected:
-                break
-            keep = input("  Connection failed. Keep this URL anyway? (y/N): ").strip().lower()
-            if keep == "y":
-                break
+        # --- Qdrant ------------------------------------------------------ #
+        qdrant_choice = _prompt_choice(
+            "Qdrant (vector database):",
+            ["Use an existing instance", "Set up one locally with Docker"],
+        )
+        if qdrant_choice == 2:
+            ok, qdrant_url = _bootstrap_qdrant_local()
+            if not ok:
+                print("\n[!] Setup cancelled — Qdrant bootstrap failed.")
+                return 1
+        else:
+            while True:
+                qdrant_url = _prompt("Qdrant URL", _cfg.qdrant_url).rstrip("/")
+                connected, msg = _test_qdrant(qdrant_url)
+                print(f"  Testing connection... {msg}")
+                if connected:
+                    break
+                keep = input("  Connection failed. Keep this URL anyway? (y/N): ").strip().lower()
+                if keep == "y":
+                    break
 
-        # Qdrant URL — same pattern
-        while True:
-            qdrant_url = _prompt("Qdrant URL", _cfg.qdrant_url).rstrip("/")
-            connected2, msg2 = _test_qdrant(qdrant_url)
-            print(f"  Testing connection... {msg2}")
-            if connected2:
-                break
-            keep = input("  Connection failed. Keep this URL anyway? (y/N): ").strip().lower()
-            if keep == "y":
-                break
+        # --- Ollama -------------------------------------------------------- #
+        print()
+        print("Ollama runs the local pipeline: embeddings, requirement extraction,")
+        print("query rewriting, and HyDE. This is separate from where answer")
+        print("synthesis happens, configured below.")
+        ollama_choice = _prompt_choice(
+            "Ollama:",
+            ["Use an existing instance", "Install locally"],
+        )
+        if ollama_choice == 2:
+            if not _bootstrap_ollama_local():
+                print("\n[!] Setup cancelled — Ollama bootstrap failed.")
+                return 1
+            ollama_url = "http://localhost:11434"
+        else:
+            while True:
+                ollama_url = _prompt("Ollama URL", _cfg.ollama_url).rstrip("/")
+                connected, msg, _ = _test_ollama(ollama_url)
+                print(f"  Testing connection... {msg}")
+                if connected:
+                    break
+                keep = input("  Connection failed. Keep this URL anyway? (y/N): ").strip().lower()
+                if keep == "y":
+                    break
+
+        # Single source of truth for available model names regardless of
+        # which branch above was taken (Codex review: don't trust raw
+        # `ollama pull`/`ollama list` output as a second source of truth).
+        _, _, available_models = _test_ollama(ollama_url)
 
         # Models — warn if not present on the server
         default_model = _prompt("Default model (fallback for all pipeline stages)", _cfg.default_model)
@@ -1037,21 +1249,27 @@ def cmd_init(args: argparse.Namespace) -> int:
         except PermissionError:
             print(f"  [!] Warning: Cannot create directory — check permissions: {processed_dir_path}")
 
-        # Remote synthesis (optional — skippable)
+        # --- Synthesis ----------------------------------------------------- #
         print()
-        print("  Remote Synthesis (optional — press Enter to skip)")
-        print("  Allows using Claude or GPT-4o for higher-quality answers.")
-        print("  All retrieval and indexing remain 100% local.")
-        print("  Only retrieved evidence snippets (shown on screen) are sent externally.")
-        use_remote_raw = input("  Enable remote synthesis? [y/N]: ").strip().lower()
-        use_remote = use_remote_raw in ("y", "yes")
+        print("  Synthesis generates a written answer for '--synthesize' queries.")
+        print("  Retrieval (search, --context, evidence, trace) always works either way.")
+        print("  Remote sends only retrieved evidence snippets and your query — never")
+        print("  full documents.")
+        synth_choice = _prompt_choice(
+            "Synthesis:",
+            [
+                "Local Ollama",
+                "Remote (Claude / GPT-4o)",
+                "None — retrieval only; synthesis requests return no generated answer",
+            ],
+        )
 
         synthesis_backend = "local"
         remote_provider = _cfg.remote_provider
         remote_model = _cfg.remote_model
         api_key_env = _cfg.api_key_env
 
-        if use_remote:
+        if synth_choice == 2:
             provider_raw = input(
                 f"  Provider [anthropic/openai] (default: {_cfg.remote_provider}): "
             ).strip().lower()
@@ -1072,6 +1290,8 @@ def cmd_init(args: argparse.Namespace) -> int:
             synthesis_backend = "remote"
             print(f"  Remote synthesis configured: {remote_provider} / {remote_model}")
             print(f"  API key read from: ${api_key_env}")
+        elif synth_choice == 3:
+            synthesis_backend = "none"
 
     except (KeyboardInterrupt, EOFError):
         print("\n\n[!] Setup cancelled — config not saved.")
@@ -1100,281 +1320,43 @@ def cmd_init(args: argparse.Namespace) -> int:
         json.dumps(cfg_data, indent=2) + "\n", encoding="utf-8"
     )
     config_path.chmod(0o600)
-
     print(f"\nConfig saved to {config_path} (permissions: 600)")
-    print("Run 'reqbot' to launch the interactive shell.")
-    return 0
 
-
-def cmd_setup(args: argparse.Namespace) -> int:
-    """Automated first-run setup: Docker check, Qdrant container, Ollama, models, config.
-
-    Runs five sequential steps, each printing a [N/5] status line. Any hard failure
-    exits non-zero with an actionable message; remaining steps do not run.
-    --advanced drops into the interactive reqbot init wizard unchanged.
-    """
-    import subprocess as _subprocess
-    import time as _time
-
-    # WP-17.3: --advanced delegates to cmd_init verbatim
-    if getattr(args, "advanced", False):
-        return cmd_init(args)
-
-    # ------------------------------------------------------------------ #
-    # Step 1: Docker check
-    # ------------------------------------------------------------------ #
-    print("[1/5] Checking for Docker...")
-    try:
-        docker_info = _subprocess.run(
-            ["docker", "info"], capture_output=True, text=True
-        )
-    except FileNotFoundError:
-        print("[-] Docker is not running or not installed.")
-        print("    Install Docker:  https://docs.docker.com/engine/install/")
-        print("    Start the daemon and re-run: reqbot setup")
-        return 1
-    if docker_info.returncode != 0:
-        print("[-] Docker is not running or not installed.")
-        print("    Install Docker:  https://docs.docker.com/engine/install/")
-        print("    Start the daemon and re-run: reqbot setup")
-        return 1
-    ver = _subprocess.run(["docker", "--version"], capture_output=True, text=True)
-    docker_ver = ver.stdout.strip() if ver.returncode == 0 else "Docker"
-    print(f"      OK — {docker_ver}")
-
-    # ------------------------------------------------------------------ #
-    # Step 2: Qdrant container
-    # ------------------------------------------------------------------ #
-    print("[2/5] Starting Qdrant...")
-
-    running = _subprocess.run(
-        ["docker", "ps", "--filter", "name=reqbot-qdrant", "--format", "{{.Names}}"],
-        capture_output=True, text=True,
-    )
-    running_names = [n.strip() for n in running.stdout.splitlines() if n.strip()]
-
-    if "reqbot-qdrant" in running_names:
-        print("      Already running.")
-    else:
-        stopped = _subprocess.run(
-            ["docker", "ps", "-a", "--filter", "name=reqbot-qdrant", "--format", "{{.Names}}"],
-            capture_output=True, text=True,
-        )
-        stopped_names = [n.strip() for n in stopped.stdout.splitlines() if n.strip()]
-        if "reqbot-qdrant" in stopped_names:
-            start = _subprocess.run(
-                ["docker", "start", "reqbot-qdrant"], capture_output=True, text=True
-            )
-            if start.returncode != 0:
-                print(f"[-] Failed to start Qdrant container: {start.stderr.strip()}")
-                print("    Re-run: reqbot setup")
-                return 1
-            print("      Container reqbot-qdrant started.")
-        else:
-            qdrant_data = Path.home() / ".local" / "share" / "reqbot" / "qdrant"
-            qdrant_data.mkdir(parents=True, exist_ok=True)
-            run_result = _subprocess.run(
-                [
-                    "docker", "run", "-d",
-                    "--name", "reqbot-qdrant",
-                    "--restart", "unless-stopped",
-                    "-p", "6333:6333",
-                    "-v", f"{qdrant_data}:/qdrant/storage",
-                    "qdrant/qdrant",
-                ],
-                capture_output=True, text=True,
-            )
-            if run_result.returncode != 0:
-                print(f"[-] Failed to start Qdrant container: {run_result.stderr.strip()}")
-                print("    Re-run: reqbot setup")
-                return 1
-            print("      Container reqbot-qdrant started.")
-
-    print("      Waiting for Qdrant to accept connections...")
-    qdrant_ready = False
-    for _ in range(10):
-        try:
-            resp = requests.get("http://localhost:6333/collections", timeout=5)
-            if resp.status_code == 200:
-                qdrant_ready = True
-                break
-        except requests.RequestException:
-            pass
-        _time.sleep(1)
-
-    if not qdrant_ready:
-        print("[-] Qdrant did not become ready in time.")
-        print("    Check container logs: docker logs reqbot-qdrant")
-        print("    Then re-run: reqbot setup")
-        return 1
-    print("      OK — Qdrant ready (http://localhost:6333)")
-
-    # ------------------------------------------------------------------ #
-    # Step 3: Ollama check and install
-    # ------------------------------------------------------------------ #
-    print("[3/5] Checking for Ollama...")
-    try:
-        ollama_ver = _subprocess.run(
-            ["ollama", "--version"], capture_output=True, text=True
-        )
-        ollama_found = ollama_ver.returncode == 0
-        version_str = ollama_ver.stdout.strip() if ollama_found else ""
-    except FileNotFoundError:
-        ollama_found = False
-        version_str = ""
-
-    if ollama_found:
-        try:
-            resp = requests.get("http://localhost:11434/api/tags", timeout=5)
-            resp.raise_for_status()
-            print(f"      Found {version_str} — reachable at http://localhost:11434")
-        except requests.RequestException:
-            print("[-] Ollama is installed but not reachable at http://localhost:11434.")
-            print("    Ensure the Ollama service is running and re-run: reqbot setup")
-            return 1
-    else:
-        print("      Not found. Installing Ollama via official installer...")
-        install = _subprocess.run(
-            ["sh", "-c", "curl -fsSL https://ollama.ai/install.sh | sh"]
-        )
-        if install.returncode != 0:
-            print("[-] Ollama install failed.")
-            print("    Try installing manually: https://ollama.ai/")
-            print("    Then re-run: reqbot setup")
-            return 1
-
-        # Poll for reachability after install — verify /api/tags, not just the root,
-        # so we confirm it's Ollama and not an unrelated service on port 11434.
-        ollama_ready = False
-        for _ in range(10):
-            try:
-                resp = requests.get("http://localhost:11434/api/tags", timeout=5)
-                if resp.status_code == 200:
-                    ollama_ready = True
-                    break
-            except requests.RequestException:
-                pass
-            _time.sleep(1)
-
-        if not ollama_ready:
-            print("[-] Ollama was installed but the service is not yet reachable at http://localhost:11434.")
-            print("    Try: systemctl start ollama   (or your init system's equivalent)")
-            print("    Then re-run: reqbot setup")
-            return 1
-        print("      Ollama installed and reachable at http://localhost:11434")
-
-    # ------------------------------------------------------------------ #
-    # Step 4: Pull core models
-    # ------------------------------------------------------------------ #
-    print("[4/5] Pulling core models...")
-    CORE_MODELS = [
-        ("nomic-embed-text", "~274 MB"),
-        ("llama3.1:8b-instruct-q4_K_M", "~4.7 GB"),
-    ]
-
-    try:
-        list_result = _subprocess.run(["ollama", "list"], capture_output=True, text=True)
-        pulled_output = list_result.stdout if list_result.returncode == 0 else ""
-    except FileNotFoundError:
-        pulled_output = ""
-
-    for model_name, size in CORE_MODELS:
-        if model_name in pulled_output:
-            print(f"      {model_name:<40} Already pulled")
-        else:
-            print(f"      {model_name:<40} Pulling... ({size})")
-            try:
-                pull = _subprocess.run(["ollama", "pull", model_name])
-            except FileNotFoundError:
-                print(f"[-] ollama binary not found — cannot pull {model_name}")
-                print("    Ensure Ollama is installed and re-run: reqbot setup")
-                return 1
-            if pull.returncode != 0:
-                print(f"[-] Model pull failed: {model_name}")
-                print("    Check Ollama logs and re-run: reqbot setup")
-                return 1
-
-    # ------------------------------------------------------------------ #
-    # Step 5: Write config and confirm
-    # ------------------------------------------------------------------ #
-    print("[5/5] Writing config and running status check...")
-    config_path = _config.CONFIG_PATH
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-
-    _SETUP_DEFAULTS = {
-        "ollama_url": "http://localhost:11434",
-        "qdrant_url": "http://localhost:6333",
-        "default_model": "llama3.1:8b-instruct-q4_K_M",
-        "extraction_model": "llama3.1:8b-instruct-q4_K_M",
-        "enrichment_model": "llama3.1:8b-instruct-q4_K_M",
-        "synthesis_model": "qwen2.5:14b",
-        "top_k": 20,
-        "min_score": 0.02,
-        "processed_dir": "~/documents/processed",
-        "synthesis_backend": "local",
-        "remote_provider": "anthropic",
-        "remote_model": "claude-sonnet-4-6",
-        "api_key_env": "ANTHROPIC_API_KEY",
-    }
-
-    do_write = True
-    if config_path.exists():
-        try:
-            answer = input(
-                f"    Config already exists at {config_path}.\n"
-                "    Overwrite with localhost defaults? (y/N): "
-            ).strip().lower()
-        except (KeyboardInterrupt, EOFError):
-            answer = ""
-        if answer not in ("y", "yes"):
-            print("    Keeping existing config.")
-            do_write = False
-
-    if do_write:
-        try:
-            config_path.write_text(
-                json.dumps(_SETUP_DEFAULTS, indent=2) + "\n", encoding="utf-8"
-            )
-            config_path.chmod(0o600)
-            print(f"      Config written to {config_path}")
-        except OSError as e:
-            print(f"[-] Could not write config: {e}")
-            print(f"    Check permissions on {config_path.parent} and re-run: reqbot setup")
-            return 1
-
-    # Determine which URLs will be active after setup exits:
-    # - wrote new config  → localhost defaults we just wrote
-    # - kept existing     → whatever _cfg already held (loaded at startup)
-    if do_write:
-        effective_ollama = "http://localhost:11434"
-        effective_qdrant = "http://localhost:6333"
-    else:
-        effective_ollama = _cfg.ollama_url
-        effective_qdrant = _cfg.qdrant_url
-
-    # Render human-readable status output (display only — always returns 0).
-    status_args = argparse.Namespace(ollama_url=effective_ollama, qdrant_url=effective_qdrant)
+    # Gate the success banner on actual service health — shared by every
+    # existing/bootstrap combination (previously only the automated `setup`
+    # flow did this final health check).
+    status_args = argparse.Namespace(ollama_url=ollama_url, qdrant_url=qdrant_url)
     cmd_status(status_args)
 
-    # Gate the success banner on actual service health.
-    # cmd_status() is a display primitive; use status_service.check() for truth.
     from services import status_service as _status_service
-    health = _status_service.check(effective_ollama, effective_qdrant, _cfg.processed_dir_path())
+    health = _status_service.check(ollama_url, qdrant_url, Path(processed_dir).expanduser().resolve())
     if not health["ollama"]["reachable"] or not health["qdrant"]["reachable"]:
-        print("[-] ReqBot setup completed, but the environment is not healthy yet.")
-        print("    Fix the status issues above and re-run: reqbot setup")
+        print("[-] Config saved, but the environment is not healthy yet.")
+        print("    Fix the status issues above, then run 'reqbot status' to re-check.")
         return 1
 
-    print("=== ReqBot is ready ===")
+    print("\n=== ReqBot is ready ===")
     print()
     print('  reqbot ask "what are the password requirements?"')
     print("  reqbot docs")
     print("  reqbot serve   # starts the read-only API on http://127.0.0.1:8000")
-    print()
-    print("Note: The synthesis model (qwen2.5:14b, ~9 GB) will download automatically")
-    print("on your first use of --synthesize.")
+    if synthesis_backend == "local":
+        print()
+        print("Note: The synthesis model (qwen2.5:14b, ~9 GB) will download automatically")
+        print("on your first use of --synthesize.")
 
     return 0
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    """Deprecated alias for 'init' — runs the same guided first-run flow.
+
+    Kept for backward compatibility with existing scripts/docs. --advanced is
+    accepted but is a no-op now that 'setup' and 'init' run the same flow.
+    """
+    print("[!] 'reqbot setup' is deprecated and now runs 'reqbot init'. "
+          "Use 'reqbot init' going forward.")
+    return cmd_init(args)
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
@@ -1614,19 +1596,23 @@ def main() -> None:
                          help="Include surrounding raw chunk text from grc_context")
     p_trace.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")
 
-    # setup
+    # setup (deprecated alias for init)
     p_setup = subparsers.add_parser(
         "setup",
-        help="Automated first-run setup (Docker, Qdrant, Ollama, models, config)",
+        help="Deprecated alias for 'init' — use 'reqbot init' instead",
     )
     p_setup.add_argument(
         "--advanced",
         action="store_true",
-        help="Drop into the interactive init wizard instead of the automated flow",
+        help="No-op, kept for backward compatibility ('setup' and 'init' are now the same flow)",
     )
 
     # init
-    subparsers.add_parser("init", help="Interactive setup wizard — writes ~/.config/reqbot/config.json")
+    subparsers.add_parser(
+        "init",
+        help="Guided first-run setup — configure Qdrant, Ollama, and synthesis "
+             "(asks per service whether to use an existing instance or bootstrap locally)",
+    )
 
     # status
     p_status = subparsers.add_parser("status", help="Show system status")

@@ -115,17 +115,20 @@ python3 pipeline/run_pipeline.py \
 
 ## Rebuilding Qdrant from Existing JSONL
 
-`reindex` rebuilds the **requirements collection** from all normalized JSONL files in
-`~/documents/processed/` without re-running extraction:
+`reindex` rebuilds the **requirements collection** (`grc_requirements`) from all normalized
+JSONL files in `~/documents/processed/` without re-running extraction:
 
 ```bash
 python3 cli/reqbot.py reindex
 ```
 
-The **context chunks collection** (`grc_context`) is separate and must be rebuilt independently:
+The **context chunks collection** (`grc_context`) is separate and has no bulk-reindex command.
+Rebuild it by looping over every `_chunks.jsonl` file:
 
 ```bash
-python3 pipeline/embed_context_index.py --processed-dir ~/documents/processed/
+find ~/documents/processed -name '*_chunks.jsonl' | while read chunks; do
+  python3 cli/reqbot.py index-context "$chunks"
+done
 ```
 
 Run both after adding a new field to normalized JSONL, after a corpus refresh, or after
@@ -145,8 +148,10 @@ curl -X DELETE http://192.168.30.153:6333/collections/grc_context
 # 2. Rebuild requirements collection
 python3 cli/reqbot.py reindex
 
-# 3. Rebuild context chunks collection
-python3 pipeline/embed_context_index.py --processed-dir ~/documents/processed/
+# 3. Rebuild context chunks collection (one call per document)
+find ~/documents/processed -name '*_chunks.jsonl' | while read chunks; do
+  python3 cli/reqbot.py index-context "$chunks"
+done
 ```
 
 > The collection name suffix (`_1775409441`) is a hash of the embedding config. It will be the same after a fresh reindex as long as the model and dimensions haven't changed. Verify with `reqbot status`.

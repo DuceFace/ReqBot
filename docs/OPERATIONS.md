@@ -103,11 +103,27 @@ python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
 python3 cli/reqbot.py ingest ~/path/to/dodi.pdf \
   --layout-mode pdfplumber \
   --ollama-url http://192.168.90.100:11434
+
+# Structure-aware — required for profile skip_sections filtering to apply; slower
+# on CPU (layout/table/OCR model inference) but exercises the full current pipeline
+python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
+  --layout-mode docling \
+  --ollama-url http://192.168.90.100:11434
 ```
 
 Output goes to `~/documents/processed/<doc_stem>_<timestamp>/`. Indexing (both
 `grc_requirements` and `grc_context`) runs automatically after extraction; add `--no-index`
 for artifact-only/debug runs.
+
+**Verifying GPU usage during ingestion:** Step C/D.5 extraction and enrichment run through
+Ollama. Confirm inference is actually using the GPU, not silently falling back to CPU:
+
+```bash
+curl http://192.168.90.100:11434/api/ps
+```
+
+For each loaded model, compare `size_vram` to `size`: `size_vram == size` means the model is
+fully resident in VRAM; `size_vram > 0` but less than `size` means only partial GPU offload.
 
 To resume a killed Step C job (do NOT start a new run — you lose the prompt hash cache):
 ```bash
@@ -153,18 +169,42 @@ python3 cli/reqbot.py index-context ~/documents/processed/<run_dir>/<doc_stem>_c
 
 ## Nuking and Rebuilding the Qdrant Collections
 
-To start fresh (e.g., after a corpus refresh with newly ingested docs):
+Two different situations both start with "wipe the collections," but the recovery step differs:
+
+- **Disaster recovery** (schema change, corruption, bad state) — rebuild from whatever JSONL
+  already exists in `~/documents/processed/` via `reqbot reindex`. No re-extraction; picks up
+  the latest run per document automatically.
+- **Genuine corpus refresh** (re-ingesting documents through an updated pipeline) — re-ingest
+  the documents you want refreshed via `reqbot ingest`/`reqbot batch` first. Indexing happens
+  as part of that ingest itself; no separate `reindex` step is needed for freshly ingested docs.
+  Only run `reindex` afterward if you also need to pick up *other* documents' existing JSONL
+  that weren't part of the refresh.
+
+To nuke, first inspect what actually exists — `grc_requirements` may be a plain collection or
+an alias pointing at a hash-suffixed backing collection (WP-24.2's alias-swap rebuild pattern),
+and the exact backing name changes every time the embedding config or a fresh reindex creates
+a new one, so don't hardcode a literal name:
 
 ```bash
-# 1. Delete the collections via Qdrant API
-curl -X DELETE http://192.168.30.153:6333/collections/grc_requirements_1775409441
+# 1. Check current state first
+python3 cli/reqbot.py status
+# or, for the raw collection/alias list:
+python3 -c "
+from qdrant_client import QdrantClient
+c = QdrantClient(url='http://192.168.30.153:6333')
+print('collections:', [col.name for col in c.get_collections().collections])
+print('aliases:', [(a.alias_name, a.collection_name) for a in c.get_aliases().aliases])
+"
+
+# 2. Delete whatever collection name(s) that showed — for grc_requirements, delete the
+#    backing collection (not just the alias) if one exists; delete grc_context directly.
+curl -X DELETE http://192.168.30.153:6333/collections/<backing_or_plain_name>
 curl -X DELETE http://192.168.30.153:6333/collections/grc_context
 
-# 2. Rebuild both collections
+# 3. Rebuild — reindex from existing JSONL, or re-ingest for a genuine refresh (see above)
 python3 cli/reqbot.py reindex
 ```
 
-> The collection name suffix (`_1775409441`) is a hash of the embedding config. It will be the same after a fresh reindex as long as the model and dimensions haven't changed. Verify with `reqbot status`.
 > The first `reindex` after upgrading to WP-24.2 migrates `grc_context` from a plain collection
 > to an alias-backed one (a brief delete-then-alias-create window, same one-time cost
 > `grc_requirements` already pays if it's ever nuked back to a real collection). Every

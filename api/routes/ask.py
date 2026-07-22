@@ -22,7 +22,7 @@ class AskRequest(BaseModel):
     document_ids: list[str] = Field(default_factory=list)
     no_rewrite: bool = False
     context: bool = False
-    hyde: bool = False
+    hyde: bool = True
 
 
 @router.post("/ask")

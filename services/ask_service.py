@@ -32,7 +32,7 @@ def ask(
     no_rewrite: bool = False,
     context: bool = False,
     context_collection: str = "grc_context",
-    hyde: bool = False,
+    hyde: bool = True,
     synthesis_backend: str = "local",
     synthesis_provider: str = "anthropic",
     synthesis_api_key: str = "",

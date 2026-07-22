@@ -194,6 +194,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
             json_output=args.json_output,
             context=args.context,
             context_collection=args.context_collection,
+            hyde=not getattr(args, "no_hyde", False),
         )
         return 0
     except Exception as e:
@@ -1573,6 +1574,7 @@ def main() -> None:
         help="Include surrounding raw chunk text from grc_context (retrieval-time only; does not affect indexing)",
     )
     p_ask.add_argument("--no-rewrite", action="store_true", dest="no_rewrite", help="Skip query rewriting")
+    p_ask.add_argument("--no-hyde", action="store_true", dest="no_hyde", help="Disable HyDE hypothesis leg — baseline dense + BM25 RRF only")
     p_ask.add_argument("--rewrite-model", type=str, default="llama3.1:8b-instruct-q4_K_M", dest="rewrite_model", help="LLM model for query rewriting")
     p_ask.add_argument("--context-collection", type=str, default="grc_context", dest="context_collection", help="Qdrant context collection name")
     p_ask.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")

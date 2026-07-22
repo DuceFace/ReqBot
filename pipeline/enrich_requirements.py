@@ -409,7 +409,14 @@ def run(
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    stem = norm_path.stem.replace("_requirements_normalized", "")
+    # Anchored suffix strip, not a broad .replace() — a PDF whose own stem
+    # happens to contain "_requirements_normalized" (e.g.
+    # "policy_requirements_normalized_v1.pdf") would otherwise have that
+    # substring collapsed everywhere it appears, producing an enriched
+    # filename whose doc_key no longer matches the real *_chunks.jsonl file
+    # and silently breaking context indexing downstream (WP-24.3 review).
+    from core.artifact_resolver import doc_key_from_requirements_path
+    stem = doc_key_from_requirements_path(norm_path)
     enriched_path = out_dir / f"{stem}_requirements_enriched.jsonl"
 
     # Load all normalized requirements

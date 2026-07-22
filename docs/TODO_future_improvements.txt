@@ -186,24 +186,14 @@ These are quality experiments, not guaranteed product work.
    Collapse to unique requirement_id before reranking or display so one
    requirement cannot crowd out the result set.
 
-3. HyDE promotion from spike to CLI flag
-   The HyDE (hypothetical document embedding) spike lives on core/ask.py only
-   and is not wired into cli/reqbot.py. Promote it as reqbot ask --hyde after
-   confirming the gate results from WP-15.4 still hold on the current corpus.
-
-   Before wiring:
-   - re-run the 5-query gate with the current 45-document corpus
-   - confirm no regression on exact control-ID queries (BM25 leg handles those)
-   - acceptable latency on target hardware
-
-4. HyPE / hypothetical question indexing (separate from HyDE)
+3. HyPE / hypothetical question indexing (separate from HyDE)
    Pre-generate likely user questions for each requirement at ingest time and
    index those as an additional retrieval surface.
 
    This may improve query-time recall, but it adds generated text to the index
    and should be clearly separated from source-grounded fields.
 
-5. Corrective retrieval gate
+4. Corrective retrieval gate
    If retrieval confidence is weak, retry once with a targeted rewrite or
    alternate retrieval strategy, then surface a low-confidence warning if the
    result is still weak.

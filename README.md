@@ -97,6 +97,12 @@ Common options:
 - `--json` - emit JSON
 - `--no-rewrite` - disable query rewriting
 - `--rewrite-model M` - model for query rewriting
+- `--no-hyde` - disable HyDE (Hypothetical Document Embedding) retrieval augmentation; falls
+  back to baseline dense + BM25 RRF only. HyDE is on by default — it generates a hypothetical
+  requirement statement and adds its embedding as a third RRF leg, and passed its Phase 15
+  evaluation gate (≥3 queries improved, none degraded, no hallucinated IDs). `--no-rewrite` and
+  `--no-hyde` are independent controls; the fastest pre-Phase-24 retrieval behavior is both
+  flags together.
 
 ### `ingest`
 

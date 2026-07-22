@@ -119,12 +119,21 @@ echo "  Python extracted: $("$BUNDLED_PYTHON" --version)"
 # Step 3: Install Python dependencies
 # ---------------------------------------------------------------
 echo "[3/6] Installing Python dependencies..."
+# -I (isolated mode) is required on both invocations below — without it, pip
+# resolves against the *host user's* site-packages too (Python's site module
+# auto-appends ~/.local/lib/pythonX.Y/site-packages for any non-isolated
+# invocation), sees this build machine's already-installed dev packages as
+# "already satisfied," and silently skips installing real copies into the
+# bundle's own site-packages. That produced a bundle that looked complete
+# (smoke tests passed by accident, via host leakage) but had almost nothing
+# actually installed — caught by isolated-mode verification, see Step 3.5.
+#
 # Upgrade pip first (bundled pip may be older)
-"$BUNDLED_PYTHON" -m pip install --upgrade pip --quiet --disable-pip-version-check
+"$BUNDLED_PYTHON" -I -m pip install --upgrade pip --quiet --disable-pip-version-check
 
 # Install all required packages into the bundled Python's site-packages.
 # Pinned to the exact versions running on the build machine.
-"$BUNDLED_PYTHON" -m pip install \
+"$BUNDLED_PYTHON" -I -m pip install \
     "pymupdf==1.27.1" \
     "pdfplumber==0.11.9" \
     "fastembed==0.7.4" \
@@ -141,14 +150,31 @@ echo "[3/6] Installing Python dependencies..."
 echo "  Dependencies installed"
 
 # ---------------------------------------------------------------
+# Step 3.5: Verify the install actually landed in the bundle (isolated import)
+# ---------------------------------------------------------------
+echo "[3.5/6] Verifying bundled dependencies (isolated import check)..."
+# Must run with -I — a non-isolated check here would pass even if Step 3 did
+# nothing at all, for the exact same host-leakage reason described above.
+if ! ISOLATED_IMPORT_ERR=$("$BUNDLED_PYTHON" -I -c "import fitz, pdfplumber, fastembed, qdrant_client, ollama, fastapi, uvicorn, openpyxl, docling" 2>&1); then
+    echo "  ERROR: one or more bundled dependencies failed to import in isolated mode." >&2
+    echo "         This means Step 3's pip install did not actually populate the" >&2
+    echo "         bundle's own site-packages:" >&2
+    echo "$ISOLATED_IMPORT_ERR" >&2
+    exit 1
+fi
+echo "  All bundled dependencies import cleanly under -I (isolated mode)"
+
+# ---------------------------------------------------------------
 # Step 4: Pre-seed fastembed BM25 model cache
 # ---------------------------------------------------------------
 echo "[4/6] Pre-seeding fastembed BM25 model cache..."
 # fastembed defaults to /tmp/fastembed_cache/ (wiped on reboot).
 # We force it to download into our models/ directory so the bundle is
 # air-gap capable. The launcher sets FASTEMBED_CACHE_PATH at runtime.
+# -I here too — must import fastembed from the bundle's own site-packages,
+# not a host copy, same isolation reasoning as Step 3.
 FASTEMBED_CACHE_PATH="$BUNDLE_DIR/models" \
-    "$BUNDLED_PYTHON" -c "
+    "$BUNDLED_PYTHON" -I -c "
 from fastembed import SparseTextEmbedding
 import os
 print('  Downloading Qdrant/bm25 model...')
@@ -219,7 +245,12 @@ REQBOT_HOME="$(cd "$(dirname "$0")" && pwd)"
 # HuggingFace — required for air-gapped environments.
 export FASTEMBED_CACHE_PATH="$REQBOT_HOME/models"
 
-exec "$REQBOT_HOME/python/bin/python3" "$REQBOT_HOME/app/cli/reqbot.py" "$@"
+# -I (isolated mode): without it, Python auto-appends the host user's own
+# site-packages (~/.local/lib/pythonX.Y/site-packages) to sys.path, so the
+# "bundled" interpreter would silently import whatever happens to be pip
+# installed on the host machine instead of the bundle's own copies — the
+# same leakage this launcher must not have at runtime.
+exec "$REQBOT_HOME/python/bin/python3" -I "$REQBOT_HOME/app/cli/reqbot.py" "$@"
 LAUNCHER_SCRIPT
 
 chmod +x "$BUNDLE_DIR/reqbot"
@@ -235,6 +266,17 @@ else
     echo "  ERROR: reqbot --help failed — bundle is broken" >&2
     exit 1
 fi
+
+# Confirm the launcher actually runs isolated — not just that -I is present
+# in the script text, but that Python itself reports user-site as disabled
+# under this exact invocation.
+USER_SITE_CHECK=$("$BUNDLE_DIR/python/bin/python3" -I -c "import site; print(site.ENABLE_USER_SITE)")
+if [ "$USER_SITE_CHECK" != "False" ]; then
+    echo "  ERROR: bundled Python reports ENABLE_USER_SITE=$USER_SITE_CHECK under -I — expected False" >&2
+    echo "         The launcher would not be isolated from the host's packages." >&2
+    exit 1
+fi
+echo "  Isolation check: ENABLE_USER_SITE=False under -I  OK"
 
 # ---------------------------------------------------------------
 # Summary

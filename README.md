@@ -19,8 +19,8 @@ Run `reqbot serve` to start the web interface. Run `reqbot docs` to see your ind
 ## Requirements
 
 - Python 3.12+
-- Docker (required; runs Qdrant as a container)
-- [Ollama](https://ollama.ai/) (auto-installed by `reqbot setup` if absent)
+- Docker (only needed if you have `reqbot init` bootstrap Qdrant locally)
+- [Ollama](https://ollama.ai/) (only needed if you have `reqbot init` bootstrap it locally)
 - Python dependencies:
 
 ```bash
@@ -29,30 +29,29 @@ pip3 install --break-system-packages -r requirements.txt
 
 ## Setup
 
-Run once on a fresh Linux machine with Docker installed:
+Run once on a fresh machine:
 
 ```bash
-reqbot setup
+reqbot init
 ```
 
-This automates five steps: Docker check → Qdrant container → Ollama install (if absent) → core model pull → config write. When it completes, `reqbot ask` is ready.
+This asks, per service, whether to use an existing instance or set one up locally:
 
-The two core models pulled during setup:
+- **Qdrant** — point at an existing URL, or have `reqbot init` start a local Docker container.
+- **Ollama** — point at an existing URL, or have `reqbot init` install it locally and pull the
+  two core models (`nomic-embed-text` ~274 MB for embeddings; `llama3.1:8b-instruct-q4_K_M`
+  ~4.7 GB for extraction/query rewriting/HyDE). These are needed for local pipeline work
+  regardless of where answer synthesis happens.
+- **Synthesis** — Local Ollama, Remote (Claude/GPT-4o), or None (retrieval-only; `--synthesize`
+  returns no generated answer). The synthesis model (`qwen2.5:14b`, ~9 GB) is **not** pulled
+  during setup if you choose local — it downloads automatically the first time you run
+  `--synthesize`.
 
-| Model | Size | Purpose |
-|-------|------|---------|
-| `nomic-embed-text` | ~274 MB | Dense embeddings (required for all search) |
-| `llama3.1:8b-instruct-q4_K_M` | ~4.7 GB | Step C extraction + query rewriting |
+The two service choices are independent — e.g. an existing managed Qdrant plus a locally
+bootstrapped Ollama, or vice versa, both work.
 
-The synthesis model (`qwen2.5:14b`, ~9 GB) is **not** pulled during setup. It downloads automatically the first time you run `--synthesize`.
-
-**Advanced / custom infrastructure:**
-
-```bash
-reqbot setup --advanced   # or: reqbot init
-```
-
-Opens an interactive wizard for configuring remote Ollama/Qdrant URLs, custom models, or remote synthesis backends (Anthropic, OpenAI).
+`reqbot setup` still works as a deprecated alias for `reqbot init` (existing scripts/docs
+referencing it won't break), but `reqbot init` is the one documented first-run path.
 
 ## Quick Start
 
@@ -187,24 +186,26 @@ Options:
 
 The same checklist is available from the browser via the Checklists screen.
 
-### `setup`
-
-Automated first-run setup (Docker, Qdrant, Ollama, models, config).
-
-```bash
-reqbot setup            # automated flow
-reqbot setup --advanced # interactive wizard (same as reqbot init)
-```
-
 ### `init`
 
-Interactive setup wizard — configure URLs, models, and optional remote synthesis.
+Guided first-run setup — asks, per service, whether to use an existing Qdrant/Ollama instance
+or bootstrap one locally, then configures models and synthesis (local, remote, or none).
 
 ```bash
 reqbot init
 ```
 
-Writes `~/.config/reqbot/config.json`. Use this for non-default infrastructure (remote Ollama/Qdrant, custom models).
+Writes `~/.config/reqbot/config.json`.
+
+### `setup`
+
+Deprecated alias for `init` — runs the same guided flow. `--advanced` is accepted but is a
+no-op (kept for backward compatibility with older scripts/docs).
+
+```bash
+reqbot setup            # same as: reqbot init
+reqbot setup --advanced # same as: reqbot init
+```
 
 ### `docs`
 

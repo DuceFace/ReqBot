@@ -679,9 +679,17 @@ def run(
                 if not syn_api_key:
                     print(
                         f"[!] Remote synthesis configured but {_cfg_syn.api_key_env} "
-                        "is not set — falling back to local"
+                        "is not set — falling back to local",
+                        file=sys.stderr,
                     )
                     syn_backend = "local"
+            elif syn_backend == "none":
+                print(
+                    "[!] Synthesis is disabled for this setup (retrieval-only). "
+                    "Run 'reqbot init' to enable it.",
+                    file=sys.stderr,
+                )
+                synthesize = False
         except Exception:
             pass  # config unavailable — use local defaults
 

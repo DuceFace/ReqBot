@@ -123,24 +123,32 @@ python3 pipeline/run_pipeline.py \
 
 ## Rebuilding Qdrant from Existing JSONL
 
-`reindex` rebuilds the **requirements collection** (`grc_requirements`) from all normalized
-JSONL files in `~/documents/processed/` without re-running extraction:
+`reindex` rebuilds **both** `grc_requirements` and `grc_context` from existing artifacts in
+`~/documents/processed/` without re-running extraction, using an atomic temp-collection +
+alias swap for each collection — the live index is never touched until indexing succeeds.
+Prefers `*_requirements_enriched.jsonl` over `*_requirements_normalized.jsonl` per document
+when both exist.
 
 ```bash
 python3 cli/reqbot.py reindex
 ```
 
-The **context chunks collection** (`grc_context`) is separate and has no bulk-reindex command.
-Rebuild it by looping over every `_chunks.jsonl` file:
+For a faster requirements-only rebuild (skips the slower, CPU-bound context rebuild — useful
+when only requirement JSONL changed):
 
 ```bash
-find ~/documents/processed -name '*_chunks.jsonl' | while read chunks; do
-  python3 cli/reqbot.py index-context "$chunks"
-done
+python3 cli/reqbot.py reindex --requirements-only
 ```
 
-Run both after adding a new field to normalized JSONL, after a corpus refresh, or after
+Run after adding a new field to normalized/enriched JSONL, after a corpus refresh, or after
 restoring from backup.
+
+**Repair/debug:** to rebuild a single document's context chunks without a full reindex, use
+the low-level `index-context` command directly:
+
+```bash
+python3 cli/reqbot.py index-context ~/documents/processed/<run_dir>/<doc_stem>_chunks.jsonl
+```
 
 ---
 
@@ -153,16 +161,15 @@ To start fresh (e.g., after a corpus refresh with newly ingested docs):
 curl -X DELETE http://192.168.30.153:6333/collections/grc_requirements_1775409441
 curl -X DELETE http://192.168.30.153:6333/collections/grc_context
 
-# 2. Rebuild requirements collection
+# 2. Rebuild both collections
 python3 cli/reqbot.py reindex
-
-# 3. Rebuild context chunks collection (one call per document)
-find ~/documents/processed -name '*_chunks.jsonl' | while read chunks; do
-  python3 cli/reqbot.py index-context "$chunks"
-done
 ```
 
 > The collection name suffix (`_1775409441`) is a hash of the embedding config. It will be the same after a fresh reindex as long as the model and dimensions haven't changed. Verify with `reqbot status`.
+> The first `reindex` after upgrading to WP-24.2 migrates `grc_context` from a plain collection
+> to an alias-backed one (a brief delete-then-alias-create window, same one-time cost
+> `grc_requirements` already pays if it's ever nuked back to a real collection). Every
+> `reindex` after that is a zero-downtime alias swap for both collections.
 
 ---
 

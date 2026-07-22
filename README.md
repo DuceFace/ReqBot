@@ -129,13 +129,19 @@ Supports the same `--layout-mode`, model, and enrichment flags as `ingest`.
 
 ### `reindex`
 
-Rebuild Qdrant from the most recent processed JSONL for each document.
+Rebuild `grc_requirements` and `grc_context` from the most recent processed artifacts for
+each document.
 
 ```bash
-reqbot reindex
+reqbot reindex                    # rebuilds both collections
+reqbot reindex --requirements-only  # fast path — requirements only, skips context
 ```
 
-This does not re-run extraction. It rebuilds from existing artifacts and uses an atomic alias swap.
+This does not re-run extraction. It rebuilds from existing JSONL/chunk artifacts using an
+atomic temp-collection + alias swap for both collections, so the live index is never touched
+until indexing succeeds. Prefers `*_requirements_enriched.jsonl` over
+`*_requirements_normalized.jsonl` per document when both exist. `--requirements-only` skips
+the slower, CPU-bound `grc_context` rebuild — useful when only requirement JSONL changed.
 
 ### `index`
 

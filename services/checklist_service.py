@@ -19,6 +19,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from core.artifact_resolver import resolve_requirement_file
 from core.profiles import load_profile
 
 log = logging.getLogger(__name__)
@@ -29,32 +30,13 @@ CONFIDENCE_REVIEW_THRESHOLD = 0.8
 def _resolve_doc_path(processed_dir: Path, doc_key: str) -> Path:
     """Return the best requirements JSONL path for doc_key.
 
-    Groups candidates by run directory (parent dir). Picks the most recent run
-    using the latest file mtime within each run, then prefers enriched over
-    normalized within that run. This prevents an older enriched file from a
-    previous run from beating a newer normalized file from a later run.
+    Thin delegate to core.artifact_resolver.resolve_requirement_file(), which
+    also backs cli/reqbot.py's cmd_reindex (WP-24.2) — enriched-preference and
+    latest-run-wins are defined in exactly one place.
 
     Raises ValueError if no matching file is found.
     """
-    runs: dict[Path, dict[str, Path]] = {}
-    for suffix in ("enriched", "normalized"):
-        suffix_str = f"_requirements_{suffix}"
-        for p in processed_dir.rglob(f"*{suffix_str}.jsonl"):
-            stem = p.stem
-            if stem.endswith(suffix_str) and stem[: -len(suffix_str)] == doc_key:
-                runs.setdefault(p.parent, {})[suffix] = p
-
-    if not runs:
-        raise ValueError(
-            f"No requirements JSONL found for doc_key '{doc_key}' in {processed_dir}"
-        )
-
-    latest_run = max(
-        runs,
-        key=lambda d: max(p.stat().st_mtime for p in runs[d].values()),
-    )
-    candidates = runs[latest_run]
-    return candidates.get("enriched") or candidates["normalized"]
+    return resolve_requirement_file(processed_dir, doc_key)
 
 
 def _checklist_item_id(requirement_ids: list[str]) -> str:

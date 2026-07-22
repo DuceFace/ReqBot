@@ -58,6 +58,28 @@ def _positive_int(value: str) -> int:
     return i
 
 
+def _read_document_id(jsonl_path: str) -> str | None:
+    """Read the document_id field from the first record of a requirements JSONL.
+
+    This is the PDF-content-hash document_id written by parse_and_normalize,
+    used so context chunks can be cross-referenced by the same ID stored in
+    requirements payloads (ask --context, trace). Returns None if the file is
+    empty/unreadable or the field is missing — callers then fall back to
+    embed_context_index.run()'s filename-derived default.
+    """
+    try:
+        with open(jsonl_path) as f:
+            first_line = f.readline()
+        if first_line:
+            return json.loads(first_line).get("document_id")
+    except Exception as e:
+        log.warning(
+            "Could not read document_id from %s: %s — context chunks will use filename-derived ID",
+            jsonl_path, e,
+        )
+    return None
+
+
 def cmd_ingest(args: argparse.Namespace) -> int:
     """Run the full extraction pipeline on a PDF."""
     from pipeline import run_pipeline as _run_pipeline
@@ -115,20 +137,10 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     out_dir_path = Path(index_path).parent
     chunk_files = list(out_dir_path.glob("*_chunks.jsonl"))
     if chunk_files:
-        # Extract the PDF-hash document_id written by parse_and_normalize
-        norm_doc_id: str | None = None
-        try:
-            with open(index_path) as _nf:
-                first_line = _nf.readline()
-            if first_line:
-                norm_doc_id = json.loads(first_line).get("document_id")
-        except Exception as e:
-            log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", index_path, e)
-
         try:
             _embed_ctx.run(
                 str(chunk_files[0]),
-                document_id=norm_doc_id,
+                document_id=_read_document_id(index_path),
                 qdrant_url=args.qdrant_url,
                 ollama_url=args.ollama_url,
             )
@@ -267,19 +279,10 @@ def cmd_batch(args: argparse.Namespace) -> int:
         # by the same ID stored in requirements payloads.
         chunk_files = list(out_dir.glob("*_chunks.jsonl"))
         if chunk_files:
-            batch_doc_id: str | None = None
-            try:
-                with open(index_path) as _nf:
-                    first_line = _nf.readline()
-                if first_line:
-                    batch_doc_id = json.loads(first_line).get("document_id")
-            except Exception as e:
-                log.warning("Could not read document_id from %s: %s — context chunks will use filename-derived ID", index_path, e)
-
             try:
                 _embed_ctx.run(
                     str(chunk_files[0]),
-                    document_id=batch_doc_id,
+                    document_id=_read_document_id(index_path),
                     qdrant_url=args.qdrant_url,
                     ollama_url=args.ollama_url,
                 )
@@ -302,95 +305,24 @@ def cmd_batch(args: argparse.Namespace) -> int:
     return 0 if not failed else 1
 
 
-def cmd_reindex(args: argparse.Namespace) -> int:
-    """Rebuild the Qdrant collection from all existing normalized JSONL files.
+def _alias_swap(qdrant, live_name: str, temp_name: str) -> None:
+    """Atomically point live_name at temp_name, replacing whatever backs it today.
 
-    Uses an atomic alias swap so the live collection is never touched until
-    all indexing succeeds:
-      1. Index everything into a temp collection (grc_requirements_<timestamp>)
-      2. On full success: swap the 'grc_requirements' alias to the new collection
-         and delete the old one.
-      3. On any failure: delete the temp collection, leave live index untouched.
-
-    No LLM re-extraction needed — JSONL is the system of record.
+    Handles both cases: live_name is currently an alias (pure atomic swap), or
+    live_name is currently a real collection — a one-time migration with a
+    brief delete-then-alias-create window, the same cost any first move to
+    aliasing pays. Shared by both the grc_requirements and grc_context rebuild
+    paths in cmd_reindex.
     """
-    import time as _time
-    from pipeline import embed_and_index as _embed
-    from qdrant_client import QdrantClient as _QC
     from qdrant_client.models import (
         CreateAliasOperation, CreateAlias,
         DeleteAliasOperation, DeleteAlias,
     )
 
-    LIVE_ALIAS = "grc_requirements"
-
-    processed_dir = _cfg.processed_dir_path()
-    if not processed_dir.exists():
-        log.error("Processed documents directory not found: %s", processed_dir)
-        return 1
-
-    import re as _re
-    all_norm_files = sorted(processed_dir.rglob("*_requirements_normalized.jsonl"))
-    if not all_norm_files:
-        log.error("No normalized JSONL files found in: %s", processed_dir)
-        return 1
-
-    # For each document, keep only the most recently modified JSONL.
-    # Directory names are: {doc_stem}_{YYYYMMDD}_{HHMMSS}/
-    # Strip the trailing timestamp to get the canonical doc name.
-    _ts_pattern = _re.compile(r"_\d{8}_\d{6}$")
-    latest: dict[str, Path] = {}
-    for p in all_norm_files:
-        doc_key = _ts_pattern.sub("", p.parent.name)
-        if doc_key not in latest or p.stat().st_mtime > latest[doc_key].stat().st_mtime:
-            latest[doc_key] = p
-    norm_files = sorted(latest.values())
-
-    skipped = len(all_norm_files) - len(norm_files)
-    if skipped:
-        log.info("Deduped to %d unique document(s) — skipping %d older run(s)", len(norm_files), skipped)
-    log.info("Found %d JSONL file(s) to reindex", len(norm_files))
-
-    temp_name = f"{LIVE_ALIAS}_{int(_time.time())}"
-    log.info("Building into temp collection: %s", temp_name)
-
-    failed = []
-    for i, jsonl_path in enumerate(norm_files):
-        log.info("[%d/%d] Indexing: %s", i + 1, len(norm_files), jsonl_path.name)
-        try:
-            _embed.run(
-                str(jsonl_path),
-                qdrant_url=args.qdrant_url,
-                ollama_url=args.ollama_url,
-                collection_name=temp_name,
-                recreate=(i == 0),
-            )
-        except Exception as e:
-            log.error("Indexing failed for %s: %s", jsonl_path.name, e)
-            failed.append(jsonl_path.name)
-
-    if failed:
-        log.error("=" * 60)
-        log.error("REINDEX FAILED — %d file(s) failed. Live index untouched.", len(failed))
-        for name in failed:
-            log.error("  FAIL: %s", name)
-        log.error("=" * 60)
-        # Clean up the incomplete temp collection
-        try:
-            _QC(url=args.qdrant_url).delete_collection(temp_name)
-            log.info("Deleted incomplete temp collection: %s", temp_name)
-        except Exception as e:
-            log.warning("Could not delete temp collection %s: %s", temp_name, e)
-        return 1
-
-    # All files indexed — perform atomic alias swap
-    qdrant = _QC(url=args.qdrant_url)
-
-    # Discover what 'grc_requirements' currently is: alias or real collection
     old_backing = None
     try:
         for a in qdrant.get_aliases().aliases:
-            if a.alias_name == LIVE_ALIAS:
+            if a.alias_name == live_name:
                 old_backing = a.collection_name
                 break
     except Exception:
@@ -398,23 +330,20 @@ def cmd_reindex(args: argparse.Namespace) -> int:
 
     alias_ops = []
     if old_backing:
-        # Already an alias — atomically replace it
-        alias_ops.append(DeleteAliasOperation(delete_alias=DeleteAlias(alias_name=LIVE_ALIAS)))
+        alias_ops.append(DeleteAliasOperation(delete_alias=DeleteAlias(alias_name=live_name)))
     else:
-        # Real collection exists — delete it before creating alias (brief window)
         try:
-            qdrant.delete_collection(LIVE_ALIAS)
-            log.info("Deleted old real collection '%s'", LIVE_ALIAS)
+            qdrant.delete_collection(live_name)
+            log.info("Deleted old real collection '%s'", live_name)
         except Exception as e:
-            log.warning("Could not delete old collection '%s': %s", LIVE_ALIAS, e)
+            log.warning("Could not delete old collection '%s': %s", live_name, e)
 
     alias_ops.append(CreateAliasOperation(
-        create_alias=CreateAlias(collection_name=temp_name, alias_name=LIVE_ALIAS),
+        create_alias=CreateAlias(collection_name=temp_name, alias_name=live_name),
     ))
     qdrant.update_collection_aliases(change_aliases_operations=alias_ops)
-    log.info("Alias '%s' now points to '%s'", LIVE_ALIAS, temp_name)
+    log.info("Alias '%s' now points to '%s'", live_name, temp_name)
 
-    # Delete the old backing collection (if this was an alias swap)
     if old_backing and old_backing != temp_name:
         try:
             qdrant.delete_collection(old_backing)
@@ -422,10 +351,176 @@ def cmd_reindex(args: argparse.Namespace) -> int:
         except Exception as e:
             log.warning("Could not delete old backing collection %s: %s", old_backing, e)
 
+
+def _reindex_requirements(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
+    """Rebuild grc_requirements from the resolved requirements JSONL per document.
+
+    All-or-nothing: any file failure aborts the temp collection and leaves the
+    live alias untouched (unchanged from pre-WP-24.2 behavior).
+    """
+    from pipeline import embed_and_index as _embed
+    from qdrant_client import QdrantClient as _QC
+
+    live_alias = "grc_requirements"
+    temp_name = f"{live_alias}_{int(time.time())}"
+    log.info("Building requirements into temp collection: %s", temp_name)
+
+    items = sorted(req_files.items())
+    failed = []
+    for i, (doc_key, jsonl_path) in enumerate(items):
+        log.info("[%d/%d] Indexing: %s", i + 1, len(items), jsonl_path.name)
+        try:
+            _embed.run(
+                str(jsonl_path),
+                qdrant_url=qdrant_url,
+                ollama_url=ollama_url,
+                collection_name=temp_name,
+                recreate=(i == 0),
+            )
+        except Exception as e:
+            log.error("Indexing failed for %s: %s", jsonl_path.name, e)
+            failed.append(jsonl_path.name)
+
+    qdrant = _QC(url=qdrant_url)
+
+    if failed:
+        log.error("=" * 60)
+        log.error("REINDEX FAILED — %d file(s) failed. Live requirements index untouched.", len(failed))
+        for name in failed:
+            log.error("  FAIL: %s", name)
+        log.error("=" * 60)
+        try:
+            qdrant.delete_collection(temp_name)
+            log.info("Deleted incomplete temp collection: %s", temp_name)
+        except Exception as e:
+            log.warning("Could not delete temp collection %s: %s", temp_name, e)
+        return False
+
+    _alias_swap(qdrant, live_alias, temp_name)
     log.info("=" * 60)
-    log.info("REINDEX COMPLETE: %d files indexed, live alias swapped", len(norm_files))
+    log.info("Requirements reindex complete: %d document(s) indexed, live alias swapped", len(items))
     log.info("=" * 60)
-    return 0
+    return True
+
+
+def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
+    """Rebuild grc_context from *_chunks.jsonl alongside each resolved requirements file.
+
+    A missing chunks file is a warning-and-skip, not a failure — indexing
+    continues for the remaining documents either way. But a real indexing
+    exception for any document means the shared temp collection is NOT
+    alias-swapped: embed_context_index.run() upserts in batches, so a failed
+    document may have already written some of its chunks into the temp
+    collection before raising, and swapping it live would pollute grc_context
+    with a partial/incomplete version of that document. On any failure the
+    temp collection is deleted and the live grc_context alias is left
+    completely untouched; only a fully clean temp collection (every attempted
+    document succeeded) is ever swapped in.
+    """
+    from pipeline import embed_context_index as _embed_ctx
+    from qdrant_client import QdrantClient as _QC
+
+    live_alias = "grc_context"
+    temp_name = f"{live_alias}_{int(time.time())}"
+    log.info("Building context into temp collection: %s", temp_name)
+
+    items = sorted(req_files.items())
+    indexed = []
+    failed = []
+    skipped = []
+
+    for doc_key, req_path in items:
+        # Exact match on doc_key, not an unfiltered glob()[0] — a run directory
+        # could in principle hold artifacts for more than one document, and
+        # grabbing an arbitrary chunks file would pair the wrong document_id
+        # with the wrong chunks (corrupting ask --context / trace lookups).
+        chunk_path = req_path.parent / f"{doc_key}_chunks.jsonl"
+        if not chunk_path.exists():
+            log.warning("No chunks.jsonl found for %s — skipping context index", doc_key)
+            skipped.append(doc_key)
+            continue
+
+        try:
+            _embed_ctx.run(
+                str(chunk_path),
+                document_id=_read_document_id(str(req_path)),
+                qdrant_url=qdrant_url,
+                ollama_url=ollama_url,
+                collection_name=temp_name,
+                recreate=(not indexed),
+            )
+            indexed.append(doc_key)
+        except Exception as e:
+            log.error("Context indexing failed for %s: %s", doc_key, e)
+            failed.append(doc_key)
+
+    qdrant = _QC(url=qdrant_url)
+
+    if failed:
+        log.error("=" * 60)
+        log.error(
+            "REINDEX PARTIAL: requirements rebuilt; context rebuild failed for %d document(s). "
+            "Live context index untouched.",
+            len(failed),
+        )
+        for name in failed:
+            log.error("  FAIL: %s", name)
+        log.error("=" * 60)
+        try:
+            qdrant.delete_collection(temp_name)
+        except Exception as e:
+            log.warning("Could not delete temp collection %s: %s", temp_name, e)
+        return False
+
+    if not indexed:
+        log.error("REINDEX: no documents indexed into grc_context — live context index untouched")
+        try:
+            qdrant.delete_collection(temp_name)
+        except Exception as e:
+            log.warning("Could not delete temp collection %s: %s", temp_name, e)
+        return False
+
+    _alias_swap(qdrant, live_alias, temp_name)
+    log.info("=" * 60)
+    log.info("Context reindex complete: %d document(s) indexed, live alias swapped", len(indexed))
+    if skipped:
+        log.info("Skipped %d document(s) with no chunks.jsonl", len(skipped))
+    log.info("=" * 60)
+    return True
+
+
+def cmd_reindex(args: argparse.Namespace) -> int:
+    """Rebuild grc_requirements and (by default) grc_context from existing artifacts.
+
+    No LLM re-extraction — JSONL/chunks are the system of record. Uses an
+    atomic temp-collection + alias-swap for both collections so the live
+    index is never touched until indexing succeeds. Prefers
+    *_requirements_enriched.jsonl over *_requirements_normalized.jsonl per
+    document, "latest run wins" when multiple runs exist.
+    --requirements-only skips the slower, CPU-bound grc_context rebuild.
+    """
+    from core.artifact_resolver import resolve_latest_requirement_files
+
+    processed_dir = _cfg.processed_dir_path()
+    if not processed_dir.exists():
+        log.error("Processed documents directory not found: %s", processed_dir)
+        return 1
+
+    req_files = resolve_latest_requirement_files(processed_dir)
+    if not req_files:
+        log.error("No requirements JSONL files found in: %s", processed_dir)
+        return 1
+
+    log.info("Found %d document(s) to reindex", len(req_files))
+
+    if not _reindex_requirements(req_files, args.qdrant_url, args.ollama_url):
+        return 1
+
+    if getattr(args, "requirements_only", False):
+        log.info("Skipped grc_context rebuild (--requirements-only)")
+        return 0
+
+    return 0 if _reindex_context(req_files, args.qdrant_url, args.ollama_url) else 1
 
 
 def cmd_docs(args: argparse.Namespace) -> int:
@@ -1522,7 +1617,13 @@ def main() -> None:
     # reindex
     p_reindex = subparsers.add_parser(
         "reindex",
-        help="Rebuild Qdrant collection from all existing JSONL (no re-extraction)",
+        help="Rebuild grc_requirements and grc_context from existing JSONL/chunks (no re-extraction)",
+    )
+    p_reindex.add_argument(
+        "--requirements-only",
+        action="store_true",
+        dest="requirements_only",
+        help="Skip the grc_context rebuild (fast path — requirements-only, same speed as before WP-24.2)",
     )
     p_reindex.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
     p_reindex.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")

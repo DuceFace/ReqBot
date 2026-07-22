@@ -218,5 +218,5 @@ archive/*.log
 # WP-3 review scratch files (CSV is generated from JSONL; JSONL is source of truth)
 eval/gold_eval_chunks_review.csv
 
-# HyDE debug artifact — logged by core/ask.py --hyde at DEBUG level for batch review
+# HyDE debug artifact — logged by core/ask.py --hyde-debug-log at DEBUG level for batch review
 hyde_hypotheses.jsonl

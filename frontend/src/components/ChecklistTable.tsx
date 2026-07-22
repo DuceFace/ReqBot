@@ -34,7 +34,7 @@ const COL_HEADER_CLASS =
 export default function ChecklistTable({ items }: Props) {
   return (
     <div className="overflow-x-auto rounded border border-gray-200 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
-      <table className="w-full text-sm border-collapse">
+      <table className="min-w-full text-sm border-collapse">
         <thead>
           {/* Group header row */}
           <tr className="bg-gray-100 border-b border-gray-200">

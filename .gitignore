@@ -207,6 +207,7 @@ __marimo__/
 # ReqBot — project-specific
 CLAUDE.md
 raw_pdfs/
+documents/processed/
 Backups/
 build/linux-x86_64/
 dist/

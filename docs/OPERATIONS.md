@@ -17,6 +17,14 @@ Day-to-day procedures for running, developing, and maintaining ReqBot on the Pro
 
 ---
 
+## First-Run Setup
+
+New machine or fresh config: `python3 cli/reqbot.py init` — see README.md's "Setup" section
+for the full per-service (Qdrant/Ollama existing-vs-bootstrap) and synthesis (local/remote/none)
+walkthrough. `reqbot setup` still works as a deprecated alias.
+
+---
+
 ## Starting the UI
 
 The compiled `reqbot` binary is stale — always use the Python source directly:

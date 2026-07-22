@@ -120,6 +120,37 @@ def test_document_id_read_from_requirements_file_not_filename(tmp_path):
     assert kwargs["document_id"] == "pdf-hash-abc123"
 
 
+def test_two_documents_sharing_a_run_directory_get_matching_chunks(tmp_path):
+    """A run directory holding artifacts for more than one document must not
+    pair one document's chunks with another's document_id — chunk_files[0]
+    from an unfiltered glob would do exactly that."""
+    run_dir = tmp_path / "shared_run"
+    run_dir.mkdir()
+
+    req_a = run_dir / "DOC-A_requirements_normalized.jsonl"
+    req_a.write_text(json.dumps({"document_id": "hash-a", "requirement_id": "REQ-1"}) + "\n")
+    chunks_a = run_dir / "DOC-A_chunks.jsonl"
+    chunks_a.write_text(json.dumps({"chunk_id": "a1", "text": "doc a text"}) + "\n")
+
+    req_b = run_dir / "DOC-B_requirements_normalized.jsonl"
+    req_b.write_text(json.dumps({"document_id": "hash-b", "requirement_id": "REQ-2"}) + "\n")
+    chunks_b = run_dir / "DOC-B_chunks.jsonl"
+    chunks_b.write_text(json.dumps({"chunk_id": "b1", "text": "doc b text"}) + "\n")
+
+    mock_client = _mock_qdrant()
+
+    with patch("qdrant_client.QdrantClient", return_value=mock_client), \
+         patch("pipeline.embed_and_index.run"), \
+         patch("pipeline.embed_context_index.run") as mock_embed_ctx:
+        rc = cmd_reindex(_args())
+
+    assert rc == 0
+    assert mock_embed_ctx.call_count == 2
+    calls_by_document_id = {c.kwargs["document_id"]: c.args[0] for c in mock_embed_ctx.call_args_list}
+    assert calls_by_document_id["hash-a"] == str(chunks_a)
+    assert calls_by_document_id["hash-b"] == str(chunks_b)
+
+
 def test_missing_chunks_file_does_not_prevent_requirements_indexing(tmp_path):
     _write_doc(tmp_path, "DOC-A", "hash-a", with_chunks=True)
     _write_doc(tmp_path, "DOC-B", "hash-b", with_chunks=False)

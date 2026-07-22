@@ -430,15 +430,19 @@ def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
     skipped = []
 
     for doc_key, req_path in items:
-        chunk_files = list(req_path.parent.glob("*_chunks.jsonl"))
-        if not chunk_files:
+        # Exact match on doc_key, not an unfiltered glob()[0] — a run directory
+        # could in principle hold artifacts for more than one document, and
+        # grabbing an arbitrary chunks file would pair the wrong document_id
+        # with the wrong chunks (corrupting ask --context / trace lookups).
+        chunk_path = req_path.parent / f"{doc_key}_chunks.jsonl"
+        if not chunk_path.exists():
             log.warning("No chunks.jsonl found for %s — skipping context index", doc_key)
             skipped.append(doc_key)
             continue
 
         try:
             _embed_ctx.run(
-                str(chunk_files[0]),
+                str(chunk_path),
                 document_id=_read_document_id(str(req_path)),
                 qdrant_url=qdrant_url,
                 ollama_url=ollama_url,

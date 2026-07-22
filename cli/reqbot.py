@@ -455,7 +455,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     ollama_url = getattr(args, "ollama_url", _cfg.ollama_url)
     qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
-    result = status_service.check(ollama_url, qdrant_url, _cfg.processed_dir_path())
+    processed_dir = getattr(args, "processed_dir", None) or _cfg.processed_dir_path()
+    result = status_service.check(ollama_url, qdrant_url, processed_dir)
 
     print("=" * 60)
     print("ReqBot System Status")
@@ -1325,11 +1326,14 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Gate the success banner on actual service health — shared by every
     # existing/bootstrap combination (previously only the automated `setup`
     # flow did this final health check).
-    status_args = argparse.Namespace(ollama_url=ollama_url, qdrant_url=qdrant_url)
+    resolved_processed_dir = Path(processed_dir).expanduser().resolve()
+    status_args = argparse.Namespace(
+        ollama_url=ollama_url, qdrant_url=qdrant_url, processed_dir=resolved_processed_dir
+    )
     cmd_status(status_args)
 
     from services import status_service as _status_service
-    health = _status_service.check(ollama_url, qdrant_url, Path(processed_dir).expanduser().resolve())
+    health = _status_service.check(ollama_url, qdrant_url, resolved_processed_dir)
     if not health["ollama"]["reachable"] or not health["qdrant"]["reachable"]:
         print("[-] Config saved, but the environment is not healthy yet.")
         print("    Fix the status issues above, then run 'reqbot status' to re-check.")

@@ -28,6 +28,8 @@ export default function SearchView() {
   const [error, setError] = useState<string | null>(null)
   // Incrementing this triggers a retry without changing q or doc.
   const [retries, setRetries] = useState(0)
+  // Fast mode skips the HyDE hypothesis leg (2-leg dense+BM25 RRF instead of 3-leg).
+  const [fastMode, setFastMode] = useState(false)
 
   const synth = useSynthesis()
   const { reset: synthReset } = synth
@@ -37,10 +39,12 @@ export default function SearchView() {
     setInput(q)
   }, [q])
 
-  // Reset synthesis when the committed query or doc filter changes.
+  // Reset synthesis when the committed query, doc filter, or fast mode changes —
+  // toggling fast mode changes the underlying evidence set, so a previously
+  // generated answer may no longer match what's on screen.
   useEffect(() => {
     synthReset()
-  }, [q, doc, synthReset])
+  }, [q, doc, fastMode, synthReset])
 
   // Load document list once on mount for the filter dropdown.
   useEffect(() => {
@@ -70,6 +74,7 @@ export default function SearchView() {
         question: q,
         top_k: 20,
         document_ids: doc ? [doc] : undefined,
+        hyde: !fastMode,
       })
       .then(res => {
         if (cancelled) return
@@ -84,10 +89,13 @@ export default function SearchView() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-    // retries intentionally included so the retry button can re-run
-    // the same query without changing the URL params.
+    // retries is intentionally included (not referenced in the body) so the
+    // retry button can re-run the same query without changing the URL params.
+    // Every other dependency this effect actually closes over — q, doc,
+    // fastMode — is listed above, so this disable covers only that one
+    // deliberate exception, not a genuinely missing dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, doc, retries])
+  }, [q, doc, fastMode, retries])
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -106,6 +114,7 @@ export default function SearchView() {
         top_k: 20,
         document_ids: doc ? [doc] : undefined,
         synthesize: true,
+        hyde: !fastMode,
       }).then(res => res.metadata.synthesis || null)
     )
   }
@@ -159,6 +168,15 @@ export default function SearchView() {
           {docLoadError && (
             <p className="mt-1 text-xs text-red-600">Could not load document list.</p>
           )}
+          <label className="flex items-center gap-2 mt-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={fastMode}
+              onChange={e => setFastMode(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Fast mode (skip HyDE)
+          </label>
         </div>
 
         {/* Loading */}

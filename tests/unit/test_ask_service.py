@@ -107,3 +107,20 @@ def test_runtime_error_propagates(mock_retrieve):
     mock_retrieve.side_effect = RuntimeError("Qdrant unavailable")
     with pytest.raises(RuntimeError):
         ask("test", "http://qdrant:6333", "http://ollama:11434")
+
+
+@patch("core.ask.retrieve")
+def test_hyde_defaults_to_true(mock_retrieve):
+    """WP-24.5: HyDE is default-on retrieval augmentation, not opt-in."""
+    mock_retrieve.return_value = _make_retrieve_result()
+    ask("test", "http://qdrant:6333", "http://ollama:11434")
+    _, kwargs = mock_retrieve.call_args
+    assert kwargs["hyde"] is True
+
+
+@patch("core.ask.retrieve")
+def test_hyde_false_is_forwarded(mock_retrieve):
+    mock_retrieve.return_value = _make_retrieve_result()
+    ask("test", "http://qdrant:6333", "http://ollama:11434", hyde=False)
+    _, kwargs = mock_retrieve.call_args
+    assert kwargs["hyde"] is False

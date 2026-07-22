@@ -82,6 +82,7 @@ def _read_document_id(jsonl_path: str) -> str | None:
 
 def cmd_ingest(args: argparse.Namespace) -> int:
     """Run the full extraction pipeline on a PDF."""
+    from core import artifact_resolver as _resolver
     from pipeline import run_pipeline as _run_pipeline
     from pipeline import embed_and_index as _embed
     from pipeline import embed_context_index as _embed_ctx
@@ -121,10 +122,10 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         log.error("%s", e)
         return 1
 
-    if not args.index:
+    if getattr(args, "no_index", False):
         return 0
 
-    # Optionally chain indexing (uses enriched JSONL if enrichment ran, else normalized)
+    # Index by default (uses enriched JSONL if enrichment ran, else normalized)
     try:
         _embed.run(index_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url)
     except Exception as e:
@@ -134,12 +135,15 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     # Also index raw chunks into grc_context for dual-retrieval.
     # Pass the PDF-hash document_id from the indexed JSONL so that
     # ask.py can resolve context chunks by the same ID used in requirements payloads.
+    # Exact doc_key match, not glob()[0] — same correctness fix as WP-24.2's
+    # reindex context-matching (see core/artifact_resolver.py).
     out_dir_path = Path(index_path).parent
-    chunk_files = list(out_dir_path.glob("*_chunks.jsonl"))
-    if chunk_files:
+    doc_key = _resolver.doc_key_from_requirements_path(Path(index_path))
+    chunk_path = out_dir_path / f"{doc_key}_chunks.jsonl"
+    if chunk_path.exists():
         try:
             _embed_ctx.run(
-                str(chunk_files[0]),
+                str(chunk_path),
                 document_id=_read_document_id(index_path),
                 qdrant_url=args.qdrant_url,
                 ollama_url=args.ollama_url,
@@ -218,6 +222,7 @@ def cmd_index_context(args: argparse.Namespace) -> int:
 
 def cmd_batch(args: argparse.Namespace) -> int:
     """Run the full pipeline on every PDF in a directory."""
+    from core import artifact_resolver as _resolver
     from pipeline import run_pipeline as _run_pipeline
     from pipeline import embed_and_index as _embed
     from pipeline import embed_context_index as _embed_ctx
@@ -277,11 +282,14 @@ def cmd_batch(args: argparse.Namespace) -> int:
         # Also index raw chunks into grc_context for dual-retrieval.
         # Pass the PDF-hash document_id so ask.py can resolve context chunks
         # by the same ID stored in requirements payloads.
-        chunk_files = list(out_dir.glob("*_chunks.jsonl"))
-        if chunk_files:
+        # Exact doc_key match, not glob()[0] — same correctness fix as
+        # WP-24.2's reindex context-matching.
+        doc_key = _resolver.doc_key_from_requirements_path(Path(index_path))
+        chunk_path = out_dir / f"{doc_key}_chunks.jsonl"
+        if chunk_path.exists():
             try:
                 _embed_ctx.run(
-                    str(chunk_files[0]),
+                    str(chunk_path),
                     document_id=_read_document_id(index_path),
                     qdrant_url=args.qdrant_url,
                     ollama_url=args.ollama_url,
@@ -1511,7 +1519,14 @@ def main() -> None:
         help="Convenience alias: sets both --extraction-model and --enrichment-model",
     )
     p_ingest.add_argument("--max-chunks", type=int, help="Limit chunks for testing")
-    p_ingest.add_argument("--index", action="store_true", help="Also index into Qdrant after extraction")
+    p_ingest.add_argument(
+        "--no-index", action="store_true", dest="no_index",
+        help="Skip indexing — write pipeline artifacts only (debug/inspection)",
+    )
+    # Deprecated: indexing is now the default, so --index is an inert no-op.
+    # Kept accepted (not removed) so old scripts/shell history/README snippets
+    # that still type --index don't suddenly fail to parse.
+    p_ingest.add_argument("--index", action="store_true", help=argparse.SUPPRESS)
     p_ingest.add_argument(
         "--layout-mode",
         choices=["pymupdf", "pdfplumber", "docling"],
@@ -1553,7 +1568,10 @@ def main() -> None:
     p_ask.add_argument("--requirement-type", action="append", dest="requirement_types", help="Filter by type")
     p_ask.add_argument("--document-id", action="append", dest="document_ids", help="Filter by document")
     p_ask.add_argument("--json", action="store_true", dest="json_output", help="Output as JSON")
-    p_ask.add_argument("--context", action="store_true", help="Enrich with surrounding chunk text from grc_context")
+    p_ask.add_argument(
+        "--context", action="store_true",
+        help="Include surrounding raw chunk text from grc_context (retrieval-time only; does not affect indexing)",
+    )
     p_ask.add_argument("--no-rewrite", action="store_true", dest="no_rewrite", help="Skip query rewriting")
     p_ask.add_argument("--rewrite-model", type=str, default="llama3.1:8b-instruct-q4_K_M", dest="rewrite_model", help="LLM model for query rewriting")
     p_ask.add_argument("--context-collection", type=str, default="grc_context", dest="context_collection", help="Qdrant context collection name")
@@ -1657,8 +1675,10 @@ def main() -> None:
                             help="Output format: markdown (default) or json")
     p_evidence.add_argument("--output", type=str, default=None, dest="output_file",
                             help="Write output to FILE instead of printing")
-    p_evidence.add_argument("--context", action="store_true",
-                            help="Include surrounding raw chunk text from grc_context")
+    p_evidence.add_argument(
+        "--context", action="store_true",
+        help="Include surrounding raw chunk text from grc_context (retrieval-time only; does not affect indexing)",
+    )
     p_evidence.add_argument("--top-k", type=int, default=20, dest="top_k",
                             help="Number of results to retrieve (default: 20)")
     p_evidence.add_argument("--document-id", action="append", dest="document_ids", default=[],
@@ -1697,8 +1717,10 @@ def main() -> None:
     p_trace = subparsers.add_parser("trace", help="Trace full provenance of a requirement by ID")
     p_trace.add_argument("requirement_id", type=str, help="Requirement ID (e.g. REQ-a3f2c1d4e5b6)")
     p_trace.add_argument("--json", action="store_true", dest="json_output", help="Output as JSON")
-    p_trace.add_argument("--context", action="store_true",
-                         help="Include surrounding raw chunk text from grc_context")
+    p_trace.add_argument(
+        "--context", action="store_true",
+        help="Include surrounding raw chunk text from grc_context (retrieval-time only; does not affect indexing)",
+    )
     p_trace.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")
 
     # setup (deprecated alias for init)

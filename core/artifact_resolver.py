@@ -15,6 +15,20 @@ _ENRICHED_SUFFIX = "_requirements_enriched"
 _NORMALIZED_SUFFIX = "_requirements_normalized"
 
 
+def doc_key_from_requirements_path(path: Path) -> str:
+    """Strip the _requirements_enriched/_requirements_normalized suffix from a
+    requirements JSONL path's stem to get the canonical doc_key.
+
+    Falls back to the bare stem if neither suffix matches (defensive — every
+    requirements JSONL the pipeline produces has one of these two suffixes).
+    """
+    stem = path.stem
+    for suffix in (_ENRICHED_SUFFIX, _NORMALIZED_SUFFIX):
+        if stem.endswith(suffix):
+            return stem[: -len(suffix)]
+    return stem
+
+
 def resolve_latest_requirement_files(processed_dir: Path) -> dict[str, Path]:
     """Return the best requirements JSONL path for every document under processed_dir.
 
@@ -29,10 +43,7 @@ def resolve_latest_requirement_files(processed_dir: Path) -> dict[str, Path]:
 
     for suffix, key in ((_ENRICHED_SUFFIX, "enriched"), (_NORMALIZED_SUFFIX, "normalized")):
         for p in processed_dir.rglob(f"*{suffix}.jsonl"):
-            stem = p.stem
-            if not stem.endswith(suffix):
-                continue
-            doc_key = stem[: -len(suffix)]
+            doc_key = doc_key_from_requirements_path(p)
             by_doc.setdefault(doc_key, {}).setdefault(p.parent, {})[key] = p
 
     result: dict[str, Path] = {}

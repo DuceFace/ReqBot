@@ -670,7 +670,7 @@ class GrcaiConsole(cmd.Cmd):
     def do_ingest(self, arg: str) -> None:
         """Run the full extraction pipeline on a PDF.
 
-        Usage: ingest <pdf_path> [--index] [--layout-mode pymupdf|pdfplumber]
+        Usage: ingest <pdf_path> [--no-index] [--layout-mode pymupdf|pdfplumber]
                                  [--model MODEL] [--output-dir DIR]
                                  [--max-chunks N]
         """
@@ -679,8 +679,13 @@ class GrcaiConsole(cmd.Cmd):
         parser.add_argument("--output-dir", type=str, default=None, dest="output_dir")
         parser.add_argument("--model", type=str, default=None)
         parser.add_argument("--max-chunks", type=_positive_int, default=None, dest="max_chunks")
-        parser.add_argument("--index", action="store_true",
-                            help="Also index into Qdrant after extraction")
+        parser.add_argument(
+            "--no-index", action="store_true", dest="no_index",
+            help="Skip indexing — write pipeline artifacts only (debug/inspection)",
+        )
+        # Deprecated: indexing is now the default, so --index is an inert no-op,
+        # kept accepted so old shell history doesn't suddenly fail to parse.
+        parser.add_argument("--index", action="store_true", help=argparse.SUPPRESS)
         parser.add_argument(
             "--layout-mode",
             choices=["pymupdf", "pdfplumber"],
@@ -697,8 +702,14 @@ class GrcaiConsole(cmd.Cmd):
             output_dir=parsed.output_dir,
             model=parsed.model if parsed.model else self._session["default_model"],
             max_chunks=parsed.max_chunks,
-            index=parsed.index,
+            no_index=parsed.no_index,
             layout_mode=parsed.layout_mode,
+            # cmd_ingest reads these unconditionally; the interactive shell has
+            # no --skip-enrichment/--profile flags of its own, so supply the
+            # same defaults cli/reqbot.py's argparse would (this Namespace was
+            # previously missing both, which crashed cmd_ingest on every call).
+            skip_enrichment=False,
+            profile="cybersecurity",
             ollama_url=self._session["ollama_url"],
             qdrant_url=self._session["qdrant_url"],
         )

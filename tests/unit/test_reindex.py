@@ -135,7 +135,12 @@ def test_missing_chunks_file_does_not_prevent_requirements_indexing(tmp_path):
     assert mock_embed_ctx.call_count == 1  # only DOC-A has chunks
 
 
-def test_context_failure_for_one_doc_is_partial_and_nonzero(tmp_path, caplog):
+def test_context_failure_for_one_doc_does_not_swap_and_deletes_temp(tmp_path, caplog):
+    """embed_context_index.run() upserts in batches, so a failed document may
+    have already written partial chunks into the temp collection before
+    raising. The temp collection must be discarded, not swapped live, even
+    though another document succeeded — otherwise grc_context would end up
+    with a partial/incomplete version of the failed document."""
     _write_doc(tmp_path, "DOC-A", "hash-a")
     _write_doc(tmp_path, "DOC-B", "hash-b")
     mock_client = _mock_qdrant()
@@ -150,9 +155,16 @@ def test_context_failure_for_one_doc_is_partial_and_nonzero(tmp_path, caplog):
         rc = cmd_reindex(_args())
 
     assert rc == 1  # partial context failure must not report overall success
-    # The successful document's context work is still swapped in.
-    assert mock_client.update_collection_aliases.call_count == 2
+    # Only the requirements alias swap happened — context was never swapped,
+    # and the temp context collection was deleted instead.
+    assert mock_client.update_collection_aliases.call_count == 1
+    context_temp_names = {
+        call.args[0] for call in mock_client.delete_collection.call_args_list
+        if call.args[0].startswith("grc_context_")
+    }
+    assert len(context_temp_names) == 1
     assert "REINDEX PARTIAL" in caplog.text
+    assert "untouched" in caplog.text.lower()
 
 
 def test_all_context_docs_fail_no_swap_and_nonzero(tmp_path):

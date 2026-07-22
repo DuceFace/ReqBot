@@ -406,13 +406,16 @@ def _reindex_requirements(req_files: dict, qdrant_url: str, ollama_url: str) -> 
 def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
     """Rebuild grc_context from *_chunks.jsonl alongside each resolved requirements file.
 
-    Per-document fault tolerant, unlike the requirements rebuild's all-or-nothing
-    gate: a missing chunks file is a warning-and-skip (not a failure), and one
-    document's indexing exception does not abort the rest. The alias swap still
-    happens for whatever succeeded — but this function returns False whenever
-    any document failed, so cmd_reindex reports a non-zero exit code. A rebuild
-    that didn't fully do what it promised must not report overall success, even
-    though the successful portion is still applied live.
+    A missing chunks file is a warning-and-skip, not a failure — indexing
+    continues for the remaining documents either way. But a real indexing
+    exception for any document means the shared temp collection is NOT
+    alias-swapped: embed_context_index.run() upserts in batches, so a failed
+    document may have already written some of its chunks into the temp
+    collection before raising, and swapping it live would pollute grc_context
+    with a partial/incomplete version of that document. On any failure the
+    temp collection is deleted and the live grc_context alias is left
+    completely untouched; only a fully clean temp collection (every attempted
+    document succeeded) is ever swapped in.
     """
     from pipeline import embed_context_index as _embed_ctx
     from qdrant_client import QdrantClient as _QC
@@ -449,6 +452,22 @@ def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
 
     qdrant = _QC(url=qdrant_url)
 
+    if failed:
+        log.error("=" * 60)
+        log.error(
+            "REINDEX PARTIAL: requirements rebuilt; context rebuild failed for %d document(s). "
+            "Live context index untouched.",
+            len(failed),
+        )
+        for name in failed:
+            log.error("  FAIL: %s", name)
+        log.error("=" * 60)
+        try:
+            qdrant.delete_collection(temp_name)
+        except Exception as e:
+            log.warning("Could not delete temp collection %s: %s", temp_name, e)
+        return False
+
     if not indexed:
         log.error("REINDEX: no documents indexed into grc_context — live context index untouched")
         try:
@@ -458,19 +477,6 @@ def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
         return False
 
     _alias_swap(qdrant, live_alias, temp_name)
-
-    if failed:
-        log.error("=" * 60)
-        log.error(
-            "REINDEX PARTIAL: requirements rebuilt; context rebuilt for %d document(s), "
-            "failed for %d document(s).",
-            len(indexed), len(failed),
-        )
-        for name in failed:
-            log.error("  FAIL: %s", name)
-        log.error("=" * 60)
-        return False
-
     log.info("=" * 60)
     log.info("Context reindex complete: %d document(s) indexed, live alias swapped", len(indexed))
     if skipped:

@@ -346,6 +346,7 @@ def generate_hyde_hypothesis(
     model: str,
     client: ollama.Client,
     log_file: str = "hyde_hypotheses.jsonl",
+    enabled: bool = False,
 ) -> str | None:
     """Generate a hypothetical requirement statement for HyDE dense retrieval.
 
@@ -353,9 +354,11 @@ def generate_hyde_hypothesis(
     dense vector aligns with answer-shaped corpus text rather than question-shaped
     query text.
 
-    Logs successful hypotheses to log_file for batch review — inspect in aggregate
-    after an evaluation run, not inline. Empty responses and generation failures
-    are not logged; caller receives None and falls back to baseline retrieval.
+    HyDE is now default-on retrieval augmentation, so hypothesis logging to
+    log_file is opt-in via `enabled` (wired from --hyde-debug-log on core/ask.py's
+    standalone CLI) — normal default-on usage must not write to disk on every
+    query. Empty responses and generation failures are never logged regardless
+    of `enabled`; caller receives None and falls back to baseline retrieval.
     """
     import time
     try:
@@ -369,16 +372,17 @@ def generate_hyde_hypothesis(
             log.warning("HyDE: model returned empty hypothesis — skipping HyDE leg")
             return None
         log.debug("HyDE hypothesis: %s", hypothesis[:120] + ("..." if len(hypothesis) > 120 else ""))
-        try:
-            with open(log_file, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps({
-                    "query": question,
-                    "hypothesis": hypothesis,
-                    "model": model,
-                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                }, ensure_ascii=False) + "\n")
-        except Exception as log_err:
-            log.warning("HyDE: failed to write hypothesis log (%s)", log_err)
+        if enabled:
+            try:
+                with open(log_file, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps({
+                        "query": question,
+                        "hypothesis": hypothesis,
+                        "model": model,
+                        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    }, ensure_ascii=False) + "\n")
+            except Exception as log_err:
+                log.warning("HyDE: failed to write hypothesis log (%s)", log_err)
         return hypothesis
     except Exception as e:
         log.warning("HyDE: hypothesis generation failed (%s) — skipping HyDE leg", e)
@@ -440,7 +444,8 @@ def retrieve(
     ollama_url: str = "http://localhost:11434",
     context: bool = False,
     context_collection: str = CONTEXT_COLLECTION_NAME,
-    hyde: bool = False,
+    hyde: bool = True,
+    hyde_debug_log: bool = False,
     synthesis_backend: str = "local",
     synthesis_provider: str = "anthropic",
     synthesis_api_key: str = "",
@@ -499,7 +504,9 @@ def retrieve(
         # which may be a remote backend name (e.g. claude-sonnet-4-6) incompatible
         # with a direct ollama.generate() call.
         log.info("HyDE: generating hypothesis with model: %s", rewrite_model)
-        hypothesis = generate_hyde_hypothesis(question, rewrite_model, ollama_client)
+        hypothesis = generate_hyde_hypothesis(
+            question, rewrite_model, ollama_client, enabled=hyde_debug_log,
+        )
         if hypothesis:
             try:
                 hyde_result = ollama_client.embed(model=EMBEDDING_MODEL, input=hypothesis)
@@ -652,7 +659,8 @@ def run(
     json_output: bool = False,
     context: bool = False,
     context_collection: str = CONTEXT_COLLECTION_NAME,
-    hyde: bool = False,
+    hyde: bool = True,
+    hyde_debug_log: bool = False,
 ) -> list[dict]:
     """Query GRC requirements and print results to stdout.
 
@@ -709,6 +717,7 @@ def run(
         context=context,
         context_collection=context_collection,
         hyde=hyde,
+        hyde_debug_log=hyde_debug_log,
         synthesis_backend=syn_backend,
         synthesis_provider=syn_provider,
         synthesis_api_key=syn_api_key,
@@ -870,11 +879,23 @@ def main() -> None:
     parser.add_argument(
         "--hyde",
         action="store_true",
+        help=argparse.SUPPRESS,  # HyDE is default-on now; kept as an inert compatibility no-op
+    )
+    parser.add_argument(
+        "--no-hyde",
+        action="store_true",
+        dest="no_hyde",
         help=(
-            "Enable HyDE (Hypothetical Document Embedding) augmentation — generates a "
-            "hypothetical requirement statement and adds its embedding as a second dense "
-            "RRF leg. Spike evaluation flag; logs hypotheses to hyde_hypotheses.jsonl."
+            "Disable HyDE (Hypothetical Document Embedding) augmentation — falls back to "
+            "baseline dense + BM25 RRF only. HyDE is on by default (Phase 15 evaluation gate "
+            "passed: >=3 queries improved, none degraded, no hallucinated IDs)."
         ),
+    )
+    parser.add_argument(
+        "--hyde-debug-log",
+        action="store_true",
+        dest="hyde_debug_log",
+        help="Log HyDE hypotheses to hyde_hypotheses.jsonl in the CWD for batch review (debug/eval only; off by default)",
     )
     args = parser.parse_args()
 
@@ -894,7 +915,8 @@ def main() -> None:
         json_output=args.json_output,
         context=args.context,
         context_collection=args.context_collection,
-        hyde=args.hyde,
+        hyde=not args.no_hyde,
+        hyde_debug_log=args.hyde_debug_log,
     )
 
 

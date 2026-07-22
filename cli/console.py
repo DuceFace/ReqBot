@@ -581,7 +581,7 @@ class GrcaiConsole(cmd.Cmd):
 
         Usage: ask <question> [--synthesize] [--top-k N] [--model MODEL]
                               [--domain-tag TAG] [--requirement-type TYPE]
-                              [--document-id ID] [--context] [--json]
+                              [--document-id ID] [--context] [--json] [--no-hyde]
 
         Active session filters (document_id, domain_tag, requirement_type)
         are auto-injected — no need to type them every time.
@@ -607,6 +607,8 @@ class GrcaiConsole(cmd.Cmd):
                             help="Enrich with surrounding chunk context")
         parser.add_argument("--json", action="store_true", dest="json_output",
                             help="Output results as JSON")
+        parser.add_argument("--no-hyde", action="store_true", dest="no_hyde",
+                            help="Disable HyDE hypothesis leg — baseline dense + BM25 RRF only")
 
         parsed = self._parse_shell_args(parser, arg)
         if parsed is None:
@@ -631,6 +633,7 @@ class GrcaiConsole(cmd.Cmd):
             json_output=parsed.json_output,
             context=parsed.context,
             no_rewrite=False,
+            no_hyde=parsed.no_hyde,
             rewrite_model="llama3.1:8b-instruct-q4_K_M",
             context_collection="grc_context",
             ollama_url=self._session["ollama_url"],

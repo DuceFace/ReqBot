@@ -290,7 +290,8 @@ def run(
             log.warning("PDF file not found: %s — document_id will be empty", pdf_path)
 
     chunks_path = Path(chunks_jsonl).resolve()
-    stem = reqs_path.stem.replace("_extracted_requirements", "")
+    from core.artifact_resolver import doc_key_from_extracted_path
+    stem = doc_key_from_extracted_path(reqs_path)
     norm_path = out_dir / f"{stem}_requirements_normalized.jsonl"
     fail_path = out_dir / f"{stem}_normalization_failures.jsonl"
 
@@ -510,7 +511,8 @@ def main() -> None:
     if args.chunks_jsonl:
         chunks_path = str(Path(args.chunks_jsonl).resolve())
     else:
-        stem = reqs_path.stem.replace("_extracted_requirements", "")
+        from core.artifact_resolver import doc_key_from_extracted_path
+        stem = doc_key_from_extracted_path(reqs_path)
         chunks_path = str(reqs_path.parent / f"{stem}_chunks.jsonl")
 
     out_dir = Path(args.output_dir).resolve() if args.output_dir else reqs_path.parent

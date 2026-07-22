@@ -112,3 +112,16 @@ def test_missing_source_pdf_field_no_crash(tmp_path):
     result = list_docs(tmp_path)
     assert result["docs"][0]["source_pdf"] == ""
     assert result["docs"][0]["count"] == 1
+
+
+def test_doc_key_preserves_pdf_stem_containing_normalized_substring(tmp_path):
+    """Codex PR #92 review: a PDF literally named
+    "policy_requirements_normalized_v1.pdf" must not have its doc_key mangled
+    by a broad substring replace — doc_key_from_requirements_path() strips
+    only the trailing suffix."""
+    stem = "policy_requirements_normalized_v1"
+    run_dir = tmp_path / f"{stem}_20260101_120000"
+    run_dir.mkdir()
+    _write_jsonl(run_dir / f"{stem}_requirements_normalized.jsonl", [SAMPLE_REQ])
+    result = list_docs(tmp_path)
+    assert result["docs"][0]["doc_key"] == stem

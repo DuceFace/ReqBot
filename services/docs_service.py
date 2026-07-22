@@ -12,6 +12,8 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from core.artifact_resolver import doc_key_from_requirements_path
+
 log = logging.getLogger(__name__)
 
 
@@ -30,7 +32,7 @@ def list_docs(processed_dir: Path) -> dict:
     # Deduplicate by doc stem — keep the most recently modified file per document
     latest: dict[str, Path] = {}
     for p in all_files:
-        doc_key = p.stem.replace("_requirements_normalized", "")
+        doc_key = doc_key_from_requirements_path(p)
         if doc_key not in latest or p.stat().st_mtime > latest[doc_key].stat().st_mtime:
             latest[doc_key] = p
 
@@ -106,7 +108,7 @@ def resolve_source_pdfs(processed_dir: Path, doc_keys: list[str]) -> dict[str, s
     all_files = sorted(processed_dir.rglob("*_requirements_normalized.jsonl"))
     latest: dict[str, Path] = {}
     for p in all_files:
-        key = p.stem.replace("_requirements_normalized", "")
+        key = doc_key_from_requirements_path(p)
         if key not in latest or p.stat().st_mtime > latest[key].stat().st_mtime:
             latest[key] = p
 

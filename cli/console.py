@@ -448,7 +448,9 @@ class GrcaiConsole(cmd.Cmd):
                 # Key off the filename (doc stem), not the directory name.
                 # This is robust to custom --output-dir runs where multiple
                 # documents land in the same parent directory.
-                key = p.stem.replace(suffix, "")
+                # removesuffix (anchored), not replace() — a PDF stem containing
+                # this suffix as a substring elsewhere must not have it collapsed.
+                key = p.stem.removesuffix(suffix)
                 if key not in seen or p.stat().st_mtime > seen[key].stat().st_mtime:
                     seen[key] = p
             return seen

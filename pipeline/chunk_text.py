@@ -778,7 +778,7 @@ def main() -> None:
 
     else:
         # Legacy path: pages.jsonl → fixed-size overlapping chunks
-        stem = input_path.stem.replace("_pages", "")
+        stem = input_path.stem.removesuffix("_pages")
         if args.output:
             output_path = Path(args.output).resolve()
         else:

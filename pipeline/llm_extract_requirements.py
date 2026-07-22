@@ -578,7 +578,7 @@ def run(
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    stem = chunks_path.stem.replace("_chunks", "")
+    stem = chunks_path.stem.removesuffix("_chunks")
     raw_path = out_dir / f"{stem}_raw_responses.jsonl"
     reqs_path = out_dir / f"{stem}_extracted_requirements.jsonl"
     fail_path = out_dir / f"{stem}_parse_failures.jsonl"

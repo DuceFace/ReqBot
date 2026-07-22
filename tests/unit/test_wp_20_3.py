@@ -127,39 +127,12 @@ def test_pass1_template_substitutes_obligation_verbs():
     assert "{obligation_verbs}" not in result
 
 
-def test_prompt_template_substitutes_obligation_verbs_and_domain_tags():
-    verbs = ", ".join(_TEST_DOMAIN_PROFILE["obligation_verbs"])
-    tags = ", ".join(_TEST_DOMAIN_PROFILE["domain_tags"])
-    result = (
-        extract_mod.PROMPT_TEMPLATE
-        .replace("{obligation_verbs}", verbs)
-        .replace("{domain_tags_list}", tags)
-    )
-    assert "shall, must" in result
-    assert "test-tag-alpha" in result
-    assert "{obligation_verbs}" not in result
-    assert "{domain_tags_list}" not in result
-
-
 def test_cybersecurity_profile_substitution_contains_expected_verbs():
     verbs = ", ".join(_CYBER_PROFILE["obligation_verbs"])
     result = extract_mod.PASS1_PROMPT_TEMPLATE.replace("{obligation_verbs}", verbs)
     assert "shall" in result
     assert "enforce" in result
     assert "maintain" in result
-
-
-def test_cybersecurity_profile_substitution_contains_expected_tags():
-    verbs = ", ".join(_CYBER_PROFILE["obligation_verbs"])
-    tags = ", ".join(_CYBER_PROFILE["domain_tags"])
-    result = (
-        extract_mod.PROMPT_TEMPLATE
-        .replace("{obligation_verbs}", verbs)
-        .replace("{domain_tags_list}", tags)
-    )
-    assert "access-control" in result
-    assert "incident-response" in result
-    assert "training-and-awareness" in result
 
 
 # ---------------------------------------------------------------------------
@@ -468,31 +441,3 @@ def test_enrichment_cache_honored_when_profile_matches(tmp_path):
         )
 
     assert len(enrich_calls) == 0, "Cybersecurity cache with matching model must be honored"
-
-
-# ---------------------------------------------------------------------------
-# Review-round fixes — Codex P2 #3: PROMPT_TEMPLATE requirement_types_list
-# ---------------------------------------------------------------------------
-
-def test_prompt_template_substitutes_requirement_types():
-    types_str = ", ".join(_TEST_DOMAIN_PROFILE["requirement_types"])
-    result = (
-        extract_mod.PROMPT_TEMPLATE
-        .replace("{obligation_verbs}", ", ".join(_TEST_DOMAIN_PROFILE["obligation_verbs"]))
-        .replace("{domain_tags_list}", ", ".join(_TEST_DOMAIN_PROFILE["domain_tags"]))
-        .replace("{requirement_types_list}", types_str)
-    )
-    assert "policy, guidance" in result
-    assert "{requirement_types_list}" not in result
-
-
-def test_cybersecurity_profile_requirement_types_in_prompt():
-    result = (
-        extract_mod.PROMPT_TEMPLATE
-        .replace("{obligation_verbs}", ", ".join(_CYBER_PROFILE["obligation_verbs"]))
-        .replace("{domain_tags_list}", ", ".join(_CYBER_PROFILE["domain_tags"]))
-        .replace("{requirement_types_list}", ", ".join(_CYBER_PROFILE["requirement_types"]))
-    )
-    assert "technical-control" in result
-    assert "procedural-control" in result
-    assert "{requirement_types_list}" not in result

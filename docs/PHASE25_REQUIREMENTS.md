@@ -25,7 +25,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.4 — Remove legacy bundle system | In progress |
 | WP-25.5 — Docs + integration gate | Not started |
 | WP-25.6a — Model role documentation | Merged (PR #106) |
-| WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Not started |
+| WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Merged (PR #107) |
 | WP-25.6c — Embedding model configurability + index provenance | Not started (highest risk in 25.6; do last) |
 
 ## Key Changes

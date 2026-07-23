@@ -86,6 +86,8 @@ export interface AskResponse {
     retrieval_ms: number
     synthesis: string | null  // always null in Phase 18 (synthesis not exposed in GUI)
   }
+  /** e.g. embedding-model mismatch between config and indexed results (WP-25.6c). */
+  warnings: string[]
 }
 
 // ─── Trace ───────────────────────────────────────────────────────────────────
@@ -156,6 +158,8 @@ export interface CompareResponseSemantic {
   mode: 'semantic'
   ref_order: string[]
   ref_groups: Record<string, Record<string, ComparePayload>>
+  /** e.g. embedding-model mismatch between config and indexed results (WP-25.6c). */
+  warnings: string[]
 }
 
 /**
@@ -171,6 +175,8 @@ export interface CompareResponseExact {
   mode: 'exact'
   source_ref: string
   groups: Record<string, ComparePayload>
+  /** e.g. embedding-model mismatch between config and indexed results (WP-25.6c). */
+  warnings: string[]
 }
 
 export type CompareResponse = CompareResponseSemantic | CompareResponseExact
@@ -229,6 +235,8 @@ export interface EvidenceResponse {
   group_order: string[]
   total_sources: number
   synthesis_text: string
+  /** e.g. embedding-model mismatch between config and indexed results (WP-25.6c). */
+  warnings: string[]
 }
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
@@ -297,6 +305,7 @@ export interface StatusResponse {
   /** Which model ReqBot is actually configured to use per role — distinct from
    *  ollama.models above, which is just what's installed on the server. */
   configured_models: {
+    embedding: string
     extraction: string
     enrichment: string
     rewrite: string

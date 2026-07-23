@@ -17,6 +17,32 @@ log = logging.getLogger(__name__)
 CONTROL_ID_RE = re.compile(r"^[A-Z]{1,4}-\d+(\([0-9a-z]+\))*$", re.IGNORECASE)
 
 
+def _embedding_warnings(payloads: list[dict], configured_embedding_model: str) -> list[str]:
+    """Compare each result's indexed embedding_model against the configured one.
+
+    Same logic as core/ask.py's _embedding_mismatch_warnings — points indexed
+    before WP-25.6c carry no embedding_model field and are treated as
+    "nomic-embed-text" (the universal default at the time). Never blocks the
+    query.
+    """
+    mismatched_models: set[str] = set()
+    mismatched_count = 0
+    for p in payloads:
+        indexed_model = p.get("embedding_model") or "nomic-embed-text"
+        if indexed_model != configured_embedding_model:
+            mismatched_count += 1
+            mismatched_models.add(indexed_model)
+    if not mismatched_count:
+        return []
+    models_str = ", ".join(sorted(mismatched_models))
+    return [
+        f"{mismatched_count} of {len(payloads)} results were indexed with a "
+        f"different embedding model ({models_str}) than your current config "
+        f"({configured_embedding_model}) and may be unreliable; run 'reqbot reindex' "
+        "to refresh them."
+    ]
+
+
 def compare(
     query: str,
     qdrant_url: str,
@@ -24,6 +50,7 @@ def compare(
     top_k: int = 10,
     document_ids: list | None = None,
     doc_keys: list | None = None,
+    embedding_model: str = "nomic-embed-text",
 ) -> dict:
     """Compare a control ID or free-text query across all indexed documents.
 
@@ -112,6 +139,7 @@ def compare(
             "mode": "exact",
             "source_ref": query,
             "groups": doc_groups,
+            "warnings": _embedding_warnings(list(doc_groups.values()), embedding_model),
         }
 
     # -------------------------------------------------------------------
@@ -122,7 +150,7 @@ def compare(
     try:
         import ollama as _ollama
         dense_vector = _ollama.Client(host=ollama_url).embed(
-            model="nomic-embed-text", input=query
+            model=embedding_model, input=query
         ).embeddings[0]
     except Exception as e:
         raise RuntimeError(f"Dense embedding failed: {e}") from e
@@ -186,9 +214,11 @@ def compare(
         if doc_key not in ref_groups[ref]:
             ref_groups[ref][doc_key] = p
 
+    all_payloads = [p for doc_map in ref_groups.values() for p in doc_map.values()]
     return {
         "query": query,
         "mode": "semantic",
         "ref_order": ref_order,
         "ref_groups": ref_groups,
+        "warnings": _embedding_warnings(all_payloads, embedding_model),
     }

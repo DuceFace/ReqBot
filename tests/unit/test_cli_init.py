@@ -35,6 +35,7 @@ def _mock_cfg(tmp_path):
         enrichment_model="llama3.1:8b-instruct-q4_K_M",
         rewrite_model="llama3.1:8b-instruct-q4_K_M",
         synthesis_model="qwen2.5:14b",
+        embedding_model="nomic-embed-text",
         top_k=20,
         min_score=0.02,
         processed_dir=str(processed_dir),
@@ -81,7 +82,7 @@ def _run_init(tmp_path, inputs):
              "qdrant": {"reachable": True, "collections": []},
              "processed_documents": [],
              "configured_models": {
-                 "extraction": "x", "enrichment": "x", "rewrite": "x", "synthesis": "x",
+                 "embedding": "x", "extraction": "x", "enrichment": "x", "rewrite": "x", "synthesis": "x",
              },
          }):
         rc = cmd_init(SimpleNamespace())
@@ -108,7 +109,7 @@ def test_init_prompts_directly_for_urls_no_choice_menu(tmp_path):
     """Qdrant/Ollama are configured by URL only — no existing-vs-bootstrap menu."""
     inputs = [
         "http://my-qdrant:6333", "http://my-ollama:11434",
-        "", "", "", "", "",  # 5 models
+        "", "", "", "", "", "",  # 6 models (embedding, default, extraction, enrichment, rewrite, synthesis)
         "", "", "",  # top_k, min_score, processed_dir
         "3",  # synthesis = none
     ]
@@ -122,7 +123,7 @@ def test_init_writes_rewrite_model(tmp_path):
     """rewrite_model is a real prompt + config field now (WP-25.6b), not CLI-flag-only."""
     inputs = [
         "", "",  # qdrant/ollama URLs
-        "", "", "", "custom-rewrite-model", "",  # default/extraction/enrichment/rewrite/synthesis
+        "", "", "", "", "custom-rewrite-model", "",  # embedding/default/extraction/enrichment/rewrite/synthesis
         "", "", "",  # top_k, min_score, processed_dir
         "3",  # synthesis = none
     ]
@@ -145,6 +146,7 @@ def test_new_default_model_propagates_to_blank_role_models(tmp_path, monkeypatch
 
     inputs = [
         "", "",  # qdrant/ollama URLs (defaults)
+        "",  # embedding_model — default
         "mistral-custom",  # default_model — new value
         "", "", "",  # extraction/enrichment/rewrite — blank, follow the new default
         "",  # synthesis_model — default
@@ -181,7 +183,7 @@ def test_init_retries_url_on_failed_connection(tmp_path):
         "n",  # don't keep it
         "http://good-qdrant:6333",  # succeeds
         "",  # ollama URL default
-        "", "", "", "", "",  # 5 models
+        "", "", "", "", "", "",  # 6 models
         "", "", "",  # top_k, min_score, processed_dir
         "3",  # synthesis = none
     ]
@@ -194,7 +196,7 @@ def test_init_retries_url_on_failed_connection(tmp_path):
              "qdrant": {"reachable": True, "collections": []},
              "processed_documents": [],
              "configured_models": {
-                 "extraction": "x", "enrichment": "x", "rewrite": "x", "synthesis": "x",
+                 "embedding": "x", "extraction": "x", "enrichment": "x", "rewrite": "x", "synthesis": "x",
              },
          }):
         rc = cmd_init(SimpleNamespace())
@@ -208,7 +210,7 @@ def test_init_retries_url_on_failed_connection(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_synthesis_none_skips_remote_prompts_and_writes_backend_none(tmp_path):
-    inputs = ["", "", "", "", "", "", "", "", "", "", "3"]
+    inputs = ["", "", "", "", "", "", "", "", "", "", "", "3"]
     rc, written = _run_init(tmp_path, inputs)
     assert rc == 0
     assert written["synthesis_backend"] == "none"
@@ -220,7 +222,7 @@ def test_synthesis_none_skips_remote_prompts_and_writes_backend_none(tmp_path):
 
 def test_synthesis_remote_prompts_for_provider_model_and_api_key_env(tmp_path):
     inputs = [
-        "", "", "", "", "", "", "", "", "", "", "2",
+        "", "", "", "", "", "", "", "", "", "", "", "2",
         "openai", "gpt-4o", "OPENAI_API_KEY",
     ]
     rc, written = _run_init(tmp_path, inputs)
@@ -232,7 +234,7 @@ def test_synthesis_remote_prompts_for_provider_model_and_api_key_env(tmp_path):
 
 
 def test_synthesis_local_needs_no_extra_prompts(tmp_path):
-    inputs = ["", "", "", "", "", "", "", "", "", "", "1"]
+    inputs = ["", "", "", "", "", "", "", "", "", "", "", "1"]
     rc, written = _run_init(tmp_path, inputs)
     assert rc == 0
     assert written["synthesis_backend"] == "local"

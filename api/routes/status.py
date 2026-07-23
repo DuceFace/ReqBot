@@ -17,6 +17,7 @@ def get_status() -> dict:
             cfg.qdrant_url,
             cfg.processed_dir_path(),
             {
+                "embedding": cfg.embedding_model,
                 "extraction": cfg.extraction_model,
                 "enrichment": cfg.enrichment_model,
                 "rewrite": cfg.rewrite_model,

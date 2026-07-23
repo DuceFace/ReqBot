@@ -34,6 +34,7 @@ def post_ask(req: AskRequest) -> dict:
       filters:  active filters (null when not applied)
       results:  list of matching requirements (score + payload fields)
       metadata: top_k, result_count, retrieval_ms, synthesis (str | null)
+      warnings: list of strings, e.g. embedding-model mismatch (WP-25.6c)
     """
     cfg = _config.load()
 
@@ -56,6 +57,7 @@ def post_ask(req: AskRequest) -> dict:
             synthesize=req.synthesize,
             model=req.model or cfg.synthesis_model,
             rewrite_model=req.rewrite_model or cfg.rewrite_model,
+            embedding_model=cfg.embedding_model,
             domain_tags=req.domain_tags or None,
             requirement_types=req.requirement_types or None,
             document_ids=req.document_ids or None,

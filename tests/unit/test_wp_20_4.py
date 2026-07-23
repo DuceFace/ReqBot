@@ -109,7 +109,7 @@ def test_build_payload_includes_domain_profile():
         "extraction_model": "test-model",
         "run_timestamp": "2026-07-18T00:00:00Z",
     }
-    payload = build_payload(req)
+    payload = build_payload(req, "nomic-embed-text", 768)
     assert payload["domain_profile"] == "cybersecurity"
 
 
@@ -130,5 +130,5 @@ def test_build_payload_fallback_cybersecurity_for_pre_phase20_records():
         "chunk_id": None,
         # No domain_profile key — pre-Phase-20 record
     }
-    payload = build_payload(req)
+    payload = build_payload(req, "nomic-embed-text", 768)
     assert payload["domain_profile"] == "cybersecurity"

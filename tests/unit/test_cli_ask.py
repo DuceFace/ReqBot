@@ -62,7 +62,7 @@ def test_missing_no_hyde_attribute_defaults_to_hyde_enabled():
 def test_no_model_flag_falls_back_to_configured_synthesis_model():
     """WP-25.6b: --model omitted must resolve to _cfg.synthesis_model, not the
     hardcoded core.ask.DEFAULT_SYNTHESIS_MODEL literal."""
-    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model")
+    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model", embedding_model="configured-embedding-model")
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(model=None, rewrite_model=None))
     assert rc == 0
@@ -71,7 +71,7 @@ def test_no_model_flag_falls_back_to_configured_synthesis_model():
 
 
 def test_explicit_model_flag_overrides_config():
-    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model")
+    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model", embedding_model="configured-embedding-model")
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(model="explicit-model"))
     assert rc == 0
@@ -81,7 +81,7 @@ def test_explicit_model_flag_overrides_config():
 
 def test_no_rewrite_model_flag_falls_back_to_configured_rewrite_model():
     """WP-25.6b: --rewrite-model omitted must resolve to _cfg.rewrite_model."""
-    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model")
+    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model", embedding_model="configured-embedding-model")
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(rewrite_model=None))
     assert rc == 0
@@ -90,7 +90,7 @@ def test_no_rewrite_model_flag_falls_back_to_configured_rewrite_model():
 
 
 def test_explicit_rewrite_model_flag_overrides_config():
-    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model")
+    mock_cfg = SimpleNamespace(synthesis_model="configured-synth-model", rewrite_model="configured-rewrite-model", embedding_model="configured-embedding-model")
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(rewrite_model="explicit-rewrite-model"))
     assert rc == 0

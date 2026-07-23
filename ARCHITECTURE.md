@@ -293,18 +293,23 @@ pip3 install --break-system-packages anthropic openai
 
 ### Models (Ollama)
 
-ReqBot needs three model roles configured against your Ollama endpoint. None of them are pulled
+ReqBot needs several model **roles** configured against your Ollama endpoint: embedding,
+extraction, enrichment, query-rewrite/HyDE, and optional synthesis. None of them are pulled
 automatically by `reqbot init`/`setup` (WP-25.1b) — Ollama and its models are expected to already
 exist before you run `init`; pull manually with `ollama pull <model>`.
+
+The defaults below are what's validated on Tyler's own consumer-grade hardware — a recommended
+starting point, not a universal requirement. Nothing about ReqBot's design assumes these specific
+models; any Ollama-compatible model that fits a role works, subject to the configurability caveats
+below.
 
 | Role | Recommended default | Configurable? |
 |------|---------------------|---------------|
 | Embedding | `nomic-embed-text` | **No — current implementation limit.** Hardcoded as `EMBEDDING_MODEL` in `core/ask.py`, `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py` (plus inline references in `services/compare_service.py`, `services/evidence_service.py`). Changing it requires a code change, not just a config edit — and a full `reqbot reindex` afterward, since indexed vectors and query vectors must come from the same model family. |
-| Extraction / enrichment / query rewrite / HyDE | `llama3.1:8b-instruct-q4_K_M` | Yes — `extraction_model` / `enrichment_model` in `reqbot init` or config. Advanced users may point these at a different model. |
+| Extraction | `llama3.1:8b-instruct-q4_K_M` | Yes — `extraction_model` in `reqbot init` or config. Advanced users may point this at a different model. |
+| Enrichment | `llama3.1:8b-instruct-q4_K_M` | Yes — `enrichment_model` in `reqbot init` or config. Advanced users may point this at a different model. |
+| Query rewrite / HyDE | `llama3.1:8b-instruct-q4_K_M` | **No — CLI-flag only, not config.** `--rewrite-model` in `cli/reqbot.py`, with the default hardcoded twice (`cli/reqbot.py`'s argparse default and `DEFAULT_REWRITE_MODEL` in `core/ask.py`) — two copies of the same literal, not one source of truth. No `reqbot init`/config-file/env-var presence at all today, unlike the other roles. See WP-25.6b. |
 | Local synthesis (optional) | `qwen2.5:14b` | Yes — `synthesis_model` in `reqbot init` or config. Only relevant when the synthesis backend is `local`. Not pulled by `init` or automatically at any point (~9 GB) — if it's missing on the configured Ollama server, synthesis fails clearly at call time naming the model and the `ollama pull` command to fix it, rather than silently downloading it. |
-
-The defaults above are what's validated on Tyler's own consumer-grade hardware, not a requirement
-ReqBot enforces — they're a recommendation, not a mandate.
 
 **Qdrant data path (Docker-managed):** `~/.local/share/reqbot/qdrant/` — XDG Base Directory, outside the
 installer-managed `~/.reqbot/` tree so it survives installer upgrades without exclusion logic.

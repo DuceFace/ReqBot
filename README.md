@@ -57,16 +57,19 @@ manage Qdrant or Ollama itself — both must already be running somewhere reacha
 you run `init`:
 
 - **Qdrant URL** — where your vector database is reachable.
-- **Ollama URL** — where your Ollama instance is reachable. Ollama runs embeddings, requirement
-  extraction, query rewriting, and HyDE — needed for local pipeline work regardless of where
-  answer synthesis happens. Required models: `nomic-embed-text` (~274 MB) and
-  `llama3.1:8b-instruct-q4_K_M` (~4.7 GB); pull them yourself with `ollama pull <model>` if they
-  aren't already on your instance.
+- **Ollama URL** — where your Ollama instance is reachable. Ollama fills ReqBot's embedding,
+  extraction, enrichment, and query-rewrite/HyDE model roles — needed for local pipeline work
+  regardless of where answer synthesis happens. Recommended defaults, validated on consumer-grade
+  hardware, not a hard requirement: `nomic-embed-text` (~274 MB) for embedding and
+  `llama3.1:8b-instruct-q4_K_M` (~4.7 GB) for extraction/enrichment/rewrite; pull them yourself
+  with `ollama pull <model>` if they aren't already on your instance, or configure different
+  models that fit these roles (see `ARCHITECTURE.md`'s model table for what's actually
+  configurable per role today).
 - **Synthesis** — Local Ollama, Remote (Claude/GPT-4o), or None (retrieval-only; `--synthesize`
-  returns no generated answer). If you choose local, ReqBot does not pull the synthesis model
-  (`qwen2.5:14b`, ~9 GB) for you — pull it yourself (`ollama pull qwen2.5:14b`) or configure a
-  different model you already have. A missing model fails clearly at synthesis time rather than
-  triggering a silent download.
+  returns no generated answer). If you choose local, ReqBot does not pull the recommended
+  synthesis model (`qwen2.5:14b`, ~9 GB) for you — pull it yourself (`ollama pull qwen2.5:14b`)
+  or configure a different model you already have. A missing model fails clearly at synthesis
+  time rather than triggering a silent download.
 
 `reqbot setup` still works as a deprecated alias for `reqbot init` (existing scripts/docs
 referencing it won't break), but `reqbot init` is the one documented first-run path.

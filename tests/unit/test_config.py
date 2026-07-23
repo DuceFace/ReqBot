@@ -74,3 +74,32 @@ def test_rewrite_model_config_file_and_env_var(monkeypatch, tmp_path):
     monkeypatch.setenv("REQBOT_REWRITE_MODEL", "from-env-model")
     c = cfg.load()
     assert c.rewrite_model == "from-env-model"
+
+
+def test_embedding_model_default_is_nomic_embed_text():
+    c = cfg.load()
+    assert c.embedding_model == "nomic-embed-text"
+
+
+def test_embedding_model_does_not_fall_back_to_default_model(monkeypatch, tmp_path):
+    """embedding_model is independent of default_model (WP-25.6c) — unlike
+    extraction/enrichment/rewrite, it must never silently inherit a
+    default_model change."""
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"default_model": "some-other-model"}))
+    monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
+    c = cfg.load()
+    assert c.default_model == "some-other-model"
+    assert c.embedding_model == "nomic-embed-text"
+
+
+def test_embedding_model_config_file_and_env_var(monkeypatch, tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"embedding_model": "from-file-model"}))
+    monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
+    c = cfg.load()
+    assert c.embedding_model == "from-file-model"
+
+    monkeypatch.setenv("REQBOT_EMBEDDING_MODEL", "from-env-model")
+    c = cfg.load()
+    assert c.embedding_model == "from-env-model"

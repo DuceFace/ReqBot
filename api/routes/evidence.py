@@ -55,6 +55,7 @@ def post_evidence(req: EvidenceRequest) -> dict:
             synthesis_model=cfg.synthesis_model,
             provider=syn_provider,
             api_key=syn_api_key,
+            embedding_model=cfg.embedding_model,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

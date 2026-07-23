@@ -50,7 +50,7 @@ def _mock_qdrant():
 
 @pytest.fixture(autouse=True)
 def _isolate_cfg(tmp_path, monkeypatch):
-    mock_cfg = SimpleNamespace(processed_dir_path=lambda: tmp_path)
+    mock_cfg = SimpleNamespace(processed_dir_path=lambda: tmp_path, embedding_model="nomic-embed-text")
     monkeypatch.setattr(cli_reqbot, "_cfg", mock_cfg)
 
 
@@ -69,6 +69,26 @@ def test_default_reindex_rebuilds_both_collections(tmp_path):
     assert mock_embed_ctx.call_count == 2
     # One alias swap for grc_requirements, one for grc_context.
     assert mock_client.update_collection_aliases.call_count == 2
+
+
+def test_reindex_threads_configured_embedding_model_through(tmp_path, monkeypatch):
+    """WP-25.6c: reqbot reindex must re-embed with whatever embedding_model is
+    currently configured, not a hardcoded default."""
+    _write_doc(tmp_path, "DOC-A", "hash-a")
+    monkeypatch.setattr(
+        cli_reqbot, "_cfg",
+        SimpleNamespace(processed_dir_path=lambda: tmp_path, embedding_model="custom-embed-model"),
+    )
+    mock_client = _mock_qdrant()
+
+    with patch("qdrant_client.QdrantClient", return_value=mock_client), \
+         patch("pipeline.embed_and_index.run") as mock_embed, \
+         patch("pipeline.embed_context_index.run") as mock_embed_ctx:
+        rc = cmd_reindex(_args())
+
+    assert rc == 0
+    assert mock_embed.call_args.kwargs["embedding_model"] == "custom-embed-model"
+    assert mock_embed_ctx.call_args.kwargs["embedding_model"] == "custom-embed-model"
 
 
 def test_requirements_only_skips_context_entirely(tmp_path):

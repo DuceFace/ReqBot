@@ -56,6 +56,7 @@ export default function SystemHealthPanel({ data }: Props) {
         <dl className="text-xs text-gray-500 space-y-0.5">
           {(
             [
+              ['Embedding', data.configured_models.embedding],
               ['Extraction', data.configured_models.extraction],
               ['Enrichment', data.configured_models.enrichment],
               ['Rewrite', data.configured_models.rewrite],

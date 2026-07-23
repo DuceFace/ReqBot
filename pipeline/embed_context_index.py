@@ -97,9 +97,9 @@ def ensure_collection(client: QdrantClient, collection_name: str, recreate: bool
         log.info("Collection '%s' already exists, will upsert", collection_name)
 
 
-def embed_batch(texts: list[str], client: ollama.Client) -> list[list[float]]:
+def embed_batch(texts: list[str], client: ollama.Client, model: str = EMBEDDING_MODEL) -> list[list[float]]:
     """Embed a batch of texts using Ollama (dense vectors)."""
-    result = client.embed(model=EMBEDDING_MODEL, input=texts)
+    result = client.embed(model=model, input=texts)
     return result.embeddings
 
 
@@ -121,6 +121,7 @@ def run(
     recreate: bool = False,
     collection_name: str = COLLECTION_NAME,
     batch_size: int = 32,
+    embedding_model: str = EMBEDDING_MODEL,
 ) -> int:
     """Embed text chunks and index into Qdrant grc_context.
 
@@ -136,6 +137,8 @@ def run(
         recreate:        Drop and recreate the collection if True.
         collection_name: Qdrant collection name.
         batch_size:      Chunks per embedding batch.
+        embedding_model: Ollama embedding model — written into each point's
+                         payload as provenance (WP-25.6c).
 
     Returns:
         Number of chunks successfully indexed.
@@ -180,13 +183,13 @@ def run(
 
         # Dense embed — None marks a failed item
         try:
-            dense_embeddings = embed_batch(texts, ollama_client)
+            dense_embeddings = embed_batch(texts, ollama_client, embedding_model)
         except Exception as e:
             log.error("Dense batch failed at offset %d: %s — falling back to individual", batch_start, e)
             dense_embeddings = []
             for text in texts:
                 try:
-                    result = ollama_client.embed(model=EMBEDDING_MODEL, input=text)
+                    result = ollama_client.embed(model=embedding_model, input=text)
                     dense_embeddings.append(result.embeddings[0])
                 except Exception as e2:
                     log.error("Individual dense embed failed: %s — item will be skipped", e2)
@@ -233,6 +236,8 @@ def run(
                     "page_start": chunk.get("page_start"),
                     "page_end": chunk.get("page_end"),
                     "text": chunk["text"],
+                    "embedding_model": embedding_model,
+                    "embedding_dim": len(dense_emb),
                 },
             ))
 
@@ -307,6 +312,12 @@ def main() -> None:
         default=32,
         help="Number of chunks to embed per batch (default: 32)",
     )
+    parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default=EMBEDDING_MODEL,
+        help=f"Ollama embedding model (default: {EMBEDDING_MODEL})",
+    )
     args = parser.parse_args()
 
     chunks_path = Path(args.chunks_jsonl).resolve()
@@ -324,6 +335,7 @@ def main() -> None:
             recreate=args.recreate,
             collection_name=args.collection_name,
             batch_size=args.batch_size,
+            embedding_model=args.embedding_model,
         )
     except RuntimeError as e:
         log.error("%s", e)

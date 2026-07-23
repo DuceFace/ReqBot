@@ -305,7 +305,7 @@ below.
 
 | Role | Recommended default | Configurable? |
 |------|---------------------|---------------|
-| Embedding | `nomic-embed-text` | **No — current implementation limit.** Hardcoded as `EMBEDDING_MODEL` in `core/ask.py`, `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py` (plus inline references in `services/compare_service.py`, `services/evidence_service.py`). Changing it requires a code change, not just a config edit — and a full `reqbot reindex` afterward, since indexed vectors and query vectors must come from the same model family. |
+| Embedding | `nomic-embed-text` | Yes (WP-25.6c) — `embedding_model` in `reqbot init` or config, independent of `default_model` (it defines the vector shape already stored in Qdrant, so it never silently inherits a `default_model` change the way extraction/enrichment/rewrite do). Changing it is still the highest-risk config edit in the system: it takes effect on the *next* index/reindex, not retroactively — a full `reqbot reindex` is required afterward to bring existing points onto the new model. Every indexed point carries `embedding_model` + `embedding_dim` in its Qdrant payload as provenance; query time (`ask`/`compare`/`evidence`) compares each result's provenance against the currently configured model and surfaces a non-blocking `warnings` entry on mismatch rather than silently returning wrong-but-confident results. Qdrant's own vector-dimension check still applies on top of this — switching to a model with a different dimension than the collection's current one fails loudly and immediately. |
 | Extraction | `llama3.1:8b-instruct-q4_K_M` | Yes — `extraction_model` in `reqbot init` or config. Advanced users may point this at a different model. |
 | Enrichment | `llama3.1:8b-instruct-q4_K_M` | Yes — `enrichment_model` in `reqbot init` or config. Advanced users may point this at a different model. |
 | Query rewrite / HyDE | `llama3.1:8b-instruct-q4_K_M` | Yes (WP-25.6b) — `rewrite_model` in `reqbot init` or config, same `REQBOT_REWRITE_MODEL` env-var pattern and default-model fallback as extraction/enrichment. `--rewrite-model` in `cli/reqbot.py` overrides it per-call; unset, it defers to config instead of a second hardcoded literal. |
@@ -460,6 +460,7 @@ Three-layer load order (later layers win):
 | `enrichment_model` | `REQBOT_ENRICHMENT_MODEL` | falls back to `default_model` |
 | `rewrite_model` | `REQBOT_REWRITE_MODEL` | falls back to `default_model` |
 | `synthesis_model` | `REQBOT_SYNTHESIS_MODEL` | `qwen2.5:14b` |
+| `embedding_model` | `REQBOT_EMBEDDING_MODEL` | `nomic-embed-text` (independent of `default_model`) |
 | `top_k` | `REQBOT_TOP_K` | `20` |
 | `min_score` | `REQBOT_MIN_SCORE` | `0.02` |
 | `processed_dir` | `REQBOT_PROCESSED_DIR` | `~/documents/processed` |

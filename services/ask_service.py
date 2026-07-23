@@ -26,6 +26,7 @@ def ask(
     synthesize: bool = False,
     model: str = "",
     rewrite_model: str = "",
+    embedding_model: str = "",
     domain_tags: list | None = None,
     requirement_types: list | None = None,
     document_ids: list | None = None,
@@ -46,6 +47,8 @@ def ask(
       metadata: dict   — top_k, result_count, retrieval_ms, synthesis (str | None)
                          retrieval_ms is the pure retrieval wall-time (ms) from entry to just
                          before synthesis; synthesis latency is excluded even when synthesize=True.
+      warnings: list[str] — e.g. embedding-model mismatch between config and indexed
+                         results (WP-25.6c); never blocks the query.
 
     Does not raise ValueError for empty results — returns result_count=0 instead.
     Raises RuntimeError on connection or embedding failure (propagated from retrieve()).
@@ -63,6 +66,7 @@ def ask(
         document_ids=document_ids,
         no_rewrite=no_rewrite,
         rewrite_model=rewrite_model or _ask.DEFAULT_REWRITE_MODEL,
+        embedding_model=embedding_model or _ask.EMBEDDING_MODEL,
         qdrant_url=qdrant_url,
         ollama_url=ollama_url,
         context=context,
@@ -86,4 +90,5 @@ def ask(
             "retrieval_ms": data["retrieval_ms"],
             "synthesis": data["synthesis_text"] or None,
         },
+        "warnings": data.get("warnings", []),
     }

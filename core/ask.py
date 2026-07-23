@@ -428,6 +428,35 @@ def synthesize_answer(
         return response.response
 
 
+def _embedding_mismatch_warnings(result_dicts: list[dict], configured_embedding_model: str) -> list[str]:
+    """Compare each result's indexed embedding_model against the configured one.
+
+    Points indexed before WP-25.6c carry no embedding_model payload field at
+    all — those are treated as "nomic-embed-text" (the universal default at
+    the time), so an unchanged default config correctly produces no warning
+    for a legacy/mixed corpus. Only a real mismatch (config points at a
+    different model than what actually indexed a result) triggers a warning.
+    Never blocks the query — a partially reindexed corpus is a valid, common
+    state, not an error condition (WP-25.6c).
+    """
+    mismatched_models: set[str] = set()
+    mismatched_count = 0
+    for d in result_dicts:
+        indexed_model = d.get("embedding_model") or "nomic-embed-text"
+        if indexed_model != configured_embedding_model:
+            mismatched_count += 1
+            mismatched_models.add(indexed_model)
+    if not mismatched_count:
+        return []
+    models_str = ", ".join(sorted(mismatched_models))
+    return [
+        f"{mismatched_count} of {len(result_dicts)} results were indexed with a "
+        f"different embedding model ({models_str}) than your current config "
+        f"({configured_embedding_model}) and may be unreliable; run 'reqbot reindex' "
+        "to refresh them."
+    ]
+
+
 def retrieve(
     question: str,
     *,
@@ -440,6 +469,7 @@ def retrieve(
     document_ids: list[str] | None = None,
     no_rewrite: bool = False,
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
+    embedding_model: str = EMBEDDING_MODEL,
     qdrant_url: str = "http://localhost:6333",
     ollama_url: str = "http://localhost:11434",
     context: bool = False,
@@ -462,6 +492,7 @@ def retrieve(
         expanded_query: str         rewritten query; equals question when no_rewrite=True
         total:          int         number of results after min_score filtering and top_k trim
         retrieval_ms:   int         wall-clock ms from entry to just before synthesis (pure retrieval)
+        warnings:       list[str]   e.g. embedding-model mismatch between config and indexed results
     """
     import time as _time
     _t0 = _time.monotonic()
@@ -491,7 +522,7 @@ def retrieve(
 
     # Dense embed — clean semantic phrase only (no keyword stuffing)
     log.info("Embedding question: %s", question)
-    dense_result = ollama_client.embed(model=EMBEDDING_MODEL, input=dense_query)
+    dense_result = ollama_client.embed(model=embedding_model, input=dense_query)
     dense_vector = dense_result.embeddings[0]
 
     # HyDE — generate a hypothetical requirement and embed it as a second dense leg.
@@ -509,7 +540,7 @@ def retrieve(
         )
         if hypothesis:
             try:
-                hyde_result = ollama_client.embed(model=EMBEDDING_MODEL, input=hypothesis)
+                hyde_result = ollama_client.embed(model=embedding_model, input=hypothesis)
                 hyde_vector = hyde_result.embeddings[0]
                 log.info("HyDE: hypothesis embedded successfully")
             except Exception as e:
@@ -592,6 +623,7 @@ def retrieve(
             "expanded_query": dense_query,
             "total": 0,
             "retrieval_ms": int((_time.monotonic() - _t0) * 1000),
+            "warnings": [],
         }
 
     # Context retrieval (uses Qdrant hit objects — happens before dict conversion)
@@ -639,6 +671,7 @@ def retrieve(
         "expanded_query": dense_query,
         "total": len(result_dicts),
         "retrieval_ms": _retrieval_ms,
+        "warnings": _embedding_mismatch_warnings(result_dicts, embedding_model),
     }
 
 
@@ -654,6 +687,7 @@ def run(
     document_ids: list[str] | None = None,
     no_rewrite: bool = False,
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
+    embedding_model: str = EMBEDDING_MODEL,
     qdrant_url: str = "http://localhost:6333",
     ollama_url: str = "http://localhost:11434",
     json_output: bool = False,
@@ -712,6 +746,7 @@ def run(
         document_ids=document_ids,
         no_rewrite=no_rewrite,
         rewrite_model=rewrite_model,
+        embedding_model=embedding_model,
         qdrant_url=qdrant_url,
         ollama_url=ollama_url,
         context=context,
@@ -733,6 +768,9 @@ def run(
         return data["results"]
 
     print_results_table(data["results"])
+
+    for warning in data.get("warnings", []):
+        print(f"[!] {warning}")
 
     if data["synthesis_text"]:
         print(f"{'='*80}")
@@ -776,12 +814,14 @@ def main() -> None:
         _default_min_score = _cfg.min_score
         _default_qdrant_url = _cfg.qdrant_url
         _default_ollama_url = _cfg.ollama_url
+        _default_embedding_model = _cfg.embedding_model
     except Exception as e:
         log.warning("Could not load config defaults (%s) — using hardcoded defaults", e)
         _default_top_k = 20
         _default_min_score = 0.02
         _default_qdrant_url = "http://localhost:6333"
         _default_ollama_url = "http://localhost:11434"
+        _default_embedding_model = EMBEDDING_MODEL
 
     parser = argparse.ArgumentParser(
         description="Query GRC requirements via Qdrant vector search"
@@ -848,6 +888,13 @@ def main() -> None:
         help=f"LLM model for query rewriting (default: {DEFAULT_REWRITE_MODEL})",
     )
     parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default=_default_embedding_model,
+        help=f"Ollama embedding model (default: {_default_embedding_model}) — must match "
+             "whatever model actually indexed the collection you're querying",
+    )
+    parser.add_argument(
         "--qdrant-url",
         type=str,
         default=_default_qdrant_url,
@@ -910,6 +957,7 @@ def main() -> None:
         document_ids=args.document_ids,
         no_rewrite=args.no_rewrite,
         rewrite_model=args.rewrite_model,
+        embedding_model=args.embedding_model,
         qdrant_url=args.qdrant_url,
         ollama_url=args.ollama_url,
         json_output=args.json_output,

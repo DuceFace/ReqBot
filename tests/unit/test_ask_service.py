@@ -27,7 +27,7 @@ def _make_retrieve_result(results=None, synthesis_text="", retrieval_ms=10.0):
 def test_returns_canonical_shape(mock_retrieve):
     mock_retrieve.return_value = _make_retrieve_result()
     resp = ask("test question", "http://qdrant:6333", "http://ollama:11434")
-    assert set(resp.keys()) == {"query", "filters", "results", "metadata"}
+    assert set(resp.keys()) == {"query", "filters", "results", "metadata", "warnings"}
 
 
 @patch("core.ask.retrieve")

@@ -174,6 +174,13 @@ python3 cli/reqbot.py reindex --requirements-only
 Run after adding a new field to normalized/enriched JSONL, after a corpus refresh, or after
 restoring from backup.
 
+**After changing `embedding_model`:** this is also the recovery path. Every indexed point
+carries `embedding_model`/`embedding_dim` provenance in its Qdrant payload; `ask`/`compare`/
+`evidence` compare it against the currently configured model and surface a warning on mismatch
+(never a hard failure — a partially reindexed corpus is a valid, common state). `reindex`
+re-embeds every document with whichever model is currently configured and writes fresh
+provenance, clearing the warning across the corpus once complete.
+
 **Repair/debug:** to rebuild a single document's context chunks without a full reindex, use
 the low-level `index-context` command directly:
 

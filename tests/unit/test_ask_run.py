@@ -18,14 +18,35 @@ SAMPLE_RESULT = {
 }
 
 
-def _fake_retrieve_result():
+def _fake_retrieve_result(warnings=None):
     return {
         "results": [SAMPLE_RESULT],
         "total": 1,
         "synthesis_text": "",
         "expanded_query": "",
         "retrieval_ms": 5.0,
+        "warnings": warnings or [],
     }
+
+
+def test_embedding_mismatch_warning_printed_in_text_mode(capsys):
+    """WP-25.6c: run() surfaces retrieve()'s warnings (e.g. embedding-model
+    mismatch) in its normal text-output mode."""
+    warning_text = "3 of 10 results were indexed with a different embedding model"
+    with patch("core.ask.retrieve", return_value=_fake_retrieve_result(warnings=[warning_text])):
+        core_ask.run("test question")
+
+    captured = capsys.readouterr()
+    assert warning_text in captured.out
+
+
+def test_no_warnings_key_prints_nothing_extra(capsys):
+    """A retrieve() result with no warnings must not print a stray '[!]' line."""
+    with patch("core.ask.retrieve", return_value=_fake_retrieve_result()):
+        core_ask.run("test question")
+
+    captured = capsys.readouterr()
+    assert "[!]" not in captured.out
 
 
 def test_disabled_synthesis_warning_goes_to_stderr_with_json_output(capsys):

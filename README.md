@@ -64,7 +64,10 @@ you run `init`:
   `llama3.1:8b-instruct-q4_K_M` (~4.7 GB) for extraction/enrichment/rewrite; pull them yourself
   with `ollama pull <model>` if they aren't already on your instance, or configure different
   models that fit these roles (see `ARCHITECTURE.md`'s model table for what's actually
-  configurable per role today).
+  configurable per role today). Changing the embedding model is the one role-change that needs
+  a follow-up step: it defines the vector shape already stored in Qdrant, so run `reqbot reindex`
+  afterward — until you do, `ask`/`compare`/`evidence` still work but surface a warning on any
+  result indexed with a different embedding model than what's currently configured.
 - **Synthesis** — Local Ollama, Remote (Claude/GPT-4o), or None (retrieval-only; `--synthesize`
   returns no generated answer). If you choose local, ReqBot does not pull the recommended
   synthesis model (`qwen2.5:14b`, ~9 GB) for you — pull it yourself (`ollama pull qwen2.5:14b`)

@@ -26,6 +26,10 @@ _DEFAULTS: dict = {
     "enrichment_model": None,   # None → falls back to default_model at load time (R-2.1)
     "rewrite_model": None,      # None → falls back to default_model at load time (R-2.1)
     "synthesis_model": "qwen2.5:14b",
+    # embedding_model is independent of default_model — it defines the vector shape
+    # already stored in Qdrant, so it never silently inherits a default_model change
+    # the way extraction/enrichment/rewrite do (WP-25.6c).
+    "embedding_model": "nomic-embed-text",
     "top_k": 20,
     "min_score": 0.02,
     "processed_dir": "~/documents/processed",
@@ -44,6 +48,7 @@ _ENV_MAP: dict[str, str] = {
     "enrichment_model": "REQBOT_ENRICHMENT_MODEL",
     "rewrite_model": "REQBOT_REWRITE_MODEL",
     "synthesis_model": "REQBOT_SYNTHESIS_MODEL",
+    "embedding_model": "REQBOT_EMBEDDING_MODEL",
     "top_k": "REQBOT_TOP_K",
     "min_score": "REQBOT_MIN_SCORE",
     "processed_dir": "REQBOT_PROCESSED_DIR",
@@ -70,6 +75,7 @@ class ReqBotConfig:
     enrichment_model: str   # Step D.5; falls back to default_model when not set in config
     rewrite_model: str      # query rewrite + HyDE; falls back to default_model when not set
     synthesis_model: str
+    embedding_model: str    # defines the vector shape stored in Qdrant; independent of default_model
     top_k: int
     min_score: float
     processed_dir: str
@@ -169,6 +175,7 @@ def load() -> ReqBotConfig:
         enrichment_model=enrichment_model,
         rewrite_model=rewrite_model,
         synthesis_model=values["synthesis_model"],
+        embedding_model=values["embedding_model"],
         top_k=values["top_k"],
         min_score=values["min_score"],
         processed_dir=values["processed_dir"],

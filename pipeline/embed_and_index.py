@@ -66,8 +66,14 @@ def build_embedding_text(req: dict) -> str | None:
     return text
 
 
-def build_payload(req: dict) -> dict:
-    """Build lean Qdrant payload from a requirement record."""
+def build_payload(req: dict, embedding_model: str, embedding_dim: int) -> dict:
+    """Build lean Qdrant payload from a requirement record.
+
+    embedding_model/embedding_dim are indexing-time facts, not JSONL fields —
+    the same JSONL can be reindexed multiple times with a different embedding
+    model over its lifetime, so this is captured here (payload), not baked
+    into the source-of-record artifact (WP-25.6c).
+    """
     return {
         "requirement_id": req["requirement_id"],
         "document_id": req.get("document_id", ""),
@@ -92,12 +98,14 @@ def build_payload(req: dict) -> dict:
         "pipeline_version": req.get("pipeline_version", ""),
         "extraction_model": req.get("extraction_model", ""),
         "run_timestamp": req.get("run_timestamp", ""),
+        "embedding_model": embedding_model,
+        "embedding_dim": embedding_dim,
     }
 
 
-def embed_batch(texts: list[str], client: ollama.Client) -> list[list[float]]:
+def embed_batch(texts: list[str], client: ollama.Client, model: str = EMBEDDING_MODEL) -> list[list[float]]:
     """Embed a batch of texts using Ollama (dense vectors)."""
-    result = client.embed(model=EMBEDDING_MODEL, input=texts)
+    result = client.embed(model=model, input=texts)
     return result.embeddings
 
 
@@ -149,6 +157,7 @@ def run(
     recreate: bool = False,
     collection_name: str = COLLECTION_NAME,
     batch_size: int = 32,
+    embedding_model: str = EMBEDDING_MODEL,
 ) -> int:
     """Embed requirements and index into Qdrant.
 
@@ -162,6 +171,8 @@ def run(
         recreate:           Drop and recreate the collection if True.
         collection_name:    Qdrant collection name.
         batch_size:         Requirements per embedding batch.
+        embedding_model:    Ollama embedding model — written into each point's
+                             payload as provenance (WP-25.6c).
 
     Returns:
         Number of requirements successfully indexed.
@@ -213,13 +224,13 @@ def run(
             continue
 
         try:
-            dense_embeddings = embed_batch(texts, ollama_client)
+            dense_embeddings = embed_batch(texts, ollama_client, embedding_model)
         except Exception as e:
             log.error("Dense batch failed at offset %d: %s — falling back to individual", batch_start, e)
             dense_embeddings = []
             for text in texts:
                 try:
-                    result = ollama_client.embed(model=EMBEDDING_MODEL, input=text)
+                    result = ollama_client.embed(model=embedding_model, input=text)
                     dense_embeddings.append(result.embeddings[0])
                 except Exception as e2:
                     log.error("Individual dense embed failed: %s — item will be skipped", e2)
@@ -251,7 +262,7 @@ def run(
             points.append(models.PointStruct(
                 id=point_id,
                 vector={"dense": dense_emb, "sparse": sparse_emb},
-                payload=build_payload(req),
+                payload=build_payload(req, embedding_model, len(dense_emb)),
             ))
 
         total_skipped += batch_skipped
@@ -324,6 +335,12 @@ def main() -> None:
         default=32,
         help="Number of requirements to embed per batch (default: 32)",
     )
+    parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default=EMBEDDING_MODEL,
+        help=f"Ollama embedding model (default: {EMBEDDING_MODEL})",
+    )
     args = parser.parse_args()
 
     reqs_path = Path(args.requirements_jsonl).resolve()
@@ -339,6 +356,7 @@ def main() -> None:
             recreate=args.recreate,
             collection_name=args.collection_name,
             batch_size=args.batch_size,
+            embedding_model=args.embedding_model,
         )
     except RuntimeError as e:
         log.error("%s", e)

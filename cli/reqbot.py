@@ -126,7 +126,10 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
     # Index by default (uses enriched JSONL if enrichment ran, else normalized)
     try:
-        _embed.run(index_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url)
+        _embed.run(
+            index_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url,
+            embedding_model=_cfg.embedding_model,
+        )
     except Exception as e:
         log.error("Index into Qdrant failed: %s", e)
         return 1
@@ -146,6 +149,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
                 document_id=_read_document_id(index_path),
                 qdrant_url=args.qdrant_url,
                 ollama_url=args.ollama_url,
+                embedding_model=_cfg.embedding_model,
             )
         except Exception as e:
             log.error("Index context into Qdrant failed: %s", e)
@@ -166,6 +170,7 @@ def cmd_index(args: argparse.Namespace) -> int:
             ollama_url=args.ollama_url,
             recreate=args.recreate,
             batch_size=args.batch_size or 32,
+            embedding_model=_cfg.embedding_model,
         )
         return 0
     except Exception as e:
@@ -188,6 +193,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
             document_ids=args.document_ids,
             no_rewrite=args.no_rewrite,
             rewrite_model=args.rewrite_model or _cfg.rewrite_model,
+            embedding_model=_cfg.embedding_model,
             qdrant_url=args.qdrant_url,
             ollama_url=args.ollama_url,
             json_output=args.json_output,
@@ -213,6 +219,7 @@ def cmd_index_context(args: argparse.Namespace) -> int:
             ollama_url=args.ollama_url,
             recreate=args.recreate,
             batch_size=args.batch_size or 32,
+            embedding_model=_cfg.embedding_model,
         )
         return 0
     except Exception as e:
@@ -273,7 +280,10 @@ def cmd_batch(args: argparse.Namespace) -> int:
             continue
 
         try:
-            _embed.run(index_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url)
+            _embed.run(
+                index_path, qdrant_url=args.qdrant_url, ollama_url=args.ollama_url,
+                embedding_model=_cfg.embedding_model,
+            )
         except Exception as e:
             log.warning("Indexing failed for %s: %s — pipeline artifacts still saved", pdf_path.name, e)
             failed.append(pdf_path.name)
@@ -293,6 +303,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
                     document_id=_read_document_id(index_path),
                     qdrant_url=args.qdrant_url,
                     ollama_url=args.ollama_url,
+                    embedding_model=_cfg.embedding_model,
                 )
             except Exception as e:
                 log.warning("Context indexing failed for %s: %s — requirements still indexed", pdf_path.name, e)
@@ -360,7 +371,7 @@ def _alias_swap(qdrant, live_name: str, temp_name: str) -> None:
             log.warning("Could not delete old backing collection %s: %s", old_backing, e)
 
 
-def _reindex_requirements(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
+def _reindex_requirements(req_files: dict, qdrant_url: str, ollama_url: str, embedding_model: str) -> bool:
     """Rebuild grc_requirements from the resolved requirements JSONL per document.
 
     All-or-nothing: any file failure aborts the temp collection and leaves the
@@ -384,6 +395,7 @@ def _reindex_requirements(req_files: dict, qdrant_url: str, ollama_url: str) -> 
                 ollama_url=ollama_url,
                 collection_name=temp_name,
                 recreate=(i == 0),
+                embedding_model=embedding_model,
             )
         except Exception as e:
             log.error("Indexing failed for %s: %s", jsonl_path.name, e)
@@ -411,7 +423,7 @@ def _reindex_requirements(req_files: dict, qdrant_url: str, ollama_url: str) -> 
     return True
 
 
-def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
+def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str, embedding_model: str) -> bool:
     """Rebuild grc_context from *_chunks.jsonl alongside each resolved requirements file.
 
     A missing chunks file is a warning-and-skip, not a failure — indexing
@@ -456,6 +468,7 @@ def _reindex_context(req_files: dict, qdrant_url: str, ollama_url: str) -> bool:
                 ollama_url=ollama_url,
                 collection_name=temp_name,
                 recreate=(not indexed),
+                embedding_model=embedding_model,
             )
             indexed.append(doc_key)
         except Exception as e:
@@ -521,14 +534,14 @@ def cmd_reindex(args: argparse.Namespace) -> int:
 
     log.info("Found %d document(s) to reindex", len(req_files))
 
-    if not _reindex_requirements(req_files, args.qdrant_url, args.ollama_url):
+    if not _reindex_requirements(req_files, args.qdrant_url, args.ollama_url, _cfg.embedding_model):
         return 1
 
     if getattr(args, "requirements_only", False):
         log.info("Skipped grc_context rebuild (--requirements-only)")
         return 0
 
-    return 0 if _reindex_context(req_files, args.qdrant_url, args.ollama_url) else 1
+    return 0 if _reindex_context(req_files, args.qdrant_url, args.ollama_url, _cfg.embedding_model) else 1
 
 
 def cmd_docs(args: argparse.Namespace) -> int:
@@ -560,6 +573,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
     processed_dir = getattr(args, "processed_dir", None) or _cfg.processed_dir_path()
     configured_models = {
+        "embedding": _cfg.embedding_model,
         "extraction": _cfg.extraction_model,
         "enrichment": _cfg.enrichment_model,
         "rewrite": _cfg.rewrite_model,
@@ -582,6 +596,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     configured = result["configured_models"]
     print("\n--- Configured Models ---")
+    print(f"  Embedding:   {configured['embedding']}")
     print(f"  Extraction:  {configured['extraction']}")
     print(f"  Enrichment:  {configured['enrichment']}")
     print(f"  Rewrite:     {configured['rewrite']}")
@@ -724,7 +739,10 @@ def cmd_compare(args: argparse.Namespace) -> int:
     document_ids = getattr(args, "document_ids", None) or []
 
     try:
-        result = compare_service.compare(query, qdrant_url, ollama_url, top_k, document_ids)
+        result = compare_service.compare(
+            query, qdrant_url, ollama_url, top_k, document_ids,
+            embedding_model=_cfg.embedding_model,
+        )
     except ValueError as e:
         log.error("%s", e)
         return 1
@@ -829,6 +847,9 @@ def cmd_compare(args: argparse.Namespace) -> int:
             print(f"\n{len(ref_groups)} control group(s) — {total_docs} source(s)")
             print()
 
+    for warning in result.get("warnings", []):
+        print(f"[!] {warning}")
+
     return 0
 
 
@@ -864,6 +885,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             synthesis_model=_cfg.synthesis_model,
             provider=_cfg.remote_provider,
             api_key=api_key,
+            embedding_model=_cfg.embedding_model,
         )
     except ValueError as e:
         log.error("%s", e)
@@ -996,6 +1018,9 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             return 1
     else:
         print(output_text)
+
+    for warning in result.get("warnings", []):
+        log.warning("%s", warning)
 
     return 0
 
@@ -1157,6 +1182,21 @@ def cmd_init(args: argparse.Namespace) -> int:
         # `ollama pull`/`ollama list` output as a second source of truth).
         _, _, available_models = _test_ollama(ollama_url)
 
+        # Embedding model — independent of default_model; it defines the vector shape
+        # already stored in Qdrant. Changing it requires a full 'reqbot reindex'
+        # afterward, not just a config edit (WP-25.6c) — ReqBot still works and warns
+        # on mismatches in the meantime rather than blocking queries.
+        embedding_model = _prompt("Embedding model", _cfg.embedding_model)
+        if available_models and embedding_model not in available_models:
+            print(f"  [!] Warning: '{embedding_model}' not found on Ollama server.")
+            print(f"      Available: {', '.join(available_models)}")
+        if embedding_model != _cfg.embedding_model:
+            print(
+                f"  [!] Embedding model changed from '{_cfg.embedding_model}' to "
+                f"'{embedding_model}' — existing indexed data was embedded with the old "
+                "model. Run 'reqbot reindex' after saving to refresh it."
+            )
+
         # Models — warn if not present on the server
         default_model = _prompt("Default model (fallback for all pipeline stages)", _cfg.default_model)
         if available_models and default_model not in available_models:
@@ -1270,6 +1310,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "enrichment_model": enrichment_model,
         "rewrite_model": rewrite_model,
         "synthesis_model": synthesis_model,
+        "embedding_model": embedding_model,
         "top_k": top_k,
         "min_score": min_score,
         "processed_dir": processed_dir,

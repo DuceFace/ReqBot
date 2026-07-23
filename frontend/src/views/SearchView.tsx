@@ -24,6 +24,7 @@ export default function SearchView() {
   const [docLoadError, setDocLoadError] = useState(false)
   const [results, setResults] = useState<AskResult[] | null>(null)
   const [retrievalMs, setRetrievalMs] = useState<number | null>(null)
+  const [warnings, setWarnings] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Incrementing this triggers a retry without changing q or doc.
@@ -62,6 +63,7 @@ export default function SearchView() {
       // leaving stale error banners and loading indicators after navigating back.
       setResults(null)
       setRetrievalMs(null)
+      setWarnings([])
       setError(null)
       setLoading(false)
       return
@@ -80,6 +82,7 @@ export default function SearchView() {
         if (cancelled) return
         setResults(res.results)
         setRetrievalMs(res.metadata.retrieval_ms)
+        setWarnings(res.warnings)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -190,6 +193,14 @@ export default function SearchView() {
         {/* Results */}
         {!loading && !error && results !== null && (
           <>
+            {warnings.length > 0 && (
+              <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                {warnings.map((w, i) => (
+                  <p key={i}>{w}</p>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-4 text-sm text-gray-500">
               <span>Results ({results.length})</span>
               <div className="flex items-center gap-3">

@@ -72,6 +72,7 @@ def post_compare(req: CompareRequest) -> dict:
             ollama_url=cfg.ollama_url,
             top_k=req.top_k,
             doc_keys=[doc_pdf_1, doc_pdf_2],
+            embedding_model=cfg.embedding_model,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

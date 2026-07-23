@@ -1,6 +1,20 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
+import requests
 
 from core import synthesis
+
+
+class _FakeTagsResp:
+    def __init__(self, models):
+        self._models = models
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return {"models": [{"name": m} for m in self._models]}
 
 
 @patch("core.synthesis.synthesize_local")
@@ -59,3 +73,88 @@ def test_backend_defaults_to_local_for_unrecognized_value(mock_remote, mock_loca
     assert result == "local answer"
     mock_local.assert_called_once()
     mock_remote.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# synthesize_local(): WP-25.1c — fail clearly instead of auto-pulling
+# ---------------------------------------------------------------------------
+
+@patch("subprocess.run")
+@patch("ollama.Client")
+@patch("requests.get")
+def test_synthesize_local_raises_clear_error_when_model_missing(mock_get, mock_client_cls, mock_run):
+    mock_get.return_value = _FakeTagsResp(["nomic-embed-text"])
+
+    with pytest.raises(RuntimeError, match="qwen2.5:14b"):
+        synthesis.synthesize_local(
+            question="q", evidence="e", model="qwen2.5:14b",
+            ollama_url="http://localhost:11434",
+        )
+
+    mock_client_cls.assert_not_called()  # never reaches generate()
+    mock_run.assert_not_called()  # never shells out to `ollama pull` on the user's behalf
+
+
+@patch("ollama.Client")
+@patch("requests.get")
+def test_synthesize_local_accepts_untagged_config_matching_latest_tag(mock_get, mock_client_cls):
+    """Codex review, PR #102: Ollama treats an untagged name like 'llama3.2' as an
+    implicit 'llama3.2:latest', and generate() accepts either form — but /api/tags
+    reports the fully-qualified name. An untagged config must not false-positive
+    as missing just because /api/tags only lists the ':latest' form."""
+    mock_get.return_value = _FakeTagsResp(["llama3.2:latest"])
+    mock_client = MagicMock()
+    mock_client.generate.return_value = MagicMock(response="the answer")
+    mock_client_cls.return_value = mock_client
+
+    result = synthesis.synthesize_local(
+        question="q", evidence="e", model="llama3.2",
+        ollama_url="http://localhost:11434",
+    )
+    assert result == "the answer"
+
+
+@patch("ollama.Client")
+@patch("requests.get")
+def test_synthesize_local_explicit_tag_does_not_match_a_different_tag(mock_get, mock_client_cls):
+    """The untagged-vs-:latest leniency must not widen into accepting any tag —
+    an explicitly tagged config still requires that exact tag to be present."""
+    mock_get.return_value = _FakeTagsResp(["llama3.2:8b"])
+
+    with pytest.raises(RuntimeError, match="llama3.2:70b"):
+        synthesis.synthesize_local(
+            question="q", evidence="e", model="llama3.2:70b",
+            ollama_url="http://localhost:11434",
+        )
+    mock_client_cls.assert_not_called()
+
+
+@patch("ollama.Client")
+@patch("requests.get")
+def test_synthesize_local_proceeds_when_model_present(mock_get, mock_client_cls):
+    mock_get.return_value = _FakeTagsResp(["qwen2.5:14b"])
+    mock_client = MagicMock()
+    mock_client.generate.return_value = MagicMock(response="the answer")
+    mock_client_cls.return_value = mock_client
+
+    result = synthesis.synthesize_local(
+        question="q", evidence="e", model="qwen2.5:14b",
+        ollama_url="http://localhost:11434",
+    )
+    assert result == "the answer"
+
+
+@patch("ollama.Client")
+@patch("requests.get", side_effect=requests.RequestException("connection refused"))
+def test_synthesize_local_fails_open_when_presence_check_itself_errors(mock_get, mock_client_cls):
+    """A network error during the presence-check shouldn't block synthesis —
+    let generate() surface whatever the real problem is, same as before."""
+    mock_client = MagicMock()
+    mock_client.generate.return_value = MagicMock(response="the answer")
+    mock_client_cls.return_value = mock_client
+
+    result = synthesis.synthesize_local(
+        question="q", evidence="e", model="qwen2.5:14b",
+        ollama_url="http://localhost:11434",
+    )
+    assert result == "the answer"

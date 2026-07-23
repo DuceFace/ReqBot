@@ -1275,8 +1275,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     print("  reqbot serve   # starts the read-only API on http://127.0.0.1:8000")
     if synthesis_backend == "local":
         print()
-        print("Note: The synthesis model (qwen2.5:14b, ~9 GB) will download automatically")
-        print("on your first use of --synthesize.")
+        print(f"Note: ReqBot does not download models for you. If '{synthesis_model}' isn't")
+        print(f"already on your Ollama server, pull it before using --synthesize:")
+        print(f"  OLLAMA_HOST={ollama_url} ollama pull {synthesis_model}")
 
     return 0
 

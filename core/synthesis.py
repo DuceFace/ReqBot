@@ -71,37 +71,30 @@ def synthesize_local(
             "[-] Ollama package not found: pip3 install --break-system-packages ollama"
         )
 
-    # Lazy model pull: verify the model is present on the Ollama server before calling
-    # generate(). This only runs on the local path; synthesize_remote() never reaches here.
-    # Fails open: if the check itself errors, proceed and let generate() surface the error.
-    import os as _os
-    import subprocess as _subprocess
-    import sys as _sys
+    # Verify the model is present on the Ollama server before calling generate(). ReqBot
+    # does not guess or presume which model a user wants on their own endpoint — if it's
+    # missing, fail clearly and name the exact fix, rather than silently pulling ~9 GB on
+    # their behalf. This only runs on the local path; synthesize_remote() never reaches here.
     try:
         import requests as _requests
         tags_resp = _requests.get(f"{ollama_url}/api/tags", timeout=10)
         tags_resp.raise_for_status()
-        present = [m["name"] for m in tags_resp.json().get("models", [])]
-        if model not in present:
-            print(
-                f"[*] Synthesis model {model} not found. Downloading (~9 GB)...\n"
-                f"    This is a one-time download. Run `OLLAMA_HOST={ollama_url} ollama pull {model}`\n"
-                f"    manually to control timing.",
-                file=_sys.stderr,
-            )
-            # Set OLLAMA_HOST so the CLI targets the same server as ollama_url, not
-            # whatever default daemon port the local binary happens to be pointing at.
-            pull_result = _subprocess.run(
-                ["ollama", "pull", model],
-                env={**_os.environ, "OLLAMA_HOST": ollama_url},
-            )
-            if pull_result.returncode != 0:
-                print(
-                    f"[-] Failed to pull synthesis model {model}. Will attempt synthesis anyway.",
-                    file=_sys.stderr,
-                )
     except Exception:
-        pass  # check fails open — generate() will surface a clear error if model is truly missing
+        pass  # can't reach the server to check — let generate() surface that error directly
+    else:
+        present = [m["name"] for m in tags_resp.json().get("models", [])]
+        # Ollama treats an untagged model name (no ":") as an implicit ":latest" —
+        # generate() accepts either form, but /api/tags reports the fully-qualified
+        # name. Accept both so an untagged config doesn't false-positive as missing
+        # when the tagged form is what's actually listed (Codex review, PR #102).
+        acceptable = {model} if ":" in model else {model, f"{model}:latest"}
+        if not acceptable & set(present):
+            raise RuntimeError(
+                f"[-] Synthesis model '{model}' is not available on the configured Ollama "
+                f"server ({ollama_url}).\n"
+                f"    Pull it yourself: OLLAMA_HOST={ollama_url} ollama pull {model}\n"
+                f"    Or configure a different model via `reqbot init` (synthesis_model)."
+            )
 
     prompt = raw_prompt if raw_prompt else SYNTHESIS_PROMPT.format(evidence=evidence, question=question)
     log.info("Synthesizing answer with local model: %s", model)

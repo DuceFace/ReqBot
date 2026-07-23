@@ -46,9 +46,10 @@ you run `init`:
   `llama3.1:8b-instruct-q4_K_M` (~4.7 GB); pull them yourself with `ollama pull <model>` if they
   aren't already on your instance.
 - **Synthesis** — Local Ollama, Remote (Claude/GPT-4o), or None (retrieval-only; `--synthesize`
-  returns no generated answer). The synthesis model (`qwen2.5:14b`, ~9 GB) is **not** pulled
-  during setup if you choose local — it downloads automatically the first time you run
-  `--synthesize`.
+  returns no generated answer). If you choose local, ReqBot does not pull the synthesis model
+  (`qwen2.5:14b`, ~9 GB) for you — pull it yourself (`ollama pull qwen2.5:14b`) or configure a
+  different model you already have. A missing model fails clearly at synthesis time rather than
+  triggering a silent download.
 
 `reqbot setup` still works as a deprecated alias for `reqbot init` (existing scripts/docs
 referencing it won't break), but `reqbot init` is the one documented first-run path.

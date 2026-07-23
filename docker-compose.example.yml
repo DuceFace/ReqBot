@@ -12,6 +12,13 @@
 services:
   reqbot:
     build: .
+    # Tagging the build output lets `docker compose up` reuse a pre-built/pre-loaded image
+    # instead of always rebuilding from source — Compose only builds when no image with this
+    # name:tag exists locally yet. This is what makes the air-gapped transfer path (README.md)
+    # actually work: `docker load` on the offline machine populates this exact tag, so the
+    # subsequent `docker compose up -d` there runs the loaded image rather than trying (and
+    # failing, with no source checkout or build tools) to build it (Codex review, PR #109).
+    image: reqbot:latest
     # No auth exists in the API layer yet (Phase 26+). Publishing only to the host's own
     # loopback keeps this at the exact same reachability as `reqbot serve`'s own
     # 127.0.0.1 default — zero regression out of the box. Widening this to 0.0.0.0:8000

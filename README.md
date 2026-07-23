@@ -50,9 +50,10 @@ Phase 26+), so widening this to a real network interface is a deliberate operato
 responsible for your own reverse proxy/TLS/firewall if you do.
 
 Configure service URLs and model preferences via `REQBOT_*` environment variables in
-`docker-compose.yml` (see `ARCHITECTURE.md`'s Configuration table for the full list) rather than
-the interactive `reqbot init` wizard — though `docker compose exec reqbot reqbot init` also works
-if you'd rather use the guided prompts.
+`docker-compose.yml` (see `ARCHITECTURE.md`'s Configuration table for the full list) — the
+natural fit for a container, since it's set once at deploy time with no interactive session
+required. The guided `reqbot init` wizard still works too if you prefer it: `docker compose exec
+reqbot reqbot init`.
 
 ### 2. Source / dev install
 
@@ -96,6 +97,12 @@ gunzip -c reqbot-image.tar.gz | docker load
 gunzip -c qdrant-image.tar.gz | docker load
 docker compose up -d   # docker-compose.yml as copied in path 1 above
 ```
+
+`docker-compose.example.yml`'s `reqbot` service tags its build output as `image: reqbot:latest`
+(matching the tag used above) alongside `build: .` — Compose only builds an image that isn't
+already present locally, so once `docker load` has populated that exact tag, `docker compose up
+-d` runs the loaded image directly rather than trying to rebuild from source on a machine that
+has neither a checkout nor build tools.
 
 Ollama models themselves aren't part of this image transfer — pull/copy them to the air-gapped
 Ollama instance separately (`ollama pull <model>` on a connected machine, then whatever your

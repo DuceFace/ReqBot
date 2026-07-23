@@ -22,7 +22,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.1c — local synthesis fails clearly instead of auto-pulling | Merged (PR #102) |
 | WP-25.2 — Real Python package foundation | Merged (PR #103) |
 | WP-25.3 — Docker image + compose examples | Merged (PR #104) |
-| WP-25.4 — Remove legacy bundle system | In progress |
+| WP-25.4 — Remove legacy bundle system | Merged (PR #105) |
 | WP-25.5 — Docs + integration gate | In progress |
 | WP-25.6a — Model role documentation | Merged (PR #106) |
 | WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Merged (PR #107) |
@@ -337,8 +337,8 @@ wrong-but-confident results.
 
 ## Phase 25 Gate Walkthrough (WP-25.5)
 
-Executed live against this environment's real Ollama (`192.168.90.100:11434`) and Qdrant
-(`192.168.30.153:6333`) instances on 2026-07-23, after WP-25.6c merged.
+Executed live against this environment's real configured Ollama and Qdrant instances on
+2026-07-23, after WP-25.6c merged.
 
 - **Clean source install works** — verified: `pip install .` into a fresh throwaway venv, then
   `reqbot --help` lists every subcommand and `reqbot status` reads the existing config and

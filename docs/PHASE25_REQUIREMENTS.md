@@ -26,7 +26,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.5 — Docs + integration gate | Not started |
 | WP-25.6a — Model role documentation | Merged (PR #106) |
 | WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Merged (PR #107) |
-| WP-25.6c — Embedding model configurability + index provenance | Not started (highest risk in 25.6; do last) |
+| WP-25.6c — Embedding model configurability + index provenance | Merged (PR #108) |
 
 ## Key Changes
 

@@ -83,7 +83,12 @@ def synthesize_local(
         pass  # can't reach the server to check — let generate() surface that error directly
     else:
         present = [m["name"] for m in tags_resp.json().get("models", [])]
-        if model not in present:
+        # Ollama treats an untagged model name (no ":") as an implicit ":latest" —
+        # generate() accepts either form, but /api/tags reports the fully-qualified
+        # name. Accept both so an untagged config doesn't false-positive as missing
+        # when the tagged form is what's actually listed (Codex review, PR #102).
+        acceptable = {model} if ":" in model else {model, f"{model}:latest"}
+        if not acceptable & set(present):
             raise RuntimeError(
                 f"[-] Synthesis model '{model}' is not available on the configured Ollama "
                 f"server ({ollama_url}).\n"

@@ -224,6 +224,16 @@ DEPENDENCY / TOOLCHAIN BACKLOG
    upgrades. Merge when CI passes unless release notes show a relevant behavior
    change.
 
+3. Security scanning / code checks in CI
+   Currently only GitHub's passive Dependabot alerts cover this repo (dependency
+   CVEs from the manifest files, surfaced on the Security tab — no CI job runs
+   against them). No SAST, no secret scanning, no code-scanning job alongside
+   the existing pytest/ruff CI checks. Worth adding eventually: bandit (or
+   equivalent) for Python, an ESLint security plugin for the frontend, and/or
+   GitHub code scanning (CodeQL). Not urgent — no known exploited issue driving
+   this — but real automated coverage should replace ad hoc vigilance
+   eventually rather than staying deferred indefinitely.
+
 
 ================================================================
 BACKBURNER

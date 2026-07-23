@@ -20,8 +20,9 @@ Day-to-day procedures for running, developing, and maintaining ReqBot on the Pro
 ## First-Run Setup
 
 New machine or fresh config: `python3 cli/reqbot.py init` — see README.md's "Setup" section
-for the full per-service (Qdrant/Ollama existing-vs-bootstrap) and synthesis (local/remote/none)
-walkthrough. `reqbot setup` still works as a deprecated alias.
+for the full Qdrant/Ollama URL and synthesis (local/remote/none) walkthrough. Qdrant and Ollama
+must already be running before you run `init` — it configures URLs only, it does not install
+or manage either service. `reqbot setup` still works as a deprecated alias.
 
 ---
 

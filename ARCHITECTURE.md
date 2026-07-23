@@ -292,11 +292,18 @@ pip3 install --break-system-packages anthropic openai
 
 ### Models (Ollama)
 
-| Model | Role | Pulled Via |
-|-------|------|-----------|
-| `llama3.1:8b-instruct-q4_K_M` | Step C extraction + query rewriting | `reqbot setup` (or `ollama pull llama3.1:8b-instruct-q4_K_M`) |
-| `nomic-embed-text` | Dense embeddings (768-dim) | `reqbot setup` (or `ollama pull nomic-embed-text`) |
-| `qwen2.5:14b` | Synthesis answers | **Lazy-pulled** on first `--synthesize` use; not pulled during setup (~9 GB) |
+ReqBot needs three model roles configured against your Ollama endpoint. None of them are pulled
+automatically by `reqbot init`/`setup` (WP-25.1b) — Ollama and its models are expected to already
+exist before you run `init`; pull manually with `ollama pull <model>`.
+
+| Role | Recommended default | Configurable? |
+|------|---------------------|---------------|
+| Embedding | `nomic-embed-text` | **No — current implementation limit.** Hardcoded as `EMBEDDING_MODEL` in `core/ask.py`, `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py` (plus inline references in `services/compare_service.py`, `services/evidence_service.py`). Changing it requires a code change, not just a config edit — and a full `reqbot reindex` afterward, since indexed vectors and query vectors must come from the same model family. |
+| Extraction / enrichment / query rewrite / HyDE | `llama3.1:8b-instruct-q4_K_M` | Yes — `extraction_model` / `enrichment_model` in `reqbot init` or config. Advanced users may point these at a different model. |
+| Local synthesis (optional) | `qwen2.5:14b` | Yes — `synthesis_model` in `reqbot init` or config. Only relevant when the synthesis backend is `local`; **lazy-pulled** on first `--synthesize` use rather than during `init` (~9 GB). |
+
+The defaults above are what's validated on Tyler's own consumer-grade hardware, not a requirement
+ReqBot enforces — they're a recommendation, not a mandate.
 
 **Qdrant data path (Docker-managed):** `~/.local/share/reqbot/qdrant/` — XDG Base Directory, outside the
 installer-managed `~/.reqbot/` tree so it survives installer upgrades without exclusion logic.
@@ -465,7 +472,8 @@ Optional files loaded at startup:
 |-------|-----|-------|
 | `reqbot` | Installed launcher → `cli/reqbot.py` | CLI mode (subcommand) or shell mode (no args) |
 | `python3 cli/reqbot.py <cmd>` | Dev/source mode | Same behavior, no installer needed |
-| `reqbot setup [--advanced]` | Bootstrap | One-shot first-run setup: Docker check, Qdrant container, Ollama install, core model pull, config write. Operational bootstrap — not part of pipeline or retrieval. `--advanced` delegates to `reqbot init` verbatim. |
+| `reqbot init` | Config wizard | One-shot first-run setup: configures Qdrant/Ollama URLs and model/synthesis preferences, writes config. Does not install or manage either service. Operational bootstrap — not part of pipeline or retrieval. |
+| `reqbot setup [--advanced]` | Deprecated alias | Delegates to `reqbot init` verbatim; `--advanced` is a no-op. |
 | `reqbot serve [--host H] [--port P]` | API server | Starts uvicorn on 127.0.0.1:8000; Swagger at /api-docs |
 | `python3 pipeline/run_pipeline.py <pdf>` | Direct pipeline run | Bypass reqbot for Step C resume with `--output-dir` |
 | `python3 pipeline/<step>.py` | Individual step | Each step is standalone with `--help` |

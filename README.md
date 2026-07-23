@@ -19,8 +19,8 @@ Run `reqbot serve` to start the web interface. Run `reqbot docs` to see your ind
 ## Requirements
 
 - Python 3.12+
-- Docker (only needed if you have `reqbot init` bootstrap Qdrant locally)
-- [Ollama](https://ollama.ai/) (only needed if you have `reqbot init` bootstrap it locally)
+- A running [Qdrant](https://qdrant.tech/) instance, reachable by URL
+- A running [Ollama](https://ollama.ai/) instance, reachable by URL
 - Python dependencies:
 
 ```bash
@@ -35,20 +35,20 @@ Run once on a fresh machine:
 reqbot init
 ```
 
-This asks, per service, whether to use an existing instance or set one up locally:
+This configures service URLs and model/synthesis preferences. ReqBot does not install, start, or
+manage Qdrant or Ollama itself — both must already be running somewhere reachable by URL before
+you run `init`:
 
-- **Qdrant** — point at an existing URL, or have `reqbot init` start a local Docker container.
-- **Ollama** — point at an existing URL, or have `reqbot init` install it locally and pull the
-  two core models (`nomic-embed-text` ~274 MB for embeddings; `llama3.1:8b-instruct-q4_K_M`
-  ~4.7 GB for extraction/query rewriting/HyDE). These are needed for local pipeline work
-  regardless of where answer synthesis happens.
+- **Qdrant URL** — where your vector database is reachable.
+- **Ollama URL** — where your Ollama instance is reachable. Ollama runs embeddings, requirement
+  extraction, query rewriting, and HyDE — needed for local pipeline work regardless of where
+  answer synthesis happens. Required models: `nomic-embed-text` (~274 MB) and
+  `llama3.1:8b-instruct-q4_K_M` (~4.7 GB); pull them yourself with `ollama pull <model>` if they
+  aren't already on your instance.
 - **Synthesis** — Local Ollama, Remote (Claude/GPT-4o), or None (retrieval-only; `--synthesize`
   returns no generated answer). The synthesis model (`qwen2.5:14b`, ~9 GB) is **not** pulled
   during setup if you choose local — it downloads automatically the first time you run
   `--synthesize`.
-
-The two service choices are independent — e.g. an existing managed Qdrant plus a locally
-bootstrapped Ollama, or vice versa, both work.
 
 `reqbot setup` still works as a deprecated alias for `reqbot init` (existing scripts/docs
 referencing it won't break), but `reqbot init` is the one documented first-run path.
@@ -201,8 +201,8 @@ The same checklist is available from the browser via the Checklists screen.
 
 ### `init`
 
-Guided first-run setup — asks, per service, whether to use an existing Qdrant/Ollama instance
-or bootstrap one locally, then configures models and synthesis (local, remote, or none).
+Guided first-run setup — configures Qdrant/Ollama service URLs and models/synthesis (local,
+remote, or none). Does not install or manage either service; both must already be running.
 
 ```bash
 reqbot init

@@ -465,7 +465,8 @@ Optional files loaded at startup:
 |-------|-----|-------|
 | `reqbot` | Installed launcher → `cli/reqbot.py` | CLI mode (subcommand) or shell mode (no args) |
 | `python3 cli/reqbot.py <cmd>` | Dev/source mode | Same behavior, no installer needed |
-| `reqbot setup [--advanced]` | Bootstrap | One-shot first-run setup: Docker check, Qdrant container, Ollama install, core model pull, config write. Operational bootstrap — not part of pipeline or retrieval. `--advanced` delegates to `reqbot init` verbatim. |
+| `reqbot init` | Config wizard | One-shot first-run setup: configures Qdrant/Ollama URLs and model/synthesis preferences, writes config. Does not install or manage either service. Operational bootstrap — not part of pipeline or retrieval. |
+| `reqbot setup [--advanced]` | Deprecated alias | Delegates to `reqbot init` verbatim; `--advanced` is a no-op. |
 | `reqbot serve [--host H] [--port P]` | API server | Starts uvicorn on 127.0.0.1:8000; Swagger at /api-docs |
 | `python3 pipeline/run_pipeline.py <pdf>` | Direct pipeline run | Bypass reqbot for Step C resume with `--output-dir` |
 | `python3 pipeline/<step>.py` | Individual step | Each step is standalone with `--help` |

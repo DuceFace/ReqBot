@@ -23,7 +23,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.2 — Real Python package foundation | Merged (PR #103) |
 | WP-25.3 — Docker image + compose examples | Merged (PR #104) |
 | WP-25.4 — Remove legacy bundle system | Merged (PR #105) |
-| WP-25.5 — Docs + integration gate | In progress |
+| WP-25.5 — Docs + integration gate | Merged (PR #109) |
 | WP-25.6a — Model role documentation | Merged (PR #106) |
 | WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Merged (PR #107) |
 | WP-25.6c — Embedding model configurability + index provenance | Merged (PR #108) |
@@ -375,13 +375,24 @@ browser-GUI click-through (search/trace/compare/evidence/checklist screens, Dock
 reachable from an actual browser) — not something this environment can drive, so Phase 25
 closure is Tyler's call once that pass happens, not declared here.
 
+**Update, 2026-07-23 — manual pass complete, Phase 25 closed.** Tyler ran `reqbot serve` and
+clicked through search/trace/compare/evidence/checklist in a real browser. The pass caught a
+real bug the CLI/CI checks above didn't: Qdrant only held 247 points (one leftover test
+document from an ad hoc `reqbot ingest` the day before) against a 31,725-requirement JSONL
+corpus across 45 documents — search worked mechanically but returned irrelevant results for
+almost any query, since HyDE/RRF ranking can't fix an index that's missing 99% of the corpus.
+Fixed with `reqbot reindex` (no re-extraction needed — JSONL is the system of record;
+re-embedding all 45 documents took ~3 minutes, not the 12+ hour original ingest). Re-verified
+via `reqbot ask` and in the browser afterward — all five screens confirmed good. This is the
+gate doing its job: an API/CLI-only verification pass would have missed this.
+
 ## Open Question For Phase 26 (Not Decided, Not In Scope Here)
 
 Remote synthesis (`reqbot ask --synthesize` calling out to Anthropic/OpenAI from inside
 ReqBot) was designed before MCP was on the roadmap. Once MCP is the primary interface, an
 orchestrating LLM (Claude, etc.) already has the structured evidence in its own context and
 will synthesize the answer itself — that's the actual MCP design intent
-(`docs/FUTURE_MCP_IDEA.md`: "synthesis never replaces structured output; it augments it").
+(`archive/FUTURE_MCP_IDEA.md`: "synthesis never replaces structured output; it augments it").
 Remote synthesis calling out to a second LLM from inside ReqBot is likely redundant in that
 flow and may be worth deprecating. Local Ollama synthesis is a different case — it still
 serves users with no LLM client at all who want a self-contained/offline answer, and isn't

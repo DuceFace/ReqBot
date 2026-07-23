@@ -71,7 +71,8 @@ jobs:
           echo "$resp" | python3 -c '
           import json, sys
           d = json.load(sys.stdin)
-          assert d["qdrant_url"] == "http://qdrant:6333", f"unexpected qdrant_url: {d[\"qdrant_url\"]}"
+          qdrant_url = d["qdrant_url"]
+          assert qdrant_url == "http://qdrant:6333", "unexpected qdrant_url: " + qdrant_url
           assert d["qdrant"]["reachable"] is True, "qdrant not reachable from inside the container"
           assert d["ollama_url"], "ollama_url missing from status response"
           '

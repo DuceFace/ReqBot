@@ -156,12 +156,13 @@ frontend/          ← React + TypeScript + Tailwind web GUI (Phase 18+)
 ```
 
 **Build:** `bash build/build-frontend.sh` (npm ci + npm run build → frontend/dist/).
-`bundle.sh` runs this automatically and copies dist into the installer tree.
 `reqbot serve` detects dist/index.html and serves the GUI; falls back to API-only mode if absent.
+The Docker image (Phase 25, WP-25.3) builds this in its own `node:20` stage and copies
+the result in as package data — see `Dockerfile`.
 
-Each package contains an `__init__.py`. Every entry point injects its repo root (or
-bundle `app/`) onto `sys.path` at startup, enabling both standalone execution and
-cross-package imports without a venv.
+Each package contains an `__init__.py`. Entry points defensively insert the repo root onto
+`sys.path` at startup, so imports resolve the same way whether running from a source
+checkout or an installed `reqbot` package (`pip install .`, Phase 25 WP-25.2).
 
 ### Internal Import Graph
 

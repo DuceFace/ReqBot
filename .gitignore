@@ -210,9 +210,10 @@ docs/agent/
 raw_pdfs/
 documents/processed/
 Backups/
+# WP-25.4 removed the self-extracting bundle system; build/linux-x86_64/ was its output
+# tree. Left ignored in case any local leftovers still exist on a dev machine.
 build/linux-x86_64/
-# `python -m build`/`pip install .` scratch dirs — collide with this repo's own
-# build/ directory (bundle scripts) until WP-25.4 removes those (Phase 25).
+# `python -m build`/`pip install .` scratch dirs.
 build/lib/
 build/bdist.*/
 dist/

@@ -1,0 +1,55 @@
+# ReqBot — example Docker Compose setup
+#
+# Copy to docker-compose.yml and adjust as needed. This is a starting point for local/
+# self-hosted use, not a managed deployment tool — ReqBot itself never starts, stops, or
+# manages these containers; that's Compose's job, not app code's.
+#
+# Ollama is commented out because GPU/host setups vary too much for one example to fit
+# everyone (see the "ollama" service below) — point REQBOT_OLLAMA_URL at whatever Ollama
+# instance you already run (local GPU box, another machine on your network, etc.) unless
+# you uncomment it.
+
+services:
+  reqbot:
+    build: .
+    # No auth exists in the API layer yet (Phase 26+). Publishing only to the host's own
+    # loopback keeps this at the exact same reachability as `reqbot serve`'s own
+    # 127.0.0.1 default — zero regression out of the box. Widening this to 0.0.0.0:8000
+    # (or a real network interface) is a deliberate choice for a remote/multi-user
+    # deployment, and that operator is responsible for their own reverse proxy/TLS/firewall.
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      REQBOT_QDRANT_URL: "http://qdrant:6333"
+      REQBOT_OLLAMA_URL: "http://host.docker.internal:11434"
+    volumes:
+      - ./documents/processed:/root/documents/processed
+    depends_on:
+      - qdrant
+    extra_hosts:
+      # Lets REQBOT_OLLAMA_URL above reach an Ollama instance running on the Docker host
+      # itself. Remove/adjust if Ollama runs elsewhere on your network instead.
+      - "host.docker.internal:host-gateway"
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant-storage:/qdrant/storage
+
+  # Uncomment if you want Ollama itself running in Compose rather than pointing at an
+  # existing instance. GPU passthrough syntax varies by host (Linux/nvidia-container-toolkit
+  # vs. Docker Desktop vs. no GPU at all) — this is the plain-CPU form; add a `deploy.
+  # resources.reservations.devices` block for GPU passthrough on a Linux host with the
+  # NVIDIA Container Toolkit installed.
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "127.0.0.1:11434:11434"
+  #   volumes:
+  #     - ollama-storage:/root/.ollama
+
+volumes:
+  qdrant-storage:
+  # ollama-storage:

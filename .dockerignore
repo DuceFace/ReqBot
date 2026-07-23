@@ -1,0 +1,38 @@
+# Keep processed artifacts, caches, local envs, and build junk out of images.
+
+.git
+.github
+
+# Processed documents / local data — never belongs in an image
+documents/
+raw_pdfs/
+Backups/
+archive/
+
+# Local dev artifacts
+build/
+dist/
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+
+# Tests / eval data not needed at runtime
+tests/
+eval/
+
+# Editor / OS cruft
+.vscode/
+.idea/
+*.DS_Store
+
+# Local docs not meant to ship in the image
+docs/agent/
+CLAUDE.md

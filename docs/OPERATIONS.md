@@ -70,8 +70,9 @@ python3 cli/reqbot.py evidence "incident response"
 
 ## Rebuilding the Frontend
 
-Requires Node.js 20 LTS or newer and npm on the PATH (not installed by default in the Coder
-workspace — `sudo apt-get install -y nodejs npm`, or use nvm/nodesource for a specific version):
+Requires Node.js 20 LTS or newer and npm on the PATH. Install Node 20+ using nvm, NodeSource, or
+an OS package source that actually provides Node 20+. On Ubuntu, the default `apt install nodejs
+npm` package may install Node 18, which is too old for ReqBot.
 
 ```bash
 bash build/build-frontend.sh

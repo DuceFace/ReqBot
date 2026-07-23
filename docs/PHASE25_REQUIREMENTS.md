@@ -21,8 +21,8 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.1b — `reqbot init` becomes config-only | Merged (PR #99) |
 | WP-25.1c — local synthesis fails clearly instead of auto-pulling | Merged (PR #102) |
 | WP-25.2 — Real Python package foundation | Merged (PR #103) |
-| WP-25.3 — Docker image + compose examples | In progress |
-| WP-25.4 — Remove legacy bundle system | Not started (blocked on 25.2 + 25.3 gates) |
+| WP-25.3 — Docker image + compose examples | Merged (PR #104) |
+| WP-25.4 — Remove legacy bundle system | In progress |
 | WP-25.5 — Docs + integration gate | Not started |
 | WP-25.6a — Model role documentation | Not started |
 | WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Not started |

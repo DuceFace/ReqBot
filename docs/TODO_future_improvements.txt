@@ -241,8 +241,10 @@ DEPENDENCY / TOOLCHAIN BACKLOG
    Acceptable for now since requirements.txt is the legacy/source-install path,
    not actively wrong, but Phase 25 should eventually decide requirements.txt's
    fate: kept in sync with pyproject.toml's extras split, explicitly demoted to
-   a "legacy path, may drift" doc note, or removed once WP-25.4 retires the
-   bundle system that's requirements.txt's main remaining reason to exist.
+   a "legacy path, may drift" doc note, or removed outright. WP-25.4 has now
+   retired the bundle system, so requirements.txt's only remaining reason to
+   exist is as the documented legacy/source-development path (README.md) —
+   the decision is still open, just no longer tied to the bundle system.
 
 
 ================================================================

@@ -182,12 +182,12 @@ def cmd_ask(args: argparse.Namespace) -> int:
             top_k=args.top_k,
             min_score=args.min_score,
             synthesize=args.synthesize,
-            model=args.model or _ask.DEFAULT_SYNTHESIS_MODEL,
+            model=args.model or _cfg.synthesis_model,
             domain_tags=args.domain_tags,
             requirement_types=args.requirement_types,
             document_ids=args.document_ids,
             no_rewrite=args.no_rewrite,
-            rewrite_model=args.rewrite_model,
+            rewrite_model=args.rewrite_model or _cfg.rewrite_model,
             qdrant_url=args.qdrant_url,
             ollama_url=args.ollama_url,
             json_output=args.json_output,
@@ -559,7 +559,13 @@ def cmd_status(args: argparse.Namespace) -> int:
     ollama_url = getattr(args, "ollama_url", _cfg.ollama_url)
     qdrant_url = getattr(args, "qdrant_url", _cfg.qdrant_url)
     processed_dir = getattr(args, "processed_dir", None) or _cfg.processed_dir_path()
-    result = status_service.check(ollama_url, qdrant_url, processed_dir)
+    configured_models = {
+        "extraction": _cfg.extraction_model,
+        "enrichment": _cfg.enrichment_model,
+        "rewrite": _cfg.rewrite_model,
+        "synthesis": _cfg.synthesis_model,
+    }
+    result = status_service.check(ollama_url, qdrant_url, processed_dir, configured_models)
 
     print("=" * 60)
     print("ReqBot System Status")
@@ -573,6 +579,13 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(f"  - {m['name']} ({m['size_gb']:.1f} GB)")
     else:
         print("  Status: NOT REACHABLE")
+
+    configured = result["configured_models"]
+    print("\n--- Configured Models ---")
+    print(f"  Extraction:  {configured['extraction']}")
+    print(f"  Enrichment:  {configured['enrichment']}")
+    print(f"  Rewrite:     {configured['rewrite']}")
+    print(f"  Synthesis:   {configured['synthesis']}")
 
     qdrant = result["qdrant"]
     print(f"\n--- Qdrant ({qdrant_url}) ---")
@@ -1077,6 +1090,21 @@ def cmd_init(args: argparse.Namespace) -> int:
         val = input(f"{label} [{default}]: ").strip()
         return val if val else default
 
+    def _prompt_role_model(label: str, resolved_default: str) -> str | None:
+        """Prompt for a role model that falls back to default_model (R-2.1).
+
+        Shows the just-entered default_model as the bracketed suggestion, not
+        whatever this role happened to resolve to before this init run — a
+        blank answer means "follow default_model", so it returns None rather
+        than freezing a literal, letting core.config.load()'s existing
+        fallback keep tracking default_model afterward (Codex review, PR #107:
+        entering a new default_model then blanking through extraction/
+        enrichment/rewrite must actually adopt the new value, not silently
+        re-write the stale one loaded before init started).
+        """
+        val = input(f"{label} [{resolved_default}]: ").strip()
+        return val if val else None
+
     def _prompt_choice(label: str, options: list[str], default: int = 1) -> int:
         """Print a numbered menu; return the 1-based choice (default on empty input)."""
         print(f"\n{label}")
@@ -1135,14 +1163,19 @@ def cmd_init(args: argparse.Namespace) -> int:
             print(f"  [!] Warning: '{default_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 
-        extraction_model = _prompt("Step C extraction model (default: same as above)", _cfg.extraction_model)
-        if available_models and extraction_model not in available_models:
+        extraction_model = _prompt_role_model("Step C extraction model (default: same as above)", default_model)
+        if extraction_model and available_models and extraction_model not in available_models:
             print(f"  [!] Warning: '{extraction_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 
-        enrichment_model = _prompt("Step D.5 enrichment model (default: same as above)", _cfg.enrichment_model)
-        if available_models and enrichment_model not in available_models:
+        enrichment_model = _prompt_role_model("Step D.5 enrichment model (default: same as above)", default_model)
+        if enrichment_model and available_models and enrichment_model not in available_models:
             print(f"  [!] Warning: '{enrichment_model}' not found on Ollama server.")
+            print(f"      Available: {', '.join(available_models)}")
+
+        rewrite_model = _prompt_role_model("Query-rewrite/HyDE model (default: same as above)", default_model)
+        if rewrite_model and available_models and rewrite_model not in available_models:
+            print(f"  [!] Warning: '{rewrite_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 
         synthesis_model = _prompt("Synthesis model", _cfg.synthesis_model)
@@ -1235,6 +1268,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "default_model": default_model,
         "extraction_model": extraction_model,
         "enrichment_model": enrichment_model,
+        "rewrite_model": rewrite_model,
         "synthesis_model": synthesis_model,
         "top_k": top_k,
         "min_score": min_score,
@@ -1401,7 +1435,7 @@ def main() -> None:
     )
     p_ask.add_argument("--no-rewrite", action="store_true", dest="no_rewrite", help="Skip query rewriting")
     p_ask.add_argument("--no-hyde", action="store_true", dest="no_hyde", help="Disable HyDE hypothesis leg — baseline dense + BM25 RRF only")
-    p_ask.add_argument("--rewrite-model", type=str, default="llama3.1:8b-instruct-q4_K_M", dest="rewrite_model", help="LLM model for query rewriting")
+    p_ask.add_argument("--rewrite-model", type=str, default=None, dest="rewrite_model", help=f"LLM model for query rewriting (default: configured rewrite_model, currently {_cfg.rewrite_model})")
     p_ask.add_argument("--context-collection", type=str, default="grc_context", dest="context_collection", help="Qdrant context collection name")
     p_ask.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
     p_ask.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")

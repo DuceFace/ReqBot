@@ -308,7 +308,7 @@ below.
 | Embedding | `nomic-embed-text` | **No — current implementation limit.** Hardcoded as `EMBEDDING_MODEL` in `core/ask.py`, `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py` (plus inline references in `services/compare_service.py`, `services/evidence_service.py`). Changing it requires a code change, not just a config edit — and a full `reqbot reindex` afterward, since indexed vectors and query vectors must come from the same model family. |
 | Extraction | `llama3.1:8b-instruct-q4_K_M` | Yes — `extraction_model` in `reqbot init` or config. Advanced users may point this at a different model. |
 | Enrichment | `llama3.1:8b-instruct-q4_K_M` | Yes — `enrichment_model` in `reqbot init` or config. Advanced users may point this at a different model. |
-| Query rewrite / HyDE | `llama3.1:8b-instruct-q4_K_M` | **No — CLI-flag only, not config.** `--rewrite-model` in `cli/reqbot.py`, with the default hardcoded twice (`cli/reqbot.py`'s argparse default and `DEFAULT_REWRITE_MODEL` in `core/ask.py`) — two copies of the same literal, not one source of truth. No `reqbot init`/config-file/env-var presence at all today, unlike the other roles. See WP-25.6b. |
+| Query rewrite / HyDE | `llama3.1:8b-instruct-q4_K_M` | Yes (WP-25.6b) — `rewrite_model` in `reqbot init` or config, same `REQBOT_REWRITE_MODEL` env-var pattern and default-model fallback as extraction/enrichment. `--rewrite-model` in `cli/reqbot.py` overrides it per-call; unset, it defers to config instead of a second hardcoded literal. |
 | Local synthesis (optional) | `qwen2.5:14b` | Yes — `synthesis_model` in `reqbot init` or config. Only relevant when the synthesis backend is `local`. Not pulled by `init` or automatically at any point (~9 GB) — if it's missing on the configured Ollama server, synthesis fails clearly at call time naming the model and the `ollama pull` command to fix it, rather than silently downloading it. |
 
 **Qdrant data path (Docker-managed):** `~/.local/share/reqbot/qdrant/` — XDG Base Directory, outside the
@@ -458,6 +458,7 @@ Three-layer load order (later layers win):
 | `default_model` | `REQBOT_DEFAULT_MODEL` | `llama3.1:8b-instruct-q4_K_M` |
 | `extraction_model` | `REQBOT_EXTRACTION_MODEL` | falls back to `default_model` |
 | `enrichment_model` | `REQBOT_ENRICHMENT_MODEL` | falls back to `default_model` |
+| `rewrite_model` | `REQBOT_REWRITE_MODEL` | falls back to `default_model` |
 | `synthesis_model` | `REQBOT_SYNTHESIS_MODEL` | `qwen2.5:14b` |
 | `top_k` | `REQBOT_TOP_K` | `20` |
 | `min_score` | `REQBOT_MIN_SCORE` | `0.02` |

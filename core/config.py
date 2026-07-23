@@ -24,6 +24,7 @@ _DEFAULTS: dict = {
     "default_model": "llama3.1:8b-instruct-q4_K_M",
     "extraction_model": None,   # None → falls back to default_model at load time (R-2.1)
     "enrichment_model": None,   # None → falls back to default_model at load time (R-2.1)
+    "rewrite_model": None,      # None → falls back to default_model at load time (R-2.1)
     "synthesis_model": "qwen2.5:14b",
     "top_k": 20,
     "min_score": 0.02,
@@ -41,6 +42,7 @@ _ENV_MAP: dict[str, str] = {
     "default_model": "REQBOT_DEFAULT_MODEL",
     "extraction_model": "REQBOT_EXTRACTION_MODEL",
     "enrichment_model": "REQBOT_ENRICHMENT_MODEL",
+    "rewrite_model": "REQBOT_REWRITE_MODEL",
     "synthesis_model": "REQBOT_SYNTHESIS_MODEL",
     "top_k": "REQBOT_TOP_K",
     "min_score": "REQBOT_MIN_SCORE",
@@ -66,6 +68,7 @@ class ReqBotConfig:
     default_model: str
     extraction_model: str   # Step C; falls back to default_model when not set in config
     enrichment_model: str   # Step D.5; falls back to default_model when not set in config
+    rewrite_model: str      # query rewrite + HyDE; falls back to default_model when not set
     synthesis_model: str
     top_k: int
     min_score: float
@@ -150,11 +153,13 @@ def load() -> ReqBotConfig:
             else:
                 values[key] = val
 
-    # R-2.1: extraction_model / enrichment_model fall back to default_model when absent.
-    # Existing configs that predate WP-2 will have None here — resolve silently.
+    # R-2.1: extraction_model / enrichment_model / rewrite_model fall back to default_model
+    # when absent. Existing configs that predate WP-2 (or WP-25.6b for rewrite_model) will
+    # have None here — resolve silently.
     default_model = values["default_model"]
     extraction_model = values.get("extraction_model") or default_model
     enrichment_model = values.get("enrichment_model") or default_model
+    rewrite_model = values.get("rewrite_model") or default_model
 
     cfg = ReqBotConfig(
         ollama_url=values["ollama_url"],
@@ -162,6 +167,7 @@ def load() -> ReqBotConfig:
         default_model=default_model,
         extraction_model=extraction_model,
         enrichment_model=enrichment_model,
+        rewrite_model=rewrite_model,
         synthesis_model=values["synthesis_model"],
         top_k=values["top_k"],
         min_score=values["min_score"],

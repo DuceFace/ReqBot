@@ -634,7 +634,7 @@ class GrcaiConsole(cmd.Cmd):
             context=parsed.context,
             no_rewrite=False,
             no_hyde=parsed.no_hyde,
-            rewrite_model="llama3.1:8b-instruct-q4_K_M",
+            rewrite_model=_reqbot._cfg.rewrite_model,
             context_collection="grc_context",
             ollama_url=self._session["ollama_url"],
             qdrant_url=self._session["qdrant_url"],

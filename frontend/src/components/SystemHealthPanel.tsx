@@ -49,6 +49,15 @@ export default function SystemHealthPanel({ data }: Props) {
           detail={data.qdrant.reachable ? collectionList : `Unreachable — ${data.qdrant_url}`}
         />
       </div>
+      <div className="px-5 py-3 bg-gray-50 border-t border-gray-100">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+          Configured Models
+        </p>
+        <p className="text-xs text-gray-500">
+          Extraction: {data.configured_models.extraction} &middot; Enrichment: {data.configured_models.enrichment}
+          {' '}&middot; Rewrite: {data.configured_models.rewrite} &middot; Synthesis: {data.configured_models.synthesis}
+        </p>
+      </div>
       <div className="px-5 py-3 bg-gray-50 rounded-b-lg">
         <p className="text-xs text-gray-500">
           {docCount} processed document{docCount !== 1 ? 's' : ''} on disk

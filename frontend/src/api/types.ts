@@ -294,4 +294,12 @@ export interface StatusResponse {
     collections: Array<{ name: string; points: number | string }>
   }
   processed_documents: Array<{ path: string; count: number }>
+  /** Which model ReqBot is actually configured to use per role — distinct from
+   *  ollama.models above, which is just what's installed on the server. */
+  configured_models: {
+    extraction: string
+    enrichment: string
+    rewrite: string
+    synthesis: string
+  }
 }

@@ -16,6 +16,12 @@ def get_status() -> dict:
             cfg.ollama_url,
             cfg.qdrant_url,
             cfg.processed_dir_path(),
+            {
+                "extraction": cfg.extraction_model,
+                "enrichment": cfg.enrichment_model,
+                "rewrite": cfg.rewrite_model,
+                "synthesis": cfg.synthesis_model,
+            },
         )
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))

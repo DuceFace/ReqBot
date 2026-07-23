@@ -33,6 +33,7 @@ def _mock_cfg(tmp_path):
         default_model="llama3.1:8b-instruct-q4_K_M",
         extraction_model="llama3.1:8b-instruct-q4_K_M",
         enrichment_model="llama3.1:8b-instruct-q4_K_M",
+        rewrite_model="llama3.1:8b-instruct-q4_K_M",
         synthesis_model="qwen2.5:14b",
         top_k=20,
         min_score=0.02,
@@ -79,6 +80,9 @@ def _run_init(tmp_path, inputs):
              "ollama": {"reachable": True, "models": []},
              "qdrant": {"reachable": True, "collections": []},
              "processed_documents": [],
+             "configured_models": {
+                 "extraction": "x", "enrichment": "x", "rewrite": "x", "synthesis": "x",
+             },
          }):
         rc = cmd_init(SimpleNamespace())
     written = json.loads((tmp_path / "config.json").read_text())
@@ -104,7 +108,7 @@ def test_init_prompts_directly_for_urls_no_choice_menu(tmp_path):
     """Qdrant/Ollama are configured by URL only — no existing-vs-bootstrap menu."""
     inputs = [
         "http://my-qdrant:6333", "http://my-ollama:11434",
-        "", "", "", "",  # 4 models
+        "", "", "", "", "",  # 5 models
         "", "", "",  # top_k, min_score, processed_dir
         "3",  # synthesis = none
     ]
@@ -112,6 +116,19 @@ def test_init_prompts_directly_for_urls_no_choice_menu(tmp_path):
     assert rc == 0
     assert written["qdrant_url"] == "http://my-qdrant:6333"
     assert written["ollama_url"] == "http://my-ollama:11434"
+
+
+def test_init_writes_rewrite_model(tmp_path):
+    """rewrite_model is a real prompt + config field now (WP-25.6b), not CLI-flag-only."""
+    inputs = [
+        "", "",  # qdrant/ollama URLs
+        "", "", "", "custom-rewrite-model", "",  # default/extraction/enrichment/rewrite/synthesis
+        "", "", "",  # top_k, min_score, processed_dir
+        "3",  # synthesis = none
+    ]
+    rc, written = _run_init(tmp_path, inputs)
+    assert rc == 0
+    assert written["rewrite_model"] == "custom-rewrite-model"
 
 
 def test_init_retries_url_on_failed_connection(tmp_path):
@@ -131,7 +148,7 @@ def test_init_retries_url_on_failed_connection(tmp_path):
         "n",  # don't keep it
         "http://good-qdrant:6333",  # succeeds
         "",  # ollama URL default
-        "", "", "", "",  # 4 models
+        "", "", "", "", "",  # 5 models
         "", "", "",  # top_k, min_score, processed_dir
         "3",  # synthesis = none
     ]
@@ -143,6 +160,9 @@ def test_init_retries_url_on_failed_connection(tmp_path):
              "ollama": {"reachable": True, "models": []},
              "qdrant": {"reachable": True, "collections": []},
              "processed_documents": [],
+             "configured_models": {
+                 "extraction": "x", "enrichment": "x", "rewrite": "x", "synthesis": "x",
+             },
          }):
         rc = cmd_init(SimpleNamespace())
     written = json.loads((tmp_path / "config.json").read_text())
@@ -155,7 +175,7 @@ def test_init_retries_url_on_failed_connection(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_synthesis_none_skips_remote_prompts_and_writes_backend_none(tmp_path):
-    inputs = ["", "", "", "", "", "", "", "", "", "3"]
+    inputs = ["", "", "", "", "", "", "", "", "", "", "3"]
     rc, written = _run_init(tmp_path, inputs)
     assert rc == 0
     assert written["synthesis_backend"] == "none"
@@ -167,7 +187,7 @@ def test_synthesis_none_skips_remote_prompts_and_writes_backend_none(tmp_path):
 
 def test_synthesis_remote_prompts_for_provider_model_and_api_key_env(tmp_path):
     inputs = [
-        "", "", "", "", "", "", "", "", "", "2",
+        "", "", "", "", "", "", "", "", "", "", "2",
         "openai", "gpt-4o", "OPENAI_API_KEY",
     ]
     rc, written = _run_init(tmp_path, inputs)
@@ -179,7 +199,7 @@ def test_synthesis_remote_prompts_for_provider_model_and_api_key_env(tmp_path):
 
 
 def test_synthesis_local_needs_no_extra_prompts(tmp_path):
-    inputs = ["", "", "", "", "", "", "", "", "", "1"]
+    inputs = ["", "", "", "", "", "", "", "", "", "", "1"]
     rc, written = _run_init(tmp_path, inputs)
     assert rc == 0
     assert written["synthesis_backend"] == "local"

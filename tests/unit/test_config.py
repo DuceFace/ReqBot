@@ -57,3 +57,20 @@ def test_extraction_enrichment_fallback_to_default():
     c = cfg.load()
     assert c.extraction_model == c.default_model
     assert c.enrichment_model == c.default_model
+
+
+def test_rewrite_model_fallback_to_default():
+    c = cfg.load()
+    assert c.rewrite_model == c.default_model
+
+
+def test_rewrite_model_config_file_and_env_var(monkeypatch, tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"rewrite_model": "from-file-model"}))
+    monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
+    c = cfg.load()
+    assert c.rewrite_model == "from-file-model"
+
+    monkeypatch.setenv("REQBOT_REWRITE_MODEL", "from-env-model")
+    c = cfg.load()
+    assert c.rewrite_model == "from-env-model"

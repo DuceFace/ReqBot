@@ -15,7 +15,12 @@ if str(_ROOT) not in sys.path:
 log = logging.getLogger(__name__)
 
 
-def check(ollama_url: str, qdrant_url: str, processed_dir: Path) -> dict:
+def check(
+    ollama_url: str,
+    qdrant_url: str,
+    processed_dir: Path,
+    configured_models: dict | None = None,
+) -> dict:
     """Check system status and return structured results.
 
     Returns a dict with keys:
@@ -24,6 +29,9 @@ def check(ollama_url: str, qdrant_url: str, processed_dir: Path) -> dict:
       ollama: {reachable: bool, models: list[{name, size_gb}]}
       qdrant: {reachable: bool, collections: list[{name, points}]}
       processed_documents: list[{path: str, count: int}]
+      configured_models: dict — which model ReqBot is actually configured to use per
+        role (extraction/enrichment/rewrite/synthesis), distinct from `ollama.models`
+        above which is what's merely installed/available on the server (WP-25.6b).
     """
     result: dict = {
         "ollama_url": ollama_url,
@@ -31,6 +39,7 @@ def check(ollama_url: str, qdrant_url: str, processed_dir: Path) -> dict:
         "ollama": {"reachable": False, "models": []},
         "qdrant": {"reachable": False, "collections": []},
         "processed_documents": [],
+        "configured_models": configured_models or {},
     }
 
     # --- Ollama ---

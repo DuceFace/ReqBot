@@ -10,6 +10,22 @@ Phase 25 changes ReqBot’s deployment strategy from “self-contained Linux bun
 - Air-gap story: export/import Docker images and pre-pulled dependency/model artifacts, not a custom self-extracting installer
 - MCP: deferred to Phase 26 candidate because packaging/deployment must be boring first
 
+## Status
+
+This table is the live source of truth for Phase 25 WP status — update it here when a WP lands,
+not in `CLAUDE.md` or anywhere else.
+
+| WP | Status |
+|---|---|
+| WP-25.1a — Node/npm build prerequisite cleanup | Merged (PR #98) |
+| WP-25.1b — `reqbot init` becomes config-only | Merged (PR #99) |
+| WP-25.1c — local synthesis fails clearly instead of auto-pulling | Not started |
+| WP-25.2 — Real Python package foundation | Not started |
+| WP-25.3 — Docker image + compose examples | Not started |
+| WP-25.4 — Remove legacy bundle system | Not started (blocked on 25.2 + 25.3 gates) |
+| WP-25.5 — Docs + integration gate | Not started |
+| WP-25.6 — Embedding model configurability + provenance tracking | Not started (independent of 25.1–25.5) |
+
 ## Key Changes
 
 ### WP-25.1 — Standard Build Prerequisites + Init Cleanup

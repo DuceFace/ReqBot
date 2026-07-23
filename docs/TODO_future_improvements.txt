@@ -234,6 +234,16 @@ DEPENDENCY / TOOLCHAIN BACKLOG
    this — but real automated coverage should replace ad hoc vigilance
    eventually rather than staying deferred indefinitely.
 
+4. requirements.txt vs. pyproject.toml drift (Codex review, WP-25.2)
+   WP-25.2 moved rapidfuzz into pyproject.toml's reqbot[dev] extra, since its
+   only consumer (eval/eval_harness.py) isn't reachable through any product
+   surface — but requirements.txt still lists it as a runtime dependency.
+   Acceptable for now since requirements.txt is the legacy/source-install path,
+   not actively wrong, but Phase 25 should eventually decide requirements.txt's
+   fate: kept in sync with pyproject.toml's extras split, explicitly demoted to
+   a "legacy path, may drift" doc note, or removed once WP-25.4 retires the
+   bundle system that's requirements.txt's main remaining reason to exist.
+
 
 ================================================================
 BACKBURNER

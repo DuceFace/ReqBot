@@ -17,6 +17,24 @@ Day-to-day procedures for running, developing, and maintaining ReqBot on the Pro
 
 ---
 
+## Installing Python Dependencies (this environment)
+
+This Coder workspace runs on Debian/Ubuntu with an externally-managed system Python — plain
+`pip install` refuses to touch it, so both the packaged install (README's primary path) and the
+legacy `requirements.txt` path need `--break-system-packages` here specifically:
+
+```bash
+pip3 install --break-system-packages .
+# or, legacy/source path:
+pip3 install --break-system-packages -r requirements.txt -r requirements-dev.txt
+```
+
+This flag is a Debian/Ubuntu packaging-policy quirk of this specific environment, not general
+ReqBot install guidance — most Python installs (a real venv, macOS, most other Linux setups)
+never need it. That's why it lives here and not in README.md.
+
+---
+
 ## First-Run Setup
 
 New machine or fresh config: `python3 cli/reqbot.py init` — see README.md's "Setup" section

@@ -433,8 +433,13 @@ Top-K results from Qdrant grc_requirements
 
 | Collection | Contents | Vector Schema | Used By |
 |------------|----------|---------------|---------|
-| `grc_requirements` | Normalized requirement statements | 768-dim cosine (dense) + BM25 sparse, RRF fusion | ask, trace, compare, evidence |
+| `grc_requirements` | Normalized requirement statements | cosine dense + BM25 sparse, RRF fusion | ask, trace, compare, evidence |
 | `grc_context` | Raw chunk text (Step B output) | Same hybrid schema | ask/trace/evidence --context |
+
+Dense vector dimension is derived from the configured `embedding_model`'s actual output at
+collection-creation time (WP-25.6c), not a hardcoded constant — `nomic-embed-text` (the default)
+happens to be 768-dim, but collection creation is deferred until the first successful embedding
+comes back so a differently-sized model still produces a correctly-shaped collection.
 
 Both collections use an atomic alias swap on reindex — the live collection is not touched until
 all documents succeed. On failure, the temp collection is deleted.

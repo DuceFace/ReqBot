@@ -51,7 +51,6 @@ log = logging.getLogger(__name__)
 COLLECTION_NAME = "grc_context"
 EMBEDDING_MODEL = "nomic-embed-text"
 SPARSE_MODEL = "Qdrant/bm25"
-VECTOR_DIM = 768
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -65,8 +64,15 @@ def load_jsonl(path: Path) -> list[dict]:
     return records
 
 
-def ensure_collection(client: QdrantClient, collection_name: str, recreate: bool) -> None:
-    """Create or recreate the Qdrant collection."""
+def prepare_collection(client: QdrantClient, collection_name: str, recreate: bool) -> bool:
+    """Delete the collection if recreate=True, and report whether creation is
+    still needed.
+
+    Creation is deferred to create_collection() below rather than done here,
+    because the dense vector dimension depends on the configured
+    embedding_model (WP-25.6c) — it's only known once the first embedding
+    actually comes back, not before any text has been embedded.
+    """
     exists = client.collection_exists(collection_name)
 
     if exists and recreate:
@@ -74,27 +80,36 @@ def ensure_collection(client: QdrantClient, collection_name: str, recreate: bool
         client.delete_collection(collection_name)
         exists = False
 
-    if not exists:
-        client.create_collection(
-            collection_name=collection_name,
-            vectors_config={
-                "dense": models.VectorParams(
-                    size=VECTOR_DIM,
-                    distance=models.Distance.COSINE,
-                ),
-            },
-            sparse_vectors_config={
-                "sparse": models.SparseVectorParams(
-                    index=models.SparseIndexParams(on_disk=False),
-                ),
-            },
-        )
-        log.info(
-            "Created collection '%s' (dense cosine %d-dim + sparse BM25)",
-            collection_name, VECTOR_DIM,
-        )
-    else:
+    if exists:
         log.info("Collection '%s' already exists, will upsert", collection_name)
+
+    return not exists
+
+
+def create_collection(client: QdrantClient, collection_name: str, vector_dim: int) -> None:
+    """Create the collection with a dense vector size matching the actual
+    embedding output — not a hardcoded constant, so a non-default
+    embedding_model with a dimension other than nomic-embed-text's 768
+    still produces a correctly-shaped collection (WP-25.6c, Codex review
+    PR #108)."""
+    client.create_collection(
+        collection_name=collection_name,
+        vectors_config={
+            "dense": models.VectorParams(
+                size=vector_dim,
+                distance=models.Distance.COSINE,
+            ),
+        },
+        sparse_vectors_config={
+            "sparse": models.SparseVectorParams(
+                index=models.SparseIndexParams(on_disk=False),
+            ),
+        },
+    )
+    log.info(
+        "Created collection '%s' (dense cosine %d-dim + sparse BM25)",
+        collection_name, vector_dim,
+    )
 
 
 def embed_batch(texts: list[str], client: ollama.Client, model: str = EMBEDDING_MODEL) -> list[list[float]]:
@@ -167,7 +182,7 @@ def run(
     sparse_model = SparseTextEmbedding(model_name=SPARSE_MODEL)
 
     client = QdrantClient(url=qdrant_url)
-    ensure_collection(client, collection_name, recreate)
+    needs_creation = prepare_collection(client, collection_name, recreate)
 
     start = time.time()
     total_indexed = 0
@@ -213,6 +228,14 @@ def run(
                 except Exception as e2:
                     log.error("Individual sparse embed failed: %s — item will be skipped", e2)
                     sparse_embeddings.append(None)
+
+        if needs_creation:
+            first_dense = next((e for e in dense_embeddings if e is not None), None)
+            if first_dense is not None:
+                create_collection(client, collection_name, len(first_dense))
+                needs_creation = False
+            # else: every embedding in this batch failed — nothing to create
+            # from yet; retry on the next batch.
 
         # Build points — skip any item where either embedding failed
         points = []

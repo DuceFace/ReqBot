@@ -7,18 +7,37 @@ Covers the pure/local logic that's testable without a real Ollama/Qdrant:
     evidence_service._embedding_warnings() detect mismatches correctly and never
     block (empty list = no warning, not an error)
 """
+import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from core.ask import _embedding_mismatch_warnings
 from pipeline.embed_and_index import build_payload
 from pipeline.embed_and_index import embed_batch as embed_and_index_batch
+from pipeline.embed_and_index import run as embed_and_index_run
 from pipeline.embed_context_index import embed_batch as embed_context_batch
+from pipeline.embed_context_index import run as embed_context_index_run
 from services.compare_service import _embedding_warnings as compare_warnings
 from services.evidence_service import _embedding_warnings as evidence_warnings
+
+
+def _mock_sparse_model():
+    """A fastembed.SparseTextEmbedding stand-in: .embed(texts) yields one
+    fake sparse embedding object per input text."""
+    mock_model = MagicMock()
+
+    def _embed(texts):
+        for _ in texts:
+            emb = MagicMock()
+            emb.indices.tolist.return_value = [0]
+            emb.values.tolist.return_value = [1.0]
+            yield emb
+
+    mock_model.embed.side_effect = _embed
+    return mock_model
 
 # ---------------------------------------------------------------------------
 # build_payload — provenance written at index time
@@ -104,3 +123,73 @@ def test_compare_and_evidence_warnings_match_core_ask_behavior():
     compare_w = compare_warnings(results, "new-model")
     evidence_w = evidence_warnings(results, "new-model")
     assert core_w == compare_w == evidence_w
+
+
+# ---------------------------------------------------------------------------
+# Collection creation — dimension derived from the actual embedding, not a
+# hardcoded 768 (Codex review, PR #108: a hardcoded VECTOR_DIM would make
+# `reqbot reindex` fail outright for any embedding_model with a different
+# output dimension, undermining the whole point of WP-25.6c).
+# ---------------------------------------------------------------------------
+
+def test_embed_and_index_create_collection_uses_actual_embedding_dimension(tmp_path):
+    jsonl_path = tmp_path / "reqs.jsonl"
+    jsonl_path.write_text(json.dumps(_MIN_REQ) + "\n")
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.collection_exists.return_value = False
+    mock_qdrant.get_collection.return_value = MagicMock(points_count=1)
+
+    mock_ollama_client = MagicMock()
+    mock_ollama_client.embed.return_value = MagicMock(embeddings=[[0.0] * 1024])
+
+    with patch("pipeline.embed_and_index.QdrantClient", return_value=mock_qdrant), \
+         patch("pipeline.embed_and_index.ollama.Client", return_value=mock_ollama_client), \
+         patch("pipeline.embed_and_index.SparseTextEmbedding", return_value=_mock_sparse_model()):
+        embed_and_index_run(str(jsonl_path), embedding_model="a-1024-dim-model")
+
+    mock_qdrant.create_collection.assert_called_once()
+    _, kwargs = mock_qdrant.create_collection.call_args
+    assert kwargs["vectors_config"]["dense"].size == 1024
+
+
+def test_embed_context_index_create_collection_uses_actual_embedding_dimension(tmp_path):
+    chunks_path = tmp_path / "doc_chunks.jsonl"
+    chunks_path.write_text(json.dumps({"chunk_id": "c1", "text": "hello world"}) + "\n")
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.collection_exists.return_value = False
+    mock_qdrant.get_collection.return_value = MagicMock(points_count=1)
+
+    mock_ollama_client = MagicMock()
+    mock_ollama_client.embed.return_value = MagicMock(embeddings=[[0.0] * 1024])
+
+    with patch("pipeline.embed_context_index.QdrantClient", return_value=mock_qdrant), \
+         patch("pipeline.embed_context_index.ollama.Client", return_value=mock_ollama_client), \
+         patch("pipeline.embed_context_index.SparseTextEmbedding", return_value=_mock_sparse_model()):
+        embed_context_index_run(str(chunks_path), embedding_model="a-1024-dim-model")
+
+    mock_qdrant.create_collection.assert_called_once()
+    _, kwargs = mock_qdrant.create_collection.call_args
+    assert kwargs["vectors_config"]["dense"].size == 1024
+
+
+def test_embed_and_index_skips_creation_when_collection_already_exists(tmp_path):
+    """recreate=False and an existing collection must not attempt creation at
+    all — upserts into whatever dimension the collection already has."""
+    jsonl_path = tmp_path / "reqs.jsonl"
+    jsonl_path.write_text(json.dumps(_MIN_REQ) + "\n")
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.collection_exists.return_value = True
+    mock_qdrant.get_collection.return_value = MagicMock(points_count=1)
+
+    mock_ollama_client = MagicMock()
+    mock_ollama_client.embed.return_value = MagicMock(embeddings=[[0.0] * 768])
+
+    with patch("pipeline.embed_and_index.QdrantClient", return_value=mock_qdrant), \
+         patch("pipeline.embed_and_index.ollama.Client", return_value=mock_ollama_client), \
+         patch("pipeline.embed_and_index.SparseTextEmbedding", return_value=_mock_sparse_model()):
+        embed_and_index_run(str(jsonl_path))
+
+    mock_qdrant.create_collection.assert_not_called()

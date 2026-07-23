@@ -763,6 +763,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
                 "mode": "exact",
                 "source_ref": result["source_ref"],
                 "groups": list(doc_groups.values()),
+                "warnings": result.get("warnings", []),
             }, indent=2, ensure_ascii=False))
             return 0
 
@@ -811,6 +812,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
                     {"source_ref": ref, "documents": list(ref_groups[ref].values())}
                     for ref in ref_order
                 ],
+                "warnings": result.get("warnings", []),
             }, indent=2, ensure_ascii=False))
             return 0
 

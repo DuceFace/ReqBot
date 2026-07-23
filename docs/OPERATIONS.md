@@ -2,6 +2,12 @@
 
 Day-to-day procedures for running, developing, and maintaining ReqBot on the Proxmox dev environment.
 
+**Scope note (WP-25.5):** this file is specific to this project's own dev environment — hardcoded
+IPs, a particular Debian/Ubuntu package-policy quirk, etc. It is not general install/deployment
+guidance for other users or environments. For that, see `README.md`'s "Install / Deployment"
+section (Docker, source/dev install, air-gapped transfer) — general instructions live there, not
+here, so they stay usable by anyone regardless of how this specific box is set up.
+
 ---
 
 ## Environment Quick Facts

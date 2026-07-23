@@ -23,7 +23,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.2 — Real Python package foundation | Merged (PR #103) |
 | WP-25.3 — Docker image + compose examples | Merged (PR #104) |
 | WP-25.4 — Remove legacy bundle system | In progress |
-| WP-25.5 — Docs + integration gate | Not started |
+| WP-25.5 — Docs + integration gate | In progress |
 | WP-25.6a — Model role documentation | Merged (PR #106) |
 | WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Merged (PR #107) |
 | WP-25.6c — Embedding model configurability + index provenance | Merged (PR #108) |
@@ -334,6 +334,46 @@ wrong-but-confident results.
 - The old self-extracting Linux bundle is deleted after the Docker/pip replacement lands, not quarantined indefinitely.
 - `nomic-embed-text` remains the recommended, validated embedding default after WP-25.6 — making
   it configurable does not change what ReqBot ships or suggests out of the box.
+
+## Phase 25 Gate Walkthrough (WP-25.5)
+
+Executed live against this environment's real Ollama (`192.168.90.100:11434`) and Qdrant
+(`192.168.30.153:6333`) instances on 2026-07-23, after WP-25.6c merged.
+
+- **Clean source install works** — verified: `pip install .` into a fresh throwaway venv, then
+  `reqbot --help` lists every subcommand and `reqbot status` reads the existing config and
+  reaches both services correctly from that fresh install.
+- **`reqbot init` configures existing Qdrant/Ollama URLs only** — no bootstrap capability exists;
+  covered by `tests/unit/test_cli_init.py`'s `test_no_bootstrap_functions_remain`, which asserts
+  the Docker/Ollama-installer bootstrap helpers were removed entirely in WP-25.1b, not just
+  unused.
+- **Docker image starts API/UI; container can reach configured Qdrant/Ollama** — not re-verified
+  in this environment (this Coder sandbox can't run a Docker daemon at all — nested-container/
+  DinD limitation, documented in WP-25.3). Verified instead via `.github/workflows/ci.yml`'s
+  `docker` job (WP-25.3 follow-up), which runs on GitHub-hosted runners with native Docker
+  support and checks exactly this: image builds from a clean checkout with no Node/npm on the
+  build host, container starts, `/api/status` responds, configured `REQBOT_QDRANT_URL`/
+  `REQBOT_OLLAMA_URL` are honored and Qdrant is reachable from inside the container. That job has
+  run green on every Phase 25 PR since it was added.
+- **Checklist/search/trace work** — verified directly via CLI against the real corpus. The CLI
+  and the container's API both call the same service layer (`services/ask_service.py`,
+  `services/checklist_service.py`, `services/trace_service.py` — the CLI/GUI/API/MCP-thin-
+  interfaces architecture rule), so this is the same code path a browser session in the
+  container would exercise:
+    - `reqbot ask "access control"` — returned ranked results.
+    - `reqbot trace REQ-9a753fdeec40` — returned full provenance (document, source ref, page,
+      extraction model, run date).
+    - `reqbot checklist --doc afi17-101 --format json` — generated a 247-item checklist.
+  The browser GUI's own click-through of these same endpoints is **not verified in this pass** —
+  no Node/browser in this sandbox — and still needs a manual pass from Tyler.
+- **No bundle scripts remain** — verified: searching for `bundle*.sh`/`reqbot-install.sh` finds
+  nothing outside this doc's own historical narrative of WP-25.4's removal; no live code or
+  other doc references the deleted scripts.
+
+Everything CLI/API/CI-verifiable is done. Phase 25's only remaining open item is a manual
+browser-GUI click-through (search/trace/compare/evidence/checklist screens, Docker container
+reachable from an actual browser) — not something this environment can drive, so Phase 25
+closure is Tyler's call once that pass happens, not declared here.
 
 ## Open Question For Phase 26 (Not Decided, Not In Scope Here)
 

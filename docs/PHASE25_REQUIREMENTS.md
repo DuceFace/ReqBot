@@ -24,7 +24,9 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.3 — Docker image + compose examples | Not started |
 | WP-25.4 — Remove legacy bundle system | Not started (blocked on 25.2 + 25.3 gates) |
 | WP-25.5 — Docs + integration gate | Not started |
-| WP-25.6 — Embedding model configurability + provenance tracking | Not started (independent of 25.1–25.5) |
+| WP-25.6a — Model role documentation | Not started |
+| WP-25.6b — LLM model config consistency (extraction/enrichment/rewrite/HyDE/synthesis) | Not started |
+| WP-25.6c — Embedding model configurability + index provenance | Not started (highest risk in 25.6; do last) |
 
 ## Key Changes
 
@@ -174,27 +176,73 @@ gap with no working install path at all.
     - checklist/search/trace work from the container
     - no bundle scripts remain
 
-### WP-25.6 — Embedding Model Configurability + Provenance Tracking
+### WP-25.6 — Model Agnosticism (split into three sub-WPs)
 
-Independent of the WP-25.1–25.5 packaging/Docker sequence — does not block, and is not blocked
-by, any of them. Can land in any order relative to the rest of Phase 25.
+"Make ReqBot model-agnostic" is really three problems of increasing risk, not one — split into
+separate commits/PRs so a low-risk docs fix doesn't sit blocked behind the one genuinely
+dangerous change (Codex review, same reasoning as the WP-25.1a/b/c split). Recommended work
+order is 25.6a → 25.6b → 25.6c (increasing risk), but none of the three blocks the WP-25.1–25.5
+packaging/Docker sequence or each other in a hard technical sense.
 
-- Add `embedding_model` to `reqbot init`/config, alongside the existing `extraction_model`,
-  `enrichment_model`, `synthesis_model` fields. Default: `nomic-embed-text` (unchanged).
+#### WP-25.6a — Model Role Documentation
+
+Low risk; mostly docs/wording, no behavior change.
+
+- State ReqBot's model needs as **roles**, not specific model names: embedding, extraction,
+  enrichment, query-rewrite/HyDE, and optional synthesis. Today's defaults
+  (`nomic-embed-text`, `llama3.1:8b-instruct-q4_K_M`, `qwen2.5:14b`) are recommended
+  consumer-hardware defaults, not universal requirements — don't write docs that imply
+  otherwise.
+- **Fix a specific inaccuracy this phase already introduced:** `ARCHITECTURE.md`'s model table
+  (added responding to Codex's WP-25.1b review) currently folds "extraction / enrichment /
+  query rewrite / HyDE" into one row and claims all of it is configurable via `extraction_model`
+  / `enrichment_model`. That's wrong for the query-rewrite/HyDE role specifically — see WP-25.6b;
+  `rewrite_model` has no config-file presence at all today. Split that row and correct the claim
+  when this WP lands.
+
+#### WP-25.6b — LLM Model Config Consistency
+
+Medium risk — audits and fixes real, already-confirmed inconsistency in how the *non-embedding*
+model roles are configured, not just documented.
+
+- **Confirmed gap:** `extraction_model`, `enrichment_model`, and `synthesis_model` are real
+  config fields (`core/config.py`), settable via `reqbot init`, with env var overrides
+  (`REQBOT_EXTRACTION_MODEL` etc.). `rewrite_model` (query rewriting + HyDE hypothesis
+  generation) is **not** — it's a CLI-flag-only setting (`--rewrite-model` in `cli/reqbot.py`)
+  whose default (`llama3.1:8b-instruct-q4_K_M`) is hardcoded as a literal in the argparse call
+  *and* separately as `DEFAULT_REWRITE_MODEL` in `core/ask.py` — two hardcoded copies of the
+  same default, not one source of truth. Add `rewrite_model` to config/`reqbot init` the same
+  way the other three roles work.
+- **Confirmed gap:** `reqbot status` shows which models are *available on the Ollama server*
+  (`services/status_service.py`), not which models ReqBot is actually *configured* to use for
+  each role. Add the configured extraction/enrichment/rewrite/synthesis model names to the
+  status output so a user can see what's actually selected, not just what's installed.
+- Audit CLI/API/frontend for any other place a model name is hardcoded outside config for these
+  four roles (not embedding — that's WP-25.6c) and wire it to config instead.
+- Update `ARCHITECTURE.md`'s model table per the WP-25.6a fix once `rewrite_model` is real
+  config, so the table's configurability claim becomes true rather than needing a correction.
+
+#### WP-25.6c — Embedding Model Configurability + Index Provenance
+
+The dangerous one — embedding models define the actual vector shape stored in Qdrant, so a
+mismatch between what indexed a point and what's querying it doesn't error, it silently returns
+wrong-but-confident results.
+
+- Add `embedding_model` to `reqbot init`/config, alongside the (now, post-25.6b) consistent
+  extraction/enrichment/rewrite/synthesis fields. Default: `nomic-embed-text` (unchanged).
 - Replace the hardcoded `EMBEDDING_MODEL = "nomic-embed-text"` constants in `core/ask.py`,
   `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py` — and the inline
   `"nomic-embed-text"` literals in `services/compare_service.py` and
-  `services/evidence_service.py` — with the configured value. Today none of these read from
-  config; the embedding model is the one model role that isn't configurable yet, unlike
-  extraction/enrichment/synthesis.
+  `services/evidence_service.py` — with the configured value.
 - **Track embedding provenance as Qdrant payload metadata, not a JSONL field.** Set
-  `embedding_model` in the payload dict built in `embed_and_index.py`/`embed_context_index.py`
-  (same place `domain_profile` is already copied in) at index time. This is deliberately
-  different from `domain_profile`: domain_profile is a fact about *extraction*, captured once
-  from JSONL; embedding_model is a fact about *indexing*, and the same JSONL file can be
-  reindexed multiple times with different models over its lifetime. Writing it into JSONL would
-  mean mutating a verbatim-capture pipeline artifact after the fact just to record indexing
-  state — it belongs on the index side of the line, not the source-of-record side.
+  `embedding_model` (and vector dimension) in the payload dict built in
+  `embed_and_index.py`/`embed_context_index.py` (same place `domain_profile` is already copied
+  in) at index time. This is deliberately different from `domain_profile`: domain_profile is a
+  fact about *extraction*, captured once from JSONL; embedding_model is a fact about *indexing*,
+  and the same JSONL file can be reindexed multiple times with different models over its
+  lifetime. Writing it into JSONL would mean mutating a verbatim-capture pipeline artifact after
+  the fact just to record indexing state — it belongs on the index side of the line, not the
+  source-of-record side.
 - At query time (`core/ask.py`'s `retrieve()`, plus `compare_service`/`evidence_service`),
   compare each result's `embedding_model` payload against the currently configured embedding
   model. On any mismatch, surface a `warnings` field (CLI output, API response, frontend) rather
@@ -209,6 +257,10 @@ by, any of them. Can land in any order relative to the rest of Phase 25.
   the case Qdrant's own guardrail can't catch: two different models that happen to share a
   dimension, where a query succeeds and returns confident-looking, semantically wrong results
   with no error at all.
+- `reqbot reindex` must handle the configured embedding model correctly — re-embed with
+  whatever model is currently configured, write the matching provenance metadata, and this is
+  the documented recovery path after an embedding-model config change (full reindex of both
+  collections, not a partial one).
 - Document in README/OPERATIONS: `nomic-embed-text` remains the recommended, validated default;
   advanced users may configure a different embedding model where ReqBot's configuration supports
   it, understanding that doing so requires a full `reqbot reindex` (both collections) to clear
@@ -225,14 +277,22 @@ by, any of them. Can land in any order relative to the rest of Phase 25.
     - missing Docling extra produces a clear error only when docling mode is requested
     - synthesis against a missing/unpulled model fails with a clear, actionable message
       (names the model, suggests `ollama pull <model>`) instead of silently auto-pulling
-    - changing `embedding_model` in config changes which model `core/ask.py`,
+    - WP-25.6b: `rewrite_model` is a real config field, settable via `reqbot init`, with the
+      same env var override pattern as `extraction_model`/`enrichment_model`/`synthesis_model`
+    - WP-25.6b: `reqbot status` output includes the configured extraction/enrichment/rewrite/
+      synthesis model names, not just what's available on the Ollama server
+    - WP-25.6c: changing `embedding_model` in config changes which model `core/ask.py`,
       `embed_and_index.py`, `embed_context_index.py`, `compare_service`, and `evidence_service`
       actually call — no leftover hardcoded reference wins over the configured value
-    - `embed_and_index.py`/`embed_context_index.py` write `embedding_model` into the Qdrant
-      payload at index time
-    - `retrieve()` surfaces a `warnings` entry when a result's payload `embedding_model` differs
-      from the currently configured one, and surfaces nothing when they match
-    - a mismatched-embedding-model query still returns its results (warning, not a hard failure)
+    - WP-25.6c: `embed_and_index.py`/`embed_context_index.py` write `embedding_model` into the
+      Qdrant payload at index time
+    - WP-25.6c: `retrieve()` surfaces a `warnings` entry when a result's payload
+      `embedding_model` differs from the currently configured one, and surfaces nothing when
+      they match
+    - WP-25.6c: a mismatched-embedding-model query still returns its results (warning, not a
+      hard failure)
+    - WP-25.6c: `reqbot reindex` re-embeds using the currently configured embedding model and
+      writes matching provenance metadata
 
 - Build checks:
     - bash build/build-frontend.sh succeeds with Node 20+ and npm

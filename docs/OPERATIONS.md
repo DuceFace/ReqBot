@@ -1,6 +1,18 @@
 # ReqBot — Operations Runbook
 
-Day-to-day procedures for running, developing, and maintaining ReqBot on the Proxmox dev environment.
+Day-to-day procedures for running, developing, and maintaining a ReqBot deployment: rebuild/
+reindex steps, ingest recipes, common gotchas.
+
+**Scope note (WP-25.5):** this is a general runbook, not this-repo's-own private environment
+notes — every host/IP below is a placeholder (`<qdrant-host>`, `<ollama-host>`, etc.) for you to
+substitute with your own. It's illustrated throughout with one example split-host setup (Qdrant
+and Ollama each on their own machine, separate from where ReqBot itself runs) because that's a
+common real deployment shape, not because it's the only one — a single-machine setup works the
+same way with all placeholders pointing at `localhost`. It complements, not replaces, `README.md`'s
+"Install / Deployment" section (Docker, source/dev install, air-gapped transfer) — that section
+gets you installed; this one covers what you do afterward. (This repo's own actual environment
+values, for anyone working in this specific dev box, are recorded in the gitignored `CLAUDE.md`,
+not here — keeping this file free of anyone's specific infrastructure details since it's public.)
 
 ---
 
@@ -8,20 +20,20 @@ Day-to-day procedures for running, developing, and maintaining ReqBot on the Pro
 
 | Thing | Detail |
 |---|---|
-| Dev server | `192.168.30.152` (Proxmox blade, Coder workspace in Docker container) |
-| Ollama | `http://192.168.90.100:11434` (Tyler's local machine) |
-| Qdrant | `http://192.168.30.153:6333` (LXC on Proxmox blade) |
+| ReqBot host | `<dev-server-host>` — wherever `reqbot serve`/the CLI actually runs |
+| Ollama | `http://<ollama-host>:11434` — often a separate machine with a GPU |
+| Qdrant | `http://<qdrant-host>:6333` — often a separate host or container |
 | Processed JSONL | `~/documents/processed/` |
 | Config file | `~/.config/reqbot/config.json` |
 | Project root | `~/grc-ai-system/` |
 
 ---
 
-## Installing Python Dependencies (this environment)
+## Installing Python Dependencies (Debian/Ubuntu example)
 
-This Coder workspace runs on Debian/Ubuntu with an externally-managed system Python — plain
-`pip install` refuses to touch it, so both the packaged install (README's primary path) and the
-legacy `requirements.txt` path need `--break-system-packages` here specifically:
+Debian/Ubuntu ship an externally-managed system Python by default — plain `pip install` refuses
+to touch it, so both the packaged install (README's primary path) and the legacy
+`requirements.txt` path need `--break-system-packages` there specifically:
 
 ```bash
 pip3 install --break-system-packages .
@@ -29,9 +41,9 @@ pip3 install --break-system-packages .
 pip3 install --break-system-packages -r requirements.txt -r requirements-dev.txt
 ```
 
-This flag is a Debian/Ubuntu packaging-policy quirk of this specific environment, not general
-ReqBot install guidance — most Python installs (a real venv, macOS, most other Linux setups)
-never need it. That's why it lives here and not in README.md.
+This flag is a Debian/Ubuntu packaging-policy quirk, not general ReqBot install guidance — most
+Python installs (a real venv, macOS, most other Linux setups) never need it. That's why it lives
+here and not in README.md.
 
 ---
 
@@ -53,12 +65,17 @@ cd ~/grc-ai-system
 python3 cli/reqbot.py serve --host 0.0.0.0
 ```
 
-The UI is then available via Coder port forwarding:
-1. In VS Code: `Ctrl+Shift+P` → **Forward a Port** → `8000`
+If your dev environment runs behind a remote-workspace tool with its own port-forwarding layer
+(e.g. Coder, GitHub Codespaces), you'll need to forward port 8000 through that tool rather than
+hitting the host's IP directly — for example, in a Coder workspace using VS Code:
+1. `Ctrl+Shift+P` → **Forward a Port** → `8000`
 2. If the port was previously forwarded and is now hanging: `Ctrl+Shift+P` → **Stop Forwarding a Port** → `8000`, then re-add it
 3. Open `http://localhost:8000` in your browser
 
-> **Why not `http://192.168.30.152:8000` directly?** The Coder workspace runs inside a Docker container (`172.17.0.2`). Port 8000 is not exposed to the host network — only the Coder agent tunnel exposes it. Port 3000 (Coder itself) works because the Coder server runs on the host.
+> **Why not the host's own IP directly?** If your dev environment itself runs inside a container
+> (e.g. a Coder workspace that is itself a Docker container), that container's ports usually
+> aren't exposed to the host network at all — only whatever tunnel the remote-workspace tool
+> provides is. That tunnel is what makes `localhost:8000` on your local machine work.
 
 ---
 
@@ -83,7 +100,7 @@ python3 cli/reqbot.py trace <requirement_id>
 python3 cli/reqbot.py evidence "incident response"
 ```
 
-> When running `run_pipeline.py` directly (not via the CLI), always pass `--ollama-url http://192.168.90.100:11434`. The default `localhost:11434` resolves to the dev server container, not Tyler's machine where Ollama runs.
+> When running `run_pipeline.py` directly (not via the CLI), always pass `--ollama-url http://<ollama-host>:11434` if Ollama runs on a separate machine. The default `localhost:11434` resolves to wherever ReqBot itself is running, not necessarily where Ollama runs.
 
 ---
 
@@ -113,18 +130,18 @@ cd ~/grc-ai-system
 
 # Standard ingest (most NIST/AFI/DAF docs) — indexes into Qdrant by default
 python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
-  --ollama-url http://192.168.90.100:11434
+  --ollama-url http://<ollama-host>:11434
 
 # Table-heavy docs (DODIs) — pdfplumber handles tables better
 python3 cli/reqbot.py ingest ~/path/to/dodi.pdf \
   --layout-mode pdfplumber \
-  --ollama-url http://192.168.90.100:11434
+  --ollama-url http://<ollama-host>:11434
 
 # Structure-aware — required for profile skip_sections filtering to apply; slower
 # on CPU (layout/table/OCR model inference) but exercises the full current pipeline
 python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
   --layout-mode docling \
-  --ollama-url http://192.168.90.100:11434
+  --ollama-url http://<ollama-host>:11434
 ```
 
 Output goes to `~/documents/processed/<doc_stem>_<timestamp>/`. Indexing (both
@@ -135,7 +152,7 @@ for artifact-only/debug runs.
 Ollama. Confirm inference is actually using the GPU, not silently falling back to CPU:
 
 ```bash
-curl http://192.168.90.100:11434/api/ps
+curl http://<ollama-host>:11434/api/ps
 ```
 
 For each loaded model, compare `size_vram` to `size`: `size_vram == size` means the model is
@@ -147,7 +164,7 @@ python3 pipeline/run_pipeline.py \
   ~/path/to/doc.pdf \
   --output-dir ~/documents/processed/<existing_run_dir> \
   --skip-to C \
-  --ollama-url http://192.168.90.100:11434
+  --ollama-url http://<ollama-host>:11434
 ```
 
 ---
@@ -214,15 +231,15 @@ python3 cli/reqbot.py status
 # or, for the raw collection/alias list:
 python3 -c "
 from qdrant_client import QdrantClient
-c = QdrantClient(url='http://192.168.30.153:6333')
+c = QdrantClient(url='http://<qdrant-host>:6333')
 print('collections:', [col.name for col in c.get_collections().collections])
 print('aliases:', [(a.alias_name, a.collection_name) for a in c.get_aliases().aliases])
 "
 
 # 2. Delete whatever collection name(s) that showed — for grc_requirements, delete the
 #    backing collection (not just the alias) if one exists; delete grc_context directly.
-curl -X DELETE http://192.168.30.153:6333/collections/<backing_or_plain_name>
-curl -X DELETE http://192.168.30.153:6333/collections/grc_context
+curl -X DELETE http://<qdrant-host>:6333/collections/<backing_or_plain_name>
+curl -X DELETE http://<qdrant-host>:6333/collections/grc_context
 
 # 3. Rebuild — reindex from existing JSONL, or re-ingest for a genuine refresh (see above)
 python3 cli/reqbot.py reindex
@@ -252,7 +269,7 @@ python3 -m ruff check .
 ## Common Gotchas
 
 - **`reqbot` binary is stale** — always use `python3 cli/reqbot.py`. The binary predates Phase 18 and does not have checklist, compare (updated), or any Phase 21+ commands.
-- **Ollama URL** — pipeline scripts default to `localhost:11434` which resolves to the container, not Tyler's machine. Always pass `--ollama-url http://192.168.90.100:11434` when running pipeline scripts directly.
+- **Ollama URL** — pipeline scripts default to `localhost:11434`, which only works if Ollama runs on the same machine as ReqBot. Always pass `--ollama-url http://<ollama-host>:11434` when running pipeline scripts directly if Ollama runs elsewhere.
 - **Step C resume** — re-running pipeline on the same PDF without `--output-dir` creates a new timestamped directory and loses the prompt hash cache. Use `--output-dir <old_dir> --skip-to C` to resume.
 - **Frontend not updating** — the browser caches aggressively. After a frontend rebuild, do a hard reload (`Ctrl+Shift+R`) if a normal reload doesn't show changes.
 - **Port forwarding stale** — if `http://localhost:8000` hangs, the VS Code port forward tunnel is stale. Stop and re-add port 8000 via `Ctrl+Shift+P`.

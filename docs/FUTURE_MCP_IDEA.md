@@ -13,10 +13,11 @@ Core idea
   and structurally.
 
   Phase concept
-  MCP is a Phase 25 candidate (see docs/PHASE24_REQUIREMENTS.md) — it does not
-  fit Phase 24's cleanup/defaults theme, and waits until setup, indexing
-  defaults, and the corpus refresh are settled. GUI expansion (Phase 19) and
-  domain profiles (Phase 20) are already done.
+  MCP is a Phase 26 candidate (see docs/PHASE25_REQUIREMENTS.md) — packaging
+  and deployment (Phase 25: pip package, Docker image, model-role config
+  consistency) had to be boring and settled first, so MCP isn't competing
+  with a moving deployment target. GUI expansion (Phase 19) and domain
+  profiles (Phase 20) are already done.
 
   Domain profiles (Phase 20) should land before the MCP surface. Once
   list_documents can return semantic metadata (authority type, domain,

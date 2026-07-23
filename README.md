@@ -22,7 +22,40 @@ Run `reqbot serve` to start the web interface. Run `reqbot docs` to see your ind
 - A running [Qdrant](https://qdrant.tech/) instance, reachable by URL
 - A running [Ollama](https://ollama.ai/) instance, reachable by URL
 
-## Install
+## Install / Deployment
+
+ReqBot supports three paths depending on how you want to run it. All three run the same code —
+Docker just wraps the pip package (WP-25.2) so you never need Node/npm/Python installed on the
+host machine to get it running.
+
+### 1. Docker (recommended for most deployments)
+
+```bash
+git clone <this-repo>
+cd grc-ai-system
+cp docker-compose.example.yml docker-compose.yml   # adjust Ollama URL / Qdrant version if needed
+docker compose up -d
+```
+
+This builds the image from `Dockerfile` (multi-stage: a pinned `node:20` stage builds the
+frontend, so the *build host* never needs Node either) and starts `reqbot` alongside a `qdrant`
+container. Point it at an existing Ollama instance via `REQBOT_OLLAMA_URL` in the compose file —
+Ollama itself isn't containerized by default since GPU/host setups vary too much for one example
+to fit everyone (see the commented-out `ollama` service in `docker-compose.example.yml` if you
+want it in Compose too).
+
+The published port defaults to `127.0.0.1:8000:8000` — host-machine-only, matching `reqbot
+serve`'s own loopback default. There is no authentication in the API layer yet (planned for
+Phase 26+), so widening this to a real network interface is a deliberate operator choice; you're
+responsible for your own reverse proxy/TLS/firewall if you do.
+
+Configure service URLs and model preferences via `REQBOT_*` environment variables in
+`docker-compose.yml` (see `ARCHITECTURE.md`'s Configuration table for the full list) — the
+natural fit for a container, since it's set once at deploy time with no interactive session
+required. The guided `reqbot init` wizard still works too if you prefer it: `docker compose exec
+reqbot reqbot init`.
+
+### 2. Source / dev install
 
 ```bash
 pip install .
@@ -43,6 +76,39 @@ this predates WP-25.2's packaging and is kept for compatibility, not recommended
 Some externally-managed Python environments (e.g. Debian/Ubuntu) require an extra flag for this
 path; see `docs/OPERATIONS.md` for that environment-specific detail rather than baking it in here.
 `pip install .` above is the supported path going forward.
+
+### 3. Air-gapped Docker image transfer
+
+For environments with no internet access at the target machine, build and export the image where
+you *do* have connectivity, then transfer the archive over:
+
+```bash
+# On a connected machine:
+docker build -t reqbot:latest .
+docker save reqbot:latest | gzip > reqbot-image.tar.gz
+
+# Also pull the Qdrant image referenced in docker-compose.example.yml, if it needs to travel too:
+docker pull qdrant/qdrant:v1.17.1
+docker save qdrant/qdrant:v1.17.1 | gzip > qdrant-image.tar.gz
+
+# Transfer both .tar.gz files to the air-gapped machine by whatever means your environment
+# permits (USB, approved file transfer, etc.), then on that machine:
+gunzip -c reqbot-image.tar.gz | docker load
+gunzip -c qdrant-image.tar.gz | docker load
+docker compose up -d   # docker-compose.yml as copied in path 1 above
+```
+
+`docker-compose.example.yml`'s `reqbot` service tags its build output as `image: reqbot:latest`
+(matching the tag used above) alongside `build: .` — Compose only builds an image that isn't
+already present locally, so once `docker load` has populated that exact tag, `docker compose up
+-d` runs the loaded image directly rather than trying to rebuild from source on a machine that
+has neither a checkout nor build tools.
+
+Ollama models themselves aren't part of this image transfer — pull/copy them to the air-gapped
+Ollama instance separately (`ollama pull <model>` on a connected machine, then whatever your
+environment's approved model-transfer process is; Ollama supports importing from a local model
+file). This mirrors the same "ReqBot never installs Qdrant/Ollama or their models for you"
+boundary that applies to every deployment path.
 
 ## Setup
 
@@ -418,7 +484,11 @@ Useful flags:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - module map and data flows
 - [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
-- [docs/PHASE22_REQUIREMENTS.md](docs/PHASE22_REQUIREMENTS.md) - Phase 22 plan (Browser Checklist Workflow)
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) - day-to-day runbook for this project's own dev
+  environment (service IPs, rebuild/reindex procedures) — not general deployment guidance; see
+  "Install / Deployment" above for that
 - [docs/PHASE23_REQUIREMENTS.md](docs/PHASE23_REQUIREMENTS.md) - Phase 23 plan (Checklist Assessor Workflow)
+- [docs/PHASE24_REQUIREMENTS.md](docs/PHASE24_REQUIREMENTS.md) - Phase 24 plan (HyDE + corpus refresh)
+- [docs/PHASE25_REQUIREMENTS.md](docs/PHASE25_REQUIREMENTS.md) - Phase 25 plan (packaging and deployment reset)
 - [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document
-- [archive/](archive/) - completed phase plans (Phases 14–21)
+- [archive/](archive/) - completed phase plans (Phases 7–22)

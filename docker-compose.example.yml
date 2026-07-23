@@ -21,6 +21,9 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       REQBOT_QDRANT_URL: "http://qdrant:6333"
+      # Default assumes Ollama runs on the Docker host itself (see extra_hosts below).
+      # If you uncomment the "ollama" service further down instead, change this to
+      # "http://ollama:11434" — host.docker.internal won't reach a Compose-managed service.
       REQBOT_OLLAMA_URL: "http://host.docker.internal:11434"
     volumes:
       - ./documents/processed:/root/documents/processed
@@ -45,6 +48,8 @@ services:
   # vs. Docker Desktop vs. no GPU at all) — this is the plain-CPU form; add a `deploy.
   # resources.reservations.devices` block for GPU passthrough on a Linux host with the
   # NVIDIA Container Toolkit installed.
+  # Also change the reqbot service's REQBOT_OLLAMA_URL above to "http://ollama:11434" if
+  # you uncomment this — host.docker.internal won't reach it.
   # ollama:
   #   image: ollama/ollama:latest
   #   ports:

@@ -70,23 +70,27 @@ python3 cli/reqbot.py evidence "incident response"
 
 ## Rebuilding the Frontend
 
-`npm` is not on the PATH in the Coder workspace. Use the Node binary bundled with VS Code Server:
+The real prerequisite is Node.js 20+ and npm. Standard build:
 
 ```bash
-cd ~/grc-ai-system/frontend
-
-# One-liner (copy-paste ready)
-NODE=/tmp/code-server/lib/code-server-4.129.0/lib/node && \
-  $NODE node_modules/.bin/tsc --noEmit && \
-  $NODE node_modules/.bin/vite build
+cd ~/grc-ai-system
+bash build/build-frontend.sh
 ```
+
+`npm` is not on the PATH in this specific Coder workspace — `build-frontend.sh` detects that
+automatically and falls back to invoking the already-installed `frontend/node_modules/` tools
+directly via a bundled Node binary (VS Code Server ships one). That fallback is a convenience
+for this constrained container, not the supported build path; it does not run `npm ci`, so it
+won't pick up dependency changes — run a real `npm ci` first on any machine that has npm.
+
+If the fallback finds more than one candidate Node binary (common here — this workspace
+accumulates several old VS Code Server session directories over time), it refuses to guess and
+asks you to set `REQBOT_BUILD_NODE=/path/to/node` explicitly. Find one with:
+`find ~/.vscode-server /tmp/code-server -iname node -type f`
 
 A successful build prints `✓ built in X.XXs` and updates `frontend/dist/`. The `dist/` folder is gitignored — it is a build artifact, not tracked in the repo.
 
 After rebuilding, **reload the browser tab** — the running server picks up new dist files immediately (no server restart needed).
-
-> If the VS Code version changes and the path above breaks, find the new node binary with:
-> `find /home/coder/.vscode-server -name "node" -type f`
 
 ---
 

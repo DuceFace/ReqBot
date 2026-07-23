@@ -11,6 +11,25 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRONTEND_DIR="$SCRIPT_DIR/../frontend"
 
+if ! command -v npm >/dev/null 2>&1; then
+    echo "[-] npm not found on PATH." >&2
+    echo "    Install Node.js 20 LTS or newer (npm is bundled with it): https://nodejs.org/" >&2
+    exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+    echo "[-] node not found on PATH." >&2
+    echo "    Install Node.js 20 LTS or newer: https://nodejs.org/" >&2
+    exit 1
+fi
+
+NODE_MAJOR="$(node --version | sed -E 's/^v([0-9]+).*/\1/')"
+if [ "$NODE_MAJOR" -lt 20 ]; then
+    echo "[-] Node $(node --version) found, this project requires Node 20 LTS or newer." >&2
+    echo "    Install Node.js 20 LTS or newer: https://nodejs.org/" >&2
+    exit 1
+fi
+
 echo "[+] Building frontend (Vite + React + Tailwind)..."
 cd "$FRONTEND_DIR"
 npm ci

@@ -131,6 +131,39 @@ def test_init_writes_rewrite_model(tmp_path):
     assert written["rewrite_model"] == "custom-rewrite-model"
 
 
+def test_new_default_model_propagates_to_blank_role_models(tmp_path, monkeypatch):
+    """PR #107 review: entering a new default_model then blanking through
+    extraction/enrichment/rewrite must adopt the new value, not silently
+    re-write the stale value that was loaded before this init run started.
+
+    Blank role-model answers are written as null (not a frozen literal) so
+    core.config.load()'s existing default_model fallback (R-2.1) keeps
+    tracking default_model dynamically going forward.
+    """
+    for env_var in ("REQBOT_EXTRACTION_MODEL", "REQBOT_ENRICHMENT_MODEL", "REQBOT_REWRITE_MODEL"):
+        monkeypatch.delenv(env_var, raising=False)
+
+    inputs = [
+        "", "",  # qdrant/ollama URLs (defaults)
+        "mistral-custom",  # default_model — new value
+        "", "", "",  # extraction/enrichment/rewrite — blank, follow the new default
+        "",  # synthesis_model — default
+        "", "", "",  # top_k, min_score, processed_dir
+        "3",  # synthesis = none
+    ]
+    rc, written = _run_init(tmp_path, inputs)
+    assert rc == 0
+    assert written["default_model"] == "mistral-custom"
+    assert written["extraction_model"] is None
+    assert written["enrichment_model"] is None
+    assert written["rewrite_model"] is None
+
+    loaded = core_config.load()
+    assert loaded.extraction_model == "mistral-custom"
+    assert loaded.enrichment_model == "mistral-custom"
+    assert loaded.rewrite_model == "mistral-custom"
+
+
 def test_init_retries_url_on_failed_connection(tmp_path):
     """A failed connectivity test re-prompts unless the user chooses to keep it."""
     call_count = {"n": 0}

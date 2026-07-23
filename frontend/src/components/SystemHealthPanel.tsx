@@ -53,10 +53,21 @@ export default function SystemHealthPanel({ data }: Props) {
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
           Configured Models
         </p>
-        <p className="text-xs text-gray-500">
-          Extraction: {data.configured_models.extraction} &middot; Enrichment: {data.configured_models.enrichment}
-          {' '}&middot; Rewrite: {data.configured_models.rewrite} &middot; Synthesis: {data.configured_models.synthesis}
-        </p>
+        <dl className="text-xs text-gray-500 space-y-0.5">
+          {(
+            [
+              ['Extraction', data.configured_models.extraction],
+              ['Enrichment', data.configured_models.enrichment],
+              ['Rewrite', data.configured_models.rewrite],
+              ['Synthesis', data.configured_models.synthesis],
+            ] as const
+          ).map(([role, model]) => (
+            <div key={role} className="flex gap-1">
+              <dt className="shrink-0">{role}:</dt>
+              <dd className="break-words">{model}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
       <div className="px-5 py-3 bg-gray-50 rounded-b-lg">
         <p className="text-xs text-gray-500">

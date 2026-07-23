@@ -1090,6 +1090,21 @@ def cmd_init(args: argparse.Namespace) -> int:
         val = input(f"{label} [{default}]: ").strip()
         return val if val else default
 
+    def _prompt_role_model(label: str, resolved_default: str) -> str | None:
+        """Prompt for a role model that falls back to default_model (R-2.1).
+
+        Shows the just-entered default_model as the bracketed suggestion, not
+        whatever this role happened to resolve to before this init run — a
+        blank answer means "follow default_model", so it returns None rather
+        than freezing a literal, letting core.config.load()'s existing
+        fallback keep tracking default_model afterward (Codex review, PR #107:
+        entering a new default_model then blanking through extraction/
+        enrichment/rewrite must actually adopt the new value, not silently
+        re-write the stale one loaded before init started).
+        """
+        val = input(f"{label} [{resolved_default}]: ").strip()
+        return val if val else None
+
     def _prompt_choice(label: str, options: list[str], default: int = 1) -> int:
         """Print a numbered menu; return the 1-based choice (default on empty input)."""
         print(f"\n{label}")
@@ -1148,18 +1163,18 @@ def cmd_init(args: argparse.Namespace) -> int:
             print(f"  [!] Warning: '{default_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 
-        extraction_model = _prompt("Step C extraction model (default: same as above)", _cfg.extraction_model)
-        if available_models and extraction_model not in available_models:
+        extraction_model = _prompt_role_model("Step C extraction model (default: same as above)", default_model)
+        if extraction_model and available_models and extraction_model not in available_models:
             print(f"  [!] Warning: '{extraction_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 
-        enrichment_model = _prompt("Step D.5 enrichment model (default: same as above)", _cfg.enrichment_model)
-        if available_models and enrichment_model not in available_models:
+        enrichment_model = _prompt_role_model("Step D.5 enrichment model (default: same as above)", default_model)
+        if enrichment_model and available_models and enrichment_model not in available_models:
             print(f"  [!] Warning: '{enrichment_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 
-        rewrite_model = _prompt("Query-rewrite/HyDE model (default: same as above)", _cfg.rewrite_model)
-        if available_models and rewrite_model not in available_models:
+        rewrite_model = _prompt_role_model("Query-rewrite/HyDE model (default: same as above)", default_model)
+        if rewrite_model and available_models and rewrite_model not in available_models:
             print(f"  [!] Warning: '{rewrite_model}' not found on Ollama server.")
             print(f"      Available: {', '.join(available_models)}")
 

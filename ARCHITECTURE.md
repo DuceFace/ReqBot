@@ -300,7 +300,7 @@ exist before you run `init`; pull manually with `ollama pull <model>`.
 |------|---------------------|---------------|
 | Embedding | `nomic-embed-text` | **No — current implementation limit.** Hardcoded as `EMBEDDING_MODEL` in `core/ask.py`, `pipeline/embed_and_index.py`, `pipeline/embed_context_index.py` (plus inline references in `services/compare_service.py`, `services/evidence_service.py`). Changing it requires a code change, not just a config edit — and a full `reqbot reindex` afterward, since indexed vectors and query vectors must come from the same model family. |
 | Extraction / enrichment / query rewrite / HyDE | `llama3.1:8b-instruct-q4_K_M` | Yes — `extraction_model` / `enrichment_model` in `reqbot init` or config. Advanced users may point these at a different model. |
-| Local synthesis (optional) | `qwen2.5:14b` | Yes — `synthesis_model` in `reqbot init` or config. Only relevant when the synthesis backend is `local`; **lazy-pulled** on first `--synthesize` use rather than during `init` (~9 GB). |
+| Local synthesis (optional) | `qwen2.5:14b` | Yes — `synthesis_model` in `reqbot init` or config. Only relevant when the synthesis backend is `local`. Not pulled by `init` or automatically at any point (~9 GB) — if it's missing on the configured Ollama server, synthesis fails clearly at call time naming the model and the `ollama pull` command to fix it, rather than silently downloading it. |
 
 The defaults above are what's validated on Tyler's own consumer-grade hardware, not a requirement
 ReqBot enforces — they're a recommendation, not a mandate.

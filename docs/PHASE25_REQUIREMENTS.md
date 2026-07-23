@@ -20,7 +20,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-25.1a — Node/npm build prerequisite cleanup | Merged (PR #98) |
 | WP-25.1b — `reqbot init` becomes config-only | Merged (PR #99) |
 | WP-25.1c — local synthesis fails clearly instead of auto-pulling | Done, pending PR review |
-| WP-25.2 — Real Python package foundation | Not started |
+| WP-25.2 — Real Python package foundation | Done, pending PR review |
 | WP-25.3 — Docker image + compose examples | Not started |
 | WP-25.4 — Remove legacy bundle system | Not started (blocked on 25.2 + 25.3 gates) |
 | WP-25.5 — Docs + integration gate | Not started |

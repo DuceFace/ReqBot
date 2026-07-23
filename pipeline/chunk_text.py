@@ -496,8 +496,8 @@ def run_structure_aware(
         from docling.chunking import HybridChunker
     except ImportError as e:
         raise RuntimeError(
-            "Docling is not installed. Run: "
-            "pip3 install --break-system-packages docling"
+            "Docling is not installed. Install the Docling extra: "
+            "pip install reqbot[docling]"
         ) from e
 
     doc = ancestry_result.doc

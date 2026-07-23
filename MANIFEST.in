@@ -1,0 +1,11 @@
+# Non-.py files bundled into the reqbot package. See pyproject.toml's
+# [tool.setuptools] include-package-data = true, which relies on this file.
+
+# Domain profiles — needed at runtime by core/profiles.py.
+recursive-include profiles *.json
+exclude profiles/test-*.json
+
+# Built frontend — present only when build/build-frontend.sh has run first
+# (packaged/container builds). Absent in a plain source checkout; that's fine,
+# a missing recursive-include target is not an error.
+recursive-include frontend/dist *

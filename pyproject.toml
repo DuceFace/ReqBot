@@ -1,3 +1,59 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reqbot"
+version = "0.1.0"
+description = "Local-AI compliance requirements extraction, indexing, and search"
+readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.12"
+dependencies = [
+    "pymupdf==1.27.1",
+    "pdfplumber==0.11.9",
+    "fastembed==0.7.4",
+    "qdrant-client==1.17.0",
+    "ollama==0.6.1",
+    "requests==2.33.0",
+    "openpyxl==3.1.5",
+    "fastapi==0.115.12",
+    "uvicorn==0.34.3",
+    "aiofiles==25.1.0",
+]
+
+[project.optional-dependencies]
+# The one dependency actually big enough (torch/torchvision weight) to justify
+# gating behind an extra — everything else that ships a real, normal feature
+# (XLSX export, serve, hybrid search) stays in base. See docs/PHASE25_REQUIREMENTS.md.
+docling = ["docling==2.84.0"]
+remote = ["anthropic>=0.40.0", "openai>=1.50.0"]
+dev = ["pytest==9.1.1", "ruff==0.15.22", "pytest-cov==7.1.0", "rapidfuzz>=3.0.0"]
+
+[project.scripts]
+reqbot = "cli.reqbot:main"
+
+[tool.setuptools]
+packages = [
+    "api",
+    "api.routes",
+    "cli",
+    "core",
+    "frontend",
+    "models",
+    "pipeline",
+    "services",
+    "profiles",
+]
+# MANIFEST.in is the source of truth for which non-.py files get included (a plain
+# package-data glob doesn't reliably handle frontend/dist/'s dynamically-hashed,
+# deeply nested Vite output across setuptools versions — recursive-include does).
+include-package-data = true
+
+[tool.setuptools.exclude-package-data]
+# test-*.json fixtures are for tests/unit/, not something the installed package ships.
+profiles = ["test-*.json"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

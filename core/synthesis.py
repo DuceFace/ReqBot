@@ -67,6 +67,9 @@ def synthesize_local(
     try:
         import ollama as _ollama
     except ImportError:
+        # ollama is a base dependency of the reqbot package (pyproject.toml) — this
+        # should be unreachable in a properly installed package. Left as a defensive
+        # message for source/dev checkouts that haven't installed requirements.txt.
         raise RuntimeError(
             "[-] Ollama package not found: pip3 install --break-system-packages ollama"
         )
@@ -135,8 +138,8 @@ def synthesize_remote(
             import anthropic as _anthropic
         except ImportError:
             raise RuntimeError(
-                "[-] Remote synthesis requires 'anthropic' package: "
-                "pip3 install --break-system-packages anthropic"
+                "[-] Remote synthesis requires the 'anthropic' package. "
+                "Install the remote extra: pip install reqbot[remote]"
             )
         client = _anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
@@ -151,8 +154,8 @@ def synthesize_remote(
             import openai as _openai
         except ImportError:
             raise RuntimeError(
-                "[-] Remote synthesis requires 'openai' package: "
-                "pip3 install --break-system-packages openai"
+                "[-] Remote synthesis requires the 'openai' package. "
+                "Install the remote extra: pip install reqbot[remote]"
             )
         client = _openai.OpenAI(api_key=api_key)
         completion = client.chat.completions.create(

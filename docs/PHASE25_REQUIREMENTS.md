@@ -19,9 +19,9 @@ not in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-25.1a — Node/npm build prerequisite cleanup | Merged (PR #98) |
 | WP-25.1b — `reqbot init` becomes config-only | Merged (PR #99) |
-| WP-25.1c — local synthesis fails clearly instead of auto-pulling | Done, pending PR review |
-| WP-25.2 — Real Python package foundation | Done, pending PR review |
-| WP-25.3 — Docker image + compose examples | Not started |
+| WP-25.1c — local synthesis fails clearly instead of auto-pulling | Merged (PR #102) |
+| WP-25.2 — Real Python package foundation | Merged (PR #103) |
+| WP-25.3 — Docker image + compose examples | In progress |
 | WP-25.4 — Remove legacy bundle system | Not started (blocked on 25.2 + 25.3 gates) |
 | WP-25.5 — Docs + integration gate | Not started |
 | WP-25.6a — Model role documentation | Not started |
@@ -309,6 +309,14 @@ wrong-but-confident results.
     - configured REQBOT_OLLAMA_URL and REQBOT_QDRANT_URL are honored
     - docker-compose.example.yml's default port publish is loopback-scoped
       (127.0.0.1:8000:8000), not reachable from another host on the network out of the box
+    - **CI now runs this automatically** (`.github/workflows/ci.yml`'s `docker` job, added
+      WP-25.3 follow-up): builds `docker-compose.example.yml`, waits for `/api/status` to
+      respond, asserts `qdrant_url`/`ollama_url` are honored and Qdrant is reachable from
+      inside the container, and asserts the packaged `frontend/dist` is served at `/`. No real
+      Ollama in CI, so this doesn't cover actual ask/search behavior — only that the image
+      builds, starts, and wires config correctly. GitHub-hosted runners have Docker built in
+      already (no nested-container/DinD problem, unlike the Coder dev sandbox this WP was
+      built in) — first real run happens when this lands on GitHub, not verified locally here.
 
 - Regression checks:
     - pytest tests/unit/ -q

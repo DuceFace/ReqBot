@@ -21,11 +21,28 @@ Run `reqbot serve` to start the web interface. Run `reqbot docs` to see your ind
 - Python 3.12+
 - A running [Qdrant](https://qdrant.tech/) instance, reachable by URL
 - A running [Ollama](https://ollama.ai/) instance, reachable by URL
-- Python dependencies:
+
+## Install
 
 ```bash
-pip3 install --break-system-packages -r requirements.txt
+pip install .
+reqbot --help
 ```
+
+Optional extras:
+
+```bash
+pip install ".[docling]"   # structure-aware PDF extraction (Docling + torch)
+pip install ".[remote]"    # remote synthesis via Anthropic/OpenAI
+pip install ".[dev]"       # test/lint tooling
+```
+
+**Legacy/source-development path:** a source checkout can still run directly against
+`requirements.txt` (`pip install -r requirements.txt`) without installing the package at all —
+this predates WP-25.2's packaging and is kept for compatibility, not recommended for new setups.
+Some externally-managed Python environments (e.g. Debian/Ubuntu) require an extra flag for this
+path; see `docs/OPERATIONS.md` for that environment-specific detail rather than baking it in here.
+`pip install .` above is the supported path going forward.
 
 ## Setup
 

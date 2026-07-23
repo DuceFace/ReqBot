@@ -211,6 +211,10 @@ raw_pdfs/
 documents/processed/
 Backups/
 build/linux-x86_64/
+# `python -m build`/`pip install .` scratch dirs — collide with this repo's own
+# build/ directory (bundle scripts) until WP-25.4 removes those (Phase 25).
+build/lib/
+build/bdist.*/
 dist/
 frontend/dist/
 frontend/node_modules/

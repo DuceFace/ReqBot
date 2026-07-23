@@ -32,3 +32,57 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: pytest tests/ -v --cov=core --cov=services --cov=pipeline --cov-report=term-missing
+
+  docker:
+    # Docker smoke test for the image/compose files added in WP-25.3 (Phase 25). GitHub-hosted
+    # runners have unprivileged Docker support built in already — no nested-container/DinD
+    # problem here, unlike a Docker-in-Docker dev sandbox. There's no real Ollama in CI, so this
+    # only proves the container builds, starts, and honors REQBOT_QDRANT_URL/REQBOT_OLLAMA_URL —
+    # not full ask/search behavior, which needs real models and is out of scope for CI.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and start stack
+        run: |
+          # documents/processed/ is gitignored (real user data) — the bind mount in
+          # docker-compose.example.yml expects it to exist, same as it would on a real
+          # deployment after a first `reqbot ingest`.
+          mkdir -p documents/processed
+          docker compose -f docker-compose.example.yml up -d --build
+
+      - name: Wait for reqbot to respond
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/status >/dev/null; then
+              echo "reqbot responded after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "reqbot never responded on /api/status" >&2
+          docker compose -f docker-compose.example.yml logs
+          exit 1
+
+      - name: Verify Qdrant/Ollama URLs are honored from inside the container
+        run: |
+          resp="$(curl -sf http://127.0.0.1:8000/api/status)"
+          echo "$resp"
+          echo "$resp" | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)
+          assert d["qdrant_url"] == "http://qdrant:6333", f"unexpected qdrant_url: {d[\"qdrant_url\"]}"
+          assert d["qdrant"]["reachable"] is True, "qdrant not reachable from inside the container"
+          assert d["ollama_url"], "ollama_url missing from status response"
+          '
+
+      - name: Verify the packaged frontend/dist is served
+        run: curl -sf http://127.0.0.1:8000/ | grep -qi '<div id="root"'
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.example.yml logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.example.yml down -v

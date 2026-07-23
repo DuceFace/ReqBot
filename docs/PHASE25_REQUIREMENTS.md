@@ -309,6 +309,14 @@ wrong-but-confident results.
     - configured REQBOT_OLLAMA_URL and REQBOT_QDRANT_URL are honored
     - docker-compose.example.yml's default port publish is loopback-scoped
       (127.0.0.1:8000:8000), not reachable from another host on the network out of the box
+    - **CI now runs this automatically** (`.github/workflows/ci.yml`'s `docker` job, added
+      WP-25.3 follow-up): builds `docker-compose.example.yml`, waits for `/api/status` to
+      respond, asserts `qdrant_url`/`ollama_url` are honored and Qdrant is reachable from
+      inside the container, and asserts the packaged `frontend/dist` is served at `/`. No real
+      Ollama in CI, so this doesn't cover actual ask/search behavior — only that the image
+      builds, starts, and wires config correctly. GitHub-hosted runners have Docker built in
+      already (no nested-container/DinD problem, unlike the Coder dev sandbox this WP was
+      built in) — first real run happens when this lands on GitHub, not verified locally here.
 
 - Regression checks:
     - pytest tests/unit/ -q

@@ -32,7 +32,9 @@ services:
       - "host.docker.internal:host-gateway"
 
   qdrant:
-    image: qdrant/qdrant:latest
+    # Pinned to match this repo's qdrant-client==1.17.0 pin (pyproject.toml) — bump both
+    # together rather than floating on :latest.
+    image: qdrant/qdrant:v1.17.1
     ports:
       - "127.0.0.1:6333:6333"
     volumes:

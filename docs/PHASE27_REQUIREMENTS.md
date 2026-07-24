@@ -83,10 +83,15 @@ internal storage details — accept both bare `doc_key` (`"afi17-101"`) and full
 `compare_documents`/`compare_service` already have for the `.pdf` suffix.
 
 **Scope:**
-- Validate requested `document_ids` against the corpus's known documents before querying, using
-  the same doc_key ↔ source_pdf resolution `api/routes/compare.py`'s `_canonical()` /
-  `docs_service.resolve_source_pdfs()` already use (not a raw string-equality check) so both
-  accepted forms resolve correctly.
+- Validate requested `document_ids` against the corpus's known documents before querying: check
+  each value against `docs_service.list_docs()`'s known `doc_key` values and their resolved
+  `source_pdf` values (via `docs_service.resolve_source_pdfs()`) — a value must actually match a
+  known document to be accepted. **Do not reuse `api/routes/compare.py`'s `_canonical()` for
+  this** (Codex review, PR #118) — it's intentionally forgiving, fabricating `<doc_key>.pdf` for
+  anything it can't resolve, which is correct for compare's fallback UX but would defeat the
+  hard-error requirement here by silently "resolving" an invalid name instead of rejecting it.
+  Only normalize a value into its canonical `source_pdf` form after confirming it matches a known
+  document.
 - On any unresolved value(s), raise a clear error naming the bad document key(s) — do not query
   Qdrant with them.
 - Apply the fix in `core/ask.py` / `services/ask_service.py` so `search_requirements` (MCP),
@@ -252,7 +257,9 @@ Carried forward from Phase 26, still binding:
    layer; MCP inherits it, it does not implement its own copy.
 2. Do not hide backend failures as empty results — this is the exact failure mode WP-27.1 and
    WP-27.2 are fixing; don't introduce a new instance of it while doing so.
-3. Do not widen scope beyond the four findings this phase exists to close. New ideas surfaced
-   while working these WPs (e.g. the CLI's own `--document-id` gap noted in WP-27.3, or whether
-   `evidence_service.build()`'s call-site duplication should be refactored further) go back into
-   `docs/TODO_future_improvements.txt`, not into this phase's diff.
+3. Do not widen scope beyond the four findings this phase exists to close, plus what WP-27.3
+   explicitly takes on (fixing `reqbot evidence --document-id`'s hash-filter bug as part of
+   fixing `evidence_service.build()`'s filter at its root — that's in scope, not an example of
+   scope creep). New ideas surfaced while working these WPs beyond what's already scoped above
+   (e.g. whether `evidence_service.build()`'s call-site duplication should be refactored further)
+   go back into `docs/TODO_future_improvements.txt`, not into this phase's diff.

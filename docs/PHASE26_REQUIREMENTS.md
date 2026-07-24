@@ -1,6 +1,7 @@
 # ReqBot Phase 26 - MCP Tool Surface
 
-**Status:** Draft
+**Status:** Locked (WP-26.1 complete — tool surface, dependency/transport/command decisions, and
+backlog cleanup confirmed; implementation starts at WP-26.2)
 **Date:** 2026-07-23
 **Preceded by:** Phase 25 (Packaging and Deployment Reset)
 **Followed by:** TBD
@@ -14,7 +15,7 @@ not in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-26.1 — MCP Design Lock + Backlog Cleanup | Not started |
+| WP-26.1 — MCP Design Lock + Backlog Cleanup | Complete |
 | WP-26.2 — MCP Server Skeleton | Not started |
 | WP-26.3 — Corpus + Search Tools | Not started |
 | WP-26.4 — Compare + Evidence Tools | Not started |
@@ -222,9 +223,17 @@ export remains CLI/API/GUI-only until a concrete MCP use case proves file export
   generate()` is already a stable, existing feature rather than a new "candidates" generator the
   original note was hedging against — but WP-26.1 should confirm it's an intentional promotion,
   not scope creep that slipped in unnoticed.
+
+  **Confirmed in WP-26.1:** the promotion is intentional, not scope creep. `checklist_service.
+  generate()` is a stable, already-shipped feature (Phase 21), so wrapping it is the same kind of
+  thin-wrapper work as the other five tools — it does not introduce new generation logic the way a
+  "candidates" generator would have.
 - Record the remote-synthesis question as deferred, not decided.
 
-**Preferred decisions for review:**
+  **Confirmed in WP-26.1:** still deferred (see Section 8) — not resolved here, just not
+  forgotten.
+
+**Locked decisions (confirmed in WP-26.1):**
 
 - Dependency: **`mcp`** (`pip install mcp`), the official Python MCP SDK maintained by the
   Model Context Protocol project — use its bundled `mcp.server.fastmcp.FastMCP` decorator API,

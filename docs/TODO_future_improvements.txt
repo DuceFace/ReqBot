@@ -38,33 +38,18 @@ ACTIVE BACKLOG
    pages in memory. Current documents do not appear to require this, but it is a
    useful scalability hardening item.
 
-3. Low-text page detection / OCR warning
-   Flag pages with unusually low extracted text counts. These pages may be image
-   scans or otherwise OCR-dependent.
-
-   Keep this as detection first. Actual OCR support should be a separate
-   build-vs-borrow decision.
-
-4. Page number contiguity validation
-   Validate that Step A page numbers are contiguous and start at 1 before Step B
-   chunks them. Missing or duplicate page numbers may indicate extraction bugs.
-
-5. Chunk overlap guard
-   Assert that overlap is smaller than chunk_size in Step B. This prevents an
-   infinite-loop class of bug if a bad caller or config value is introduced.
-
-6. Ollama finish_reason / token metadata
+3. Ollama finish_reason / token metadata
    Investigate whether Ollama response metadata can detect truncation more
    reliably than JSON parse failure alone.
 
-7. Remove duplicate profile vocabulary constants
+4. Remove duplicate profile vocabulary constants
    Step C and Step D.5 still keep module-level VALID_DOMAIN_TAGS and
    VALID_REQUIREMENT_TYPES constants that mirror profiles/cybersecurity.json.
    They remain useful for compatibility today, but they are a second source of
    truth. Consider deriving fallback defaults from core.profiles when the profile
    plumbing is stable enough.
 
-8. Profile-based skip-section filtering — docling-only gap
+5. Profile-based skip-section filtering — docling-only gap
    profiles/*.json's skip_sections field is consumed when the docling engine is
    used (pipeline/run_pipeline.py passes it into chunk_text.run_structure_aware,
    which filters via _should_skip_chunk/_should_skip_section). But the default
@@ -74,7 +59,7 @@ ACTIVE BACKLOG
    explicitly opts into docling. Revisit once docling is closer to being the
    default engine, or if legacy chunking gains its own section awareness.
 
-9. Optional LLM-backed audit question generation
+6. Optional LLM-backed audit question generation
    Phase 21 intentionally leaves audit_question blank. A future opt-in feature
    may use an LLM to generate human-friendly audit questions, but it must not be
    default behavior.
@@ -86,20 +71,20 @@ ACTIVE BACKLOG
    - blank is better than an unsupported rephrase
    - generated questions should be marked as generated text
 
-10. MCP tool surface (Phase 26 active work — see docs/PHASE26_REQUIREMENTS.md; original idea archived at archive/FUTURE_MCP_IDEA.md)
-    Expose ReqBot as a tool server so external assistants can query a self-hosted
-    ReqBot instance.
+7. MCP tool surface (Phase 26 active work — see docs/PHASE26_REQUIREMENTS.md; original idea archived at archive/FUTURE_MCP_IDEA.md)
+   Expose ReqBot as a tool server so external assistants can query a self-hosted
+   ReqBot instance.
 
-    Useful first tools:
-    - search requirements
-    - trace requirement
-    - list documents
-    - generate checklist
-    - build evidence pack
+   Useful first tools:
+   - search requirements
+   - trace requirement
+   - list documents
+   - generate checklist
+   - build evidence pack
 
-    Architecture rule: MCP must call the same service layer as CLI and GUI.
+   Architecture rule: MCP must call the same service layer as CLI and GUI.
 
-11. Runtime validation for frontend API responses
+8. Runtime validation for frontend API responses
     TypeScript types only protect at compile time. Runtime validation could catch
     backend/frontend contract drift before it becomes confusing UI behavior.
 
@@ -110,16 +95,16 @@ ACTIVE BACKLOG
     - external clients consume the API
     - contract drift causes a real debugging issue
 
-12. Evidence view configurable result depth
+9. Evidence view configurable result depth
     EvidenceView currently calls the API with a fixed top_k value. Add a simple
     control when users need to tune evidence depth.
 
-13. Evidence view expandable sources and context
+10. Evidence view expandable sources and context
     Evidence groups currently emphasize the representative requirement. The API
     also returns all sources per group and context_text. A future UI can expose
     "show more sources" and surrounding context per group.
 
-14. Checklist assessor-note preservation on regeneration
+11. Checklist assessor-note preservation on regeneration
     Running generate() for a document that was already exported and annotated
     will silently reset assessor_notes and status to their initial values
     ("" / "not-started"). Any assessor work done against the exported CSV or

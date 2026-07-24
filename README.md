@@ -484,9 +484,8 @@ Useful flags:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - module map and data flows
 - [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
-- [docs/OPERATIONS.md](docs/OPERATIONS.md) - day-to-day runbook for this project's own dev
-  environment (service IPs, rebuild/reindex procedures) — not general deployment guidance; see
-  "Install / Deployment" above for that
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) - operational runbook for rebuild/reindex steps, ingest
+  recipes, and common gotchas
 - [docs/PHASE26_REQUIREMENTS.md](docs/PHASE26_REQUIREMENTS.md) - Phase 26 plan (MCP tool surface)
 - [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document
 - [archive/](archive/) - completed phase plans (Phases 7–25)

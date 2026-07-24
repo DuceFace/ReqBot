@@ -25,7 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 # The one dependency actually big enough (torch/torchvision weight) to justify
 # gating behind an extra — everything else that ships a real, normal feature
-# (XLSX export, serve, hybrid search) stays in base. See docs/PHASE25_REQUIREMENTS.md.
+# (XLSX export, serve, hybrid search) stays in base. See archive/PHASE25_REQUIREMENTS.md.
 docling = ["docling==2.84.0"]
 remote = ["anthropic>=0.40.0", "openai>=1.50.0"]
 dev = ["pytest==9.1.1", "ruff==0.15.22", "pytest-cov==7.1.0", "rapidfuzz>=3.0.0"]

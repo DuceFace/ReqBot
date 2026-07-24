@@ -1,7 +1,6 @@
 # ReqBot Phase 26 - MCP Tool Surface
 
-**Status:** Locked (WP-26.1 complete — tool surface, dependency/transport/command decisions, and
-backlog cleanup confirmed; implementation starts at WP-26.2)
+**Status:** Complete — all six WPs shipped and merged; MCP proven end-to-end in WP-26.6.
 **Date:** 2026-07-23
 **Preceded by:** Phase 25 (Packaging and Deployment Reset)
 **Followed by:** TBD
@@ -20,7 +19,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-26.3 — Corpus + Search Tools | Complete |
 | WP-26.4 — Compare + Evidence Tools | Complete |
 | WP-26.5 — Checklist Tool | Complete |
-| WP-26.6 — Integration Gate | Not started |
+| WP-26.6 — Integration Gate | Complete |
 
 ---
 
@@ -414,6 +413,46 @@ which one was used.
 - Manual MCP walkthrough above is recorded in the Phase 26 doc.
 
 **Gate:** MCP is proven useful end-to-end without introducing a forked behavior path.
+
+**Walkthrough record (2026-07-24):**
+
+Claude Code was configured as an MCP client for this repo (`claude mcp add reqbot -- python3
+cli/reqbot.py mcp`, local project scope) but the newly-added server doesn't attach to an
+already-running Claude Code session — it only loads at session start. Rather than interrupt the
+in-progress session to restart and pick it up, the walkthrough used the same MCP client already
+verified in WP-26.2 through WP-26.5: a real `mcp.client.stdio.stdio_client` + `ClientSession`
+connecting to `python3 cli/reqbot.py mcp` over stdio (genuine MCP protocol, not an in-process
+`FastMCP.call_tool()` shortcut). The `claude mcp add` registration was left in place so a future
+session can use Claude Code itself as the client directly.
+
+All 12 steps passed against live Ollama (`192.168.90.100:11434`) and Qdrant (`192.168.30.153:6333`),
+45 documents / 31,725 requirements indexed:
+
+1. Environment reachable — confirmed via `get_status`.
+2. `reqbot mcp` started cleanly over stdio.
+3. Client connected, `list_tools` returned all 7 tools: `get_status`, `list_documents`,
+   `search_requirements`, `trace_requirement`, `compare_documents`, `map_evidence`,
+   `generate_checklist`.
+4. `get_status` — Ollama and Qdrant both reachable, 3 models listed, 2 Qdrant collections.
+5. `list_documents` — 45 docs, 31,725 total requirements.
+6. `search_requirements("access control requirements", top_k=5)` — 5 hits; first hit
+   `REQ-1497d49936b0`, `source_ref=AC-03(15)`, `source_pdf=NIST.SP.800-53Ar5.pdf`,
+   `source_quote` present.
+7. `trace_requirement("REQ-1497d49936b0")` — full requirement payload with `source_quote`
+   present, 0 cross-framework matches for this particular ID.
+8. `compare_documents("CJCSI 6510.02G", "CJCSI6510_01F", "access control", top_k=5)` — semantic
+   mode, canonical `doc_pdf_1`/`doc_pdf_2` resolved correctly.
+9. `map_evidence("access control", top_k=5)` — 2 groups, 5 total sources.
+10. `generate_checklist("CJCSI 6510.02G")` — `reqbot-checklist` v1.0 envelope, 103 items, each
+    with a stable `CHK-` id and `source_ref`.
+11. Every result above carried expected provenance (`source_ref`/`source_pdf`/`source_quote` or
+    their checklist/compare/evidence equivalents) — no bare/opaque results.
+12. CLI confirmed working independently of any MCP server process: `reqbot status` and
+    `reqbot ask "access control" --top-k 2` both ran correctly after the MCP client's stdio
+    subprocess had already exited (stdio transport is per-connection, no persistent server to
+    conflict with the CLI).
+
+`ruff check .` and the full unit suite (516 tests) both passed on the same commit.
 
 ---
 

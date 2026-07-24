@@ -140,7 +140,10 @@ that one entry instead of repeating it.
 
 def get_review(diff: str) -> str:
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION)
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_INSTRUCTION,
+        http_options=types.HttpOptions(timeout=120_000),  # milliseconds; no job-level CI timeout backs this up
+    )
     for attempt in range(3):
         try:
             response = client.models.generate_content(

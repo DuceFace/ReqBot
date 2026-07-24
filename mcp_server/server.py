@@ -8,7 +8,7 @@ there's no need to catch and re-wrap here.
 from mcp.server.fastmcp import FastMCP
 
 from core import config as _config
-from services import status_service
+from services import ask_service, docs_service, status_service, trace_service
 
 mcp = FastMCP("reqbot")
 
@@ -29,6 +29,56 @@ def get_status() -> dict:
             "synthesis": cfg.synthesis_model,
         },
     )
+
+
+@mcp.tool()
+def list_documents() -> dict:
+    """List indexed documents: doc_key, source PDF, requirement count, chunking mode, run date,
+    and domain profile for each. Call this before search_requirements/trace_requirement to see
+    what's actually in the corpus."""
+    cfg = _config.load()
+    return docs_service.list_docs(cfg.processed_dir_path())
+
+
+@mcp.tool()
+def search_requirements(
+    question: str,
+    top_k: int = 20,
+    document_ids: list[str] | None = None,
+    domain_tags: list[str] | None = None,
+    requirement_types: list[str] | None = None,
+    context: bool = False,
+) -> dict:
+    """Search requirements and return ranked, source-backed hits with provenance and warnings.
+
+    Structured retrieval only -- no LLM synthesis is ever performed by this tool (synthesis
+    stays optional and separately labeled per Phase 26's architecture rules, on other tools
+    that intentionally support it). Pass a returned result's requirement_id to
+    trace_requirement for full provenance on one hit.
+    """
+    cfg = _config.load()
+    return ask_service.ask(
+        question,
+        cfg.qdrant_url,
+        cfg.ollama_url,
+        top_k=top_k,
+        embedding_model=cfg.embedding_model,
+        rewrite_model=cfg.rewrite_model,
+        domain_tags=domain_tags,
+        requirement_types=requirement_types,
+        document_ids=document_ids,
+        context=context,
+        synthesize=False,
+    )
+
+
+@mcp.tool()
+def trace_requirement(requirement_id: str, include_context: bool = False) -> dict:
+    """Retrieve full provenance for one known requirement_id: the full payload (source_quote,
+    source_ref, document/page/section metadata), cross-framework matches sharing the same
+    source_ref in other documents, and optionally the surrounding source chunk text."""
+    cfg = _config.load()
+    return trace_service.trace(requirement_id, cfg.qdrant_url, show_context=include_context)
 
 
 def run() -> None:

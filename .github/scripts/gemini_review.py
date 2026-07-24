@@ -191,7 +191,9 @@ def get_review(diff: str) -> str:
                     print(f"{model} key #{key_num}: {reason}, moving on: {err}", file=sys.stderr)
                     break  # a client error won't resolve by retrying the same model/key
 
-    raise last_err
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("Gemini review failed: MODEL_CHAIN or the key list was empty")
 
 
 def find_existing_comment(repo: str, pr_number: str) -> str | None:

@@ -140,6 +140,56 @@ ACTIVE BACKLOG
     entry, matching the existing warnings field precedent in ask_service.ask()'s
     response) -- design questions deferred to that WP, not implicit here.
 
+13. Evidence synthesis uses the wrong model field for the remote backend (Codex
+    review, WP-26.4/PR #115)
+    api/routes/evidence.py's post_evidence() (and mcp_server/server.py's
+    map_evidence, which mirrors it) always pass cfg.synthesis_model into
+    evidence_service.build()'s synthesis_model kwarg, even when
+    syn_backend == "remote". core.config.ReqBotConfig has a separate
+    remote_model field (default "claude-sonnet-4-6") specifically for the
+    remote path; synthesis_model is the local Ollama model. Today this means a
+    remote-configured evidence synthesis request sends a local model name
+    (e.g. "qwen2.5:14b") to Anthropic/OpenAI, the call fails, and
+    core.synthesis.synthesize()'s caller swallows the exception -- so the
+    caller (CLI, API, or MCP) just gets an empty synthesis_text with no error,
+    silently degrading instead of using the remote model that was actually
+    configured.
+
+    Pre-existing in api/routes/evidence.py, not introduced by MCP -- MCP
+    mirrored the route exactly per the thin-wrapper rule. Fix belongs in the
+    shared call site(s) (or ideally inside evidence_service.build() itself, so
+    CLI/API/MCP can't drift on this again): select remote_model when
+    synthesis_backend == "remote", synthesis_model when "local". Needs its own
+    planned WP -- do not patch mcp_server/server.py alone.
+
+14. map_evidence has no document_ids filter (Gemini review, WP-26.4/PR #115)
+    Both api/routes/evidence.py's EvidenceRequest and mcp_server/server.py's
+    map_evidence hardcode document_ids=None into evidence_service.build(),
+    even though the service itself accepts a document_ids filter and the CLI
+    exposes it (cli/reqbot.py's evidence subcommand has --document-id).
+    So the API and MCP surfaces are narrower than the CLI here today -- not a
+    regression MCP introduced, but a pre-existing CLI/API inconsistency MCP
+    faithfully mirrored rather than closing. Needs a planned WP to add
+    document_ids to EvidenceRequest and thread it through the route, with MCP
+    following the same shape once the API does (thin-wrapper rule -- MCP
+    should not get a filter the API itself doesn't expose first).
+
+15. api_key_env=None would crash the remote-synthesis-backend fallback check
+    (Gemini review, WP-26.4/PR #115)
+    api/routes/evidence.py and mcp_server/server.py's map_evidence both call
+    os.environ.get(cfg.api_key_env, "") unconditionally when
+    synthesis_backend == "remote". core.config._DEFAULTS sets api_key_env to
+    the string "ANTHROPIC_API_KEY", but it has no REQBOT_* env var mapping, so
+    it's only settable by hand-editing config.json -- a user could set it to
+    null there, and since ReqBotConfig.load() uses values.get(key, default)
+    (not values.get(key) or default), an explicit null in the file is not
+    replaced by the default. os.environ.get(None, "") raises TypeError in
+    that case, an unhandled crash rather than a graceful fallback to the
+    local backend. Pre-existing in api/routes/evidence.py too, not MCP-only.
+    Needs a planned WP: guard with `if cfg.api_key_env else ""`, ideally at
+    the shared call-site pattern shared by API and MCP (or make
+    ReqBotConfig.load() itself refuse to store a null api_key_env).
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS

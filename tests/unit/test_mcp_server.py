@@ -304,3 +304,242 @@ def test_trace_requirement_service_failure_becomes_structured_mcp_error():
             asyncio.run(
                 server.mcp.call_tool("trace_requirement", {"requirement_id": "REQ-x"})
             )
+
+
+# ---------------------------------------------------------------------------
+# compare_documents (WP-26.4)
+# ---------------------------------------------------------------------------
+
+def test_compare_documents_calls_compare_service_with_resolved_pdfs():
+    from mcp_server import server
+
+    cfg = _mock_cfg()
+    fake_result = {"query": "AC-2", "mode": "exact", "source_ref": "AC-2", "groups": {}}
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch(
+            "mcp_server.server.resolve_source_pdfs",
+            return_value={"docA": "docA.pdf", "docB": "docB.pdf"},
+        ),
+        patch("mcp_server.server.compare_service.compare", return_value=fake_result) as mock_compare,
+    ):
+        result = server.compare_documents("docA", "docB", "AC-2", top_k=15)
+
+    mock_compare.assert_called_once_with(
+        query="AC-2",
+        qdrant_url=cfg.qdrant_url,
+        ollama_url=cfg.ollama_url,
+        top_k=15,
+        doc_keys=["docA.pdf", "docB.pdf"],
+        embedding_model=cfg.embedding_model,
+    )
+    assert result["doc_id_1"] == "docA"
+    assert result["doc_id_2"] == "docB"
+    assert result["doc_pdf_1"] == "docA.pdf"
+    assert result["doc_pdf_2"] == "docB.pdf"
+
+
+def test_compare_documents_falls_back_to_dotpdf_suffix_when_unresolved():
+    """resolve_source_pdfs returns '' for an unknown doc_key -- _canonical_source_pdf
+    must fall back to doc_key + '.pdf' rather than passing an empty string through."""
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.resolve_source_pdfs", return_value={"docA": "", "docB": ""}),
+        patch("mcp_server.server.compare_service.compare", return_value={}) as mock_compare,
+    ):
+        result = server.compare_documents("docA", "docB", "AC-2")
+
+    assert result["doc_pdf_1"] == "docA.pdf"
+    assert result["doc_pdf_2"] == "docB.pdf"
+    assert mock_compare.mock_calls[0].kwargs["doc_keys"] == ["docA.pdf", "docB.pdf"]
+
+
+def test_compare_documents_rejects_top_k_out_of_bounds():
+    from mcp_server import server
+
+    with patch("mcp_server.server._config.load", return_value=_mock_cfg()):
+        for bad in (0, -5, 101):
+            with pytest.raises(ValueError, match="top_k"):
+                server.compare_documents("docA", "docB", "AC-2", top_k=bad)
+
+
+def test_compare_documents_semantic_mode_preserves_provenance_fields():
+    from mcp_server import server
+
+    fake_result = {
+        "query": "access control",
+        "mode": "semantic",
+        "ref_order": ["AC-2"],
+        "ref_groups": {
+            "AC-2": {
+                "docA.pdf": {"source_ref": "AC-2", "source_pdf": "docA.pdf", "source_quote": "..."},
+            }
+        },
+        "warnings": [],
+    }
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.resolve_source_pdfs", return_value={}),
+        patch("mcp_server.server.compare_service.compare", return_value=fake_result),
+    ):
+        result = server.compare_documents("docA", "docB", "access control")
+
+    rep = result["ref_groups"]["AC-2"]["docA.pdf"]
+    for field in ("source_ref", "source_pdf", "source_quote"):
+        assert rep[field]
+
+
+def test_compare_documents_resolve_failure_does_not_crash_tool():
+    """api/routes/compare.py swallows resolve_source_pdfs failures and falls back to
+    doc_key + '.pdf' rather than failing the whole comparison -- match that behavior."""
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.resolve_source_pdfs", side_effect=OSError("disk error")),
+        patch("mcp_server.server.compare_service.compare", return_value={}) as mock_compare,
+    ):
+        result = server.compare_documents("docA", "docB", "AC-2")
+
+    assert result["doc_pdf_1"] == "docA.pdf"
+    assert result["doc_pdf_2"] == "docB.pdf"
+    assert mock_compare.called
+
+
+def test_compare_documents_service_failure_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.resolve_source_pdfs", return_value={}),
+        patch("mcp_server.server.compare_service.compare", side_effect=ValueError("No requirements found")),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(
+                server.mcp.call_tool(
+                    "compare_documents",
+                    {"doc_id_1": "docA", "doc_id_2": "docB", "topic": "AC-2"},
+                )
+            )
+
+
+# ---------------------------------------------------------------------------
+# map_evidence (WP-26.4)
+# ---------------------------------------------------------------------------
+
+def test_map_evidence_calls_evidence_service_with_expected_params():
+    from mcp_server import server
+
+    cfg = _mock_cfg(synthesis_backend="local")
+    fake_result = {"query": "x", "groups": {}, "group_order": [], "total_sources": 0, "synthesis_text": ""}
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch("mcp_server.server.evidence_service.build", return_value=fake_result) as mock_build,
+    ):
+        result = server.map_evidence(
+            "access control",
+            domain_tags=["access-control"],
+            requirement_types=["shall"],
+            synthesize=True,
+            top_k=25,
+        )
+
+    assert result is fake_result
+    _, args, kwargs = mock_build.mock_calls[0]
+    assert kwargs["query"] == "access control"
+    assert kwargs["qdrant_url"] == cfg.qdrant_url
+    assert kwargs["ollama_url"] == cfg.ollama_url
+    assert kwargs["top_k"] == 25
+    assert kwargs["show_context"] is False
+    assert kwargs["document_ids"] is None
+    assert kwargs["domain_tags"] == ["access-control"]
+    assert kwargs["requirement_types"] == ["shall"]
+    assert kwargs["synthesize"] is True
+    assert kwargs["synthesis_model"] == cfg.synthesis_model
+    assert kwargs["embedding_model"] == cfg.embedding_model
+
+
+def test_map_evidence_rejects_top_k_out_of_bounds():
+    from mcp_server import server
+
+    with patch("mcp_server.server._config.load", return_value=_mock_cfg()):
+        for bad in (0, -1, 101):
+            with pytest.raises(ValueError, match="top_k"):
+                server.map_evidence("question", top_k=bad)
+
+
+def test_map_evidence_falls_back_to_local_when_remote_key_missing():
+    """Mirrors api/routes/evidence.py: if synthesis_backend is 'remote' but the
+    configured api_key_env isn't set, silently fall back to 'local' rather than
+    failing the whole evidence request."""
+    from mcp_server import server
+
+    cfg = _mock_cfg(synthesis_backend="remote", remote_provider="anthropic", api_key_env="ANTHROPIC_API_KEY")
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch.dict("os.environ", {}, clear=False),
+        patch("mcp_server.server.evidence_service.build", return_value={}) as mock_build,
+    ):
+        import os as _os
+        _os.environ.pop("ANTHROPIC_API_KEY", None)
+        server.map_evidence("question")
+
+    assert mock_build.mock_calls[0].kwargs["synthesis_backend"] == "local"
+    assert mock_build.mock_calls[0].kwargs["api_key"] == ""
+
+
+def test_map_evidence_uses_remote_backend_when_key_present():
+    from mcp_server import server
+
+    cfg = _mock_cfg(synthesis_backend="remote", remote_provider="anthropic", api_key_env="ANTHROPIC_API_KEY")
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-fake"}),
+        patch("mcp_server.server.evidence_service.build", return_value={}) as mock_build,
+    ):
+        server.map_evidence("question")
+
+    assert mock_build.mock_calls[0].kwargs["synthesis_backend"] == "remote"
+    assert mock_build.mock_calls[0].kwargs["api_key"] == "sk-fake"
+    assert mock_build.mock_calls[0].kwargs["provider"] == "anthropic"
+
+
+def test_map_evidence_grouped_output_preserves_sources_and_warnings():
+    from mcp_server import server
+
+    fake_result = {
+        "query": "x",
+        "groups": {
+            "AC-2": {
+                "source_ref": "AC-2",
+                "representative": {"source_ref": "AC-2", "source_quote": "..."},
+                "sources": [{"source_ref": "AC-2", "source_pdf": "docA.pdf"}],
+                "context_text": None,
+            }
+        },
+        "group_order": ["AC-2"],
+        "total_sources": 1,
+        "synthesis_text": "",
+        "warnings": ["1 of 1 results were indexed with a different embedding model"],
+    }
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.evidence_service.build", return_value=fake_result),
+    ):
+        result = server.map_evidence("question")
+
+    assert result["groups"]["AC-2"]["sources"] == fake_result["groups"]["AC-2"]["sources"]
+    assert result["warnings"] == fake_result["warnings"]
+
+
+def test_map_evidence_service_failure_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.evidence_service.build", side_effect=RuntimeError("ollama unreachable")),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(server.mcp.call_tool("map_evidence", {"topic": "x"}))

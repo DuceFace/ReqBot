@@ -39,6 +39,7 @@ def _mock_cfg(**overrides):
     cfg.enrichment_model = "cfg-enrichment"
     cfg.rewrite_model = "cfg-rewrite"
     cfg.synthesis_model = "cfg-synthesis"
+    cfg.min_score = 0.07
     for key, value in overrides.items():
         setattr(cfg, key, value)
     return cfg
@@ -166,6 +167,32 @@ def test_search_requirements_calls_ask_service_with_expected_params():
     assert kwargs["context"] is True
     assert kwargs["embedding_model"] == cfg.embedding_model
     assert kwargs["rewrite_model"] == cfg.rewrite_model
+    assert kwargs["min_score"] == cfg.min_score
+
+
+def test_search_requirements_rejects_top_k_out_of_bounds():
+    """Same 1..100 bound /api/ask enforces via Pydantic (api/routes/ask.py) -- unbounded
+    top_k lets a caller drive core.ask.retrieve's Qdrant prefetch/fusion limits arbitrarily
+    high (Codex review, PR #114), and a negative top_k breaks hits[:top_k] slicing."""
+    from mcp_server import server
+
+    with patch("mcp_server.server._config.load", return_value=_mock_cfg()):
+        for bad in (0, -5, 101, 100000):
+            with pytest.raises(ValueError, match="top_k"):
+                server.search_requirements("question", top_k=bad)
+
+
+def test_search_requirements_accepts_top_k_boundary_values():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.ask_service.ask", return_value={}) as mock_ask,
+    ):
+        server.search_requirements("question", top_k=1)
+        server.search_requirements("question", top_k=100)
+
+    assert mock_ask.call_count == 2
 
 
 def test_search_requirements_never_synthesizes():

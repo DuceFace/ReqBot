@@ -56,12 +56,22 @@ def search_requirements(
     that intentionally support it). Pass a returned result's requirement_id to
     trace_requirement for full provenance on one hit.
     """
+    # Same bound /api/ask enforces via Pydantic's Field(ge=1, le=100) (api/routes/ask.py) --
+    # that's interface-boundary input validation, not shared core/ask.py business logic, so
+    # each interface owning its own copy is the existing pattern, not a rule violation.
+    # Unbounded top_k isn't just "large": core.ask.retrieve derives Qdrant prefetch/fusion
+    # limits from it (prefetch_limit = max(100, top_k * 5)), and a negative top_k breaks
+    # hits[:top_k] slicing (Python slices from the end instead of limiting count).
+    if not 1 <= top_k <= 100:
+        raise ValueError(f"top_k must be between 1 and 100, got {top_k}")
+
     cfg = _config.load()
     return ask_service.ask(
         question,
         cfg.qdrant_url,
         cfg.ollama_url,
         top_k=top_k,
+        min_score=cfg.min_score,
         embedding_model=cfg.embedding_model,
         rewrite_model=cfg.rewrite_model,
         domain_tags=domain_tags,

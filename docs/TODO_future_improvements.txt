@@ -121,6 +121,25 @@ ACTIVE BACKLOG
       re-ingested document that produces the same requirement_ids will
       correctly re-associate assessor notes
 
+12. Validate document_ids filter in core/ask.py (Codex review, WP-26.3/PR #114)
+    core/ask.py's retrieve() passes document_ids straight into a Qdrant MatchAny
+    filter with no existence check against the actual corpus. A typo'd or stale
+    document_id doesn't error -- it just produces an empty or reduced hit set,
+    indistinguishable from a legitimate no-match search. This violates the
+    Phase 26 architecture rule that invalid document keys must not be hidden as
+    fake empty results (docs/PHASE26_REQUIREMENTS.md Section 4, rule 5).
+
+    Pre-existing gap in core/ask.py / services/ask_service.py, not introduced by
+    or unique to MCP -- the CLI and API share the exact same hole today. Fix
+    belongs in the shared service layer so CLI, API, and MCP all benefit
+    identically; do not patch this into mcp_server/server.py alone (would create
+    an MCP-only behavior fork -- see guardrail #6 in docs/PHASE26_REQUIREMENTS.md
+    and DECISIONS AND GUARDRAILS #6 below). Needs its own planned WP: validate
+    requested document_ids against docs_service.list_docs()'s known doc_keys
+    before querying, and decide the failure shape (hard error vs. a warning
+    entry, matching the existing warnings field precedent in ask_service.ask()'s
+    response) -- design questions deferred to that WP, not implicit here.
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS

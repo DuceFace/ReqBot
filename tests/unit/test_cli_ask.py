@@ -66,7 +66,6 @@ def test_no_model_flag_falls_back_to_configured_synthesis_model():
         synthesis_model="configured-synth-model",
         rewrite_model="configured-rewrite-model",
         embedding_model="configured-embedding-model",
-        processed_dir_path=lambda: "/fake/processed",
     )
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(model=None, rewrite_model=None))
@@ -80,7 +79,6 @@ def test_explicit_model_flag_overrides_config():
         synthesis_model="configured-synth-model",
         rewrite_model="configured-rewrite-model",
         embedding_model="configured-embedding-model",
-        processed_dir_path=lambda: "/fake/processed",
     )
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(model="explicit-model"))
@@ -95,7 +93,6 @@ def test_no_rewrite_model_flag_falls_back_to_configured_rewrite_model():
         synthesis_model="configured-synth-model",
         rewrite_model="configured-rewrite-model",
         embedding_model="configured-embedding-model",
-        processed_dir_path=lambda: "/fake/processed",
     )
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(rewrite_model=None))
@@ -109,26 +106,12 @@ def test_explicit_rewrite_model_flag_overrides_config():
         synthesis_model="configured-synth-model",
         rewrite_model="configured-rewrite-model",
         embedding_model="configured-embedding-model",
-        processed_dir_path=lambda: "/fake/processed",
     )
     with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
         rc = cmd_ask(_args(rewrite_model="explicit-rewrite-model"))
     assert rc == 0
     _, kwargs = mock_run.call_args
     assert kwargs["rewrite_model"] == "explicit-rewrite-model"
-
-
-def test_processed_dir_passed_to_run():
-    mock_cfg = SimpleNamespace(
-        synthesis_model="configured-synth-model",
-        rewrite_model="configured-rewrite-model",
-        embedding_model="configured-embedding-model",
-        processed_dir_path=lambda: "/fake/processed",
-    )
-    with patch("cli.reqbot._cfg", mock_cfg), patch("core.ask.run") as mock_run:
-        cmd_ask(_args())
-    _, kwargs = mock_run.call_args
-    assert kwargs["processed_dir"] == "/fake/processed"
 
 
 def test_unknown_document_ids_logs_clear_error_not_crash():
@@ -139,7 +122,6 @@ def test_unknown_document_ids_logs_clear_error_not_crash():
         synthesis_model="configured-synth-model",
         rewrite_model="configured-rewrite-model",
         embedding_model="configured-embedding-model",
-        processed_dir_path=lambda: "/fake/processed",
     )
     with (
         patch("cli.reqbot._cfg", mock_cfg),

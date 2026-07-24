@@ -40,7 +40,6 @@ SPARSE_MODEL = "Qdrant/bm25"
 DEFAULT_SYNTHESIS_MODEL = "qwen2.5:14b"
 DEFAULT_REWRITE_MODEL = "llama3.1:8b-instruct-q4_K_M"
 
-from core import artifact_resolver as _artifact_resolver
 from core import constants as _const
 CONTEXT_UUID_NAMESPACE = _const.CONTEXT_UUID_NS
 
@@ -146,6 +145,47 @@ def build_query_filter(
         return None
 
     return models.Filter(must=conditions)
+
+
+def resolve_document_ids(
+    client: QdrantClient, document_ids: list[str]
+) -> tuple[list[str], list[str]]:
+    """Resolve caller-supplied document_ids (doc_key or source_pdf form) against
+    what's actually indexed in the grc_requirements collection.
+
+    Validates against the live collection, not the processed_dir JSONL directory
+    (Codex review, PR #119) — a document ingested via `reqbot ingest --output-dir`
+    or indexed via `reqbot index <arbitrary.jsonl>` can be fully searchable while
+    living outside the configured processed_dir, and conversely a JSONL sitting in
+    processed_dir may never have been indexed. The Qdrant collection is the only
+    thing that reflects what a query can actually match, so it's the only correct
+    source of truth for this check.
+
+    A value is accepted only if `client.count()` confirms at least one point has
+    that exact source_pdf value (or `value + ".pdf"` when value doesn't already
+    end in .pdf) — never fabricated for an unrecognized value. Uses an exact count
+    (not the faster approximate mode) because this is a validation gate: a false
+    "not found" here would wrongly reject a real, searchable document.
+
+    Returns (resolved_source_pdfs, unknown_values).
+    """
+    resolved: list[str] = []
+    unknown: list[str] = []
+    for value in document_ids:
+        candidate = value if value.lower().endswith(".pdf") else f"{value}.pdf"
+        match_values = [value] if candidate == value else [value, candidate]
+        count = client.count(
+            collection_name=COLLECTION_NAME,
+            count_filter=models.Filter(
+                must=[models.FieldCondition(key="source_pdf", match=models.MatchAny(any=match_values))]
+            ),
+            exact=True,
+        ).count
+        if count > 0:
+            resolved.append(candidate)
+        else:
+            unknown.append(value)
+    return resolved, unknown
 
 
 def retrieve_context_chunks(
@@ -468,7 +508,6 @@ def retrieve(
     domain_tags: list[str] | None = None,
     requirement_types: list[str] | None = None,
     document_ids: list[str] | None = None,
-    processed_dir: Path | None = None,
     no_rewrite: bool = False,
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
     embedding_model: str = EMBEDDING_MODEL,
@@ -496,20 +535,19 @@ def retrieve(
         retrieval_ms:   int         wall-clock ms from entry to just before synthesis (pure retrieval)
         warnings:       list[str]   e.g. embedding-model mismatch between config and indexed results
 
-    Raises ValueError if document_ids contains a value that doesn't match any known
-    document's doc_key or source_pdf (Phase 27, WP-27.1) — a stale or typo'd document
+    Raises ValueError if document_ids contains a value not indexed in the
+    grc_requirements collection (Phase 27, WP-27.1) — a stale or typo'd document
     filter is invalid input, not a weak-search condition, so it errors instead of
-    silently returning an empty/reduced result set. Requires processed_dir when
-    document_ids is non-empty.
+    silently returning an empty/reduced result set.
     """
     import time as _time
     _t0 = _time.monotonic()
 
+    qdrant_client = QdrantClient(url=qdrant_url)
+
     if document_ids:
-        if processed_dir is None:
-            raise ValueError("document_ids filter requires processed_dir to validate against")
-        resolved_document_ids, unknown_document_ids = _artifact_resolver.resolve_document_ids(
-            processed_dir, document_ids
+        resolved_document_ids, unknown_document_ids = resolve_document_ids(
+            qdrant_client, document_ids
         )
         if unknown_document_ids:
             raise ValueError(
@@ -593,7 +631,7 @@ def retrieve(
     # to draw from — otherwise low-score hits can consume top_k slots before filtering.
     prefetch_limit = max(100, top_k * 5)
     fusion_limit = max(top_k * 3, 50) if min_score > 0 else top_k
-    qdrant_client = QdrantClient(url=qdrant_url)
+    # qdrant_client already created above (needed early for document_ids validation)
 
     prefetch_legs = [
         models.Prefetch(
@@ -707,7 +745,6 @@ def run(
     domain_tags: list[str] | None = None,
     requirement_types: list[str] | None = None,
     document_ids: list[str] | None = None,
-    processed_dir: Path | None = None,
     no_rewrite: bool = False,
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
     embedding_model: str = EMBEDDING_MODEL,
@@ -767,7 +804,6 @@ def run(
         domain_tags=domain_tags,
         requirement_types=requirement_types,
         document_ids=document_ids,
-        processed_dir=processed_dir,
         no_rewrite=no_rewrite,
         rewrite_model=rewrite_model,
         embedding_model=embedding_model,
@@ -839,7 +875,6 @@ def main() -> None:
         _default_qdrant_url = _cfg.qdrant_url
         _default_ollama_url = _cfg.ollama_url
         _default_embedding_model = _cfg.embedding_model
-        _default_processed_dir = _cfg.processed_dir_path()
     except Exception as e:
         log.warning("Could not load config defaults (%s) — using hardcoded defaults", e)
         _default_top_k = 20
@@ -847,7 +882,6 @@ def main() -> None:
         _default_qdrant_url = "http://localhost:6333"
         _default_ollama_url = "http://localhost:11434"
         _default_embedding_model = EMBEDDING_MODEL
-        _default_processed_dir = None
 
     parser = argparse.ArgumentParser(
         description="Query GRC requirements via Qdrant vector search"
@@ -981,7 +1015,6 @@ def main() -> None:
         domain_tags=args.domain_tags,
         requirement_types=args.requirement_types,
         document_ids=args.document_ids,
-        processed_dir=_default_processed_dir,
         no_rewrite=args.no_rewrite,
         rewrite_model=args.rewrite_model,
         embedding_model=args.embedding_model,

@@ -1,4 +1,3 @@
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -117,17 +116,6 @@ def test_value_error_propagates(mock_retrieve):
     mock_retrieve.side_effect = ValueError("Unknown document_ids: bad-doc")
     with pytest.raises(ValueError, match="bad-doc"):
         ask("test", "http://qdrant:6333", "http://ollama:11434", document_ids=["bad-doc"])
-
-
-@patch("core.ask.retrieve")
-def test_processed_dir_passed_to_retrieve(mock_retrieve):
-    mock_retrieve.return_value = _make_retrieve_result()
-    ask(
-        "test", "http://qdrant:6333", "http://ollama:11434",
-        document_ids=["afi17-101"], processed_dir=Path("/fake/processed"),
-    )
-    _, kwargs = mock_retrieve.call_args
-    assert kwargs["processed_dir"] == Path("/fake/processed")
 
 
 @patch("core.ask.retrieve")

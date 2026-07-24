@@ -191,7 +191,6 @@ def cmd_ask(args: argparse.Namespace) -> int:
             domain_tags=args.domain_tags,
             requirement_types=args.requirement_types,
             document_ids=args.document_ids,
-            processed_dir=_cfg.processed_dir_path(),
             no_rewrite=args.no_rewrite,
             rewrite_model=args.rewrite_model or _cfg.rewrite_model,
             embedding_model=_cfg.embedding_model,

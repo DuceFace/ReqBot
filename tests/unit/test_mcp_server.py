@@ -237,21 +237,6 @@ def test_search_requirements_service_failure_becomes_structured_mcp_error():
             asyncio.run(server.mcp.call_tool("search_requirements", {"question": "x"}))
 
 
-def test_search_requirements_passes_processed_dir():
-    """Phase 27, WP-27.1: document_ids validation needs processed_dir threaded
-    through from config, same as list_documents/generate_checklist already do."""
-    from mcp_server import server
-
-    cfg = _mock_cfg()
-    with (
-        patch("mcp_server.server._config.load", return_value=cfg),
-        patch("mcp_server.server.ask_service.ask", return_value={}) as mock_ask,
-    ):
-        server.search_requirements("question", document_ids=["afi17-101"])
-
-    assert mock_ask.mock_calls[0].kwargs["processed_dir"] == cfg.processed_dir_path.return_value
-
-
 def test_search_requirements_unknown_document_ids_becomes_structured_mcp_error():
     """Phase 27, WP-27.1: an unknown document_ids value must surface as a
     structured MCP error naming the bad key, not a silent empty result."""

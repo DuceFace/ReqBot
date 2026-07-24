@@ -93,7 +93,6 @@ def search_requirements(
         domain_tags=domain_tags,
         requirement_types=requirement_types,
         document_ids=document_ids,
-        processed_dir=cfg.processed_dir_path(),
         context=context,
         synthesize=False,
     )

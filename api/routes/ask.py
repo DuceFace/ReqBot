@@ -61,7 +61,6 @@ def post_ask(req: AskRequest) -> dict:
             domain_tags=req.domain_tags or None,
             requirement_types=req.requirement_types or None,
             document_ids=req.document_ids or None,
-            processed_dir=cfg.processed_dir_path(),
             no_rewrite=req.no_rewrite,
             context=req.context,
             hyde=req.hyde,

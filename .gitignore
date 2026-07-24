@@ -206,7 +206,6 @@ __marimo__/
 
 # ReqBot — project-specific
 CLAUDE.md
-docs/agent/
 raw_pdfs/
 documents/processed/
 Backups/
@@ -219,7 +218,9 @@ build/bdist.*/
 dist/
 frontend/dist/
 frontend/node_modules/
-archive/*.log
+# Historical/completed-phase docs are tracked explicitly via git mv when archived; this only
+# keeps incidental drops (run logs, dead reports) out of `git status` noise going forward.
+archive/
 
 # WP-3 review scratch files (CSV is generated from JSONL; JSONL is source of truth)
 eval/gold_eval_chunks_review.csv

@@ -39,6 +39,7 @@ def _mock_cfg(**overrides):
     cfg.enrichment_model = "cfg-enrichment"
     cfg.rewrite_model = "cfg-rewrite"
     cfg.synthesis_model = "cfg-synthesis"
+    cfg.min_score = 0.07
     for key, value in overrides.items():
         setattr(cfg, key, value)
     return cfg
@@ -102,3 +103,204 @@ def test_get_status_service_failure_becomes_structured_mcp_error():
     ):
         with pytest.raises(ToolError):
             asyncio.run(server.mcp.call_tool("get_status", {}))
+
+
+# ---------------------------------------------------------------------------
+# list_documents (WP-26.3)
+# ---------------------------------------------------------------------------
+
+def test_list_documents_calls_docs_service_with_processed_dir():
+    from mcp_server import server
+
+    cfg = _mock_cfg()
+    fake_result = {"docs": [], "total_reqs": 0, "total_docs": 0}
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch("mcp_server.server.docs_service.list_docs", return_value=fake_result) as mock_list,
+    ):
+        result = server.list_documents()
+
+    mock_list.assert_called_once_with(cfg.processed_dir_path.return_value)
+    assert result is fake_result
+
+
+def test_list_documents_failure_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.docs_service.list_docs", side_effect=FileNotFoundError("no such dir")),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(server.mcp.call_tool("list_documents", {}))
+
+
+# ---------------------------------------------------------------------------
+# search_requirements (WP-26.3)
+# ---------------------------------------------------------------------------
+
+def test_search_requirements_calls_ask_service_with_expected_params():
+    from mcp_server import server
+
+    cfg = _mock_cfg()
+    fake_result = {"query": "x", "results": [], "metadata": {}, "warnings": []}
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch("mcp_server.server.ask_service.ask", return_value=fake_result) as mock_ask,
+    ):
+        result = server.search_requirements(
+            "access control",
+            top_k=5,
+            document_ids=["docA"],
+            domain_tags=["access-control"],
+            requirement_types=["shall"],
+            context=True,
+        )
+
+    assert result is fake_result
+    _, args, kwargs = mock_ask.mock_calls[0]
+    assert args == ("access control", cfg.qdrant_url, cfg.ollama_url)
+    assert kwargs["top_k"] == 5
+    assert kwargs["document_ids"] == ["docA"]
+    assert kwargs["domain_tags"] == ["access-control"]
+    assert kwargs["requirement_types"] == ["shall"]
+    assert kwargs["context"] is True
+    assert kwargs["embedding_model"] == cfg.embedding_model
+    assert kwargs["rewrite_model"] == cfg.rewrite_model
+    assert kwargs["min_score"] == cfg.min_score
+
+
+def test_search_requirements_rejects_top_k_out_of_bounds():
+    """Same 1..100 bound /api/ask enforces via Pydantic (api/routes/ask.py) -- unbounded
+    top_k lets a caller drive core.ask.retrieve's Qdrant prefetch/fusion limits arbitrarily
+    high (Codex review, PR #114), and a negative top_k breaks hits[:top_k] slicing."""
+    from mcp_server import server
+
+    with patch("mcp_server.server._config.load", return_value=_mock_cfg()):
+        for bad in (0, -5, 101, 100000):
+            with pytest.raises(ValueError, match="top_k"):
+                server.search_requirements("question", top_k=bad)
+
+
+def test_search_requirements_accepts_top_k_boundary_values():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.ask_service.ask", return_value={}) as mock_ask,
+    ):
+        server.search_requirements("question", top_k=1)
+        server.search_requirements("question", top_k=100)
+
+    assert mock_ask.call_count == 2
+
+
+def test_search_requirements_never_synthesizes():
+    """Architecture rule: structured retrieval only -- no default LLM synthesis (Non-Goals,
+    Section 3). synthesize must always be False regardless of caller input, since this tool
+    doesn't even expose a synthesize parameter."""
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.ask_service.ask", return_value={}) as mock_ask,
+    ):
+        server.search_requirements("question")
+
+    assert mock_ask.mock_calls[0].kwargs["synthesize"] is False
+
+
+def test_search_requirements_warnings_pass_through():
+    from mcp_server import server
+
+    fake_result = {
+        "results": [],
+        "warnings": ["embedding model mismatch: configured nomic-embed-text, indexed other-model"],
+    }
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.ask_service.ask", return_value=fake_result),
+    ):
+        result = server.search_requirements("question")
+
+    assert result["warnings"] == fake_result["warnings"]
+
+
+def test_search_requirements_service_failure_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.ask_service.ask", side_effect=RuntimeError("ollama unreachable")),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(server.mcp.call_tool("search_requirements", {"question": "x"}))
+
+
+# ---------------------------------------------------------------------------
+# trace_requirement (WP-26.3)
+# ---------------------------------------------------------------------------
+
+def test_trace_requirement_calls_trace_service():
+    from mcp_server import server
+
+    cfg = _mock_cfg()
+    fake_result = {"requirement": {}, "cross_matches": [], "context_text": None}
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch("mcp_server.server.trace_service.trace", return_value=fake_result) as mock_trace,
+    ):
+        result = server.trace_requirement("REQ-abc123", include_context=True)
+
+    mock_trace.assert_called_once_with("REQ-abc123", cfg.qdrant_url, show_context=True)
+    assert result is fake_result
+
+
+def test_trace_requirement_provenance_fields_present():
+    from mcp_server import server
+
+    fake_requirement = {
+        "requirement_id": "REQ-abc123",
+        "source_pdf": "NIST.SP.800-53r5.pdf",
+        "source_ref": "AC-3",
+        "source_quote": "The organization shall enforce approved authorizations...",
+        "document_id": "NIST.SP.800-53r5",
+    }
+    fake_result = {"requirement": fake_requirement, "cross_matches": [], "context_text": None}
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.trace_service.trace", return_value=fake_result),
+    ):
+        result = server.trace_requirement("REQ-abc123")
+
+    for field in ("requirement_id", "source_pdf", "source_ref", "source_quote"):
+        assert result["requirement"][field], f"missing/empty provenance field: {field}"
+
+
+def test_trace_requirement_unknown_id_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch(
+            "mcp_server.server.trace_service.trace",
+            side_effect=ValueError("Requirement not found: REQ-does-not-exist"),
+        ),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(
+                server.mcp.call_tool("trace_requirement", {"requirement_id": "REQ-does-not-exist"})
+            )
+
+
+def test_trace_requirement_service_failure_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.trace_service.trace", side_effect=RuntimeError("Could not connect to Qdrant")),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(
+                server.mcp.call_tool("trace_requirement", {"requirement_id": "REQ-x"})
+            )

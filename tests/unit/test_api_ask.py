@@ -35,6 +35,7 @@ def _mock_cfg(**overrides):
     cfg.api_key_env = "ANTHROPIC_API_KEY"
     cfg.synthesis_model = "configured-synth-model"
     cfg.rewrite_model = "configured-rewrite-model"
+    cfg.processed_dir_path.return_value = "/fake/processed"
     for key, value in overrides.items():
         setattr(cfg, key, value)
     return cfg
@@ -65,3 +66,23 @@ def test_explicit_model_and_rewrite_model_override_config():
     _, kwargs = mock_ask.call_args
     assert kwargs["model"] == "explicit-model"
     assert kwargs["rewrite_model"] == "explicit-rewrite-model"
+
+
+def test_processed_dir_passed_to_ask_service():
+    with patch("api.routes.ask._config.load", return_value=_mock_cfg()), \
+         patch(_ASK_PATH, return_value=MOCK_RESULT) as mock_ask:
+        client.post("/api/ask", json={"question": "access control"})
+    _, kwargs = mock_ask.call_args
+    assert kwargs["processed_dir"] == "/fake/processed"
+
+
+def test_unknown_document_ids_returns_404():
+    """Phase 27, WP-27.1: an unknown document_ids value is a 4xx client error,
+    not a 503 backend failure -- distinguish it from RuntimeError's 503 mapping."""
+    with patch("api.routes.ask._config.load", return_value=_mock_cfg()), \
+         patch(_ASK_PATH, side_effect=ValueError("Unknown document_ids: bad-doc")):
+        resp = client.post(
+            "/api/ask", json={"question": "access control", "document_ids": ["bad-doc"]},
+        )
+    assert resp.status_code == 404
+    assert "bad-doc" in resp.json()["detail"]

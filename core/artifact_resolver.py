@@ -17,6 +17,7 @@ otherwise have that substring collapsed everywhere it appears, producing a
 mangled doc_key that no longer matches the real *_chunks.jsonl file and
 silently breaking context indexing downstream (Codex PR #92 review).
 """
+import json
 from pathlib import Path
 
 _ENRICHED_SUFFIX = "_requirements_enriched"
@@ -86,3 +87,63 @@ def resolve_requirement_file(processed_dir: Path, doc_key: str) -> Path:
     if doc_key not in files:
         raise ValueError(f"No requirements JSONL found for doc_key '{doc_key}' in {processed_dir}")
     return files[doc_key]
+
+
+def resolve_known_documents(processed_dir: Path) -> dict[str, str]:
+    """Return {doc_key: source_pdf} for every document under processed_dir.
+
+    source_pdf is read from the first JSON record of each document's resolved
+    requirements file — empty string if the file is unreadable or the field
+    is missing (legacy pre-WP-25.6c records).
+    """
+    files = resolve_latest_requirement_files(processed_dir)
+    result: dict[str, str] = {}
+    for doc_key, path in files.items():
+        source_pdf = ""
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    source_pdf = record.get("source_pdf", "")
+                    break
+        except OSError:
+            pass
+        result[doc_key] = source_pdf
+    return result
+
+
+def resolve_document_ids(
+    processed_dir: Path, document_ids: list[str]
+) -> tuple[list[str], list[str]]:
+    """Resolve caller-supplied document_ids (doc_key or source_pdf form) against
+    known documents under processed_dir.
+
+    A value is accepted only if it exactly matches a known doc_key or a known
+    source_pdf (case-insensitive) — never fabricated for an unrecognized value,
+    unlike api/routes/compare.py's _canonical(), which is deliberately forgiving
+    for its own fallback UX and must not be reused for validation (Codex review,
+    Phase 27 design, PR #118).
+
+    Returns (resolved_source_pdfs, unknown_values). A known doc_key with no
+    readable source_pdf falls back to `doc_key + ".pdf"` — a best-effort
+    completion for a document that IS known, not a guess for one that isn't.
+    """
+    known = resolve_known_documents(processed_dir)
+    by_source_pdf_lower = {v.lower(): v for v in known.values() if v}
+
+    resolved: list[str] = []
+    unknown: list[str] = []
+    for value in document_ids:
+        if value in known:
+            resolved.append(known[value] or f"{value}.pdf")
+        elif value.lower() in by_source_pdf_lower:
+            resolved.append(by_source_pdf_lower[value.lower()])
+        else:
+            unknown.append(value)
+    return resolved, unknown

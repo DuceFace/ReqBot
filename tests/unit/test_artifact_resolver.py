@@ -4,6 +4,7 @@ Enriched-over-normalized preference and latest-run-wins resolution, shared by
 services/checklist_service.py (single doc_key) and cli/reqbot.py's cmd_reindex
 (bulk enumeration).
 """
+import json
 import os
 import time
 from pathlib import Path
@@ -13,14 +14,19 @@ import pytest
 from core.artifact_resolver import (
     doc_key_from_extracted_path,
     doc_key_from_requirements_path,
+    resolve_document_ids,
+    resolve_known_documents,
     resolve_latest_requirement_files,
     resolve_requirement_file,
 )
 
 
-def _write(path, document_id="doc-hash-abc"):
+def _write(path, document_id="doc-hash-abc", source_pdf=None):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text('{"document_id": "%s", "requirement_id": "REQ-1"}\n' % document_id)
+    record = {"document_id": document_id, "requirement_id": "REQ-1"}
+    if source_pdf is not None:
+        record["source_pdf"] = source_pdf
+    path.write_text(json.dumps(record) + "\n")
 
 
 def _age(path, seconds_ago):
@@ -121,3 +127,109 @@ def test_doc_key_from_extracted_path_handles_embedded_suffix_substring():
 def test_doc_key_from_extracted_path_normal_case():
     path = Path("AFI17-101_extracted_requirements.jsonl")
     assert doc_key_from_extracted_path(path) == "AFI17-101"
+
+
+# ---------------------------------------------------------------------------
+# resolve_known_documents / resolve_document_ids (Phase 27, WP-27.1)
+# ---------------------------------------------------------------------------
+
+def test_resolve_known_documents_reads_source_pdf_from_first_record(tmp_path):
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path, source_pdf="afi17-101.pdf")
+
+    result = resolve_known_documents(tmp_path)
+
+    assert result == {"afi17-101": "afi17-101.pdf"}
+
+
+def test_resolve_known_documents_empty_string_when_source_pdf_field_missing(tmp_path):
+    """Legacy pre-WP-25.6c records may have no source_pdf field at all."""
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path)  # no source_pdf kwarg
+
+    result = resolve_known_documents(tmp_path)
+
+    assert result == {"afi17-101": ""}
+
+
+def test_resolve_known_documents_skips_malformed_lines_to_find_source_pdf(tmp_path):
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("not json\n" + json.dumps({"source_pdf": "afi17-101.pdf"}) + "\n")
+
+    result = resolve_known_documents(tmp_path)
+
+    assert result == {"afi17-101": "afi17-101.pdf"}
+
+
+def test_resolve_document_ids_accepts_known_doc_key(tmp_path):
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path, source_pdf="afi17-101.pdf")
+
+    resolved, unknown = resolve_document_ids(tmp_path, ["afi17-101"])
+
+    assert resolved == ["afi17-101.pdf"]
+    assert unknown == []
+
+
+def test_resolve_document_ids_accepts_source_pdf_value(tmp_path):
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path, source_pdf="afi17-101.pdf")
+
+    resolved, unknown = resolve_document_ids(tmp_path, ["afi17-101.pdf"])
+
+    assert resolved == ["afi17-101.pdf"]
+    assert unknown == []
+
+
+def test_resolve_document_ids_source_pdf_match_is_case_insensitive(tmp_path):
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path, source_pdf="afi17-101.pdf")
+
+    resolved, unknown = resolve_document_ids(tmp_path, ["AFI17-101.PDF"])
+
+    assert resolved == ["afi17-101.pdf"]
+    assert unknown == []
+
+
+def test_resolve_document_ids_rejects_unknown_value(tmp_path):
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path, source_pdf="afi17-101.pdf")
+
+    resolved, unknown = resolve_document_ids(tmp_path, ["not-a-real-doc"])
+
+    assert resolved == []
+    assert unknown == ["not-a-real-doc"]
+
+
+def test_resolve_document_ids_does_not_fabricate_for_unknown_values():
+    """Codex review, PR #118: unlike api/routes/compare.py's _canonical(), an
+    unresolved value must never be turned into a guessed '<value>.pdf' — it
+    must land in the unknown list untouched."""
+    resolved, unknown = resolve_document_ids(Path("/nonexistent"), ["totally-bogus"])
+
+    assert resolved == []
+    assert unknown == ["totally-bogus"]
+
+
+def test_resolve_document_ids_known_doc_key_without_source_pdf_falls_back(tmp_path):
+    """A known doc_key with no readable source_pdf (legacy data) still resolves
+    -- this is a best-effort completion for a document that IS known, not a
+    guess for one that isn't."""
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path)  # no source_pdf
+
+    resolved, unknown = resolve_document_ids(tmp_path, ["afi17-101"])
+
+    assert resolved == ["afi17-101.pdf"]
+    assert unknown == []
+
+
+def test_resolve_document_ids_mixed_valid_and_invalid_values(tmp_path):
+    path = tmp_path / "afi17-101_20260101_000000" / "afi17-101_requirements_normalized.jsonl"
+    _write(path, source_pdf="afi17-101.pdf")
+
+    resolved, unknown = resolve_document_ids(tmp_path, ["afi17-101", "bogus-doc"])
+
+    assert resolved == ["afi17-101.pdf"]
+    assert unknown == ["bogus-doc"]

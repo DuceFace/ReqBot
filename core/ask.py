@@ -40,6 +40,7 @@ SPARSE_MODEL = "Qdrant/bm25"
 DEFAULT_SYNTHESIS_MODEL = "qwen2.5:14b"
 DEFAULT_REWRITE_MODEL = "llama3.1:8b-instruct-q4_K_M"
 
+from core import artifact_resolver as _artifact_resolver
 from core import constants as _const
 CONTEXT_UUID_NAMESPACE = _const.CONTEXT_UUID_NS
 
@@ -467,6 +468,7 @@ def retrieve(
     domain_tags: list[str] | None = None,
     requirement_types: list[str] | None = None,
     document_ids: list[str] | None = None,
+    processed_dir: Path | None = None,
     no_rewrite: bool = False,
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
     embedding_model: str = EMBEDDING_MODEL,
@@ -493,9 +495,29 @@ def retrieve(
         total:          int         number of results after min_score filtering and top_k trim
         retrieval_ms:   int         wall-clock ms from entry to just before synthesis (pure retrieval)
         warnings:       list[str]   e.g. embedding-model mismatch between config and indexed results
+
+    Raises ValueError if document_ids contains a value that doesn't match any known
+    document's doc_key or source_pdf (Phase 27, WP-27.1) — a stale or typo'd document
+    filter is invalid input, not a weak-search condition, so it errors instead of
+    silently returning an empty/reduced result set. Requires processed_dir when
+    document_ids is non-empty.
     """
     import time as _time
     _t0 = _time.monotonic()
+
+    if document_ids:
+        if processed_dir is None:
+            raise ValueError("document_ids filter requires processed_dir to validate against")
+        resolved_document_ids, unknown_document_ids = _artifact_resolver.resolve_document_ids(
+            processed_dir, document_ids
+        )
+        if unknown_document_ids:
+            raise ValueError(
+                "Unknown document_ids (no matching indexed document): "
+                + ", ".join(sorted(unknown_document_ids))
+            )
+        document_ids = resolved_document_ids
+
     ollama_client = ollama.Client(host=ollama_url)
 
     # Query rewriting: expand acronyms, extract control IDs and domain hints.
@@ -685,6 +707,7 @@ def run(
     domain_tags: list[str] | None = None,
     requirement_types: list[str] | None = None,
     document_ids: list[str] | None = None,
+    processed_dir: Path | None = None,
     no_rewrite: bool = False,
     rewrite_model: str = DEFAULT_REWRITE_MODEL,
     embedding_model: str = EMBEDDING_MODEL,
@@ -744,6 +767,7 @@ def run(
         domain_tags=domain_tags,
         requirement_types=requirement_types,
         document_ids=document_ids,
+        processed_dir=processed_dir,
         no_rewrite=no_rewrite,
         rewrite_model=rewrite_model,
         embedding_model=embedding_model,
@@ -815,6 +839,7 @@ def main() -> None:
         _default_qdrant_url = _cfg.qdrant_url
         _default_ollama_url = _cfg.ollama_url
         _default_embedding_model = _cfg.embedding_model
+        _default_processed_dir = _cfg.processed_dir_path()
     except Exception as e:
         log.warning("Could not load config defaults (%s) — using hardcoded defaults", e)
         _default_top_k = 20
@@ -822,6 +847,7 @@ def main() -> None:
         _default_qdrant_url = "http://localhost:6333"
         _default_ollama_url = "http://localhost:11434"
         _default_embedding_model = EMBEDDING_MODEL
+        _default_processed_dir = None
 
     parser = argparse.ArgumentParser(
         description="Query GRC requirements via Qdrant vector search"
@@ -955,6 +981,7 @@ def main() -> None:
         domain_tags=args.domain_tags,
         requirement_types=args.requirement_types,
         document_ids=args.document_ids,
+        processed_dir=_default_processed_dir,
         no_rewrite=args.no_rewrite,
         rewrite_model=args.rewrite_model,
         embedding_model=args.embedding_model,

@@ -23,11 +23,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The one dependency actually big enough (torch/torchvision weight) to justify
-# gating behind an extra — everything else that ships a real, normal feature
-# (XLSX export, serve, hybrid search) stays in base. See archive/PHASE25_REQUIREMENTS.md.
+# Two different reasons an extra ends up here: docling is gated purely for weight
+# (torch/torchvision) — everything else that ships a real, normal feature (XLSX
+# export, serve, hybrid search) stays in base. See archive/PHASE25_REQUIREMENTS.md.
+# remote and mcp are gated instead because they're optional *integration surfaces*
+# (cloud LLM synthesis; external MCP clients) that a CLI/GUI-only install doesn't
+# need, regardless of how light their own dependencies are.
 docling = ["docling==2.84.0"]
 remote = ["anthropic>=0.40.0", "openai>=1.50.0"]
+mcp = ["mcp>=1.0.0"]  # WP-26.1-approved: official Python MCP SDK (mcp.server.fastmcp)
 dev = ["pytest==9.1.1", "ruff==0.15.22", "pytest-cov==7.1.0", "rapidfuzz>=3.0.0"]
 
 [project.scripts]
@@ -40,6 +44,7 @@ packages = [
     "cli",
     "core",
     "frontend",
+    "mcp_server",
     "models",
     "pipeline",
     "services",

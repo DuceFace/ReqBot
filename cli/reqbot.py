@@ -1394,6 +1394,19 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    """Start the ReqBot MCP server (stdio transport)."""
+    try:
+        from mcp_server.server import run as run_mcp
+    except ImportError:
+        log.error(
+            "mcp is not installed — run: pip3 install --break-system-packages 'reqbot[mcp]'"
+        )
+        return 1
+    run_mcp()
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="reqbot",
@@ -1662,6 +1675,12 @@ def main() -> None:
         help="Port to listen on (default: 8000)",
     )
 
+    # mcp
+    subparsers.add_parser(
+        "mcp",
+        help="Start the ReqBot MCP server (stdio transport) for external LLM/agent clients",
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1685,6 +1704,7 @@ def main() -> None:
         "compare": cmd_compare,
         "evidence": cmd_evidence,
         "serve": cmd_serve,
+        "mcp": cmd_mcp,
     }
 
     rc = commands[args.command](args)

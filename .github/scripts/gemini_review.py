@@ -16,11 +16,26 @@ from google.genai import types
 
 MARKER = "<!-- gemini-review -->"
 
-# Free-tier AI Studio key today; bump to "gemini-2.5-pro" if reasoning quality
-# still isn't good enough after the prompt rewrite below. Cost difference is
-# small either way (~4x per-token), but stay on the model that needs zero
-# billing setup until there's a concrete reason to change it.
-MODEL = "gemini-2.5-flash"
+# Best model first, most conservative last. gemini-2.5-pro isn't in this list:
+# it has zero free-tier quota on these accounts (confirmed against the AI
+# Studio quota dashboard), so it would only ever fail here. Verified against
+# client.models.list() output on 2026-07-24 -- re-check before adding a new
+# entry, a wrong ID here fails as a ClientError, not a quiet no-op.
+# gemini-2.5-flash-lite is last on purpose: much higher RPD (500 vs 20) but
+# weaker reasoning, so it only gets used once every real Flash tier on both
+# keys is exhausted for the day.
+MODEL_CHAIN = [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+]
+
+# GEMINI_API_KEY is required; GEMINI_API_KEY_2 (a second free-tier account) is
+# optional. Each model in MODEL_CHAIN is tried against every configured key
+# before falling through to the next model, so the best model gets first
+# claim on both accounts' daily quota before we ever downgrade quality.
+API_KEY_ENV_VARS = ["GEMINI_API_KEY", "GEMINI_API_KEY_2"]
 
 SYSTEM_INSTRUCTION = """
 ## Role
@@ -139,27 +154,44 @@ that one entry instead of repeating it.
 
 
 def get_review(diff: str) -> str:
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    keys = [os.environ[name] for name in API_KEY_ENV_VARS if os.environ.get(name)]
+    if not keys:
+        raise RuntimeError(f"No Gemini API key configured (checked {API_KEY_ENV_VARS})")
+
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
         http_options=types.HttpOptions(timeout=120_000),  # milliseconds; no job-level CI timeout backs this up
     )
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model=MODEL,
-                contents=f"Here is the pull request diff to review:\n\n{diff}",
-                config=config,
-            )
-            return response.text
-        except genai_errors.ServerError as err:
-            if attempt == 2:
-                raise
-            print(
-                f"Gemini API unavailable (attempt {attempt + 1}/3), retrying in 5s: {err}",
-                file=sys.stderr,
-            )
-            time.sleep(5)
+    contents = f"Here is the pull request diff to review:\n\n{diff}"
+
+    last_err: Exception | None = None
+    for model in MODEL_CHAIN:
+        for key_num, key in enumerate(keys, start=1):
+            client = genai.Client(api_key=key)
+            for attempt in range(3):
+                try:
+                    response = client.models.generate_content(
+                        model=model, contents=contents, config=config,
+                    )
+                    print(f"Review generated: model={model}, key #{key_num}", file=sys.stderr)
+                    return response.text
+                except genai_errors.ServerError as err:
+                    last_err = err
+                    if attempt < 2:
+                        print(
+                            f"{model} key #{key_num}: server error, retry {attempt + 1}/3 in 5s: {err}",
+                            file=sys.stderr,
+                        )
+                        time.sleep(5)
+                        continue
+                    print(f"{model} key #{key_num}: server error persisted, moving on", file=sys.stderr)
+                except genai_errors.ClientError as err:
+                    last_err = err
+                    reason = "rate limited" if err.code == 429 else f"client error ({err.code})"
+                    print(f"{model} key #{key_num}: {reason}, moving on: {err}", file=sys.stderr)
+                    break  # a client error won't resolve by retrying the same model/key
+
+    raise last_err
 
 
 def find_existing_comment(repo: str, pr_number: str) -> str | None:
@@ -211,11 +243,12 @@ def main() -> None:
     print("Generating Gemini review...")
     try:
         review_text = get_review(diff)
-    except genai_errors.ServerError as err:
-        print(f"Gemini review unavailable after retries: {err}", file=sys.stderr)
+    except (genai_errors.APIError, RuntimeError) as err:
+        print(f"Gemini review unavailable after exhausting all models/keys: {err}", file=sys.stderr)
         review_text = (
-            "Gemini review could not be generated right now because the Gemini API "
-            "is temporarily unavailable (503). Please re-run this workflow."
+            "Gemini review could not be generated right now — every configured model/key "
+            "combination in the fallback chain failed (rate limits, an API outage, or a "
+            "config issue; see the workflow run logs for which). Please re-run this workflow."
         )
     full_body = f"{MARKER}\n{review_text}"
 

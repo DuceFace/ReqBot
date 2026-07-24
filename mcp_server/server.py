@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from core import config as _config
 from services import (
     ask_service,
+    checklist_service,
     compare_service,
     docs_service,
     evidence_service,
@@ -197,6 +198,20 @@ def map_evidence(
         api_key=syn_api_key,
         embedding_model=cfg.embedding_model,
     )
+
+
+@mcp.tool()
+def generate_checklist(doc_key: str, profile: str = "cybersecurity") -> dict:
+    """Generate a source-backed compliance checklist for one indexed document.
+
+    Returns the full checklist envelope from checklist_service.generate(): items
+    carry a stable CHK- id, source_quote/source_ref provenance, confidence, review
+    flags/reasons, and the profile that produced them. No file export (CSV/JSON/
+    Markdown/XLSX) and no assessor-field editing over MCP -- use the CLI/API/GUI
+    export paths for that.
+    """
+    cfg = _config.load()
+    return checklist_service.generate(cfg.processed_dir_path(), doc_key, profile)
 
 
 def run() -> None:

@@ -543,3 +543,134 @@ def test_map_evidence_service_failure_becomes_structured_mcp_error():
     ):
         with pytest.raises(ToolError):
             asyncio.run(server.mcp.call_tool("map_evidence", {"topic": "x"}))
+
+
+# ---------------------------------------------------------------------------
+# generate_checklist (WP-26.5)
+# ---------------------------------------------------------------------------
+
+def _fake_checklist_envelope():
+    return {
+        "format": "reqbot-checklist",
+        "format_version": "1.0",
+        "generated_at": "2026-07-24T00:00:00+00:00",
+        "generator": {"tool": "reqbot", "command": "reqbot checklist --doc docA --profile cybersecurity"},
+        "document": {"document_id": "docA", "source_pdf": "docA.pdf"},
+        "profile": "cybersecurity",
+        "summary": {"total_items": 1, "items_requiring_review": 0},
+        "items": [
+            {
+                "checklist_item_id": "CHK-abc123",
+                "requirement_ids": ["REQ-1"],
+                "domain_tags": ["access-control"],
+                "source_ref": "AC-2",
+                "page_refs": [3],
+                "section_title_path": ["3", "3.1"],
+                "source_quote": "The organization shall...",
+                "audit_question": "",
+                "evidence_to_request": [],
+                "generation_notes": "",
+                "assessor_notes": "",
+                "status": "not-started",
+                "confidence": 0.9,
+                "requires_human_review": False,
+                "review_reasons": [],
+            }
+        ],
+    }
+
+
+def test_generate_checklist_calls_checklist_service_with_doc_key_and_profile():
+    from mcp_server import server
+
+    cfg = _mock_cfg()
+    fake_result = _fake_checklist_envelope()
+    with (
+        patch("mcp_server.server._config.load", return_value=cfg),
+        patch("mcp_server.server.checklist_service.generate", return_value=fake_result) as mock_generate,
+    ):
+        result = server.generate_checklist("docA", profile="cybersecurity")
+
+    mock_generate.assert_called_once_with(cfg.processed_dir_path.return_value, "docA", "cybersecurity")
+    assert result is fake_result
+
+
+def test_generate_checklist_defaults_profile_to_cybersecurity():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.checklist_service.generate", return_value={}) as mock_generate,
+    ):
+        server.generate_checklist("docA")
+
+    assert mock_generate.mock_calls[0].args[2] == "cybersecurity"
+
+
+def test_generate_checklist_envelope_preserves_required_top_level_fields():
+    from mcp_server import server
+
+    fake_result = _fake_checklist_envelope()
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.checklist_service.generate", return_value=fake_result),
+    ):
+        result = server.generate_checklist("docA")
+
+    for field in ("format", "format_version", "generated_at", "generator", "document", "profile", "summary", "items"):
+        assert field in result, f"missing top-level field: {field}"
+
+
+def test_generate_checklist_items_preserve_provenance_and_review_fields():
+    from mcp_server import server
+
+    fake_result = _fake_checklist_envelope()
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.checklist_service.generate", return_value=fake_result),
+    ):
+        result = server.generate_checklist("docA")
+
+    item = result["items"][0]
+    for field in (
+        "checklist_item_id",
+        "requirement_ids",
+        "source_ref",
+        "source_quote",
+        "confidence",
+        "requires_human_review",
+        "review_reasons",
+    ):
+        assert field in item, f"missing item field: {field}"
+    assert item["checklist_item_id"] == "CHK-abc123"
+    assert item["source_quote"] == "The organization shall..."
+
+
+def test_generate_checklist_invalid_doc_key_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch(
+            "mcp_server.server.checklist_service.generate",
+            side_effect=ValueError("No requirements file found for doc_key: docZ"),
+        ),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(server.mcp.call_tool("generate_checklist", {"doc_key": "docZ"}))
+
+
+def test_generate_checklist_invalid_profile_becomes_structured_mcp_error():
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch(
+            "mcp_server.server.checklist_service.generate",
+            side_effect=FileNotFoundError("Profile not found: profiles/bogus.json"),
+        ),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(
+                server.mcp.call_tool("generate_checklist", {"doc_key": "docA", "profile": "bogus"})
+            )

@@ -45,71 +45,48 @@ ACTIVE BACKLOG
    Keep this as detection first. Actual OCR support should be a separate
    build-vs-borrow decision.
 
-4. Truncated JSON recovery flag
-   When Step C recovers a truncated JSON array, add a field such as
-   "recovered_truncated": true to affected output so downstream steps can mark
-   those records for caution or review.
-
-5. Page number contiguity validation
+4. Page number contiguity validation
    Validate that Step A page numbers are contiguous and start at 1 before Step B
    chunks them. Missing or duplicate page numbers may indicate extraction bugs.
 
-6. Chunk overlap guard
+5. Chunk overlap guard
    Assert that overlap is smaller than chunk_size in Step B. This prevents an
    infinite-loop class of bug if a bad caller or config value is introduced.
 
-7. Ollama finish_reason / token metadata
+6. Ollama finish_reason / token metadata
    Investigate whether Ollama response metadata can detect truncation more
    reliably than JSON parse failure alone.
 
-8. Remove duplicate profile vocabulary constants
+7. Remove duplicate profile vocabulary constants
    Step C and Step D.5 still keep module-level VALID_DOMAIN_TAGS and
    VALID_REQUIREMENT_TYPES constants that mirror profiles/cybersecurity.json.
    They remain useful for compatibility today, but they are a second source of
    truth. Consider deriving fallback defaults from core.profiles when the profile
    plumbing is stable enough.
 
-9. Profile-based skip-section filtering
-   profiles/*.json includes skip_sections, but the chunking pipeline does not yet
-   consume that field. This is useful behavior, especially across different
-   document domains, but it should be implemented as a planned feature because
-   it changes extraction behavior.
+8. Profile-based skip-section filtering — docling-only gap
+   profiles/*.json's skip_sections field is consumed when the docling engine is
+   used (pipeline/run_pipeline.py passes it into chunk_text.run_structure_aware,
+   which filters via _should_skip_chunk/_should_skip_section). But the default
+   chunking engine is still the legacy pymupdf path, which has no section
+   hierarchy and no-ops on skip_sections (pipeline/chunk_text.py logs a warning
+   and ignores the field). So skip-section filtering only applies when a caller
+   explicitly opts into docling. Revisit once docling is closer to being the
+   default engine, or if legacy chunking gains its own section awareness.
 
-10. Checklist GUI
-    Add a browser screen for generating and reviewing checklists. The CLI and
-    service path are now stable (Phase 21 complete), so this is unblocked.
+9. Optional LLM-backed audit question generation
+   Phase 21 intentionally leaves audit_question blank. A future opt-in feature
+   may use an LLM to generate human-friendly audit questions, but it must not be
+   default behavior.
 
-    Likely first version:
-    - choose document
-    - choose output format
-    - show generated checklist preview
-    - export CSV/JSON/Markdown
+   Guardrails:
+   - explicit user flag or UI toggle
+   - source_quote remains primary
+   - no invented obligations
+   - blank is better than an unsupported rephrase
+   - generated questions should be marked as generated text
 
-11. Polished XLSX checklist export
-    CSV is good for portability, but assessors often expect Excel workbooks.
-    Do not hand-roll XLSX. Use openpyxl or XlsxWriter after approving the new
-    dependency.
-
-    Useful workbook features:
-    - frozen locate/ask/record/verify/trace columns
-    - filters enabled
-    - wrapped source_quote cells
-    - data validation for status
-    - clear columns for assessor-owned notes
-
-12. Optional LLM-backed audit question generation
-    Phase 21 intentionally leaves audit_question blank. A future opt-in feature
-    may use an LLM to generate human-friendly audit questions, but it must not be
-    default behavior.
-
-    Guardrails:
-    - explicit user flag or UI toggle
-    - source_quote remains primary
-    - no invented obligations
-    - blank is better than an unsupported rephrase
-    - generated questions should be marked as generated text
-
-13. MCP tool surface (Phase 26 active work — see docs/PHASE26_REQUIREMENTS.md; original idea archived at archive/FUTURE_MCP_IDEA.md)
+10. MCP tool surface (Phase 26 active work — see docs/PHASE26_REQUIREMENTS.md; original idea archived at archive/FUTURE_MCP_IDEA.md)
     Expose ReqBot as a tool server so external assistants can query a self-hosted
     ReqBot instance.
 
@@ -122,7 +99,7 @@ ACTIVE BACKLOG
 
     Architecture rule: MCP must call the same service layer as CLI and GUI.
 
-14. Runtime validation for frontend API responses
+11. Runtime validation for frontend API responses
     TypeScript types only protect at compile time. Runtime validation could catch
     backend/frontend contract drift before it becomes confusing UI behavior.
 
@@ -133,16 +110,16 @@ ACTIVE BACKLOG
     - external clients consume the API
     - contract drift causes a real debugging issue
 
-15. Evidence view configurable result depth
+12. Evidence view configurable result depth
     EvidenceView currently calls the API with a fixed top_k value. Add a simple
     control when users need to tune evidence depth.
 
-16. Evidence view expandable sources and context
+13. Evidence view expandable sources and context
     Evidence groups currently emphasize the representative requirement. The API
     also returns all sources per group and context_text. A future UI can expose
     "show more sources" and surrounding context per group.
 
-17. Checklist assessor-note preservation on regeneration
+14. Checklist assessor-note preservation on regeneration
     Running generate() for a document that was already exported and annotated
     will silently reset assessor_notes and status to their initial values
     ("" / "not-started"). Any assessor work done against the exported CSV or

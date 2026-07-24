@@ -16,7 +16,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-26.1 — MCP Design Lock + Backlog Cleanup | Complete |
-| WP-26.2 — MCP Server Skeleton | Not started |
+| WP-26.2 — MCP Server Skeleton | Complete |
 | WP-26.3 — Corpus + Search Tools | Not started |
 | WP-26.4 — Compare + Evidence Tools | Not started |
 | WP-26.5 — Checklist Tool | Not started |

@@ -25,6 +25,7 @@ COPY pyproject.toml MANIFEST.in README.md ./
 COPY api/ ./api/
 COPY cli/ ./cli/
 COPY core/ ./core/
+COPY mcp_server/ ./mcp_server/
 COPY models/ ./models/
 COPY pipeline/ ./pipeline/
 COPY profiles/ ./profiles/

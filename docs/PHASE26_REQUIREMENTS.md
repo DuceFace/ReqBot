@@ -19,7 +19,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-26.2 — MCP Server Skeleton | Complete |
 | WP-26.3 — Corpus + Search Tools | Complete |
 | WP-26.4 — Compare + Evidence Tools | Complete |
-| WP-26.5 — Checklist Tool | Not started |
+| WP-26.5 — Checklist Tool | Complete |
 | WP-26.6 — Integration Gate | Not started |
 
 ---

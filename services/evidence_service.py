@@ -75,11 +75,22 @@ def build(
     synthesize: bool = True,
     synthesis_backend: str = "local",
     synthesis_model: str = "",
+    remote_model: str = "",
     provider: str = "",
     api_key: str = "",
     embedding_model: str = "nomic-embed-text",
 ) -> dict:
     """Search, group, optionally retrieve context, and synthesize an evidence pack.
+
+    Selects synthesis_model or remote_model internally based on synthesis_backend
+    (Phase 27, WP-27.2) -- callers pass both unconditionally rather than picking
+    one themselves, so CLI/API/MCP can't drift on this choice again the way they
+    previously did (always sending synthesis_model, the local Ollama model, even
+    when synthesis_backend == "remote"). Falls back to synthesis_model if
+    synthesis_backend == "remote" but remote_model is empty (Gemini review,
+    PR #120) -- an empty model string reaching synthesize() is worse than using
+    the local model's name against a remote provider (still fails, but at least
+    isn't silently a no-op empty request).
 
     Returns a dict with keys:
       query: str
@@ -263,11 +274,12 @@ def build(
 
         try:
             from core import synthesis as _syn
+            model = remote_model if synthesis_backend == "remote" and remote_model else synthesis_model
             synthesis_text = _syn.synthesize(
                 question="",
                 evidence="",
                 backend=synthesis_backend,
-                model=synthesis_model,
+                model=model,
                 ollama_url=ollama_url,
                 provider=provider,
                 api_key=api_key,

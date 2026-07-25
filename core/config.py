@@ -182,8 +182,15 @@ def load() -> ReqBotConfig:
         authority_registry=values.get("authority_registry"),
         synthesis_backend=values.get("synthesis_backend", "local"),
         remote_provider=values.get("remote_provider", "anthropic"),
-        remote_model=values.get("remote_model", "claude-sonnet-4-6"),
-        api_key_env=values.get("api_key_env", "ANTHROPIC_API_KEY"),
+        # `or` (not .get(key, default)) on remote_model/api_key_env -- an explicit
+        # `null` in config.json must not survive as None/empty. Neither key has a
+        # REQBOT_* env mapping, so a hand-edited config file is the only way either
+        # gets set; a None/empty remote_model reaching evidence_service.build() or
+        # a None api_key_env reaching os.environ.get() in api/routes/evidence.py,
+        # mcp_server/server.py, or cli/reqbot.py would misbehave otherwise
+        # (Phase 27, WP-27.2; remote_model consistency fix per Gemini review, PR #120).
+        remote_model=values.get("remote_model") or "claude-sonnet-4-6",
+        api_key_env=values.get("api_key_env") or "ANTHROPIC_API_KEY",
     )
 
     # Load authority registry (optional — graceful if missing)

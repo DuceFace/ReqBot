@@ -885,6 +885,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             requirement_types=requirement_types,
             synthesis_backend=_cfg.synthesis_backend,
             synthesis_model=_cfg.synthesis_model,
+            remote_model=_cfg.remote_model,
             provider=_cfg.remote_provider,
             api_key=api_key,
             embedding_model=_cfg.embedding_model,

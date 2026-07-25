@@ -24,8 +24,9 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 NODE_VERSION="$(node --version | sed -E 's/^v//')"
-NODE_MAJOR="$(echo "$NODE_VERSION" | cut -d. -f1)"
-NODE_MINOR="$(echo "$NODE_VERSION" | cut -d. -f2)"
+NODE_MAJOR="$(echo "$NODE_VERSION" | sed -E 's/^([0-9]+).*/\1/')"
+NODE_MINOR="$(echo "$NODE_VERSION" | sed -nE 's/^[0-9]+\.([0-9]+).*/\1/p')"
+NODE_MINOR="${NODE_MINOR:-0}"
 if [ "$NODE_MAJOR" -lt 20 ] || [ $((NODE_MAJOR % 2)) -ne 0 ] || \
    { [ "$NODE_MAJOR" -eq 20 ] && [ "$NODE_MINOR" -lt 19 ]; } || \
    { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 12 ]; }; then

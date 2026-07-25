@@ -1,6 +1,7 @@
 # ReqBot Phase 28 — Frontend Toolchain & CI Security Hardening
 
-**Status:** Locked (all three WPs scoped 2026-07-25; implementation starts at WP-28.1)
+**Status:** Locked (all three WPs scoped 2026-07-25; revised same day after Codex review to
+resolve open decisions below; implementation starts at WP-28.1)
 **Date:** 2026-07-25
 **Preceded by:** Phase 27 (Service-Layer Hardening)
 **Followed by:** TBD
@@ -50,6 +51,9 @@ next feature track.
 - Add real CI-enforced security scanning (Python + frontend) — currently only GitHub's passive
   Dependabot alerts cover this repo; no SAST, no secret scanning, no code-scanning job runs
   alongside the existing pytest/ruff CI checks.
+- Keep the air-gapped/self-hosted packaging posture intact: new dev/scanner dependencies are fine,
+  but Docker image build and package-install paths must stay boring and reproducible — no new
+  runtime dependency on a hosted service the self-hosted deployment can't reach.
 
 ## 3. Non-Goals
 
@@ -59,6 +63,8 @@ next feature track.
 - No `requirements.txt` vs. `pyproject.toml` drift decision (backlog item #4) — unrelated
   toolchain question, not blocking this phase.
 - No broader CI restructuring beyond adding the security-scanning job(s) themselves.
+- No dependency-management philosophy change (npm vs. pnpm, Python lockfile strategy) — this phase
+  may add or bump dependencies but doesn't decide tooling strategy questions like that.
 
 ---
 
@@ -76,8 +82,12 @@ Vite major bump, so it can't be merged independently without manual intervention
 **Scope:**
 - Bump `react-router-dom` (and `@remix-run/router` if pinned as a direct dependency) to 6.30.4 in
   our own small PR, independent of the Vite work.
+- Keep the diff to `frontend/package.json` / `frontend/package-lock.json` unless the build surfaces
+  an unavoidable import/API change.
 - Confirm `npm run build` (or equivalent) succeeds and CI passes.
-- Close PR #58 once superseded (its Vite half is picked up by WP-28.2 instead).
+- Do **not** close PR #58 in this WP — it also carries the Vite bump, which isn't superseded until
+  WP-28.2 lands. Closing it here would drop the Vite half unresolved. Leave #58 open; it gets
+  closed as part of WP-28.2 once that PR supersedes both halves.
 
 **Non-goals:**
 - No Vite changes in this WP — kept deliberately separate so this can land fast.
@@ -85,9 +95,13 @@ Vite major bump, so it can't be merged independently without manual intervention
 **Tests / verification:**
 - CI (lint/test/docker jobs) passes.
 - Frontend build succeeds locally.
+- Quick manual route smoke (`/search`, `/compare`, `/evidence`, `/corpus`, `/system`) to confirm no
+  router errors — same-major patch bumps are low-risk but router internals are exactly the kind of
+  thing that can silently regress a route.
 
-**Gate:** `react-router-dom` is on 6.30.4, PR #58 is closed (superseded), and this WP's diff
-touches nothing else.
+**Gate:** `react-router-dom` is on 6.30.4 in `main`, CI passes, and this WP's diff is limited to
+dependency metadata unless a documented route/build issue forced a code change. PR #58 stays open
+until WP-28.2 supersedes it.
 
 ---
 
@@ -100,20 +114,33 @@ touches nothing else.
 already flags this needs to be treated as a toolchain migration, not a one-click Dependabot merge.
 
 **Background:** The Dockerfile's frontend build stage pins `node:20-bookworm-slim`. Vite's Node
-floor has moved with each major since 5.x; needs to be confirmed against whatever Vite 8 actually
-requires before merging, not assumed.
+floor has moved with each major since 5.x and Vite 8's build pipeline has changed further from the
+5.x defaults — treat both the exact Node floor and the scope of internal changes as things to pull
+from the released Vite 8 changelog at implementation time, not assumptions baked into this doc now.
+
+**Version target:** prefer the latest stable 8.x release available when WP-28.2 starts over the
+stale Dependabot target (8.0.16) — no beta/pre-release. Record the chosen version in the PR
+description along with the changelog link it was checked against.
 
 **Scope:**
 - Confirm the GitHub Actions runner's Node version and the Dockerfile's `node:20-bookworm-slim`
-  both meet Vite 8's minimum Node requirement.
+  both meet Vite 8's actual minimum Node requirement (check the released changelog, don't assume).
+  If the current image tag falls short, bump to a newer `node:20` patch tag first, or to
+  `node:22-bookworm-slim` if that's what Vite 8 actually needs — prefer the smaller bump unless
+  verification shows it's insufficient.
 - Update local developer Node version guidance (README/CONTRIBUTING) if it changes.
-- Bump `vite` to 8.0.16 (or whatever's current at implementation time) in our own PR.
+- Bump `vite` to the chosen stable 8.x version in our own PR.
+- Inspect `frontend/vite.config.*`, `frontend/tsconfig*`, `frontend/postcss.config.*`, and
+  `frontend/tailwind.config.*` for deprecated/renamed options the major bump affects. If nothing
+  needs changing, say so explicitly in the PR rather than leaving it unaddressed.
 - Run the frontend build; verify `@vitejs/plugin-react`, TypeScript, Tailwind, and PostCSS all
   still integrate correctly — these are exactly the integration points a Vite major tends to
   break silently (config option renames, plugin API changes).
 - Manual smoke: `reqbot serve` with the rebuilt `frontend/dist/` — confirm the GUI actually loads
-  and functions, not just that the build command exits 0.
-- Close PRs #58 and #59 once this PR supersedes them both.
+  and functions, and that `/assets/*` paths resolve correctly (a Vite migration can pass the build
+  step but still serve wrong static asset paths under `reqbot serve`).
+- Close PRs #58 and #59 once this PR supersedes them both (WP-28.1's router bump plus this WP's
+  Vite bump together cover everything in #58).
 
 **Non-goals:**
 - The original Dependabot security concern was about the Vite *dev server*; ReqBot's production
@@ -122,9 +149,10 @@ requires before merging, not assumed.
   vulnerability in ReqBot's own deployment.
 
 **Tests / verification:**
+- `cd frontend && npm ci && npm run build`.
 - CI (lint/test/docker jobs) passes, including the docker job's "Verify the packaged frontend/dist
   is served" step.
-- Manual smoke test of the built GUI (not just a green build).
+- Manual smoke test of the built GUI (not just a green build), including `/assets/*` loading.
 
 **Gate:** `vite` is on 8.x, the frontend builds and serves correctly under `reqbot serve`, and
 PRs #58 and #59 are both closed.
@@ -139,32 +167,48 @@ PRs #58 and #59 are both closed.
 surfaced on the Security tab) cover this repo today. No SAST, no secret scanning, no code-scanning
 job runs in `.github/workflows/ci.yml` alongside the existing `lint`/`test`/`docker` jobs.
 
+**Scanner stack (decided, not left open for implementation time):** CodeQL for Python +
+JavaScript/TypeScript SAST, as its own GitHub code-scanning workflow (not a `ci.yml` step) —
+it covers both languages without adding project dependencies, which fits the "keep the toolchain
+boring" framing of this phase. Secret scanning is a separate control CodeQL does **not** provide —
+add it explicitly (GitHub secret scanning if enabling it for this repo is available and free at
+our plan tier, otherwise gitleaks as a CI step). Do not describe CodeQL as covering secret
+scanning; it doesn't.
+
 **Scope:**
-- Add a Python SAST step (bandit, or equivalent) to CI, scoped to `core/`, `services/`, `api/`,
-  `pipeline/`, `cli/`, `mcp_server/` — matching the existing `pytest --cov` module scope.
-- Add a frontend security lint step (an ESLint security plugin) alongside whatever frontend CI
-  step WP-28.2 needs (there is currently no standalone frontend build/lint CI job — only the
-  `docker` job builds `frontend/dist` as part of the image; may need to add one, or hook the new
-  check into that build step).
-- Evaluate GitHub code scanning (CodeQL) as an alternative/addition — it runs as its own workflow
-  rather than a `ci.yml` step, so decide whether it replaces or supplements bandit/ESLint-security.
+- Add a CodeQL workflow covering Python (scoped to `core/`, `services/`, `api/`, `pipeline/`,
+  `cli/`, `mcp_server/` — matching the existing `pytest --cov` module scope) and
+  JavaScript/TypeScript (`frontend/`).
+- Add secret scanning per the decision above (GitHub secret scanning or gitleaks-in-CI).
+- If the repo still lacks a standalone frontend CI job after WP-28.2, this is a reasonable point
+  to add one, rather than hiding frontend scanning inside the Docker image build.
 - New job(s) must not block existing `lint`/`test`/`docker` jobs from running — additive, matching
   `ci.yml`'s existing `concurrency`/job structure.
+- Prefer "report and gate on high-confidence issues" over an aggressive ruleset that floods the
+  repo with low-value warnings on the first run. Document any intentional rule exclusions in
+  scanner config, not as scattered inline suppressions, unless there's no cleaner option.
 
 **Non-goals:**
 - Not fixing every finding a new scanner surfaces in this WP — the goal is getting the *coverage*
   in place. A first run may surface pre-existing findings; triage those as their own follow-up
   work (log to `docs/TODO_future_improvements.txt` if not trivial), don't let this WP balloon into
   a full remediation pass.
+- Not adding paid/vendor-hosted scanners beyond what's already free at our GitHub plan tier —
+  keep the baseline usable without a new recurring cost.
+- Not building automatic secret-revocation workflows — detecting a leaked secret is in scope,
+  responding to one is not.
 
 **Tests / verification:**
 - New CI job(s) run successfully on a PR and report findings (or a clean pass) without breaking
   the existing `lint`/`test`/`docker` jobs.
 - Confirm the job(s) actually gate on something meaningful (not a no-op scan with no rules
-  enabled).
+  enabled) and actually trigger on pull requests, not just `main` or manual dispatch — a scanner
+  that doesn't run on the PR path doesn't protect the review path.
+- Confirm a scanner failure produces a message a maintainer can act on from the Actions log
+  without needing security-specialist background.
 
-**Gate:** CI has a real, enforced security-scanning job for both Python and frontend code, running
-on every PR alongside the existing checks.
+**Gate:** CI has a real, enforced security-scanning job for both Python and frontend code
+(SAST + secret scanning), running on every PR alongside the existing checks.
 
 ---
 
@@ -177,6 +221,8 @@ Phase 28 is complete when:
 3. PRs #58 and #59 (the two stale Dependabot branches) are both closed.
 4. CI runs real security scanning on every PR, not just passive Dependabot alerts.
 5. Backlog items #1, #2, and #3 in `docs/TODO_future_improvements.txt` are marked resolved.
+6. README/CONTRIBUTING/operations docs don't contain stale Node or Vite version guidance left over
+   from before the migration.
 
 ---
 
@@ -191,3 +237,11 @@ Phase 28 is complete when:
    new scanner surfaces in one PR.
 4. Verify Vite 8's actual Node floor before merging WP-28.2 — don't assume `node:20-bookworm-slim`
    is sufficient without checking.
+5. Don't close PR #58 until *both* halves it bundles (router patch, Vite major) are actually
+   superseded on `main` — see the fixed sequencing in WP-28.1/WP-28.2 above. Close both #58 and #59
+   manually with a short comment referencing the superseding PR, rather than leaving them to
+   whatever GitHub's auto-stale behavior does.
+6. The WP-28.3 scanner job(s) must trigger on pull requests. A job that only runs on `main` or on
+   manual dispatch doesn't gate the review path and doesn't satisfy this phase's goal.
+7. Don't let a stale Dependabot-proposed version (Vite 8.0.16) dictate the final version merged if
+   a newer stable 8.x release exists by implementation time.

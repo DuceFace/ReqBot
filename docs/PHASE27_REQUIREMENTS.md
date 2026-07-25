@@ -1,6 +1,6 @@
 # ReqBot Phase 27 — Service-Layer Hardening (Phase 26 Review Cleanup)
 
-**Status:** Complete — all three WPs shipped and merged
+**Status:** Complete — all four WPs shipped and merged
 **Date:** 2026-07-24
 **Preceded by:** Phase 26 (MCP Tool Surface)
 **Followed by:** TBD
@@ -17,6 +17,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP-27.1 — Validate `document_ids` in `core/ask.py` | Complete |
 | WP-27.2 — Evidence Remote-Synthesis Backend Hardening | Complete |
 | WP-27.3 — Evidence `document_ids` Filter | Complete |
+| WP-27.4 — Ask/Search Remote-Synthesis Model Selection | Complete |
 
 ---
 
@@ -245,13 +246,83 @@ still requires the internal hash.
 
 ---
 
+### WP-27.4 — Ask/Search Remote-Synthesis Model Selection
+
+**Source:** found while implementing WP-27.2 (not part of Codex/Gemini's original four PR #114/
+#115 findings this phase was locked around). Backlog item #16.
+
+**Problem:** `cli/reqbot.py`'s `cmd_ask` passes `model=args.model or _cfg.synthesis_model` into
+`core.ask.run()`, and `api/routes/ask.py`'s `post_ask()` passes `model=req.model or
+cfg.synthesis_model` into `ask_service.ask()` — both always resolve to the local Ollama model,
+never `cfg.remote_model`, regardless of `cfg.synthesis_backend`. Identical failure mode to what
+WP-27.2 fixed in evidence: a remote-configured `reqbot ask --synthesize` or `/api/ask` with
+`synthesize=true` silently sends a local model name to the remote provider, the call fails, and
+the caller just gets no synthesis text with no visible error. `search_requirements` (MCP) never
+exposes `synthesize=True` at all (Phase 26 architecture rule), so MCP is unaffected — this is a
+CLI/API-only bug.
+
+**Confirmed (2026-07-25):** roll into Phase 27 as WP-27.4 rather than a separate phase — same
+category of bug as items #12–15, just discovered one WP later than the other three, after the
+phase doc was already locked. Mirror WP-27.2's fix: centralize the local/remote model selection
+inside `core/ask.py` (in `retrieve()`, the single function both `run()` (CLI) and
+`ask_service.ask()` (API) call), rather than duplicating the same three-line selection formula in
+both orchestration layers.
+
+**Design note — explicit `--model`/`model` override:** unlike evidence, `reqbot ask --model` and
+`AskRequest.model` let a caller override the model string outright, independent of
+`synthesis_backend`. That override must keep the highest priority. `retrieve()` gets three model
+inputs instead of evidence's two: `model` (explicit override, empty = unset), `synthesis_model`
+(config default for the local backend), `remote_model` (config default for the remote backend).
+Resolution: `model or (remote_model if synthesis_backend == "remote" and remote_model else
+synthesis_model)` — same fallback shape `evidence_service.build()` already uses, with the
+explicit-override layer on top.
+
+**Scope:**
+- `core/ask.py`'s `retrieve()`: add `synthesis_model`/`remote_model` params alongside the existing
+  `model` (repurposed to explicit-override-only, default `""`); resolve the effective model
+  internally before calling `synthesize_answer()`.
+- `core/ask.py`'s `run()` (CLI orchestration): already loads full config from disk when
+  `synthesize=True` to resolve `synthesis_backend`/`remote_provider`/api key — extend that same
+  block to also capture `synthesis_model`/`remote_model` and pass them to `retrieve()`. `main()`'s
+  standalone `--model` argparse default changes from the hardcoded `DEFAULT_SYNTHESIS_MODEL`
+  literal to `""` (unset), matching `cli/reqbot.py`'s `p_ask` behavior.
+- `services/ask_service.py`'s `ask()`: add `synthesis_model`/`remote_model` params, pass through
+  to `retrieve()` unresolved (no more folding `model or DEFAULT_SYNTHESIS_MODEL` itself — that
+  fallback now lives in `retrieve()`).
+- `cli/reqbot.py`'s `cmd_ask`: pass the raw `args.model` through (no more `or _cfg.synthesis_model`
+  collapse at this layer — `run()`'s own config load resolves it).
+- `api/routes/ask.py`'s `post_ask()`: pass `model=req.model` (raw), plus
+  `synthesis_model=cfg.synthesis_model`, `remote_model=cfg.remote_model`.
+
+**Non-goals:**
+- No change to `search_requirements` (MCP) — it never sets `synthesize=True`, so it's not
+  affected and gets no new parameters.
+- No change to `evidence_service.py` (WP-27.2's concern, already fixed).
+
+**Tests / verification:**
+- Unit test: `synthesis_backend == "remote"` with no explicit `--model`/`model` resolves to
+  `cfg.remote_model`, not `cfg.synthesis_model` — for both CLI (`reqbot ask --synthesize`) and API
+  (`/api/ask` with `synthesize=true`).
+- Unit test: an explicit `--model`/`model` override wins regardless of `synthesis_backend`.
+- Unit test: `synthesis_backend == "remote"` with `remote_model` empty falls back to
+  `synthesis_model` (same fallback WP-27.2 added for evidence).
+- Regression: existing `ask`/`cmd_ask`/`/api/ask` tests continue passing (several will need their
+  assertions reworked, same as WP-27.2's `test_evidence_service.py` rewrite, since the model
+  resolution point moves from the CLI/API layer into `core/ask.py`).
+
+**Gate:** A remote-configured `reqbot ask --synthesize` and `/api/ask` with `synthesize=true` both
+use `cfg.remote_model`, not the local Ollama model name, identically to how `map_evidence`/
+`/evidence`/`reqbot evidence` already behave after WP-27.2.
+
+---
+
 ## 5. Success Gate
 
 Phase 27 is complete when:
 
-1. All three WPs are merged.
+1. All four WPs are merged.
 2. Full unit suite passes; `ruff check .` passes.
-3. None of the four original findings (backlog items #12–15) remain open in
+3. None of the five findings this phase closes (backlog items #12–16) remain open in
    `docs/TODO_future_improvements.txt` — remove or mark resolved as each WP lands.
 4. CLI, API, and MCP behave identically for every change in this phase — no interface-specific
    forks introduced while fixing these.
@@ -268,9 +339,13 @@ Carried forward from Phase 26, still binding:
    layer; MCP inherits it, it does not implement its own copy.
 2. Do not hide backend failures as empty results — this is the exact failure mode WP-27.1 and
    WP-27.2 are fixing; don't introduce a new instance of it while doing so.
-3. Do not widen scope beyond the four findings this phase exists to close, plus what WP-27.3
-   explicitly takes on (fixing `reqbot evidence --document-id`'s hash-filter bug as part of
-   fixing `evidence_service.build()`'s filter at its root — that's in scope, not an example of
-   scope creep). New ideas surfaced while working these WPs beyond what's already scoped above
-   (e.g. whether `evidence_service.build()`'s call-site duplication should be refactored further)
-   go back into `docs/TODO_future_improvements.txt`, not into this phase's diff.
+3. Do not widen scope beyond the five findings this phase exists to close (items #12–16), plus
+   what WP-27.3 explicitly takes on (fixing `reqbot evidence --document-id`'s hash-filter bug as
+   part of fixing `evidence_service.build()`'s filter at its root — that's in scope, not an
+   example of scope creep). WP-27.4 was added after the phase was originally locked (found
+   mid-WP-27.2, confirmed 2026-07-25 as in-scope since it's the same category of bug as #12–15,
+   just in `ask`/`search_requirements` instead of `evidence`) — that's the one deliberate
+   amendment to the original lock; it doesn't open the door to further additions without the same
+   explicit confirmation. New ideas surfaced while working these WPs beyond what's already scoped
+   above (e.g. whether `evidence_service.build()`'s call-site duplication should be refactored
+   further) go back into `docs/TODO_future_improvements.txt`, not into this phase's diff.

@@ -528,7 +528,9 @@ def retrieve(
     top_k: int = 20,
     min_score: float = 0.02,
     synthesize: bool = False,
-    model: str = DEFAULT_SYNTHESIS_MODEL,
+    model: str = "",
+    synthesis_model: str = DEFAULT_SYNTHESIS_MODEL,
+    remote_model: str = "",
     domain_tags: list[str] | None = None,
     requirement_types: list[str] | None = None,
     document_ids: list[str] | None = None,
@@ -546,6 +548,16 @@ def retrieve(
     synthesis_api_key: str = "",
 ) -> dict:
     """Retrieve matching requirements and optionally synthesize an answer.
+
+    Selects synthesis_model or remote_model internally based on synthesis_backend
+    (Phase 27, WP-27.4) -- callers pass both unconditionally rather than picking
+    one themselves, mirroring evidence_service.build() (WP-27.2). model is an
+    explicit caller override (e.g. --model / AskRequest.model) and always wins
+    when set; when unset, falls back to remote_model if synthesis_backend ==
+    "remote" and remote_model is non-empty, else synthesis_model. Previously
+    run() and ask_service.ask() each pre-resolved a single "model" string using
+    only synthesis_model, so a remote-configured backend silently got the local
+    Ollama model name.
 
     Pure data path — no console output. Called by both run() (CLI render layer)
     and ask_service.ask() (API/service layer). All retrieval logic lives here;
@@ -740,9 +752,12 @@ def retrieve(
     # Synthesis
     synthesis_text = ""
     if synthesize:
+        effective_model = model or (
+            remote_model if synthesis_backend == "remote" and remote_model else synthesis_model
+        )
         evidence = format_evidence(result_dicts)
         synthesis_text = synthesize_answer(
-            question, evidence, model, ollama_client,
+            question, evidence, effective_model, ollama_client,
             backend=synthesis_backend,
             provider=synthesis_provider,
             api_key=synthesis_api_key,
@@ -765,7 +780,7 @@ def run(
     top_k: int = 20,
     min_score: float = 0.02,
     synthesize: bool = False,
-    model: str = DEFAULT_SYNTHESIS_MODEL,
+    model: str = "",
     domain_tags: list[str] | None = None,
     requirement_types: list[str] | None = None,
     document_ids: list[str] | None = None,
@@ -785,6 +800,10 @@ def run(
     Thin render wrapper over retrieve(). Loads synthesis config from disk
     and delegates all retrieval + synthesis logic to retrieve().
 
+    model is an explicit caller override (e.g. --model); leave empty to let
+    retrieve() select synthesis_model or remote_model based on
+    synthesis_backend (Phase 27, WP-27.4).
+
     Callable by reqbot.py (cmd_ask) and standalone via main() / __main__.
     Returns list of result dicts — identical to what retrieve() returns in
     its "results" key — for any caller that needs the raw data.
@@ -793,12 +812,16 @@ def run(
     syn_backend = "local"
     syn_provider = "anthropic"
     syn_api_key = ""
+    syn_synthesis_model = DEFAULT_SYNTHESIS_MODEL
+    syn_remote_model = ""
     if synthesize:
         try:
             from core import config as _cfg_mod
             _cfg_syn = _cfg_mod.load()
             syn_backend = _cfg_syn.synthesis_backend
             syn_provider = _cfg_syn.remote_provider
+            syn_synthesis_model = _cfg_syn.synthesis_model
+            syn_remote_model = _cfg_syn.remote_model
             if syn_backend == "remote":
                 import os as _os
                 syn_api_key = _os.environ.get(_cfg_syn.api_key_env, "")
@@ -825,6 +848,8 @@ def run(
         min_score=min_score,
         synthesize=synthesize,
         model=model,
+        synthesis_model=syn_synthesis_model,
+        remote_model=syn_remote_model,
         domain_tags=domain_tags,
         requirement_types=requirement_types,
         document_ids=document_ids,
@@ -936,8 +961,9 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=str,
-        default=DEFAULT_SYNTHESIS_MODEL,
-        help=f"LLM model for synthesis (default: {DEFAULT_SYNTHESIS_MODEL})",
+        default="",
+        help="LLM model for synthesis (default: configured synthesis_model, or "
+             "remote_model when synthesis_backend=remote)",
     )
     parser.add_argument(
         "--domain-tag",

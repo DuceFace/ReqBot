@@ -187,7 +187,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
             top_k=args.top_k,
             min_score=args.min_score,
             synthesize=args.synthesize,
-            model=args.model or _cfg.synthesis_model,
+            model=args.model or "",
             domain_tags=args.domain_tags,
             requirement_types=args.requirement_types,
             document_ids=args.document_ids,

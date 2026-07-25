@@ -59,9 +59,13 @@ def test_missing_no_hyde_attribute_defaults_to_hyde_enabled():
     assert kwargs["hyde"] is True
 
 
-def test_no_model_flag_falls_back_to_configured_synthesis_model():
-    """WP-25.6b: --model omitted must resolve to _cfg.synthesis_model, not the
-    hardcoded core.ask.DEFAULT_SYNTHESIS_MODEL literal."""
+def test_no_model_flag_passes_empty_string_not_hardcoded_default():
+    """Phase 27, WP-27.4: cmd_ask no longer folds in _cfg.synthesis_model itself
+    -- it passes the raw --model value through unchanged, and core.ask.run()
+    resolves synthesis_model/remote_model internally based on synthesis_backend
+    (see test_ask_run.py for that resolution logic). Folding config in here,
+    at the CLI layer, is exactly the bug WP-27.4 fixed for the remote backend
+    -- this test guards against reintroducing it."""
     mock_cfg = SimpleNamespace(
         synthesis_model="configured-synth-model",
         rewrite_model="configured-rewrite-model",
@@ -71,7 +75,7 @@ def test_no_model_flag_falls_back_to_configured_synthesis_model():
         rc = cmd_ask(_args(model=None, rewrite_model=None))
     assert rc == 0
     _, kwargs = mock_run.call_args
-    assert kwargs["model"] == "configured-synth-model"
+    assert kwargs["model"] == ""
 
 
 def test_explicit_model_flag_overrides_config():

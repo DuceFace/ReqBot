@@ -110,6 +110,15 @@ def test_runtime_error_propagates(mock_retrieve):
 
 
 @patch("core.ask.retrieve")
+def test_value_error_propagates(mock_retrieve):
+    """Phase 27, WP-27.1: an unknown document_ids value raises ValueError from
+    retrieve() -- ask_service must not swallow or reshape it."""
+    mock_retrieve.side_effect = ValueError("Unknown document_ids: bad-doc")
+    with pytest.raises(ValueError, match="bad-doc"):
+        ask("test", "http://qdrant:6333", "http://ollama:11434", document_ids=["bad-doc"])
+
+
+@patch("core.ask.retrieve")
 def test_hyde_defaults_to_true(mock_retrieve):
     """WP-24.5: HyDE is default-on retrieval augmentation, not opt-in."""
     mock_retrieve.return_value = _make_retrieve_result()

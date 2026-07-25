@@ -51,6 +51,8 @@ def ask(
                          results (WP-25.6c); never blocks the query.
 
     Does not raise ValueError for empty results — returns result_count=0 instead.
+    Raises ValueError if document_ids contains a value not found in the corpus
+    (Phase 27, WP-27.1) — propagated from retrieve().
     Raises RuntimeError on connection or embedding failure (propagated from retrieve()).
     """
     from core import ask as _ask

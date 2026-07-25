@@ -121,7 +121,7 @@ ACTIVE BACKLOG
       re-ingested document that produces the same requirement_ids will
       correctly re-associate assessor notes
 
-12. Validate document_ids filter in core/ask.py (Codex review, WP-26.3/PR #114)
+12. [RESOLVED — Phase 27, WP-27.1] Validate document_ids filter in core/ask.py (Codex review, WP-26.3/PR #114)
     core/ask.py's retrieve() passes document_ids straight into a Qdrant MatchAny
     filter with no existence check against the actual corpus. A typo'd or stale
     document_id doesn't error -- it just produces an empty or reduced hit set,

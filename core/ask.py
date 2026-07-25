@@ -147,6 +147,63 @@ def build_query_filter(
     return models.Filter(must=conditions)
 
 
+def resolve_document_ids(
+    client: QdrantClient, document_ids: list[str]
+) -> tuple[list[str], list[str]]:
+    """Resolve caller-supplied document_ids (doc_key or source_pdf form) against
+    what's actually indexed in the grc_requirements collection.
+
+    Validates against the live collection, not the processed_dir JSONL directory
+    (Codex review, PR #119) — a document ingested via `reqbot ingest --output-dir`
+    or indexed via `reqbot index <arbitrary.jsonl>` can be fully searchable while
+    living outside the configured processed_dir, and conversely a JSONL sitting in
+    processed_dir may never have been indexed. The Qdrant collection is the only
+    thing that reflects what a query can actually match, so it's the only correct
+    source of truth for this check.
+
+    A value is accepted only if `client.count()` confirms a point exists with
+    that *exact* source_pdf value — either the value as given, or (only if that
+    exact check fails) `value + ".pdf"` when value doesn't already end in .pdf.
+    Each candidate is checked and confirmed individually before being used as
+    the resolved value (Codex review, PR #119) — checking both forms in one
+    combined query and then blindly resolving to the .pdf-suffixed form
+    regardless of which one actually matched would silently rewrite the filter
+    to a value that doesn't exist in Qdrant whenever a document's real
+    source_pdf has no .pdf suffix, producing the exact silent-empty-result bug
+    this validation exists to eliminate. Never fabricated for an unrecognized
+    value. Uses an exact count (not the faster approximate mode) because this
+    is a validation gate: a false "not found" here would wrongly reject a
+    real, searchable document.
+
+    Returns (resolved_source_pdfs, unknown_values).
+    """
+    resolved: list[str] = []
+    unknown: list[str] = []
+    for value in document_ids:
+        candidates = [value]
+        if not value.lower().endswith(".pdf"):
+            candidates.append(f"{value}.pdf")
+
+        matched: str | None = None
+        for candidate in candidates:
+            count = client.count(
+                collection_name=COLLECTION_NAME,
+                count_filter=models.Filter(
+                    must=[models.FieldCondition(key="source_pdf", match=models.MatchValue(value=candidate))]
+                ),
+                exact=True,
+            ).count
+            if count > 0:
+                matched = candidate
+                break
+
+        if matched is not None:
+            resolved.append(matched)
+        else:
+            unknown.append(value)
+    return resolved, unknown
+
+
 def retrieve_context_chunks(
     results: list,
     client: QdrantClient,
@@ -493,9 +550,28 @@ def retrieve(
         total:          int         number of results after min_score filtering and top_k trim
         retrieval_ms:   int         wall-clock ms from entry to just before synthesis (pure retrieval)
         warnings:       list[str]   e.g. embedding-model mismatch between config and indexed results
+
+    Raises ValueError if document_ids contains a value not indexed in the
+    grc_requirements collection (Phase 27, WP-27.1) — a stale or typo'd document
+    filter is invalid input, not a weak-search condition, so it errors instead of
+    silently returning an empty/reduced result set.
     """
     import time as _time
     _t0 = _time.monotonic()
+
+    qdrant_client = QdrantClient(url=qdrant_url)
+
+    if document_ids:
+        resolved_document_ids, unknown_document_ids = resolve_document_ids(
+            qdrant_client, document_ids
+        )
+        if unknown_document_ids:
+            raise ValueError(
+                "Unknown document_ids (no matching indexed document): "
+                + ", ".join(sorted(unknown_document_ids))
+            )
+        document_ids = resolved_document_ids
+
     ollama_client = ollama.Client(host=ollama_url)
 
     # Query rewriting: expand acronyms, extract control IDs and domain hints.
@@ -571,7 +647,7 @@ def retrieve(
     # to draw from — otherwise low-score hits can consume top_k slots before filtering.
     prefetch_limit = max(100, top_k * 5)
     fusion_limit = max(top_k * 3, 50) if min_score > 0 else top_k
-    qdrant_client = QdrantClient(url=qdrant_url)
+    # qdrant_client already created above (needed early for document_ids validation)
 
     prefetch_legs = [
         models.Prefetch(

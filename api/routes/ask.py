@@ -68,6 +68,8 @@ def post_ask(req: AskRequest) -> dict:
             synthesis_provider=syn_provider,
             synthesis_api_key=syn_api_key,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:  # noqa: BLE001 — normalise unexpected backend errors

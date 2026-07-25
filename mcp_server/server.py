@@ -66,6 +66,11 @@ def search_requirements(
     stays optional and separately labeled per Phase 26's architecture rules, on other tools
     that intentionally support it). Pass a returned result's requirement_id to
     trace_requirement for full provenance on one hit.
+
+    document_ids accepts either bare doc_key ("afi17-101") or full source_pdf
+    ("afi17-101.pdf") values from list_documents. A value matching neither raises
+    a structured error naming the bad key(s) rather than silently returning an
+    empty/reduced result set (Phase 27, WP-27.1).
     """
     # Same bound /api/ask enforces via Pydantic's Field(ge=1, le=100) (api/routes/ask.py) --
     # that's interface-boundary input validation, not shared core/ask.py business logic, so

@@ -237,6 +237,26 @@ def test_search_requirements_service_failure_becomes_structured_mcp_error():
             asyncio.run(server.mcp.call_tool("search_requirements", {"question": "x"}))
 
 
+def test_search_requirements_unknown_document_ids_becomes_structured_mcp_error():
+    """Phase 27, WP-27.1: an unknown document_ids value must surface as a
+    structured MCP error naming the bad key, not a silent empty result."""
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch(
+            "mcp_server.server.ask_service.ask",
+            side_effect=ValueError("Unknown document_ids: bad-doc"),
+        ),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(
+                server.mcp.call_tool(
+                    "search_requirements", {"question": "x", "document_ids": ["bad-doc"]}
+                )
+            )
+
+
 # ---------------------------------------------------------------------------
 # trace_requirement (WP-26.3)
 # ---------------------------------------------------------------------------

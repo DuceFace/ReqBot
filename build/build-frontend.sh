@@ -23,9 +23,13 @@ if ! command -v node >/dev/null 2>&1; then
     exit 1
 fi
 
-NODE_MAJOR="$(node --version | sed -E 's/^v([0-9]+)\..*/\1/')"
-if [ "$NODE_MAJOR" -lt 20 ] || [ "$NODE_MAJOR" -eq 21 ] || [ "$NODE_MAJOR" -eq 23 ]; then
-    echo "[-] Node $(node --version) found. This project requires Node 20.19+ or 22.12+ (Vite 8's floor) — odd-numbered releases (21.x, 23.x) aren't supported." >&2
+NODE_VERSION="$(node --version | sed -E 's/^v//')"
+NODE_MAJOR="$(echo "$NODE_VERSION" | cut -d. -f1)"
+NODE_MINOR="$(echo "$NODE_VERSION" | cut -d. -f2)"
+if [ "$NODE_MAJOR" -lt 20 ] || [ "$NODE_MAJOR" -eq 21 ] || [ "$NODE_MAJOR" -eq 23 ] || \
+   { [ "$NODE_MAJOR" -eq 20 ] && [ "$NODE_MINOR" -lt 19 ]; } || \
+   { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 12 ]; }; then
+    echo "[-] Node $(node --version) found. This project requires Node 20.19+ or 22.12+ (Vite 8's floor) — odd-numbered releases (21.x, 23.x) and earlier 20.x/22.x patches aren't supported." >&2
     echo "    Install Node.js 20.19+ or 22.12+ LTS: https://nodejs.org/" >&2
     exit 1
 fi

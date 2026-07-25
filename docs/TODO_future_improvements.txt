@@ -162,7 +162,8 @@ ACTIVE BACKLOG
     synthesis_backend == "remote", synthesis_model when "local". Needs its own
     planned WP -- do not patch mcp_server/server.py alone.
 
-14. map_evidence has no document_ids filter (Gemini review, WP-26.4/PR #115)
+14. [RESOLVED — Phase 27, WP-27.3] map_evidence has no document_ids filter
+    (Gemini review, WP-26.4/PR #115)
     Both api/routes/evidence.py's EvidenceRequest and mcp_server/server.py's
     map_evidence hardcode document_ids=None into evidence_service.build(),
     even though the service itself accepts a document_ids filter and the CLI
@@ -173,6 +174,11 @@ ACTIVE BACKLOG
     document_ids to EvidenceRequest and thread it through the route, with MCP
     following the same shape once the API does (thin-wrapper rule -- MCP
     should not get a filter the API itself doesn't expose first).
+    Resolved alongside a deeper pre-existing bug found while scoping this:
+    evidence_service.build()'s document_ids filter matched on the internal
+    document_id hash, not doc_key/source_pdf -- WP-27.3 fixed the filter
+    itself (reusing core.ask.resolve_document_ids from WP-27.1) before adding
+    it to API/MCP, so all three surfaces now filter on caller-facing values.
 
 15. [RESOLVED — Phase 27, WP-27.2] api_key_env=None would crash the remote-synthesis-backend fallback check
     (Gemini review, WP-26.4/PR #115)

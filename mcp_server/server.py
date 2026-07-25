@@ -162,6 +162,7 @@ def compare_documents(doc_id_1: str, doc_id_2: str, topic: str, top_k: int = 10)
 @mcp.tool()
 def map_evidence(
     topic: str,
+    document_ids: list[str] | None = None,
     domain_tags: list[str] | None = None,
     requirement_types: list[str] | None = None,
     synthesize: bool = False,
@@ -173,6 +174,11 @@ def map_evidence(
     (when synthesize=True and a remote synthesis backend/API key is configured) an
     executive-summary synthesis_text. Falls back to the local backend silently if
     the configured remote backend has no API key set -- same behavior as /evidence.
+
+    document_ids accepts either bare doc_key ("afi17-101") or full source_pdf
+    ("afi17-101.pdf") values from list_documents. A value matching neither raises
+    a structured error naming the bad key(s) rather than silently returning an
+    empty/reduced result set (Phase 27, WP-27.3).
     """
     if not 1 <= top_k <= 100:
         raise ValueError(f"top_k must be between 1 and 100, got {top_k}")
@@ -193,7 +199,7 @@ def map_evidence(
         ollama_url=cfg.ollama_url,
         top_k=top_k,
         show_context=False,
-        document_ids=None,
+        document_ids=document_ids,
         domain_tags=domain_tags or None,
         requirement_types=requirement_types or None,
         synthesize=synthesize,

@@ -1,7 +1,6 @@
 # ReqBot Phase 27 — Service-Layer Hardening (Phase 26 Review Cleanup)
 
-**Status:** Locked (all three WPs scoped, open design decisions confirmed 2026-07-24;
-implementation starts at WP-27.1)
+**Status:** Complete — all three WPs shipped and merged
 **Date:** 2026-07-24
 **Preceded by:** Phase 26 (MCP Tool Surface)
 **Followed by:** TBD
@@ -17,7 +16,7 @@ not in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-27.1 — Validate `document_ids` in `core/ask.py` | Complete |
 | WP-27.2 — Evidence Remote-Synthesis Backend Hardening | Complete |
-| WP-27.3 — Evidence `document_ids` Filter | Not started |
+| WP-27.3 — Evidence `document_ids` Filter | Complete |
 
 ---
 
@@ -83,15 +82,20 @@ internal storage details — accept both bare `doc_key` (`"afi17-101"`) and full
 `compare_documents`/`compare_service` already have for the `.pdf` suffix.
 
 **Scope:**
-- Validate requested `document_ids` against the corpus's known documents before querying: check
-  each value against `docs_service.list_docs()`'s known `doc_key` values and their resolved
-  `source_pdf` values (via `docs_service.resolve_source_pdfs()`) — a value must actually match a
-  known document to be accepted. **Do not reuse `api/routes/compare.py`'s `_canonical()` for
-  this** (Codex review, PR #118) — it's intentionally forgiving, fabricating `<doc_key>.pdf` for
-  anything it can't resolve, which is correct for compare's fallback UX but would defeat the
-  hard-error requirement here by silently "resolving" an invalid name instead of rejecting it.
-  Only normalize a value into its canonical `source_pdf` form after confirming it matches a known
-  document.
+- Validate requested `document_ids` against the corpus's known documents before querying. **Do
+  not reuse `api/routes/compare.py`'s `_canonical()` for this** (Codex review, PR #118) — it's
+  intentionally forgiving, fabricating `<doc_key>.pdf` for anything it can't resolve, which is
+  correct for compare's fallback UX but would defeat the hard-error requirement here by silently
+  "resolving" an invalid name instead of rejecting it. Only normalize a value into its canonical
+  `source_pdf` form after confirming it matches a known document.
+- **As implemented (Codex P1 finding, PR #119) — resolve against the live Qdrant
+  `grc_requirements` collection via `client.count()`, not `docs_service.list_docs()` /
+  `resolve_source_pdfs()` (the JSONL/`processed_dir` layer originally scoped here).**
+  `processed_dir` is not equivalent to what's actually indexed and searchable — `reqbot ingest
+  --output-dir` and `reqbot index <arbitrary path>` can index a document whose JSONL never
+  touches `processed_dir`, which would make a JSONL-based check wrongly reject real, searchable
+  `document_ids` values. Qdrant is the only source of truth for "is this actually searchable."
+  Landed as `core.ask.resolve_document_ids(client, document_ids)`.
 - On any unresolved value(s), raise a clear error naming the bad document key(s) — do not query
   Qdrant with them.
 - Apply the fix in `core/ask.py` / `services/ask_service.py` so `search_requirements` (MCP),
@@ -203,15 +207,22 @@ in one pass instead of leaving the CLI broken while API/MCP get a new parameter.
 
 **Scope:**
 - Change `evidence_service.build()`'s `document_ids` filtering to resolve/match on `doc_key`/
-  `source_pdf` (reusing `docs_service.resolve_source_pdfs()` or equivalent), not the internal
-  `document_id` hash.
+  `source_pdf`, not the internal `document_id` hash. **As implemented — reuses
+  `core.ask.resolve_document_ids()` (WP-27.1's Qdrant-backed resolver), not
+  `docs_service.resolve_source_pdfs()`.** Keeps a single resolution implementation instead of two
+  parallel ones (JSONL-based vs. Qdrant-based) that could drift, and avoids reintroducing the
+  exact `processed_dir` != indexed-corpus gap WP-27.1's Codex P1 finding fixed. The Qdrant filter
+  field itself also changed from `document_id` to `source_pdf` to match.
 - Update `reqbot evidence --document-id` (CLI) to pass through caller-facing values now that the
-  service accepts them correctly — confirm no CLI-side translation layer is silently relying on
-  the old hash behavior.
+  service accepts them correctly — confirmed no CLI-side translation layer was relying on the old
+  hash behavior; the flag already passed `document_ids` straight through, so the service-layer fix
+  alone resolved the CLI's UX gap. Help text updated to name `doc_key`/`source_pdf` explicitly.
 - Add `document_ids: list[str] | None` to `EvidenceRequest` (API) and thread it through
   `post_evidence()`.
 - Add the matching `document_ids` parameter to `map_evidence` (MCP), mirroring the corrected API
   exactly — MCP should not get a filter shape the API doesn't already expose (thin-wrapper rule).
+- Unknown `document_ids` raise the same `ValueError` → 404 (API) / `ToolError` (MCP) / rc=1 (CLI)
+  shape WP-27.1 established for `/ask`, `search_requirements`, and `reqbot ask`.
 
 **Non-goals:**
 - No change to `search_requirements`'s or `compare_documents`'s existing `document_ids`/

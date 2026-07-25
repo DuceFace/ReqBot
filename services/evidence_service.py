@@ -101,7 +101,8 @@ def build(
       synthesis_text: str  (empty string if synthesis failed or was skipped)
 
     Raises:
-      ValueError  — no results found
+      ValueError  — no results found, or document_ids contains a value not
+        indexed in the grc_requirements collection (Phase 27, WP-27.3)
       RuntimeError — connection or embedding failure
     """
     try:
@@ -122,6 +123,22 @@ def build(
         client = QdrantClient(url=qdrant_url, timeout=10)
     except Exception as e:
         raise RuntimeError(f"Could not connect to Qdrant: {e}") from e
+
+    # document_ids resolved/validated against Qdrant's source_pdf field, not the
+    # internal document_id hash (Phase 27, WP-27.3) -- reuses core.ask's Qdrant-
+    # backed resolver (WP-27.1) rather than docs_service/processed_dir, since
+    # processed_dir isn't equivalent to what's actually indexed and searchable.
+    if document_ids:
+        from core.ask import resolve_document_ids as _resolve_document_ids
+        resolved_document_ids, unknown_document_ids = _resolve_document_ids(
+            client, document_ids
+        )
+        if unknown_document_ids:
+            raise ValueError(
+                "Unknown document_ids (no matching indexed document): "
+                + ", ".join(sorted(unknown_document_ids))
+            )
+        document_ids = resolved_document_ids
 
     # --- Dense embedding ---
     try:
@@ -147,7 +164,7 @@ def build(
     filter_conditions: list = []
     if document_ids:
         filter_conditions.append(
-            _qm.FieldCondition(key="document_id", match=_qm.MatchAny(any=document_ids))
+            _qm.FieldCondition(key="source_pdf", match=_qm.MatchAny(any=document_ids))
         )
     if domain_tags:
         filter_conditions.append(

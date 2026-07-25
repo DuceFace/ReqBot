@@ -12,6 +12,9 @@ router = APIRouter()
 
 class EvidenceRequest(BaseModel):
     topic: str
+    # accepts bare doc_key ("afi17-101") or full source_pdf ("afi17-101.pdf") --
+    # resolved against the indexed corpus by evidence_service.build() (WP-27.3)
+    document_ids: list[str] = Field(default_factory=list)
     domain_tags: list[str] = Field(default_factory=list)
     requirement_types: list[str] = Field(default_factory=list)
     synthesize: bool = False
@@ -47,7 +50,7 @@ def post_evidence(req: EvidenceRequest) -> dict:
             ollama_url=cfg.ollama_url,
             top_k=req.top_k,
             show_context=False,
-            document_ids=None,
+            document_ids=req.document_ids or None,
             domain_tags=req.domain_tags or None,
             requirement_types=req.requirement_types or None,
             synthesize=req.synthesize,

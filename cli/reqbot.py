@@ -1601,7 +1601,7 @@ def main() -> None:
     p_evidence.add_argument("--top-k", type=int, default=20, dest="top_k",
                             help="Number of results to retrieve (default: 20)")
     p_evidence.add_argument("--document-id", action="append", dest="document_ids", default=[],
-                            help="Filter by document ID (repeatable)")
+                            help="Filter by doc_key or source_pdf, e.g. afi17-101 (repeatable)")
     p_evidence.add_argument("--domain-tag", action="append", dest="domain_tags", default=[],
                             help="Filter by domain tag (repeatable)")
     p_evidence.add_argument("--requirement-type", action="append", dest="requirement_types",

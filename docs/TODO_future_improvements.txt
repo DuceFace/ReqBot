@@ -224,6 +224,27 @@ ACTIVE BACKLOG
     this internally, mirroring how evidence_service.build() now does,
     rather than each caller picking a model string itself).
 
+17. Settings/configuration screen in the GUI
+    All of ReqBot's config (ollama_url, qdrant_url, synthesis_backend,
+    remote_model, api_key_env, synthesis_model, embedding_model, top_k,
+    min_score, etc.) lives in ~/.config/reqbot/config.json and can only be
+    changed by hand-editing it over SSH. Phase 27 added several new knobs
+    (synthesis_backend, remote_model, api_key_env) that make this friction
+    worse -- there's no way to turn on remote synthesis from the GUI at all
+    right now.
+
+    A settings screen would need new API surface that doesn't exist yet: a
+    GET /config route (read current values) and a PUT/POST /config route
+    (write back to config.json), plus frontend form + validation. That's a
+    meaningfully bigger unit of work than the other UX items in this section
+    (#9-11 are additive/read-only) -- closer to a small feature than polish.
+
+    Open design question: should the screen ever handle the actual API key
+    value, or only api_key_env (the env var *name* config already stores)?
+    Leaning toward name-only, so the browser never touches or persists a
+    secret -- the actual key stays in the server's environment, same as
+    today.
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS
@@ -270,7 +291,7 @@ These are quality experiments, not guaranteed product work.
 DEPENDENCY / TOOLCHAIN BACKLOG
 ================================================================
 
-1. Vite major upgrade
+1. Vite major upgrade (Phase 28 planned work — see docs/PHASE28_REQUIREMENTS.md, WP-28.2)
    Current main uses Vite 5.x. Dependabot has proposed a Vite 8.x upgrade.
    Treat this as a frontend toolchain migration, not a tiny dependency patch.
 
@@ -284,12 +305,12 @@ DEPENDENCY / TOOLCHAIN BACKLOG
    The original security concern involved the Vite dev server. ReqBot production
    static files served through reqbot serve are a different risk surface.
 
-2. React Router maintenance updates
+2. React Router maintenance updates (Phase 28 planned work — see docs/PHASE28_REQUIREMENTS.md, WP-28.1)
    Same-major React Router updates are generally lower risk than Vite major
    upgrades. Merge when CI passes unless release notes show a relevant behavior
    change.
 
-3. Security scanning / code checks in CI
+3. Security scanning / code checks in CI (Phase 28 planned work — see docs/PHASE28_REQUIREMENTS.md, WP-28.3)
    Currently only GitHub's passive Dependabot alerts cover this repo (dependency
    CVEs from the manifest files, surfaced on the Security tab — no CI job runs
    against them). No SAST, no secret scanning, no code-scanning job alongside

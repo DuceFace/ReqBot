@@ -52,6 +52,29 @@ def test_resolve_document_ids_accepts_full_source_pdf_form():
     assert unknown == []
 
 
+def test_resolve_document_ids_accepts_doc_key_when_source_pdf_has_uppercase_pdf_suffix():
+    """Codex review, PR #121: reqbot batch explicitly globs *.PDF as well as
+    *.pdf (cmd_batch), and compute_document_identity() preserves the
+    filename's original case verbatim -- a document ingested from an
+    uppercase-extension file has a literal '.PDF' source_pdf. Appending only
+    a lowercase '.pdf' candidate would never match it, wrongly rejecting a
+    real bare doc_key as unknown."""
+    client = _mock_client({"afi17-101.PDF": 5})
+    resolved, unknown = core_ask.resolve_document_ids(client, ["afi17-101"])
+    assert resolved == ["afi17-101.PDF"]
+    assert unknown == []
+
+
+def test_resolve_document_ids_prefers_lowercase_pdf_suffix_over_uppercase():
+    """Lowercase '.pdf' is tried before uppercase '.PDF' -- confirms a
+    deterministic candidate order, not query-order-dependent behavior."""
+    client = _mock_client({"afi17-101.pdf": 5, "afi17-101.PDF": 3})
+    resolved, unknown = core_ask.resolve_document_ids(client, ["afi17-101"])
+    assert resolved == ["afi17-101.pdf"]
+    assert unknown == []
+    assert client.count.call_count == 2  # bare value, then lowercase .pdf match -- stops there
+
+
 def test_resolve_document_ids_does_not_append_pdf_suffix_when_exact_value_already_matches():
     """Codex review, PR #119: if Qdrant's real source_pdf has no .pdf suffix
     (e.g. stored as 'afi17-101'), resolving to 'afi17-101.pdf' anyway would

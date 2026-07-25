@@ -163,17 +163,24 @@ def resolve_document_ids(
 
     A value is accepted only if `client.count()` confirms a point exists with
     that *exact* source_pdf value — either the value as given, or (only if that
-    exact check fails) `value + ".pdf"` when value doesn't already end in .pdf.
+    exact check fails) `value + ".pdf"` or `value + ".PDF"` when value doesn't
+    already end in .pdf/.PDF. Both extension-case candidates are tried because
+    `compute_document_identity()` preserves the original filename verbatim
+    (`pipeline/parse_and_normalize.py`) and `reqbot batch` explicitly globs
+    both `*.pdf` and `*.PDF` (`cli/reqbot.py`'s `cmd_batch`) -- a document
+    ingested from an uppercase-extension file has a literal `.PDF` source_pdf,
+    and appending only a lowercase `.pdf` candidate would never match it,
+    wrongly rejecting a real bare doc_key as unknown (Codex review, PR #121).
     Each candidate is checked and confirmed individually before being used as
-    the resolved value (Codex review, PR #119) — checking both forms in one
-    combined query and then blindly resolving to the .pdf-suffixed form
+    the resolved value (Codex review, PR #119) — checking multiple forms in
+    one combined query and then blindly resolving to a specific suffixed form
     regardless of which one actually matched would silently rewrite the filter
     to a value that doesn't exist in Qdrant whenever a document's real
-    source_pdf has no .pdf suffix, producing the exact silent-empty-result bug
-    this validation exists to eliminate. Never fabricated for an unrecognized
-    value. Uses an exact count (not the faster approximate mode) because this
-    is a validation gate: a false "not found" here would wrongly reject a
-    real, searchable document.
+    source_pdf doesn't have that exact suffix, producing the exact
+    silent-empty-result bug this validation exists to eliminate. Never
+    fabricated for an unrecognized value. Uses an exact count (not the faster
+    approximate mode) because this is a validation gate: a false "not found"
+    here would wrongly reject a real, searchable document.
 
     Returns (resolved_source_pdfs, unknown_values).
     """
@@ -183,6 +190,7 @@ def resolve_document_ids(
         candidates = [value]
         if not value.lower().endswith(".pdf"):
             candidates.append(f"{value}.pdf")
+            candidates.append(f"{value}.PDF")
 
         matched: str | None = None
         for candidate in candidates:

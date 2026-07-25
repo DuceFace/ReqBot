@@ -566,6 +566,42 @@ def test_map_evidence_service_failure_becomes_structured_mcp_error():
             asyncio.run(server.mcp.call_tool("map_evidence", {"topic": "x"}))
 
 
+def test_map_evidence_document_ids_passed_through():
+    """Phase 27, WP-27.3: map_evidence exposes document_ids and threads it
+    through to evidence_service.build() -- previously hardcoded to None."""
+    from mcp_server import server
+
+    fake_result = {"query": "x", "groups": {}, "group_order": [], "total_sources": 0, "synthesis_text": ""}
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.evidence_service.build", return_value=fake_result) as mock_build,
+    ):
+        server.map_evidence("access control", document_ids=["afi17-101"])
+
+    assert mock_build.mock_calls[0].kwargs["document_ids"] == ["afi17-101"]
+
+
+def test_map_evidence_unknown_document_ids_becomes_structured_mcp_error():
+    """Same hard-error rule as WP-27.1's search_requirements: an unresolved
+    document_ids value must surface as a structured MCP error, not a silent
+    empty evidence pack."""
+    from mcp_server import server
+
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch(
+            "mcp_server.server.evidence_service.build",
+            side_effect=ValueError("Unknown document_ids: bad-doc"),
+        ),
+    ):
+        with pytest.raises(ToolError):
+            asyncio.run(
+                server.mcp.call_tool(
+                    "map_evidence", {"topic": "x", "document_ids": ["bad-doc"]}
+                )
+            )
+
+
 # ---------------------------------------------------------------------------
 # generate_checklist (WP-26.5)
 # ---------------------------------------------------------------------------

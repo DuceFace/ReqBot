@@ -287,8 +287,11 @@ explicit-override layer on top.
   standalone `--model` argparse default changes from the hardcoded `DEFAULT_SYNTHESIS_MODEL`
   literal to `""` (unset), matching `cli/reqbot.py`'s `p_ask` behavior.
 - `services/ask_service.py`'s `ask()`: add `synthesis_model`/`remote_model` params, pass through
-  to `retrieve()` unresolved (no more folding `model or DEFAULT_SYNTHESIS_MODEL` itself — that
-  fallback now lives in `retrieve()`).
+  to `retrieve()` unresolved — no more folding `model or cfg.synthesis_model` itself (that was
+  the actual bug: `model` used to collapse to the local model unconditionally). `synthesis_model`
+  keeps a `synthesis_model or DEFAULT_SYNTHESIS_MODEL` guard so an omitted value doesn't pass an
+  explicit empty string into `retrieve()` and shadow its own default — defensive, not a fold of
+  `model` itself.
 - `cli/reqbot.py`'s `cmd_ask`: pass the raw `args.model` through (no more `or _cfg.synthesis_model`
   collapse at this layer — `run()`'s own config load resolves it).
 - `api/routes/ask.py`'s `post_ask()`: pass `model=req.model` (raw), plus

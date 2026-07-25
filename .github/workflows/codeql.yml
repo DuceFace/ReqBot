@@ -1,0 +1,55 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly baseline scan — catches issues introduced by a dependency update alone, not just
+    # by a code change in a PR.
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Python: core/, services/, api/, pipeline/, cli/, mcp_server/ — matching the existing
+          # pytest --cov module scope. JS/TS: frontend/. Everything else (archive/, docs/, eval/,
+          # models/, profiles/, tests/) is out of scope for this scan.
+          config: |
+            paths:
+              - core
+              - services
+              - api
+              - pipeline
+              - cli
+              - mcp_server
+              - frontend
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'

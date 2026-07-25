@@ -54,6 +54,8 @@ def test_disabled_synthesis_warning_goes_to_stderr_with_json_output(capsys):
         synthesis_backend="none",
         remote_provider="anthropic",
         api_key_env="ANTHROPIC_API_KEY",
+        synthesis_model="local-model",
+        remote_model="remote-model",
     )
     with patch("core.config.load", return_value=fake_cfg), \
          patch("core.ask.retrieve", return_value=_fake_retrieve_result()):
@@ -72,6 +74,8 @@ def test_remote_missing_api_key_warning_goes_to_stderr_with_json_output(capsys, 
         synthesis_backend="remote",
         remote_provider="anthropic",
         api_key_env="ANTHROPIC_API_KEY",
+        synthesis_model="local-model",
+        remote_model="remote-model",
     )
     with patch("core.config.load", return_value=fake_cfg), \
          patch("core.ask.retrieve", return_value=_fake_retrieve_result()):

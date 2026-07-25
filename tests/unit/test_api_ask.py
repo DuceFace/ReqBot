@@ -1,8 +1,16 @@
-"""Unit tests for api/routes/ask.py's model/rewrite_model resolution (WP-25.6b).
+"""Unit tests for api/routes/ask.py's model/rewrite_model resolution (WP-25.6b)
+and synthesis_model/remote_model pass-through (Phase 27, WP-27.4).
 
-Confirms the API route resolves an omitted model/rewrite_model from config rather
+Confirms the API route resolves an omitted rewrite_model from config rather
 than passing an empty string straight through to ask_service.ask() (which used to
 fall back to a hardcoded literal, ignoring whatever the user actually configured).
+
+model itself is passed through raw (no fold-in at this layer) since
+ask_service.ask()/core.ask.retrieve() now resolve it from synthesis_model/
+remote_model based on synthesis_backend -- previously post_ask() always folded
+in cfg.synthesis_model regardless of backend, so a remote-configured /api/ask
+with synthesize=true silently sent the local Ollama model name to the remote
+provider.
 """
 import sys
 from pathlib import Path
@@ -34,19 +42,27 @@ def _mock_cfg(**overrides):
     cfg.remote_provider = "anthropic"
     cfg.api_key_env = "ANTHROPIC_API_KEY"
     cfg.synthesis_model = "configured-synth-model"
+    cfg.remote_model = "configured-remote-model"
     cfg.rewrite_model = "configured-rewrite-model"
     for key, value in overrides.items():
         setattr(cfg, key, value)
     return cfg
 
 
-def test_omitted_model_and_rewrite_model_fall_back_to_config():
+def test_omitted_model_passes_through_raw_synthesis_model_and_remote_model_from_config():
+    """Phase 27, WP-27.4: model itself stays raw (empty when omitted) --
+    synthesis_model/remote_model carry the config defaults, and
+    ask_service.ask()/retrieve() pick between them based on synthesis_backend.
+    Folding cfg.synthesis_model into `model` here regardless of backend is the
+    exact bug this WP fixed."""
     with patch("api.routes.ask._config.load", return_value=_mock_cfg()), \
          patch(_ASK_PATH, return_value=MOCK_RESULT) as mock_ask:
         resp = client.post("/api/ask", json={"question": "access control"})
     assert resp.status_code == 200
     _, kwargs = mock_ask.call_args
-    assert kwargs["model"] == "configured-synth-model"
+    assert kwargs["model"] == ""
+    assert kwargs["synthesis_model"] == "configured-synth-model"
+    assert kwargs["remote_model"] == "configured-remote-model"
     assert kwargs["rewrite_model"] == "configured-rewrite-model"
 
 

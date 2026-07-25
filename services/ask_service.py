@@ -25,6 +25,8 @@ def ask(
     min_score: float = 0.02,
     synthesize: bool = False,
     model: str = "",
+    synthesis_model: str = "",
+    remote_model: str = "",
     rewrite_model: str = "",
     embedding_model: str = "",
     domain_tags: list | None = None,
@@ -54,6 +56,10 @@ def ask(
     Raises ValueError if document_ids contains a value not found in the corpus
     (Phase 27, WP-27.1) — propagated from retrieve().
     Raises RuntimeError on connection or embedding failure (propagated from retrieve()).
+
+    model is an explicit caller override and always wins when set; synthesis_model/
+    remote_model are passed through unresolved -- retrieve() selects between them
+    based on synthesis_backend (Phase 27, WP-27.4), mirroring evidence_service.build().
     """
     from core import ask as _ask
 
@@ -62,7 +68,9 @@ def ask(
         top_k=top_k,
         min_score=min_score,
         synthesize=synthesize,
-        model=model or _ask.DEFAULT_SYNTHESIS_MODEL,
+        model=model,
+        synthesis_model=synthesis_model or _ask.DEFAULT_SYNTHESIS_MODEL,
+        remote_model=remote_model,
         domain_tags=domain_tags,
         requirement_types=requirement_types,
         document_ids=document_ids,

@@ -196,8 +196,8 @@ ACTIVE BACKLOG
     the shared call-site pattern shared by API and MCP (or make
     ReqBotConfig.load() itself refuse to store a null api_key_env).
 
-16. ask/search_requirements synthesis has the same wrong-model-field bug
-    evidence had (found during Phase 27, WP-27.2)
+16. [RESOLVED — Phase 27, WP-27.4] ask/search_requirements synthesis has the
+    same wrong-model-field bug evidence had (found during Phase 27, WP-27.2)
     While fixing item #13 for evidence, found the identical bug in the
     ask/search path: cli/reqbot.py's cmd_ask passes
     `model=args.model or _cfg.synthesis_model` into core.ask.run(), and

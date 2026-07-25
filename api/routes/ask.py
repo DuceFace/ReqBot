@@ -15,6 +15,8 @@ class AskRequest(BaseModel):
     top_k: int = Field(default=20, ge=1, le=100)
     min_score: float = Field(default=0.02, ge=0.0, le=1.0)
     synthesize: bool = False
+    # explicit override; empty lets post_ask() pick cfg.synthesis_model/remote_model
+    # based on synthesis_backend (Phase 27, WP-27.4)
     model: str = ""
     rewrite_model: str = ""
     domain_tags: list[str] = Field(default_factory=list)
@@ -55,7 +57,9 @@ def post_ask(req: AskRequest) -> dict:
             top_k=req.top_k,
             min_score=req.min_score,
             synthesize=req.synthesize,
-            model=req.model or cfg.synthesis_model,
+            model=req.model,
+            synthesis_model=cfg.synthesis_model,
+            remote_model=cfg.remote_model,
             rewrite_model=req.rewrite_model or cfg.rewrite_model,
             embedding_model=cfg.embedding_model,
             domain_tags=req.domain_tags or None,

@@ -332,6 +332,16 @@ DEPENDENCY / TOOLCHAIN BACKLOG
    exist is as the documented legacy/source-development path (README.md) —
    the decision is still open, just no longer tied to the bundle system.
 
+5. React Router v7 major upgrade (found during WP-28.2's npm audit, 2026-07-25)
+   `npm audit` flags 2 moderate CVEs in react-router 6.0.0–7.17.0 (open redirect
+   via backslash in <Link>/useNavigate, arbitrary constructor injection via
+   deserializeErrors() in SSR hydration — ReqBot's frontend is a client-only SPA,
+   so the SSR-hydration one doesn't apply here, but the open-redirect one is
+   still live in our router usage). Fix requires react-router-dom@7.18.1+, a
+   major bump — out of scope for WP-28.1 (patch-only, explicitly kept small) and
+   WP-28.2 (Vite-only). Needs its own scoped migration PR like Vite got, not a
+   one-line dependency bump, since v7 changes React Router's data APIs.
+
 
 ================================================================
 BACKBURNER

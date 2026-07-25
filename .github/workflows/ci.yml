@@ -45,6 +45,7 @@ jobs:
         with:
           name: gitleaks-report
           path: gitleaks-report.sarif
+          if-no-files-found: ignore
           retention-days: 14
 
   lint:

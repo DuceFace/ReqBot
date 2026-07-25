@@ -50,6 +50,40 @@ jobs:
               - mcp_server
               - frontend
 
-      - uses: github/codeql-action/analyze@v3
+      - id: analyze
+        uses: github/codeql-action/analyze@v3
         with:
           category: '/language:${{ matrix.language }}'
+          output: sarif-results
+
+      # codeql-action/analyze uploads results to the Security tab but does not fail the job just
+      # because it found something (Codex review, PR #127) -- it only fails on tool errors. Without
+      # this step the job stays green regardless of findings, so nothing here actually gates a PR.
+      # Fails on "error"-level results only (CodeQL's own severity classification for its default
+      # query suite), matching this phase's "report and gate on high-confidence issues" scope --
+      # not "fail on every note/recommendation-level result."
+      - name: Fail on high-confidence CodeQL findings
+        run: |
+          python3 - <<'PYEOF'
+          import json
+          import pathlib
+          import sys
+
+          sarif_dir = pathlib.Path("${{ steps.analyze.outputs.sarif-output }}")
+          error_rules = []
+          for sarif_file in sorted(sarif_dir.glob("*.sarif")):
+              data = json.loads(sarif_file.read_text())
+              for run in data.get("runs", []):
+                  for result in run.get("results", []):
+                      if result.get("level") == "error":
+                          error_rules.append(result.get("ruleId", "unknown-rule"))
+
+          if error_rules:
+              print(
+                  f"CodeQL found {len(error_rules)} error-level finding(s): {sorted(set(error_rules))}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+
+          print("No error-level CodeQL findings.")
+          PYEOF

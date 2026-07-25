@@ -161,28 +161,44 @@ def resolve_document_ids(
     thing that reflects what a query can actually match, so it's the only correct
     source of truth for this check.
 
-    A value is accepted only if `client.count()` confirms at least one point has
-    that exact source_pdf value (or `value + ".pdf"` when value doesn't already
-    end in .pdf) — never fabricated for an unrecognized value. Uses an exact count
-    (not the faster approximate mode) because this is a validation gate: a false
-    "not found" here would wrongly reject a real, searchable document.
+    A value is accepted only if `client.count()` confirms a point exists with
+    that *exact* source_pdf value — either the value as given, or (only if that
+    exact check fails) `value + ".pdf"` when value doesn't already end in .pdf.
+    Each candidate is checked and confirmed individually before being used as
+    the resolved value (Codex review, PR #119) — checking both forms in one
+    combined query and then blindly resolving to the .pdf-suffixed form
+    regardless of which one actually matched would silently rewrite the filter
+    to a value that doesn't exist in Qdrant whenever a document's real
+    source_pdf has no .pdf suffix, producing the exact silent-empty-result bug
+    this validation exists to eliminate. Never fabricated for an unrecognized
+    value. Uses an exact count (not the faster approximate mode) because this
+    is a validation gate: a false "not found" here would wrongly reject a
+    real, searchable document.
 
     Returns (resolved_source_pdfs, unknown_values).
     """
     resolved: list[str] = []
     unknown: list[str] = []
     for value in document_ids:
-        candidate = value if value.lower().endswith(".pdf") else f"{value}.pdf"
-        match_values = [value] if candidate == value else [value, candidate]
-        count = client.count(
-            collection_name=COLLECTION_NAME,
-            count_filter=models.Filter(
-                must=[models.FieldCondition(key="source_pdf", match=models.MatchAny(any=match_values))]
-            ),
-            exact=True,
-        ).count
-        if count > 0:
-            resolved.append(candidate)
+        candidates = [value]
+        if not value.lower().endswith(".pdf"):
+            candidates.append(f"{value}.pdf")
+
+        matched: str | None = None
+        for candidate in candidates:
+            count = client.count(
+                collection_name=COLLECTION_NAME,
+                count_filter=models.Filter(
+                    must=[models.FieldCondition(key="source_pdf", match=models.MatchValue(value=candidate))]
+                ),
+                exact=True,
+            ).count
+            if count > 0:
+                matched = candidate
+                break
+
+        if matched is not None:
+            resolved.append(matched)
         else:
             unknown.append(value)
     return resolved, unknown

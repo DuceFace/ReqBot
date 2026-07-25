@@ -16,15 +16,16 @@ from core import ask as core_ask
 
 
 def _mock_client(counts: dict[str, int]):
-    """Build a QdrantClient mock whose .count() looks up the requested source_pdf
-    match values in `counts` (checking each candidate in the MatchAny list)."""
+    """Build a QdrantClient mock whose .count() looks up the single exact
+    source_pdf value each call checks (resolve_document_ids checks candidates
+    one at a time, not as a combined MatchAny, so it can tell which candidate
+    actually matched -- Codex review, PR #119)."""
     client = MagicMock()
 
     def _count(collection_name, count_filter, exact):
-        match_values = count_filter.must[0].match.any
-        total = sum(counts.get(v, 0) for v in match_values)
+        match_value = count_filter.must[0].match.value
         result = MagicMock()
-        result.count = total
+        result.count = counts.get(match_value, 0)
         return result
 
     client.count.side_effect = _count
@@ -35,7 +36,9 @@ def _mock_client(counts: dict[str, int]):
 # core.ask.resolve_document_ids
 # ---------------------------------------------------------------------------
 
-def test_resolve_document_ids_accepts_known_doc_key_form():
+def test_resolve_document_ids_accepts_doc_key_when_source_pdf_has_pdf_suffix():
+    """Real source_pdf is 'afi17-101.pdf' -- bare value alone doesn't match, but
+    value + '.pdf' does, and only the confirmed-matching form is resolved to."""
     client = _mock_client({"afi17-101.pdf": 5})
     resolved, unknown = core_ask.resolve_document_ids(client, ["afi17-101"])
     assert resolved == ["afi17-101.pdf"]
@@ -46,6 +49,18 @@ def test_resolve_document_ids_accepts_full_source_pdf_form():
     client = _mock_client({"afi17-101.pdf": 5})
     resolved, unknown = core_ask.resolve_document_ids(client, ["afi17-101.pdf"])
     assert resolved == ["afi17-101.pdf"]
+    assert unknown == []
+
+
+def test_resolve_document_ids_does_not_append_pdf_suffix_when_exact_value_already_matches():
+    """Codex review, PR #119: if Qdrant's real source_pdf has no .pdf suffix
+    (e.g. stored as 'afi17-101'), resolving to 'afi17-101.pdf' anyway would
+    make retrieve() filter on a value that doesn't exist -- silently empty
+    results, the exact bug this validation exists to prevent. The bare value
+    must be checked -- and used -- before ever trying the .pdf-suffixed form."""
+    client = _mock_client({"afi17-101": 5})  # no ".pdf" entry
+    resolved, unknown = core_ask.resolve_document_ids(client, ["afi17-101"])
+    assert resolved == ["afi17-101"]
     assert unknown == []
 
 
@@ -65,6 +80,14 @@ def test_resolve_document_ids_does_not_fabricate_for_unknown_values():
     assert unknown == ["totally-bogus"]
 
 
+def test_resolve_document_ids_stops_after_first_matching_candidate():
+    """When the bare value matches, the .pdf-suffixed form must never be
+    queried -- confirms early-break, not a blind check-both-then-guess."""
+    client = _mock_client({"afi17-101": 5})
+    core_ask.resolve_document_ids(client, ["afi17-101"])
+    assert client.count.call_count == 1
+
+
 def test_resolve_document_ids_uses_exact_count():
     """A false 'not found' would wrongly reject a real document -- must use
     exact=True, not the faster approximate mode."""
@@ -72,6 +95,16 @@ def test_resolve_document_ids_uses_exact_count():
     core_ask.resolve_document_ids(client, ["afi17-101"])
     _, kwargs = client.count.call_args
     assert kwargs["exact"] is True
+
+
+def test_resolve_document_ids_prefers_exact_value_over_pdf_suffixed_candidate():
+    """If both 'afi17-101' and 'afi17-101.pdf' happen to exist as distinct
+    source_pdf values, the exact caller-supplied value takes precedence over
+    the guessed .pdf-suffixed form."""
+    client = _mock_client({"afi17-101": 3, "afi17-101.pdf": 7})
+    resolved, unknown = core_ask.resolve_document_ids(client, ["afi17-101"])
+    assert resolved == ["afi17-101"]
+    assert unknown == []
 
 
 def test_resolve_document_ids_mixed_valid_and_invalid():

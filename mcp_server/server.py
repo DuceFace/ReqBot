@@ -199,6 +199,7 @@ def map_evidence(
         synthesize=synthesize,
         synthesis_backend=syn_backend,
         synthesis_model=cfg.synthesis_model,
+        remote_model=cfg.remote_model,
         provider=syn_provider,
         api_key=syn_api_key,
         embedding_model=cfg.embedding_model,

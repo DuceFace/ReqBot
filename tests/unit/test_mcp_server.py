@@ -478,6 +478,7 @@ def test_map_evidence_calls_evidence_service_with_expected_params():
     assert kwargs["requirement_types"] == ["shall"]
     assert kwargs["synthesize"] is True
     assert kwargs["synthesis_model"] == cfg.synthesis_model
+    assert kwargs["remote_model"] == cfg.remote_model
     assert kwargs["embedding_model"] == cfg.embedding_model
 
 

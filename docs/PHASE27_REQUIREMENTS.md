@@ -16,7 +16,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-27.1 — Validate `document_ids` in `core/ask.py` | Complete |
-| WP-27.2 — Evidence Remote-Synthesis Backend Hardening | Not started |
+| WP-27.2 — Evidence Remote-Synthesis Backend Hardening | Complete |
 | WP-27.3 — Evidence `document_ids` Filter | Not started |
 
 ---

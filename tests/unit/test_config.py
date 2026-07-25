@@ -103,3 +103,30 @@ def test_embedding_model_config_file_and_env_var(monkeypatch, tmp_path):
     monkeypatch.setenv("REQBOT_EMBEDDING_MODEL", "from-env-model")
     c = cfg.load()
     assert c.embedding_model == "from-env-model"
+
+
+def test_api_key_env_defaults_to_anthropic_api_key():
+    c = cfg.load()
+    assert c.api_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_api_key_env_explicit_null_in_config_file_normalizes_to_default(monkeypatch, tmp_path):
+    """Phase 27, WP-27.2: api_key_env has no REQBOT_* env mapping, so a
+    hand-edited config.json is the only way it gets set. `values.get(key,
+    default)` only applies the default when the key is ABSENT -- an explicit
+    `null` in the file previously survived as None, and downstream
+    os.environ.get(None, "") calls (evidence route/CLI/MCP) would raise
+    TypeError instead of falling back to the local synthesis backend."""
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"api_key_env": None}))
+    monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
+    c = cfg.load()
+    assert c.api_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_api_key_env_config_file_value_respected(monkeypatch, tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"api_key_env": "OPENAI_API_KEY"}))
+    monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
+    c = cfg.load()
+    assert c.api_key_env == "OPENAI_API_KEY"

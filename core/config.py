@@ -183,7 +183,12 @@ def load() -> ReqBotConfig:
         synthesis_backend=values.get("synthesis_backend", "local"),
         remote_provider=values.get("remote_provider", "anthropic"),
         remote_model=values.get("remote_model", "claude-sonnet-4-6"),
-        api_key_env=values.get("api_key_env", "ANTHROPIC_API_KEY"),
+        # `or` (not .get(key, default)) -- an explicit `null` in config.json must not
+        # survive as None. api_key_env has no REQBOT_* env mapping, so a hand-edited
+        # config file is the only way this key gets set; downstream os.environ.get()
+        # calls in api/routes/evidence.py, mcp_server/server.py, and cli/reqbot.py
+        # would raise TypeError on a None api_key_env otherwise (Phase 27, WP-27.2).
+        api_key_env=values.get("api_key_env") or "ANTHROPIC_API_KEY",
     )
 
     # Load authority registry (optional — graceful if missing)

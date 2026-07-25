@@ -140,7 +140,7 @@ ACTIVE BACKLOG
     entry, matching the existing warnings field precedent in ask_service.ask()'s
     response) -- design questions deferred to that WP, not implicit here.
 
-13. Evidence synthesis uses the wrong model field for the remote backend (Codex
+13. [RESOLVED — Phase 27, WP-27.2] Evidence synthesis uses the wrong model field for the remote backend (Codex
     review, WP-26.4/PR #115)
     api/routes/evidence.py's post_evidence() (and mcp_server/server.py's
     map_evidence, which mirrors it) always pass cfg.synthesis_model into
@@ -174,7 +174,7 @@ ACTIVE BACKLOG
     following the same shape once the API does (thin-wrapper rule -- MCP
     should not get a filter the API itself doesn't expose first).
 
-15. api_key_env=None would crash the remote-synthesis-backend fallback check
+15. [RESOLVED — Phase 27, WP-27.2] api_key_env=None would crash the remote-synthesis-backend fallback check
     (Gemini review, WP-26.4/PR #115)
     api/routes/evidence.py and mcp_server/server.py's map_evidence both call
     os.environ.get(cfg.api_key_env, "") unconditionally when
@@ -189,6 +189,34 @@ ACTIVE BACKLOG
     Needs a planned WP: guard with `if cfg.api_key_env else ""`, ideally at
     the shared call-site pattern shared by API and MCP (or make
     ReqBotConfig.load() itself refuse to store a null api_key_env).
+
+16. ask/search_requirements synthesis has the same wrong-model-field bug
+    evidence had (found during Phase 27, WP-27.2)
+    While fixing item #13 for evidence, found the identical bug in the
+    ask/search path: cli/reqbot.py's cmd_ask passes
+    `model=args.model or _cfg.synthesis_model` into core.ask.run(), and
+    api/routes/ask.py's post_ask() passes `model=req.model or
+    cfg.synthesis_model` into ask_service.ask() -- both always resolve to the
+    local Ollama model, never cfg.remote_model, regardless of
+    cfg.synthesis_backend. Same failure mode as item #13: a remote-configured
+    `reqbot ask --synthesize` (or `/api/ask` with synthesize=true) silently
+    sends a local model name to the remote provider, the call fails, and the
+    caller just gets no synthesis text with no visible error.
+
+    Not touched by WP-27.2 -- that WP was scoped to evidence's three call
+    sites (API, MCP's map_evidence, CLI's cmd_evidence) per the locked Phase
+    27 design; this is a different subsystem (ask/search_requirements, not
+    evidence) and a new finding, not one of the four backlog items Phase 27
+    was scoped to close. search_requirements (MCP) itself never exposes
+    synthesize=True per Phase 26's architecture rule, so this only affects
+    the CLI's `reqbot ask --synthesize` and the API's `/api/ask` with
+    synthesize=true -- not MCP.
+
+    Needs its own planned WP: mirror WP-27.2's fix -- select
+    cfg.remote_model vs cfg.synthesis_model based on synthesis_backend,
+    ideally centralized (core/ask.py's retrieve()/synthesize_answer() doing
+    this internally, mirroring how evidence_service.build() now does,
+    rather than each caller picking a model string itself).
 
 
 ================================================================

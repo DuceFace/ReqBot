@@ -130,3 +130,26 @@ def test_api_key_env_config_file_value_respected(monkeypatch, tmp_path):
     monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
     c = cfg.load()
     assert c.api_key_env == "OPENAI_API_KEY"
+
+
+def test_remote_model_defaults_to_claude_sonnet():
+    c = cfg.load()
+    assert c.remote_model == "claude-sonnet-4-6"
+
+
+def test_remote_model_explicit_null_in_config_file_normalizes_to_default(monkeypatch, tmp_path):
+    """Consistency fix alongside api_key_env's (Gemini review, PR #120) --
+    remote_model had the exact same values.get(key, default) gap."""
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"remote_model": None}))
+    monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
+    c = cfg.load()
+    assert c.remote_model == "claude-sonnet-4-6"
+
+
+def test_remote_model_config_file_value_respected(monkeypatch, tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"remote_model": "gpt-4o"}))
+    monkeypatch.setattr(cfg, "CONFIG_PATH", config_file)
+    c = cfg.load()
+    assert c.remote_model == "gpt-4o"

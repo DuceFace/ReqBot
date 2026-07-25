@@ -81,3 +81,12 @@ def test_local_backend_uses_synthesis_model():
 def test_synthesize_false_never_calls_synthesize():
     _, mock_synthesize = _run_build(synthesize=False)
     mock_synthesize.assert_not_called()
+
+
+def test_remote_backend_with_empty_remote_model_falls_back_to_synthesis_model():
+    """Gemini review, PR #120: remote_model="" (or omitted) must not reach
+    synthesize() as an empty model string -- fall back to synthesis_model
+    rather than sending a doomed empty request."""
+    _, mock_synthesize = _run_build(synthesis_backend="remote", remote_model="")
+    _, kwargs = mock_synthesize.call_args
+    assert kwargs["model"] == "local-model"

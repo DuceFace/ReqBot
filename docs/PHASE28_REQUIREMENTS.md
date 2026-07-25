@@ -15,7 +15,7 @@ not in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-28.1 — React Router Patch Bump | Not started |
+| WP-28.1 — React Router Patch Bump | Complete |
 | WP-28.2 — Vite Major Upgrade (5.x → 8.x) | Not started |
 | WP-28.3 — CI Security Scanning | Not started |
 

@@ -3,7 +3,9 @@
 Covers: GET /config pass-through, POST /config's loopback-only guard, the
 API-editable field restriction (processed_dir/authority_registry/authority
 must not be settable via this endpoint even though config_service.update_config()
-itself would accept them), and partial-body behavior.
+itself would accept them), partial-body behavior, and explicit-null handling
+(only extraction_model/enrichment_model/rewrite_model may be cleared to null;
+every other field rejects an explicit null rather than writing or dropping it).
 """
 import sys
 from pathlib import Path
@@ -86,3 +88,37 @@ def test_post_config_maps_value_error_to_400():
         resp = _LOOPBACK_CLIENT.post("/api/config", json={"top_k": 30})
     assert resp.status_code == 400
     assert "bad field" in resp.json()["detail"]
+
+
+def test_post_config_allows_clearing_nullable_role_model_field():
+    """extraction_model/enrichment_model/rewrite_model are the R-2.1 fallback
+    fields — None is a legitimate stored value meaning "inherit from
+    default_model", so explicit null must reach update_config() as None,
+    not get dropped as if the field were merely omitted (Gemini review,
+    PR #132)."""
+    with patch(_UPDATE_CONFIG_PATH, return_value=MOCK_CONFIG) as mock_update:
+        resp = _LOOPBACK_CLIENT.post("/api/config", json={"extraction_model": None})
+    assert resp.status_code == 200
+    mock_update.assert_called_once_with({"extraction_model": None})
+
+
+def test_post_config_rejects_null_for_non_nullable_field():
+    """ollama_url has no null-safe handling in core.config.load() (it's
+    indexed straight out of the parsed dict), so an explicit null must be
+    rejected rather than written or silently dropped."""
+    with patch(_UPDATE_CONFIG_PATH) as mock_update:
+        resp = _LOOPBACK_CLIENT.post("/api/config", json={"ollama_url": None})
+    assert resp.status_code == 422
+    assert "ollama_url" in resp.json()["detail"]
+    mock_update.assert_not_called()
+
+
+def test_post_config_omitted_field_still_excluded_alongside_explicit_null():
+    """A field left out of the body entirely must stay excluded even when
+    another field in the same request is an explicit, allowed null."""
+    with patch(_UPDATE_CONFIG_PATH, return_value=MOCK_CONFIG) as mock_update:
+        resp = _LOOPBACK_CLIENT.post(
+            "/api/config", json={"extraction_model": None, "top_k": 30}
+        )
+    assert resp.status_code == 200
+    mock_update.assert_called_once_with({"extraction_model": None, "top_k": 30})

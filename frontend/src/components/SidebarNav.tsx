@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/checklists', label: 'Checklists' },
   { to: '/corpus', label: 'Corpus' },
   { to: '/system', label: 'System' },
+  { to: '/settings', label: 'Settings' },
 ]
 
 export default function SidebarNav() {

@@ -224,7 +224,7 @@ ACTIVE BACKLOG
     this internally, mirroring how evidence_service.build() now does,
     rather than each caller picking a model string itself).
 
-17. Settings/configuration screen in the GUI
+17. [RESOLVED — Phase 29, WP-29.3+29.4] Settings/configuration screen in the GUI
     All of ReqBot's config (ollama_url, qdrant_url, synthesis_backend,
     remote_model, api_key_env, synthesis_model, embedding_model, top_k,
     min_score, etc.) lives in ~/.config/reqbot/config.json and can only be

@@ -6,7 +6,9 @@
  *   api/routes/trace.py (TraceResponse)
  *   api/routes/docs.py  (DocsResponse)
  *   api/routes/status.py (StatusResponse)
+ *   api/routes/config.py (ConfigUpdateRequest)
  *   services/ask_service.py (canonical response shape)
+ *   services/config_service.py (ConfigResponse shape)
  */
 
 // ─── Requirement ─────────────────────────────────────────────────────────────
@@ -312,4 +314,79 @@ export interface StatusResponse {
     rewrite: string
     synthesis: string
   }
+}
+
+// ─── Config (settings screen, WP-29.3/29.4) ─────────────────────────────────
+
+/**
+ * Effective config values as returned by GET /api/config — mirrors
+ * core.config.ReqBotConfig via dataclasses.asdict(), so it includes fields
+ * (processed_dir, authority_registry, authority) that the settings screen
+ * does not render or edit; only ConfigEditableFields below is POST-able.
+ * extraction_model/enrichment_model/rewrite_model are never null here even
+ * when unset in config.json — core.config.load() already resolves the R-2.1
+ * default_model fallback before this is returned.
+ */
+export interface EffectiveConfig {
+  ollama_url: string
+  qdrant_url: string
+  default_model: string
+  extraction_model: string
+  enrichment_model: string
+  rewrite_model: string
+  synthesis_model: string
+  embedding_model: string
+  top_k: number
+  min_score: number
+  processed_dir: string
+  authority_registry: string | null
+  synthesis_backend: string
+  remote_provider: string
+  remote_model: string
+  api_key_env: string
+  authority: Record<string, unknown>
+}
+
+/**
+ * env_overridden lists field names (matching EffectiveConfig's keys) that are
+ * currently sourced from a REQBOT_* env var rather than config.json/defaults
+ * — that var wins over anything saved here until it's unset. The env var
+ * name itself follows core.config._ENV_MAP's fixed convention
+ * (`REQBOT_${FIELD_NAME.toUpperCase()}`) and isn't sent separately; if that
+ * naming convention ever changes, the display logic building the name from
+ * the field key must change with it.
+ */
+export interface ConfigResponse {
+  config: EffectiveConfig
+  env_overridden: string[]
+}
+
+/**
+ * Body for POST /api/config. Mirrors api/routes/config.py's
+ * ConfigUpdateRequest — the API-editable field subset only (processed_dir,
+ * authority_registry, authority are deliberately absent). Only include a key
+ * when its value actually changed — this is a partial merge, not a full
+ * replace, and resending an unchanged extraction_model/enrichment_model/
+ * rewrite_model value would wrongly freeze it as an explicit override
+ * instead of leaving it inheriting from default_model.
+ *
+ * extraction_model/enrichment_model/rewrite_model may be sent as `null` to
+ * explicitly clear back to that inherited state; every other field rejects
+ * an explicit null with a 422 (WP-29.3).
+ */
+export interface ConfigUpdateRequest {
+  ollama_url?: string
+  qdrant_url?: string
+  default_model?: string
+  extraction_model?: string | null
+  enrichment_model?: string | null
+  rewrite_model?: string | null
+  synthesis_model?: string
+  embedding_model?: string
+  top_k?: number
+  min_score?: number
+  synthesis_backend?: 'local' | 'remote' | 'none'
+  remote_provider?: 'anthropic' | 'openai'
+  remote_model?: string
+  api_key_env?: string
 }

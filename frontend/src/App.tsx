@@ -6,6 +6,7 @@ import EvidenceView from './views/EvidenceView'
 import CorpusView from './views/CorpusView'
 import CorpusDetailView from './views/CorpusDetailView'
 import SystemView from './views/SystemView'
+import SettingsView from './views/SettingsView'
 import ChecklistsView from './views/ChecklistsView'
 import ChecklistPreviewView from './views/ChecklistPreviewView'
 import NotFoundView from './views/NotFoundView'
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/corpus" element={<CorpusView />} />
         <Route path="/corpus/:docId" element={<CorpusDetailView />} />
         <Route path="/system" element={<SystemView />} />
+        <Route path="/settings" element={<SettingsView />} />
         <Route path="/checklists" element={<ChecklistsView />} />
         <Route path="/checklists/:docId" element={<ChecklistPreviewView />} />
         {/* Redirect legacy /docs bookmarks to /corpus */}

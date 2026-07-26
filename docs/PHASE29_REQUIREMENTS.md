@@ -185,52 +185,73 @@ prevent.
   - `update_config(partial: dict)` — **partial merge**, not full replace: reads the current
     config.json (or defaults if absent), overlays only the provided keys, validates, writes back
     with the same `chmod(0o600)` restrictive permissions `cmd_init()` already uses. Partial merge
-    (not full-document PUT) so the frontend never needs to know about every possible field to save
-    a change to one of them, and can't accidentally clobber a field it doesn't render.
-  - **Editable field set** (matches the settings screen's scope — see Non-Goals above for what's
-    excluded): `ollama_url`, `qdrant_url`, `default_model`, `extraction_model`, `enrichment_model`,
+    (not full-document PUT) so callers never need to know about every possible field to save a
+    change to one of them, and can't accidentally clobber a field they don't set.
+  - **Important:** `update_config()` itself accepts **any** valid `ReqBotConfig` field, including
+    `processed_dir` and `authority_registry` — it is the same general-purpose write path
+    `cmd_init()` needs (which must persist `processed_dir` on every init) and the settings API both
+    use. The **editable-field restriction is enforced one layer up, in `api/routes/config.py`'s
+    Pydantic request model**, not inside the service. (Codex/Gemini review, PR #129: the first
+    draft of this WP had the service itself refuse `processed_dir`, which would have broken
+    `cmd_init()`'s own write the moment it was refactored to call this function — the constraint
+    belongs on the API's input schema, not the shared service capability.)
+  - **API-editable field set** (enforced by `api/routes/config.py`'s request model, not by the
+    service): `ollama_url`, `qdrant_url`, `default_model`, `extraction_model`, `enrichment_model`,
     `rewrite_model`, `synthesis_model`, `embedding_model`, `top_k`, `min_score`,
-    `synthesis_backend`, `remote_provider`, `remote_model`, `api_key_env`. Explicitly excludes
-    `processed_dir`, `authority_registry`, and `authority` — never read or written by this service.
-- Refactor `cmd_init()` to call `config_service.update_config()` for the write, instead of
-  constructing/writing the file inline a second time — one write path, matching this project's
-  established "CLI/API/MCP share one service layer" rule.
+    `synthesis_backend`, `remote_provider`, `remote_model`, `api_key_env`. `processed_dir`,
+    `authority_registry`, and `authority` are simply absent from that Pydantic model, so the API
+    can't set them even though the underlying service function could if called directly (as
+    `cmd_init()` does).
+- Refactor `cmd_init()` to call `config_service.update_config()` (passing its full payload,
+  `processed_dir` included) for the write, instead of constructing/writing the file inline a
+  second time — one write path, matching this project's established "CLI/API/MCP share one
+  service layer" rule.
 - Add `api/routes/config.py`:
   - `GET /config` → `config_service.get_config()`'s result (effective values + override field
     names).
-  - `POST /config` → `config_service.update_config()` with the request body as the partial dict.
-    (POST, not PUT — matches this codebase's existing convention; no route anywhere today uses
-    PUT.)
-  - Validation via a Pydantic model covering the editable field set, with the same bounds already
-    implied elsewhere (`top_k`/`min_score` numeric ranges matching `EvidenceRequest`/`AskRequest`
-    conventions; `synthesis_backend`/`remote_provider` as constrained string choices — confirm the
-    actual valid `remote_provider` values, e.g. `anthropic`/`openai`, against
-    `core/synthesis.py` during implementation rather than assuming).
+  - `POST /config` → validates the request body against the API-editable-field Pydantic model
+    (above), then calls `config_service.update_config()` with the validated partial dict. (POST,
+    not PUT — matches this codebase's existing convention; no route anywhere today uses PUT.)
+  - Field bounds matching what's already implied elsewhere (`top_k`/`min_score` numeric ranges
+    matching `EvidenceRequest`/`AskRequest` conventions; `synthesis_backend`/`remote_provider` as
+    constrained string choices — confirm the actual valid `remote_provider` values, e.g.
+    `anthropic`/`openai`, against `core/synthesis.py` during implementation rather than assuming).
+  - **Loopback-only guard, specific to `POST`:** reject (403) any request whose `request.client.host`
+    isn't `127.0.0.1`/`::1`, regardless of what interface `reqbot serve` is actually bound to. See
+    Guardrail #7 for why this exists and what it isn't a substitute for.
 - No caching to work around: every route already calls `core.config.load()` fresh per-request, so
-  a `POST /config` write takes effect on the very next request — no server restart needed. Worth
-  confirming this holds for the new route too (it inherits the same pattern) and surfacing it in
-  the frontend WP's UX copy.
+  a `POST /config` write takes effect on the very next request for most fields — no server restart
+  needed. **Exception: `embedding_model`** — see WP-29.4, this one needs different UX messaging,
+  not the generic "takes effect immediately" framing.
 
 **Non-goals:**
 - No full-document replace semantics — see partial-merge design above.
 - No change to `core.config.load()`'s precedence order (hardcoded → config.json → env) — the
   settings screen writes to config.json, same tier it already occupies; it does not add a new
   precedence tier or change how env vars interact with it.
+- No general authentication/authorization system — that's backlog item "Authentication /
+  multi-user hosting" (`docs/TODO_future_improvements.txt`, ROADMAP section), a materially bigger
+  initiative than this phase takes on. The loopback guard above is a stopgap scoped to this one
+  new mutating endpoint, not a first installment of that broader item.
 
 **Tests / verification:**
 - `GET /config` returns current effective values and correctly flags which fields are
   env-overridden (test with at least one `REQBOT_*` var set).
 - `POST /config` with a partial body only changes the provided keys; re-`GET` confirms untouched
   fields (including `authority`/`authority_registry`/`processed_dir`, which aren't part of the
-  editable set at all) are unaffected.
-- `reqbot init` still produces an identical `config.json` after the `cmd_init()` refactor (no
-  behavior change from the caller's perspective, just a shared implementation).
+  *API's* editable set) are unaffected.
+- `POST /config` rejects a request whose `request.client.host` isn't loopback, even when
+  `reqbot serve` itself is bound to a non-loopback interface.
+- `reqbot init` still produces an identical `config.json` after the `cmd_init()` refactor,
+  `processed_dir` included — confirms the service-vs-route split above actually preserves this
+  behavior rather than breaking it.
 - Confirm a `POST /config` change is visible on the very next `GET /config` or any other route,
-  with no server restart — matches the "config reloads per-request" behavior already true of every
-  existing route.
+  with no server restart, for every field except `embedding_model` (see WP-29.4 for that one's
+  actual, different behavior).
 
 **Gate:** `GET`/`POST /config` exist, are backed by a shared `services/config_service.py` that
-`cmd_init()` also uses, and correctly report which fields are currently env-overridden.
+`cmd_init()` also uses (with `processed_dir` support intact), `POST /config` rejects non-loopback
+requests, and the route correctly reports which fields are currently env-overridden.
 
 ---
 
@@ -263,7 +284,16 @@ doesn't realize the other exists.
   that won't do anything until the env var goes away. Still allow saving (pre-staging a value for
   later), just don't let the UI imply it took effect when it didn't.
 - Confirmation/success messaging that reflects the real behavior confirmed in WP-29.3: changes
-  take effect immediately (next request), not "restart required."
+  take effect immediately (next request), not "restart required" — **except `embedding_model`**,
+  which needs its own distinct warning instead of the generic success message (Codex review, PR
+  #129): per `ARCHITECTURE.md`'s own documented behavior, `embedding_model` is "the highest-risk
+  config edit in the system" — it takes effect for new indexing only, not retroactively; existing
+  Qdrant points stay on the old model until a full `reqbot reindex`, and query time surfaces a
+  non-blocking `warnings` entry on model/dimension mismatch (or fails loudly if the vector
+  dimension itself differs). The settings screen must say this explicitly when this field
+  changes — something like "Saved. This does not retroactively re-embed your existing corpus —
+  run `reqbot reindex` afterward, or search results may show mismatch warnings until you do" — not
+  the same "took effect immediately" copy used for every other field.
 - `api_key_env` is rendered/edited as a plain text field for the *env var name* only — no field
   anywhere in this screen for an actual API key value, and no code path that could accept or
   display one.
@@ -272,16 +302,24 @@ doesn't realize the other exists.
 - No consolidation with `/system` — they stay separate screens with different jobs, per Problem
   above.
 - No secret/API-key-value handling anywhere in this WP (see Phase-level Non-Goals).
+- No automatic `reqbot reindex` trigger from the settings screen when `embedding_model` changes —
+  reindexing is a substantial, potentially long-running operation (see
+  [[project_reqbot_watchouts]]-style corpus-drift concerns); this WP only warns, it doesn't attempt
+  to safely automate that operation from a web form.
 
 **Tests / verification:**
-- Manual: change a field, save, confirm `GET /config` (and a subsequent unrelated request, e.g.
-  `reqbot status`) reflects it without restarting the server.
+- Manual: change a field other than `embedding_model`, save, confirm `GET /config` (and a
+  subsequent unrelated request, e.g. `reqbot status`) reflects it without restarting the server.
+- Manual: change `embedding_model` specifically, confirm the distinct reindex-warning message
+  appears instead of the generic "took effect" success message.
 - Manual: with a `REQBOT_*` env var set for a given field, confirm the UI surfaces the override
   note and does not claim the edit took effect.
 - Confirm `api_key_env` never round-trips an actual secret value in any request/response body.
 
-**Gate:** A working `/settings` screen lets a user view and edit every field in WP-29.3's editable
-set from the GUI, correctly reflects env-var overrides, and never touches an actual API key value.
+**Gate:** A working `/settings` screen lets a user view and edit every field in WP-29.3's
+API-editable set from the GUI, correctly reflects env-var overrides, never touches an actual API
+key value, and gives `embedding_model` changes their own accurate (not falsely reassuring) warning
+rather than the generic "took effect immediately" message.
 
 ---
 
@@ -307,11 +345,28 @@ Phase 29 is complete when:
 3. The settings screen must never handle an actual API key value — only `api_key_env` (the name).
    Any implementation detour toward accepting/displaying/round-tripping a real secret is a stop-
    and-ask moment, not a judgment call to make solo.
-4. `config_service.update_config()` must be a partial merge, never a full-document replace — a
-   settings-screen save must not be able to silently wipe `authority`/`authority_registry`/
-   `processed_dir` or any other field the frontend doesn't render.
-5. `cmd_init()`'s write path and the new API's write path must be the same function
+4. `config_service.update_config()` must be a partial merge, never a full-document replace — any
+   field not included in a given call is preserved as-is, not reset to a default. This is what
+   keeps a settings-screen save (which only ever sends the API-editable subset) from wiping
+   `authority`/`authority_registry`/`processed_dir`, even though the service function itself is
+   capable of writing those fields when a trusted caller like `cmd_init()` explicitly includes
+   them.
+5. The restriction to the API-editable field set belongs in `api/routes/config.py`'s Pydantic
+   request model, never inside `config_service.update_config()` itself (Codex/Gemini review, PR
+   #129 — the first draft got this backwards and would have broken `cmd_init()`'s own
+   `processed_dir` write the moment it was refactored to share this function).
+6. `cmd_init()`'s write path and the new API's write path must be the same function
    (`config_service.update_config()`), not two implementations that can drift — this is the whole
    point of WP-29.3 existing before WP-29.4.
-6. Verify `remote_provider`'s actual valid values against `core/synthesis.py` during
+7. `POST /config` must reject any request not originating from loopback (Codex review, PR #129 —
+   ReqBot ships with no API authentication at all today, and CORS origin allowlisting is a
+   browser-enforced convention that does nothing against a direct HTTP client). This is a stopgap
+   scoped to this one new mutating, system-config-changing endpoint — it is not, and should not be
+   described as, a first installment of the separate "Authentication / multi-user hosting" backlog
+   item.
+8. `embedding_model` changes must get their own accurate warning in the settings UI, not the
+   generic "took effect immediately" message every other field gets (Codex review, PR #129 —
+   `ARCHITECTURE.md` documents this as the highest-risk config edit in the system; it doesn't
+   retroactively re-embed the existing corpus without a manual `reqbot reindex`).
+9. Verify `remote_provider`'s actual valid values against `core/synthesis.py` during
    implementation — don't assume `anthropic`/`openai` are the only two without checking.

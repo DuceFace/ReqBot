@@ -29,14 +29,28 @@ interface FormState {
   api_key_env: string
 }
 
+/**
+ * GET /config always returns extraction_model/enrichment_model/rewrite_model
+ * already resolved to default_model when unset (R-2.1) — there's no signal
+ * in the response distinguishing "genuinely inherited" from "explicitly set
+ * to the same string as default_model". Treating a match as inherited (blank
+ * form field, so the placeholder/hint actually renders) is a display
+ * convention only: it never affects what buildDiff() sends, since baseline
+ * goes through this exact same function, so an untouched field's "" === ""
+ * comparison still correctly sends nothing (Gemini review, PR #133).
+ */
+function roleModelFormValue(value: string, defaultModel: string): string {
+  return value === defaultModel ? '' : value
+}
+
 function toForm(cfg: ConfigResponse['config']): FormState {
   return {
     ollama_url: cfg.ollama_url,
     qdrant_url: cfg.qdrant_url,
     default_model: cfg.default_model,
-    extraction_model: cfg.extraction_model,
-    enrichment_model: cfg.enrichment_model,
-    rewrite_model: cfg.rewrite_model,
+    extraction_model: roleModelFormValue(cfg.extraction_model, cfg.default_model),
+    enrichment_model: roleModelFormValue(cfg.enrichment_model, cfg.default_model),
+    rewrite_model: roleModelFormValue(cfg.rewrite_model, cfg.default_model),
     synthesis_model: cfg.synthesis_model,
     embedding_model: cfg.embedding_model,
     top_k: String(cfg.top_k),
@@ -100,11 +114,17 @@ function buildDiff(form: FormState, baseline: FormState): DiffResult {
     partial.top_k = topK
   }
 
-  const minScore = Number(form.min_score)
-  if (!Number.isFinite(minScore) || minScore < 0 || minScore > 1) {
-    errors.push('Minimum relevance score must be a number between 0 and 1.')
-  } else if (form.min_score !== baseline.min_score) {
-    partial.min_score = minScore
+  // Number('') is 0, a value that's otherwise in-bounds — an emptied input
+  // must not silently coerce to a real min_score of 0 (Gemini review, PR #133).
+  if (form.min_score.trim() === '') {
+    errors.push('Minimum relevance score cannot be empty.')
+  } else {
+    const minScore = Number(form.min_score)
+    if (!Number.isFinite(minScore) || minScore < 0 || minScore > 1) {
+      errors.push('Minimum relevance score must be a number between 0 and 1.')
+    } else if (form.min_score !== baseline.min_score) {
+      partial.min_score = minScore
+    }
   }
 
   if (form.synthesis_backend !== baseline.synthesis_backend) {

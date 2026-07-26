@@ -136,6 +136,26 @@ export async function getConfig(): Promise<ConfigResponse> {
   return res.json() as Promise<ConfigResponse>
 }
 
+/**
+ * A FastAPI/Pydantic-generated 422 (as opposed to one of this route's own
+ * hand-raised HTTPExceptions) returns `detail` as an array of error objects,
+ * not a string — stringifying that array directly produces "[object
+ * Object]" in the UI (Gemini review, PR #133).
+ */
+function extractErrorDetail(body: unknown): string {
+  const detail = (body as { detail?: unknown } | null)?.detail
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    return detail
+      .map(e => (e && typeof e === 'object' && typeof (e as { msg?: unknown }).msg === 'string')
+        ? (e as { msg: string }).msg
+        : JSON.stringify(e))
+      .join('; ')
+  }
+  if (detail) return JSON.stringify(detail)
+  return ''
+}
+
 export async function updateConfig(req: ConfigUpdateRequest): Promise<ConfigResponse> {
   const res = await fetch(`${BASE}/config`, {
     method: 'POST',
@@ -143,7 +163,8 @@ export async function updateConfig(req: ConfigUpdateRequest): Promise<ConfigResp
     body: JSON.stringify(req),
   })
   if (!res.ok) {
-    const detail = await res.json().then((b: { detail?: string }) => b.detail ?? '').catch(() => '')
+    const body = await res.json().catch(() => null)
+    const detail = extractErrorDetail(body)
     throw new Error(detail || `updateConfig failed: ${res.status} ${res.statusText}`)
   }
   return res.json() as Promise<ConfigResponse>

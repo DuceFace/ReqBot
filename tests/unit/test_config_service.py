@@ -75,3 +75,17 @@ def test_update_config_persists_across_calls_on_disk():
     config_service.update_config({"top_k": 5})
     on_disk = json.loads(_config.CONFIG_PATH.read_text(encoding="utf-8"))
     assert on_disk["top_k"] == 5
+
+
+@pytest.mark.parametrize("bad_content", ["[]", '"just a string"', "42", "null"])
+def test_update_config_recovers_from_non_dict_json(bad_content):
+    """A config.json holding valid-but-non-object JSON (list/string/number)
+    must fall back to defaults, not raise AttributeError from dict.update()
+    on a list/str/int (Gemini review, PR #132)."""
+    _config.CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _config.CONFIG_PATH.write_text(bad_content, encoding="utf-8")
+
+    result = config_service.update_config({"ollama_url": "http://example:11434"})
+
+    assert result["config"]["ollama_url"] == "http://example:11434"
+    assert result["config"]["qdrant_url"] == _config._DEFAULTS["qdrant_url"]

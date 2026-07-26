@@ -59,12 +59,17 @@ def update_config(partial: dict) -> dict:
     if unknown:
         raise ValueError(f"Unknown config field(s): {', '.join(sorted(unknown))}")
 
+    current = None
     if _config.CONFIG_PATH.exists():
         try:
             current = json.loads(_config.CONFIG_PATH.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
-            current = dict(_config._DEFAULTS)
-    else:
+            current = None
+    # Also falls back to defaults for valid-but-non-object JSON (a bare
+    # list/string/number) — same "corrupted, start fresh" treatment as a
+    # parse error, not an AttributeError from dict.update() (Gemini review,
+    # PR #132).
+    if not isinstance(current, dict):
         current = dict(_config._DEFAULTS)
 
     current.update(partial)

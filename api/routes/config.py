@@ -1,4 +1,5 @@
 """GET/POST /config — settings screen config service (WP-29.3)."""
+import ipaddress
 from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -47,8 +48,26 @@ class ConfigUpdateRequest(BaseModel):
 
 
 def _is_loopback(request: Request) -> bool:
+    """True only for a genuine loopback client address.
+
+    Uses ipaddress rather than a literal string tuple so this also accepts
+    dual-stack IPv4-mapped loopback (`::ffff:127.0.0.1`), which a plain
+    `host in ("127.0.0.1", "::1")` check misses on dual-stack bindings
+    (Gemini review, PR #132). Note ipv4_mapped must be unwrapped first —
+    IPv6Address("::ffff:127.0.0.1").is_loopback is False on its own; only
+    the unwrapped IPv4Address reports is_loopback True.
+    """
     host = request.client.host if request.client else None
-    return host in ("127.0.0.1", "::1")
+    if not host:
+        return False
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    mapped = getattr(addr, "ipv4_mapped", None)
+    if mapped is not None:
+        addr = mapped
+    return addr.is_loopback
 
 
 @router.get("/config")

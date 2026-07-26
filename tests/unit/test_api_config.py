@@ -18,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from api.app import app
 
 _LOOPBACK_CLIENT = TestClient(app, client=("127.0.0.1", 12345))
+_IPV6_LOOPBACK_CLIENT = TestClient(app, client=("::1", 12345))
+_IPV4_MAPPED_LOOPBACK_CLIENT = TestClient(app, client=("::ffff:127.0.0.1", 12345))
 _REMOTE_CLIENT = TestClient(app, client=("203.0.113.5", 12345))
 
 _GET_CONFIG_PATH = "api.routes.config.config_service.get_config"
@@ -46,6 +48,24 @@ def test_post_config_rejects_non_loopback_request():
 def test_post_config_allows_loopback_request():
     with patch(_UPDATE_CONFIG_PATH, return_value=MOCK_CONFIG) as mock_update:
         resp = _LOOPBACK_CLIENT.post("/api/config", json={"ollama_url": "http://x:11434"})
+    assert resp.status_code == 200
+    mock_update.assert_called_once_with({"ollama_url": "http://x:11434"})
+
+
+def test_post_config_allows_ipv6_loopback_request():
+    with patch(_UPDATE_CONFIG_PATH, return_value=MOCK_CONFIG) as mock_update:
+        resp = _IPV6_LOOPBACK_CLIENT.post("/api/config", json={"ollama_url": "http://x:11434"})
+    assert resp.status_code == 200
+    mock_update.assert_called_once_with({"ollama_url": "http://x:11434"})
+
+
+def test_post_config_allows_ipv4_mapped_ipv6_loopback_request():
+    """Dual-stack bindings can present a loopback client as ::ffff:127.0.0.1
+    — must be recognized as loopback, not rejected (Gemini review, PR #132)."""
+    with patch(_UPDATE_CONFIG_PATH, return_value=MOCK_CONFIG) as mock_update:
+        resp = _IPV4_MAPPED_LOOPBACK_CLIENT.post(
+            "/api/config", json={"ollama_url": "http://x:11434"}
+        )
     assert resp.status_code == 200
     mock_update.assert_called_once_with({"ollama_url": "http://x:11434"})
 

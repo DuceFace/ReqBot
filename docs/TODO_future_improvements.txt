@@ -95,15 +95,6 @@ ACTIVE BACKLOG
     - external clients consume the API
     - contract drift causes a real debugging issue
 
-9. [RESOLVED — Phase 29, WP-29.1] Evidence view configurable result depth (see docs/PHASE29_REQUIREMENTS.md, WP-29.1)
-    EvidenceView currently calls the API with a fixed top_k value. Add a simple
-    control when users need to tune evidence depth.
-
-10. [RESOLVED — Phase 29, WP-29.2] Evidence view expandable sources and context (see docs/PHASE29_REQUIREMENTS.md, WP-29.2)
-    Evidence groups currently emphasize the representative requirement. The API
-    also returns all sources per group and context_text. A future UI can expose
-    "show more sources" and surrounding context per group.
-
 11. Checklist assessor-note preservation on regeneration
     Running generate() for a document that was already exported and annotated
     will silently reset assessor_notes and status to their initial values
@@ -121,140 +112,16 @@ ACTIVE BACKLOG
       re-ingested document that produces the same requirement_ids will
       correctly re-associate assessor notes
 
-12. [RESOLVED — Phase 27, WP-27.1] Validate document_ids filter in core/ask.py (Codex review, WP-26.3/PR #114)
-    core/ask.py's retrieve() passes document_ids straight into a Qdrant MatchAny
-    filter with no existence check against the actual corpus. A typo'd or stale
-    document_id doesn't error -- it just produces an empty or reduced hit set,
-    indistinguishable from a legitimate no-match search. This violates the
-    Phase 26 architecture rule that invalid document keys must not be hidden as
-    fake empty results (docs/PHASE26_REQUIREMENTS.md Section 4, rule 5).
-
-    Pre-existing gap in core/ask.py / services/ask_service.py, not introduced by
-    or unique to MCP -- the CLI and API share the exact same hole today. Fix
-    belongs in the shared service layer so CLI, API, and MCP all benefit
-    identically; do not patch this into mcp_server/server.py alone (would create
-    an MCP-only behavior fork -- see guardrail #6 in docs/PHASE26_REQUIREMENTS.md
-    and DECISIONS AND GUARDRAILS #6 below). Needs its own planned WP: validate
-    requested document_ids against docs_service.list_docs()'s known doc_keys
-    before querying, and decide the failure shape (hard error vs. a warning
-    entry, matching the existing warnings field precedent in ask_service.ask()'s
-    response) -- design questions deferred to that WP, not implicit here.
-
-13. [RESOLVED — Phase 27, WP-27.2] Evidence synthesis uses the wrong model field for the remote backend (Codex
-    review, WP-26.4/PR #115)
-    api/routes/evidence.py's post_evidence() (and mcp_server/server.py's
-    map_evidence, which mirrors it) always pass cfg.synthesis_model into
-    evidence_service.build()'s synthesis_model kwarg, even when
-    syn_backend == "remote". core.config.ReqBotConfig has a separate
-    remote_model field (default "claude-sonnet-4-6") specifically for the
-    remote path; synthesis_model is the local Ollama model. Today this means a
-    remote-configured evidence synthesis request sends a local model name
-    (e.g. "qwen2.5:14b") to Anthropic/OpenAI, the call fails, and
-    core.synthesis.synthesize()'s caller swallows the exception -- so the
-    caller (CLI, API, or MCP) just gets an empty synthesis_text with no error,
-    silently degrading instead of using the remote model that was actually
-    configured.
-
-    Pre-existing in api/routes/evidence.py, not introduced by MCP -- MCP
-    mirrored the route exactly per the thin-wrapper rule. Fix belongs in the
-    shared call site(s) (or ideally inside evidence_service.build() itself, so
-    CLI/API/MCP can't drift on this again): select remote_model when
-    synthesis_backend == "remote", synthesis_model when "local". Needs its own
-    planned WP -- do not patch mcp_server/server.py alone.
-
-14. [RESOLVED — Phase 27, WP-27.3] map_evidence has no document_ids filter
-    (Gemini review, WP-26.4/PR #115)
-    Both api/routes/evidence.py's EvidenceRequest and mcp_server/server.py's
-    map_evidence hardcode document_ids=None into evidence_service.build(),
-    even though the service itself accepts a document_ids filter and the CLI
-    exposes it (cli/reqbot.py's evidence subcommand has --document-id).
-    So the API and MCP surfaces are narrower than the CLI here today -- not a
-    regression MCP introduced, but a pre-existing CLI/API inconsistency MCP
-    faithfully mirrored rather than closing. Needs a planned WP to add
-    document_ids to EvidenceRequest and thread it through the route, with MCP
-    following the same shape once the API does (thin-wrapper rule -- MCP
-    should not get a filter the API itself doesn't expose first).
-    Resolved alongside a deeper pre-existing bug found while scoping this:
-    evidence_service.build()'s document_ids filter matched on the internal
-    document_id hash, not doc_key/source_pdf -- WP-27.3 fixed the filter
-    itself (reusing core.ask.resolve_document_ids from WP-27.1) before adding
-    it to API/MCP, so all three surfaces now filter on caller-facing values.
-
-15. [RESOLVED — Phase 27, WP-27.2] api_key_env=None would crash the remote-synthesis-backend fallback check
-    (Gemini review, WP-26.4/PR #115)
-    api/routes/evidence.py and mcp_server/server.py's map_evidence both call
-    os.environ.get(cfg.api_key_env, "") unconditionally when
-    synthesis_backend == "remote". core.config._DEFAULTS sets api_key_env to
-    the string "ANTHROPIC_API_KEY", but it has no REQBOT_* env var mapping, so
-    it's only settable by hand-editing config.json -- a user could set it to
-    null there, and since ReqBotConfig.load() uses values.get(key, default)
-    (not values.get(key) or default), an explicit null in the file is not
-    replaced by the default. os.environ.get(None, "") raises TypeError in
-    that case, an unhandled crash rather than a graceful fallback to the
-    local backend. Pre-existing in api/routes/evidence.py too, not MCP-only.
-    Needs a planned WP: guard with `if cfg.api_key_env else ""`, ideally at
-    the shared call-site pattern shared by API and MCP (or make
-    ReqBotConfig.load() itself refuse to store a null api_key_env).
-
-16. [RESOLVED — Phase 27, WP-27.4] ask/search_requirements synthesis has the
-    same wrong-model-field bug evidence had (found during Phase 27, WP-27.2)
-    While fixing item #13 for evidence, found the identical bug in the
-    ask/search path: cli/reqbot.py's cmd_ask passes
-    `model=args.model or _cfg.synthesis_model` into core.ask.run(), and
-    api/routes/ask.py's post_ask() passes `model=req.model or
-    cfg.synthesis_model` into ask_service.ask() -- both always resolve to the
-    local Ollama model, never cfg.remote_model, regardless of
-    cfg.synthesis_backend. Same failure mode as item #13: a remote-configured
-    `reqbot ask --synthesize` (or `/api/ask` with synthesize=true) silently
-    sends a local model name to the remote provider, the call fails, and the
-    caller just gets no synthesis text with no visible error.
-
-    Not touched by WP-27.2 -- that WP was scoped to evidence's three call
-    sites (API, MCP's map_evidence, CLI's cmd_evidence) per the locked Phase
-    27 design; this is a different subsystem (ask/search_requirements, not
-    evidence) and a new finding, not one of the four backlog items Phase 27
-    was scoped to close. search_requirements (MCP) itself never exposes
-    synthesize=True per Phase 26's architecture rule, so this only affects
-    the CLI's `reqbot ask --synthesize` and the API's `/api/ask` with
-    synthesize=true -- not MCP.
-
-    Needs its own planned WP: mirror WP-27.2's fix -- select
-    cfg.remote_model vs cfg.synthesis_model based on synthesis_backend,
-    ideally centralized (core/ask.py's retrieve()/synthesize_answer() doing
-    this internally, mirroring how evidence_service.build() now does,
-    rather than each caller picking a model string itself).
-
-17. [RESOLVED — Phase 29, WP-29.3+29.4] Settings/configuration screen in the GUI
-    All of ReqBot's config (ollama_url, qdrant_url, synthesis_backend,
-    remote_model, api_key_env, synthesis_model, embedding_model, top_k,
-    min_score, etc.) lives in ~/.config/reqbot/config.json and can only be
-    changed by hand-editing it over SSH. Phase 27 added several new knobs
-    (synthesis_backend, remote_model, api_key_env) that make this friction
-    worse -- there's no way to turn on remote synthesis from the GUI at all
-    right now.
-
-    A settings screen would need new API surface that doesn't exist yet: a
-    GET /config route (read current values) and a PUT/POST /config route
-    (write back to config.json), plus frontend form + validation. That's a
-    meaningfully bigger unit of work than the other UX items in this section
-    (#9-11 are additive/read-only) -- closer to a small feature than polish.
-
-    Open design question: should the screen ever handle the actual API key
-    value, or only api_key_env (the env var *name* config already stores)?
-    Leaning toward name-only, so the browser never touches or persists a
-    secret -- the actual key stays in the server's environment, same as
-    today.
-
 18. SearchView has the same hardcoded top_k as EvidenceView did (found during
     Phase 29, WP-29.1)
     frontend/src/views/SearchView.tsx calls api.ask() with a fixed top_k: 20
     literal at both of its call sites (initial search and re-run-with-
     synthesis) -- the exact same pattern WP-29.1 just fixed in
-    EvidenceView.tsx. Not touched by WP-29.1, which was scoped to backlog
-    item #9 (evidence view specifically). Needs its own small WP: add the
-    same URL-persisted numeric control, following the pattern WP-29.1
-    established (topK/urlTopK split, clamped 1-100, submitted together with
-    the query on form submit).
+    EvidenceView.tsx. Not touched by WP-29.1, which was scoped to the
+    evidence view specifically (see docs/PHASE29_REQUIREMENTS.md, WP-29.1).
+    Needs its own small WP: add the same URL-persisted numeric control,
+    following the pattern WP-29.1 established (topK/urlTopK split, clamped
+    1-100, submitted together with the query on form submit).
 
 19. Frontend test infrastructure (Gemini review, PR #130, raised repeatedly)
     The frontend has zero test harness today -- no "test" script in
@@ -323,35 +190,6 @@ These are quality experiments, not guaranteed product work.
 ================================================================
 DEPENDENCY / TOOLCHAIN BACKLOG
 ================================================================
-
-1. [RESOLVED — Phase 28, WP-28.2] Vite major upgrade (see docs/PHASE28_REQUIREMENTS.md, WP-28.2)
-   Current main uses Vite 5.x. Dependabot has proposed a Vite 8.x upgrade.
-   Treat this as a frontend toolchain migration, not a tiny dependency patch.
-
-   Before merging:
-   - confirm GitHub Actions Node version supports Vite 8
-   - confirm local developer Node version guidance is current
-   - run frontend build
-   - verify @vitejs/plugin-react, TypeScript, Tailwind, and PostCSS integration
-
-   Note:
-   The original security concern involved the Vite dev server. ReqBot production
-   static files served through reqbot serve are a different risk surface.
-
-2. [RESOLVED — Phase 28, WP-28.1] React Router maintenance updates (see docs/PHASE28_REQUIREMENTS.md, WP-28.1)
-   Same-major React Router updates are generally lower risk than Vite major
-   upgrades. Merge when CI passes unless release notes show a relevant behavior
-   change.
-
-3. [RESOLVED — Phase 28, WP-28.3] Security scanning / code checks in CI (see docs/PHASE28_REQUIREMENTS.md, WP-28.3)
-   Currently only GitHub's passive Dependabot alerts cover this repo (dependency
-   CVEs from the manifest files, surfaced on the Security tab — no CI job runs
-   against them). No SAST, no secret scanning, no code-scanning job alongside
-   the existing pytest/ruff CI checks. Worth adding eventually: bandit (or
-   equivalent) for Python, an ESLint security plugin for the frontend, and/or
-   GitHub code scanning (CodeQL). Not urgent — no known exploited issue driving
-   this — but real automated coverage should replace ad hoc vigilance
-   eventually rather than staying deferred indefinitely.
 
 4. requirements.txt vs. pyproject.toml drift (Codex review, WP-25.2)
    WP-25.2 moved rapidfuzz into pyproject.toml's reqbot[dev] extra, since its

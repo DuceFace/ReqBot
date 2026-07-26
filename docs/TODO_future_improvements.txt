@@ -256,6 +256,28 @@ ACTIVE BACKLOG
     established (topK/urlTopK split, clamped 1-100, submitted together with
     the query on form submit).
 
+19. Frontend test infrastructure (Gemini review, PR #130, raised repeatedly)
+    The frontend has zero test harness today -- no "test" script in
+    package.json, no Vitest/Jest/React Testing Library anywhere. Gemini has
+    flagged this on multiple PRs (most recently WP-29.1's clampTopK/
+    parseTopKParam parsing logic having no unit coverage). Genuinely cheap
+    to add given this is already a Vite project: Vitest snaps onto the
+    existing vite.config.ts directly, no fighting a custom build. Rough
+    shape: install vitest + @testing-library/react + @testing-library/
+    jest-dom + @testing-library/user-event + jsdom; add a `test` block to
+    vite.config.ts (environment: jsdom, a setup file for jest-dom
+    matchers); add a `test` script to package.json; wire it into CI (no
+    standalone frontend CI job exists today either -- only the `docker` job
+    builds frontend/dist as part of the image, same gap WP-28.3's scope
+    noted and left for whenever this happens).
+
+    Scope the first WP tightly: harness setup + tests for the existing
+    pure utility functions only (clampTopK/parseTopKParam in
+    EvidenceView.tsx, docValue/pageRange in utils/ui.ts) -- not a mandate
+    to backfill component tests for the ~10 existing views that have zero
+    coverage today. That backfill question is a separate, later decision;
+    don't let the first WP balloon into it.
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS

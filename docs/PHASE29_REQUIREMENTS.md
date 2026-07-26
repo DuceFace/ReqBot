@@ -20,7 +20,7 @@ not in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-29.1 — Evidence View: Configurable Result Depth | Complete |
 | WP-29.2 — Evidence View: Expandable Sources & Context | Complete |
-| WP-29.3 — Settings Screen: Config Service + API | Not started |
+| WP-29.3 — Settings Screen: Config Service + API | Complete |
 | WP-29.4 — Settings Screen: Frontend | Not started |
 
 ---

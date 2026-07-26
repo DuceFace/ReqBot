@@ -1304,7 +1304,11 @@ def cmd_init(args: argparse.Namespace) -> int:
         print("\n\n[!] Setup cancelled — config not saved.")
         return 1
 
-    # Write config
+    # Write config — same service-layer write path the settings API uses
+    # (WP-29.3), so cmd_init() and POST /config never maintain two copies
+    # of "how config.json gets written."
+    from services import config_service as _config_service
+
     cfg_data = {
         "ollama_url": ollama_url,
         "qdrant_url": qdrant_url,
@@ -1322,14 +1326,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         "remote_model": remote_model,
         "api_key_env": api_key_env,
     }
-
-    config_path = _config.CONFIG_PATH
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(
-        json.dumps(cfg_data, indent=2) + "\n", encoding="utf-8"
-    )
-    config_path.chmod(0o600)
-    print(f"\nConfig saved to {config_path} (permissions: 600)")
+    _config_service.update_config(cfg_data)
+    print(f"\nConfig saved to {_config.CONFIG_PATH} (permissions: 600)")
 
     # Gate the success banner on actual service health, regardless of which
     # URLs were entered above.

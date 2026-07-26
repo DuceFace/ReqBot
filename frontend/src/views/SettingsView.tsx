@@ -398,6 +398,12 @@ export default function SettingsView() {
                     <option value="anthropic">Anthropic</option>
                     <option value="openai">OpenAI</option>
                   </select>
+                  {envOverridden.includes('remote_provider') && (
+                    <p className="mt-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                      Currently overridden by <code className="font-mono">{envVarName('remote_provider')}</code> —
+                      this change will take effect once that variable is unset.
+                    </p>
+                  )}
                 </div>
                 <Field
                   label="Remote model" id="remote_model" value={form.remote_model}

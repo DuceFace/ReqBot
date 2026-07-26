@@ -95,7 +95,7 @@ ACTIVE BACKLOG
     - external clients consume the API
     - contract drift causes a real debugging issue
 
-9. Evidence view configurable result depth
+9. [RESOLVED — Phase 29, WP-29.1] Evidence view configurable result depth (see docs/PHASE29_REQUIREMENTS.md, WP-29.1)
     EvidenceView currently calls the API with a fixed top_k value. Add a simple
     control when users need to tune evidence depth.
 
@@ -244,6 +244,39 @@ ACTIVE BACKLOG
     Leaning toward name-only, so the browser never touches or persists a
     secret -- the actual key stays in the server's environment, same as
     today.
+
+18. SearchView has the same hardcoded top_k as EvidenceView did (found during
+    Phase 29, WP-29.1)
+    frontend/src/views/SearchView.tsx calls api.ask() with a fixed top_k: 20
+    literal at both of its call sites (initial search and re-run-with-
+    synthesis) -- the exact same pattern WP-29.1 just fixed in
+    EvidenceView.tsx. Not touched by WP-29.1, which was scoped to backlog
+    item #9 (evidence view specifically). Needs its own small WP: add the
+    same URL-persisted numeric control, following the pattern WP-29.1
+    established (topK/urlTopK split, clamped 1-100, submitted together with
+    the query on form submit).
+
+19. Frontend test infrastructure (Gemini review, PR #130, raised repeatedly)
+    The frontend has zero test harness today -- no "test" script in
+    package.json, no Vitest/Jest/React Testing Library anywhere. Gemini has
+    flagged this on multiple PRs (most recently WP-29.1's clampTopK/
+    parseTopKParam parsing logic having no unit coverage). Genuinely cheap
+    to add given this is already a Vite project: Vitest snaps onto the
+    existing vite.config.ts directly, no fighting a custom build. Rough
+    shape: install vitest + @testing-library/react + @testing-library/
+    jest-dom + @testing-library/user-event + jsdom; add a `test` block to
+    vite.config.ts (environment: jsdom, a setup file for jest-dom
+    matchers); add a `test` script to package.json; wire it into CI (no
+    standalone frontend CI job exists today either -- only the `docker` job
+    builds frontend/dist as part of the image, same gap WP-28.3's scope
+    noted and left for whenever this happens).
+
+    Scope the first WP tightly: harness setup + tests for the existing
+    pure utility functions only (clampTopK/parseTopKParam in
+    EvidenceView.tsx, docValue/pageRange in utils/ui.ts) -- not a mandate
+    to backfill component tests for the ~10 existing views that have zero
+    coverage today. That backfill question is a separate, later decision;
+    don't let the first WP balloon into it.
 
 
 ================================================================

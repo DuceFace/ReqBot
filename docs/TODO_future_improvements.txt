@@ -291,7 +291,7 @@ These are quality experiments, not guaranteed product work.
 DEPENDENCY / TOOLCHAIN BACKLOG
 ================================================================
 
-1. Vite major upgrade (Phase 28 planned work — see docs/PHASE28_REQUIREMENTS.md, WP-28.2)
+1. [RESOLVED — Phase 28, WP-28.2] Vite major upgrade (see docs/PHASE28_REQUIREMENTS.md, WP-28.2)
    Current main uses Vite 5.x. Dependabot has proposed a Vite 8.x upgrade.
    Treat this as a frontend toolchain migration, not a tiny dependency patch.
 
@@ -305,12 +305,12 @@ DEPENDENCY / TOOLCHAIN BACKLOG
    The original security concern involved the Vite dev server. ReqBot production
    static files served through reqbot serve are a different risk surface.
 
-2. React Router maintenance updates (Phase 28 planned work — see docs/PHASE28_REQUIREMENTS.md, WP-28.1)
+2. [RESOLVED — Phase 28, WP-28.1] React Router maintenance updates (see docs/PHASE28_REQUIREMENTS.md, WP-28.1)
    Same-major React Router updates are generally lower risk than Vite major
    upgrades. Merge when CI passes unless release notes show a relevant behavior
    change.
 
-3. Security scanning / code checks in CI (Phase 28 planned work — see docs/PHASE28_REQUIREMENTS.md, WP-28.3)
+3. [RESOLVED — Phase 28, WP-28.3] Security scanning / code checks in CI (see docs/PHASE28_REQUIREMENTS.md, WP-28.3)
    Currently only GitHub's passive Dependabot alerts cover this repo (dependency
    CVEs from the manifest files, surfaced on the Security tab — no CI job runs
    against them). No SAST, no secret scanning, no code-scanning job alongside

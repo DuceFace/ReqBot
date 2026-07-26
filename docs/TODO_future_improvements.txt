@@ -95,7 +95,7 @@ ACTIVE BACKLOG
     - external clients consume the API
     - contract drift causes a real debugging issue
 
-9. Evidence view configurable result depth
+9. [RESOLVED — Phase 29, WP-29.1] Evidence view configurable result depth (see docs/PHASE29_REQUIREMENTS.md, WP-29.1)
     EvidenceView currently calls the API with a fixed top_k value. Add a simple
     control when users need to tune evidence depth.
 
@@ -244,6 +244,17 @@ ACTIVE BACKLOG
     Leaning toward name-only, so the browser never touches or persists a
     secret -- the actual key stays in the server's environment, same as
     today.
+
+18. SearchView has the same hardcoded top_k as EvidenceView did (found during
+    Phase 29, WP-29.1)
+    frontend/src/views/SearchView.tsx calls api.ask() with a fixed top_k: 20
+    literal at both of its call sites (initial search and re-run-with-
+    synthesis) -- the exact same pattern WP-29.1 just fixed in
+    EvidenceView.tsx. Not touched by WP-29.1, which was scoped to backlog
+    item #9 (evidence view specifically). Needs its own small WP: add the
+    same URL-persisted numeric control, following the pattern WP-29.1
+    established (topK/urlTopK split, clamped 1-100, submitted together with
+    the query on form submit).
 
 
 ================================================================

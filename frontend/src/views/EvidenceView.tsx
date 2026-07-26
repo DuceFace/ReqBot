@@ -10,6 +10,20 @@ import AppShell from '../components/AppShell'
 import { useSynthesis } from '../hooks/useSynthesis'
 import { pageRange } from '../utils/ui'
 
+const MIN_TOP_K = 1
+const MAX_TOP_K = 100
+const DEFAULT_TOP_K = 20
+
+function clampTopK(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_TOP_K
+  return Math.min(MAX_TOP_K, Math.max(MIN_TOP_K, Math.round(value)))
+}
+
+function parseTopKParam(raw: string | null): number {
+  if (raw === null) return DEFAULT_TOP_K
+  return clampTopK(Number(raw))
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function EvidenceCard({ req, from }: { req: EvidenceRequirement; from: string }) {
@@ -52,6 +66,11 @@ export default function EvidenceView() {
   const urlQ = searchParams.get('q') ?? ''
   const [topic, setTopic] = useState(urlQ)
 
+  // topK tracks the number input; urlTopK tracks the committed (URL) value.
+  // They diverge while the user is editing the field, mirroring how topic/urlQ work.
+  const urlTopK = parseTopKParam(searchParams.get('top_k'))
+  const [topK, setTopK] = useState(urlTopK)
+
   const [data, setData] = useState<EvidenceResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -61,6 +80,7 @@ export default function EvidenceView() {
 
   // Sync input with URL on browser back/forward
   useEffect(() => { setTopic(urlQ) }, [urlQ])
+  useEffect(() => { setTopK(urlTopK) }, [urlTopK])
 
   // Reset synthesis when topic changes
   useEffect(() => { synthReset() }, [urlQ, synthReset])
@@ -77,7 +97,7 @@ export default function EvidenceView() {
     setLoading(true)
     setError(null)
     api
-      .evidence({ topic: urlQ, top_k: 20 })
+      .evidence({ topic: urlQ, top_k: urlTopK })
       .then(res => {
         if (cancelled) return
         setData(res)
@@ -90,19 +110,19 @@ export default function EvidenceView() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [urlQ])
+  }, [urlQ, urlTopK])
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const trimmed = topic.trim()
     if (!trimmed) return
-    setSearchParams({ q: trimmed })
+    setSearchParams({ q: trimmed, top_k: String(clampTopK(topK)) })
   }
 
   function handleGenerateAnswer() {
     if (!urlQ || synth.loading) return
     synth.run(() =>
-      api.evidence({ topic: urlQ, top_k: 20, synthesize: true })
+      api.evidence({ topic: urlQ, top_k: urlTopK, synthesize: true })
         .then(res => res.synthesis_text || null)
     )
   }
@@ -120,6 +140,20 @@ export default function EvidenceView() {
             onChange={e => setTopic(e.target.value)}
             placeholder="Topic or control area (e.g. encryption at rest, multi-factor authentication)"
             className="flex-1 border border-gray-300 rounded px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <label htmlFor="evidence-top-k" className="sr-only">
+            Result depth
+          </label>
+          <input
+            id="evidence-top-k"
+            type="number"
+            min={MIN_TOP_K}
+            max={MAX_TOP_K}
+            value={topK}
+            onChange={e => setTopK(Number(e.target.value))}
+            title="Result depth (number of sources to retrieve, 1–100)"
+            aria-label="Result depth"
+            className="w-20 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="submit"

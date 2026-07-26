@@ -99,7 +99,7 @@ ACTIVE BACKLOG
     EvidenceView currently calls the API with a fixed top_k value. Add a simple
     control when users need to tune evidence depth.
 
-10. Evidence view expandable sources and context
+10. [RESOLVED — Phase 29, WP-29.2] Evidence view expandable sources and context (see docs/PHASE29_REQUIREMENTS.md, WP-29.2)
     Evidence groups currently emphasize the representative requirement. The API
     also returns all sources per group and context_text. A future UI can expose
     "show more sources" and surrounding context per group.

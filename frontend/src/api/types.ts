@@ -189,6 +189,7 @@ export interface EvidenceRequest {
   requirement_types?: string[]
   synthesize?: boolean
   top_k?: number
+  show_context?: boolean
 }
 
 /**

@@ -19,6 +19,7 @@ class EvidenceRequest(BaseModel):
     requirement_types: list[str] = Field(default_factory=list)
     synthesize: bool = False
     top_k: int = Field(default=10, ge=1, le=100)
+    show_context: bool = False
 
 
 @router.post("/evidence")
@@ -49,7 +50,7 @@ def post_evidence(req: EvidenceRequest) -> dict:
             qdrant_url=cfg.qdrant_url,
             ollama_url=cfg.ollama_url,
             top_k=req.top_k,
-            show_context=False,
+            show_context=req.show_context,
             document_ids=req.document_ids or None,
             domain_tags=req.domain_tags or None,
             requirement_types=req.requirement_types or None,

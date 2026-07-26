@@ -75,6 +75,19 @@ export default function EvidenceView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // "Show all sources" is pure local UI state -- group.sources is already fully populated
+  // regardless of show_context, no fetch needed.
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set())
+
+  // Context is fetched once, lazily, on the first "Show source context" click for any group
+  // (evidence_service.build() batches context for every group representative in one call --
+  // there's no per-group endpoint -- so the first click fetches all of them, and each group's
+  // reveal button independently controls only whether its own panel is visible).
+  const [contextByRef, setContextByRef] = useState<Record<string, string | null> | null>(null)
+  const [contextLoading, setContextLoading] = useState(false)
+  const [contextError, setContextError] = useState(false)
+  const [expandedContext, setExpandedContext] = useState<Set<string>>(new Set())
+
   const synth = useSynthesis()
   const { reset: synthReset } = synth
 
@@ -82,9 +95,17 @@ export default function EvidenceView() {
   useEffect(() => { setTopic(urlQ) }, [urlQ])
   useEffect(() => { setTopK(urlTopK) }, [urlTopK])
 
-  // Reset synthesis when topic or result depth changes -- otherwise a stale answer from a
-  // previous top_k stays displayed against a since-changed evidence set (Codex review, PR #130).
-  useEffect(() => { synthReset() }, [urlQ, urlTopK, synthReset])
+  // Reset synthesis and per-group expand/context state when topic or result depth changes --
+  // otherwise a stale answer or stale context from a previous search stays displayed against a
+  // since-changed evidence set (Codex review, PR #130, applied here too for the same reason).
+  useEffect(() => {
+    synthReset()
+    setExpandedSources(new Set())
+    setContextByRef(null)
+    setContextLoading(false)
+    setContextError(false)
+    setExpandedContext(new Set())
+  }, [urlQ, urlTopK, synthReset])
 
   // Run evidence map whenever URL param changes
   useEffect(() => {
@@ -127,6 +148,38 @@ export default function EvidenceView() {
       api.evidence({ topic: urlQ, top_k: urlTopK, synthesize: true })
         .then(res => res.synthesis_text || null)
     )
+  }
+
+  function toggleSources(ref: string) {
+    setExpandedSources(prev => {
+      const next = new Set(prev)
+      if (next.has(ref)) next.delete(ref)
+      else next.add(ref)
+      return next
+    })
+  }
+
+  function handleShowContext(ref: string) {
+    if (contextByRef !== null) {
+      // Already fetched for this search -- just reveal this group's panel.
+      setExpandedContext(prev => new Set(prev).add(ref))
+      return
+    }
+    if (contextLoading) return
+    setContextLoading(true)
+    setContextError(false)
+    api
+      .evidence({ topic: urlQ, top_k: urlTopK, show_context: true })
+      .then(res => {
+        const byRef: Record<string, string | null> = {}
+        for (const r of res.group_order) {
+          byRef[r] = res.groups[r]?.context_text ?? null
+        }
+        setContextByRef(byRef)
+        setExpandedContext(prev => new Set(prev).add(ref))
+      })
+      .catch(() => setContextError(true))
+      .finally(() => setContextLoading(false))
   }
 
   const fromPath = location.pathname + location.search
@@ -223,6 +276,8 @@ export default function EvidenceView() {
                 {data.group_order.map(ref => {
                   const group = data.groups[ref]
                   if (!group) return null
+                  const sourcesShown = expandedSources.has(ref)
+                  const contextShown = expandedContext.has(ref) && contextByRef !== null
                   return (
                     <section key={ref}>
                       <div className="flex items-center gap-2 mb-2">
@@ -233,7 +288,48 @@ export default function EvidenceView() {
                           ({group.sources.length} source{group.sources.length !== 1 ? 's' : ''})
                         </span>
                       </div>
-                      <EvidenceCard req={group.representative} from={fromPath} />
+
+                      {sourcesShown ? (
+                        <div className="space-y-2">
+                          {group.sources.map((src, i) => (
+                            <EvidenceCard key={src.requirement_id || i} req={src} from={fromPath} />
+                          ))}
+                        </div>
+                      ) : (
+                        <EvidenceCard req={group.representative} from={fromPath} />
+                      )}
+
+                      {group.sources.length > 1 && (
+                        <button
+                          onClick={() => toggleSources(ref)}
+                          className="mt-1.5 text-xs text-blue-600 underline hover:no-underline"
+                        >
+                          {sourcesShown ? 'Show fewer sources' : `Show all ${group.sources.length} sources`}
+                        </button>
+                      )}
+
+                      <div className="mt-2">
+                        {contextShown ? (
+                          <pre className="text-xs text-gray-600 bg-gray-100 rounded p-3 whitespace-pre-wrap leading-relaxed overflow-x-auto">
+                            {contextByRef?.[ref] || '(no context available)'}
+                          </pre>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleShowContext(ref)}
+                              disabled={contextLoading}
+                              className="text-sm text-blue-600 underline hover:no-underline disabled:opacity-50"
+                            >
+                              {contextLoading ? 'Loading…' : 'Show source context'}
+                            </button>
+                            {contextError && (
+                              <p className="mt-1 text-xs text-red-600">
+                                Failed to load context. Try again.
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </section>
                   )
                 })}

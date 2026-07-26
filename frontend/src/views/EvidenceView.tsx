@@ -20,7 +20,7 @@ function clampTopK(value: number): number {
 }
 
 function parseTopKParam(raw: string | null): number {
-  if (raw === null) return DEFAULT_TOP_K
+  if (raw === null || raw.trim() === '') return DEFAULT_TOP_K
   return clampTopK(Number(raw))
 }
 
@@ -69,7 +69,7 @@ export default function EvidenceView() {
   // topK tracks the number input; urlTopK tracks the committed (URL) value.
   // They diverge while the user is editing the field, mirroring how topic/urlQ work.
   const urlTopK = parseTopKParam(searchParams.get('top_k'))
-  const [topK, setTopK] = useState(urlTopK)
+  const [topK, setTopK] = useState<number | ''>(urlTopK)
 
   const [data, setData] = useState<EvidenceResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -82,8 +82,9 @@ export default function EvidenceView() {
   useEffect(() => { setTopic(urlQ) }, [urlQ])
   useEffect(() => { setTopK(urlTopK) }, [urlTopK])
 
-  // Reset synthesis when topic changes
-  useEffect(() => { synthReset() }, [urlQ, synthReset])
+  // Reset synthesis when topic or result depth changes -- otherwise a stale answer from a
+  // previous top_k stays displayed against a since-changed evidence set (Codex review, PR #130).
+  useEffect(() => { synthReset() }, [urlQ, urlTopK, synthReset])
 
   // Run evidence map whenever URL param changes
   useEffect(() => {
@@ -116,7 +117,8 @@ export default function EvidenceView() {
     e.preventDefault()
     const trimmed = topic.trim()
     if (!trimmed) return
-    setSearchParams({ q: trimmed, top_k: String(clampTopK(topK)) })
+    const submittedTopK = topK === '' ? DEFAULT_TOP_K : clampTopK(topK)
+    setSearchParams({ q: trimmed, top_k: String(submittedTopK) })
   }
 
   function handleGenerateAnswer() {
@@ -150,7 +152,7 @@ export default function EvidenceView() {
             min={MIN_TOP_K}
             max={MAX_TOP_K}
             value={topK}
-            onChange={e => setTopK(Number(e.target.value))}
+            onChange={e => setTopK(e.target.value === '' ? '' : Number(e.target.value))}
             title="Result depth (number of sources to retrieve, 1–100)"
             aria-label="Result depth"
             className="w-20 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"

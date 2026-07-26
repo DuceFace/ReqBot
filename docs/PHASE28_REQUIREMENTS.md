@@ -1,7 +1,6 @@
 # ReqBot Phase 28 — Frontend Toolchain & CI Security Hardening
 
-**Status:** Locked (all three WPs scoped 2026-07-25; revised same day after Codex review to
-resolve open decisions below; implementation starts at WP-28.1)
+**Status:** Complete — all three WPs shipped and merged
 **Date:** 2026-07-25
 **Preceded by:** Phase 27 (Service-Layer Hardening)
 **Followed by:** TBD
@@ -17,7 +16,7 @@ not in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-28.1 — React Router Patch Bump | Complete |
 | WP-28.2 — Vite Major Upgrade (5.x → 8.x) | Complete |
-| WP-28.3 — CI Security Scanning | Not started |
+| WP-28.3 — CI Security Scanning | Complete |
 
 ---
 

@@ -1,9 +1,13 @@
 # ReqBot Phase 29 — Settings Screen & Evidence View UX
 
-**Status:** Draft — pending review (drafted 2026-07-26; not yet reviewed)
+**Status:** Locked (drafted 2026-07-26; revised same day after Codex/Gemini review — see PR #129
+— to fix a service/route scope contradiction, add a loopback guard on `POST /config`, and correct
+the `embedding_model` "takes effect immediately" claim; implementation starts at WP-29.1)
 **Date:** 2026-07-26
 **Preceded by:** Phase 28 (Frontend Toolchain & CI Security Hardening)
-**Followed by:** TBD
+**Followed by:** Frontend test infrastructure (tentative — backlog item #19; Vitest + React
+Testing Library, scoped to harness setup + pure-function tests only, not a full component-test
+backfill)
 
 ---
 

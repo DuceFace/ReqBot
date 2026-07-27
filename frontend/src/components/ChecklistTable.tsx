@@ -1,5 +1,6 @@
 import type { ChecklistItem } from '../api/types'
 import ReviewFlagBadge from './ReviewFlagBadge'
+import { formatPath } from '../utils/ui'
 
 interface Props {
   items: ChecklistItem[]
@@ -15,10 +16,6 @@ function formatPageRefs(refs: number[]): string {
 
 function formatList(items: string[]): string {
   return items.length > 0 ? items.join(', ') : '—'
-}
-
-function formatPath(parts: string[]): string {
-  return parts.length > 0 ? parts.join(' › ') : '—'
 }
 
 // ── Column group headers ──────────────────────────────────────────────────────

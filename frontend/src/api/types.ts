@@ -30,8 +30,8 @@ export interface Requirement {
   confidence?: number         // extraction-time confidence; not always present
   page_start?: number
   page_end?: number
-  section_title_path?: string // schema v2.0 hierarchy fields
-  section_ref_path?: string
+  section_title_path?: string[] // schema v2.0 hierarchy fields
+  section_ref_path?: string[]
   parent_context?: string
   chunk_id?: number
   domain_profile?: string     // Phase 20+; pre-Phase-20 records return "cybersecurity" via fallback
@@ -143,7 +143,7 @@ export interface ComparePayload {
   confidence?: number
   page_start?: number
   page_end?: number
-  section_title_path?: string
+  section_title_path?: string[]
 }
 
 /**

@@ -150,7 +150,7 @@ ACTIVE BACKLOG
     coverage today. That backfill question is a separate, later decision;
     don't let the first WP balloon into it.
 
-20. Requirement.section_title_path / ComparePayload.section_title_path are
+20. [RESOLVED — Phase 31, WP-31.1] Requirement.section_title_path / ComparePayload.section_title_path are
     mistyped as string, not string[] (found during Phase 30, WP-30.3)
     frontend/src/api/types.ts's base Requirement interface and
     ComparePayload both declare section_title_path?: string, but the

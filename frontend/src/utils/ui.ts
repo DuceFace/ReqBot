@@ -20,6 +20,15 @@ export function docValue(doc: { source_pdf?: string; doc_key: string }): string 
   return doc.source_pdf && doc.source_pdf.trim() !== '' ? doc.source_pdf : doc.doc_key
 }
 
+/**
+ * Joins a section hierarchy breadcrumb (e.g. ["3", "3.2", "3.2.1 Access Control"])
+ * into a readable path, or '—' if empty. Shared by ChecklistTable and TraceView
+ * (WP-31.1) -- both render the same list[str] hierarchy field from the backend.
+ */
+export function formatPath(parts: string[]): string {
+  return parts.length > 0 ? parts.join(' › ') : '—'
+}
+
 // Shared by EvidenceView and SearchView (WP-30.2) -- both need identical
 // top_k clamping/URL-parsing, so it lives here once rather than duplicated
 // across the two views.

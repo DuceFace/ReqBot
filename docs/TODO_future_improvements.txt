@@ -170,7 +170,7 @@ ACTIVE BACKLOG
     add Zod coverage for AskResponse/CompareResponse while in there if
     that's judged in scope.
 
-21. Citation numbering and linking in Search/Evidence
+21. [RESOLVED — Phase 31, WP-31.2] Citation numbering and linking in Search/Evidence
     Synthesized answers cite sources, but result cards aren't numbered and
     citations don't link back to the matching requirement.
 

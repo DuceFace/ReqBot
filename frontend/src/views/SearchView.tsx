@@ -271,8 +271,8 @@ export default function SearchView() {
               </p>
             ) : (
               <div className="space-y-3">
-                {results.map(r => (
-                  <ResultCard key={r.requirement_id} result={r} />
+                {results.map((r, i) => (
+                  <ResultCard key={r.requirement_id} result={r} index={i + 1} />
                 ))}
               </div>
             )}

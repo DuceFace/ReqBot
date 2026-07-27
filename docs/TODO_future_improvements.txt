@@ -420,3 +420,14 @@ DECISIONS AND GUARDRAILS
 7. Marker remains decided against for now
    Docling has been adopted as an optional structure-aware path. Marker remains
    out unless a specific need beats its dependency and operational cost.
+
+8. Do not build a second domain profile yet (2026-07-27)
+   Cybersecurity is architecturally meant to be the first domain, not the only one
+   (docs/PRODUCT_PRD.md's PR-2 names hr_policy/safety/finance/acquisition as future
+   candidates), but building a real second profile now isn't worth it: no source
+   documents exist for any candidate domain, non-default profiles bypass Step C's
+   cache entirely (every iteration is a full re-extraction, not a resumed one --
+   see docs/PROFILES.md), and the one existing profile still has known genericity
+   gaps (hardcoded cybersecurity vocabulary in evidence_service.py's synthesis
+   prompt -- see Phase 32's WP-32.7). Revisit once Phase 32 proves the core is
+   actually domain-neutral, not just documented as intending to be.

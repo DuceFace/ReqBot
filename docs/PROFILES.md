@@ -62,6 +62,17 @@ bypassed entirely for non-default profiles, because cached records don't yet tra
 produced them (a known gap, not yet fixed). Budget for a full re-extraction, not a resumed one,
 whenever testing a profile other than `cybersecurity`.
 
+## Should you add a second profile right now?
+
+Probably not yet (decision recorded 2026-07-27, see `docs/TODO_future_improvements.txt`'s
+Decisions and Guardrails #8). Cybersecurity is meant to be the first domain, not the only one
+(`docs/PRODUCT_PRD.md`'s PR-2 names `hr_policy`/`safety`/`finance`/`acquisition` as future
+candidates) — but three things make now a bad time to actually build one: no source documents exist
+yet for any candidate domain, testing a new profile is expensive (see the cache-bypass note above),
+and the one existing profile still leaks cybersecurity-specific assumptions into supposedly generic
+code (e.g. `evidence_service.py`'s synthesis prompt hardcodes NIST control-family vocabulary —
+tracked as Phase 32's WP-32.7). Revisit once that's actually fixed, not before.
+
 ## Adding a new profile
 
 1. Create `profiles/<name>.json` with the five required fields above, matching `name` to the

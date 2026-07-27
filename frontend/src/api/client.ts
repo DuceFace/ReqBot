@@ -20,8 +20,28 @@ import type {
   ConfigResponse,
   ConfigUpdateRequest,
 } from './types'
+import type { ZodType } from 'zod'
+import { configResponseSchema, evidenceResponseSchema } from './schemas'
 
 const BASE = '/api'
+
+/**
+ * Fail-closed schema validation (WP-30.3): a mismatch throws, surfacing
+ * through the same try/catch/setError/ErrorBanner path a network failure
+ * already takes, rather than letting `undefined` silently reach the UI.
+ * Fail-open (log and pass the raw response through anyway) was explicitly
+ * ruled out in the Phase 30 doc — a warning nobody looks at isn't a fix for
+ * contract drift. The full ZodError still goes to the console as a
+ * diagnostic aid; it just isn't the only signal something went wrong.
+ */
+function parseOrThrow<T>(schema: ZodType<T>, data: unknown, label: string): T {
+  const result = schema.safeParse(data)
+  if (!result.success) {
+    console.warn(`${label} response failed schema validation`, result.error)
+    throw new Error(`${label} response did not match the expected shape — see console for details`)
+  }
+  return result.data
+}
 
 export async function ask(req: AskRequest): Promise<AskResponse> {
   const res = await fetch(`${BASE}/ask`, {
@@ -88,7 +108,7 @@ export async function evidence(req: EvidenceRequest): Promise<EvidenceResponse> 
     const detail = await res.json().then((b: { detail?: string }) => b.detail ?? '').catch(() => '')
     throw new Error(detail || `evidence failed: ${res.status} ${res.statusText}`)
   }
-  return res.json() as Promise<EvidenceResponse>
+  return parseOrThrow(evidenceResponseSchema, await res.json(), 'evidence')
 }
 
 export async function profiles(): Promise<ProfilesResponse> {
@@ -133,7 +153,7 @@ export async function checklist(req: ChecklistRequest): Promise<ChecklistEnvelop
 export async function getConfig(): Promise<ConfigResponse> {
   const res = await fetch(`${BASE}/config`)
   if (!res.ok) throw new Error(`getConfig failed: ${res.status} ${res.statusText}`)
-  return res.json() as Promise<ConfigResponse>
+  return parseOrThrow(configResponseSchema, await res.json(), 'getConfig')
 }
 
 /**
@@ -167,7 +187,7 @@ export async function updateConfig(req: ConfigUpdateRequest): Promise<ConfigResp
     const detail = extractErrorDetail(body)
     throw new Error(detail || `updateConfig failed: ${res.status} ${res.statusText}`)
   }
-  return res.json() as Promise<ConfigResponse>
+  return parseOrThrow(configResponseSchema, await res.json(), 'updateConfig')
 }
 
 /** Thrown by trace() when the requirement ID is not found (HTTP 404). */

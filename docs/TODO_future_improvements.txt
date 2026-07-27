@@ -84,7 +84,7 @@ ACTIVE BACKLOG
 
    Architecture rule: MCP must call the same service layer as CLI and GUI.
 
-8. Runtime validation for frontend API responses
+8. [RESOLVED — Phase 30, WP-30.3] Runtime validation for frontend API responses
     TypeScript types only protect at compile time. Runtime validation could catch
     backend/frontend contract drift before it becomes confusing UI behavior.
 
@@ -144,6 +144,26 @@ ACTIVE BACKLOG
     to backfill component tests for the ~10 existing views that have zero
     coverage today. That backfill question is a separate, later decision;
     don't let the first WP balloon into it.
+
+20. Requirement.section_title_path / ComparePayload.section_title_path are
+    mistyped as string, not string[] (found during Phase 30, WP-30.3)
+    frontend/src/api/types.ts's base Requirement interface and
+    ComparePayload both declare section_title_path?: string, but the
+    Python side (pipeline/chunk_text.py, pipeline/parse_and_normalize.py)
+    always produces a list[str] hierarchy breadcrumb -- confirmed via
+    WP-30.3's Zod validation rejecting a real evidence_service response
+    until EvidenceRequirement's copy of this same field was fixed to
+    string[]. Requirement/ComparePayload were left mistyped in that WP
+    (out of scope -- WP-30.3 didn't add Zod coverage for /api/ask or
+    /api/compare). frontend/src/views/TraceView.tsx:197 renders
+    req.section_title_path directly assuming a plain string
+    ({req.section_title_path && <> {req.section_title_path}</>}) -- with
+    the real array shape this likely renders concatenated with no
+    separator rather than the intended readable path. Needs its own small
+    WP: fix both interfaces to string[], fix TraceView's render to join
+    the array (matching ChecklistTable.tsx's formatPath precedent), and
+    add Zod coverage for AskResponse/CompareResponse while in there if
+    that's judged in scope.
 
 
 ================================================================

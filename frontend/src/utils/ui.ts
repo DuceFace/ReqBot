@@ -1,5 +1,11 @@
-/** Returns a formatted page reference string, or null if no page data. */
-export function pageRange(start?: number, end?: number): string | null {
+/**
+ * Returns a formatted page reference string, or null if no page data.
+ * Accepts null as well as undefined -- callers like EvidenceRequirement's
+ * page_start/page_end can carry an explicit null from the backend, not just
+ * an absent key (PR #139). The `== null` checks below already treat both the
+ * same way; only the signature needed widening to match.
+ */
+export function pageRange(start?: number | null, end?: number | null): string | null {
   if (start == null) return null
   if (end != null && end !== start) return `pp. ${start}–${end}`
   return `p. ${start}`

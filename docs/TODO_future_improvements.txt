@@ -95,7 +95,12 @@ ACTIVE BACKLOG
     - external clients consume the API
     - contract drift causes a real debugging issue
 
-11. Checklist assessor-note preservation on regeneration
+11. [DEPRIORITIZED — 2026-07-27] Checklist assessor-note preservation on regeneration
+    Considered for Phase 31 and dropped, not deferred again by default: no real user is currently
+    doing the edit-notes-then-regenerate workflow this protects, and this item had already been
+    delayed several times waiting for one. Revisit only if that usage pattern actually starts
+    happening (Tyler, 2026-07-27) -- the problem description below stays accurate if it does.
+
     Running generate() for a document that was already exported and annotated
     will silently reset assessor_notes and status to their initial values
     ("" / "not-started"). Any assessor work done against the exported CSV or

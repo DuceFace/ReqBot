@@ -123,7 +123,7 @@ ACTIVE BACKLOG
     following the pattern WP-29.1 established (topK/urlTopK split, clamped
     1-100, submitted together with the query on form submit).
 
-19. Frontend test infrastructure (Gemini review, PR #130, raised repeatedly)
+19. [RESOLVED — Phase 30, WP-30.1] Frontend test infrastructure (Gemini review, PR #130, raised repeatedly)
     The frontend has zero test harness today -- no "test" script in
     package.json, no Vitest/Jest/React Testing Library anywhere. Gemini has
     flagged this on multiple PRs (most recently WP-29.1's clampTopK/

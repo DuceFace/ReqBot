@@ -1,6 +1,8 @@
 # ReqBot Phase 30 — Frontend Test Infrastructure, SearchView Parity & Runtime Contract Validation
 
-**Status:** Draft (drafted 2026-07-26; pending Codex/Gemini review before implementation starts)
+**Status:** Locked (drafted 2026-07-26; revised same day after Codex review — see PR #136 — to add
+`handleDocChange` to WP-30.2's scope and commit WP-30.3 to fail-closed; implementation starts at
+WP-30.1)
 **Date:** 2026-07-26
 **Preceded by:** Phase 29 (Settings Screen & Evidence View UX)
 **Followed by:** None currently planned — next work will be selected from the live backlog
@@ -15,7 +17,7 @@ not in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-30.1 — Frontend Test Infrastructure | Not started |
+| WP-30.1 — Frontend Test Infrastructure | Complete |
 | WP-30.2 — SearchView: Configurable Result Depth | Not started |
 | WP-30.3 — Runtime Response Validation (Zod) | Not started |
 

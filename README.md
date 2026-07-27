@@ -486,5 +486,7 @@ Useful flags:
 - [CONTRIBUTING.md](CONTRIBUTING.md) - repo conventions and development rules
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) - operational runbook for rebuild/reindex steps, ingest
   recipes, and common gotchas
+- [docs/PHASE31_REQUIREMENTS.md](docs/PHASE31_REQUIREMENTS.md) - Phase 31 plan (trace/compare type
+  fix, citation numbering, profile schema docs)
 - [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document
-- [archive/](archive/) - completed phase plans (Phases 7–30); no phase is currently active
+- [archive/](archive/) - completed phase plans (Phases 7–30)

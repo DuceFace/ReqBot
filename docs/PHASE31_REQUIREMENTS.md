@@ -19,7 +19,7 @@ not in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-31.1 — Fix `section_title_path` Type Mismatch | Complete |
 | WP-31.2 — Citation Numbering & Linking (Search/Evidence) | Complete |
-| WP-31.3 — Profile Schema Documentation | Not started |
+| WP-31.3 — Profile Schema Documentation | Complete |
 
 ---
 
@@ -226,6 +226,14 @@ add a new profile.
 **Non-goals:**
 - No decision on whether to add a profile beyond `cybersecurity` (see Phase Non-Goals).
 - No changes to `core/profiles.py`'s validation logic — documentation only.
+
+**Found during implementation:** traced `checklist_guidance` all the way through the codebase
+(`grep -rn checklist_guidance`) and confirmed it's validated by `core/profiles.py` but read by
+nothing else — `services/checklist_service.py`/`pipeline/checklist_export.py` never reference it.
+Documented as a reserved-for-future field rather than live configuration, so nobody spends time
+populating it expecting a behavior change. Also documented Step C's non-default-profile cache-bypass
+behavior (`pipeline/llm_extract_requirements.py`) since it materially affects how expensive testing
+a new profile is (always a full re-extraction, never resumed).
 
 **Tests/verification:**
 - None beyond `git diff --check` / normal doc review — no code touched.

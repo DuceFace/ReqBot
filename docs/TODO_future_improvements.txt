@@ -182,7 +182,7 @@ ACTIVE BACKLOG
 
     Why: high provenance/trust value, bounded GUI-only work.
 
-22. Profile schema documentation pass
+22. [RESOLVED — Phase 31, WP-31.3] Profile schema documentation pass
     profiles/*.json's real schema (obligation_verbs, skip_sections,
     domain_tags, requirement_types, checklist guidance) has never had a
     dedicated documentation pass. Cheap cleanup, worth doing before adding

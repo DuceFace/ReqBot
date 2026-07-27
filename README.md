@@ -488,5 +488,7 @@ Useful flags:
   recipes, and common gotchas
 - [docs/PHASE31_REQUIREMENTS.md](docs/PHASE31_REQUIREMENTS.md) - Phase 31 plan (trace/compare type
   fix, citation numbering, profile schema docs)
+- [docs/PROFILES.md](docs/PROFILES.md) - `profiles/*.json` schema, validation rules, and what each
+  field actually does at runtime
 - [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document
 - [archive/](archive/) - completed phase plans (Phases 7–30)

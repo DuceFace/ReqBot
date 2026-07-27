@@ -4,9 +4,11 @@ A profile is a JSON file at `profiles/<name>.json` that configures ReqBot's pipe
 specific compliance domain. Today only `cybersecurity` is a real profile; see
 [Adding a new profile](#adding-a-new-profile) before assuming a second one is a small change.
 
-The loader (`core/profiles.py`) validates every field's type and rejects any field it doesn't
-recognize — there is no way to sneak extra data through unvalidated. `core.profiles.load_profile()`
-is the only supported way to read a profile; nothing else parses `profiles/*.json` directly.
+The loader (`core/profiles.py`) validates every top-level field's type and rejects any top-level
+key it doesn't recognize. That guarantee doesn't extend below the top level, though: nested content
+inside `checklist_guidance` other than its one defined sub-field (`evidence_categories`) is neither
+type-checked nor rejected — see that field's row below. `core.profiles.load_profile()` is the only
+supported way to read a profile; nothing else parses `profiles/*.json` directly.
 
 ## Schema
 
@@ -17,8 +19,8 @@ is the only supported way to read a profile; nothing else parses `profiles/*.jso
 | `name` | `string` | Must match the filename (`profiles/foo.json` must have `"name": "foo"`) — checked last, after every other validation passes. |
 | `obligation_verbs` | `string[]`, non-empty | Step C (`pipeline/llm_extract_requirements.py`) — substituted into the extraction prompt's `{obligation_verbs}` placeholder, joined with `", "`. This is the literal list of words the LLM is told signal an actionable requirement. |
 | `skip_sections` | `string[]`, empty allowed | Chunking (`pipeline/chunk_text.py`) — section headings to exclude from the corpus (e.g. `"GLOSSARY"`, `"REFERENCES"`). **Only takes effect on the docling structure-aware layout mode.** The default legacy pymupdf chunking path has no section hierarchy to filter on and just logs a warning and no-ops on this field. If your ingest run doesn't pass `--layout-mode docling`, `skip_sections` is silently doing nothing. |
-| `domain_tags` | `string[]`, non-empty | Step C's extraction prompt and Step D.5's enrichment prompt (`pipeline/enrich_requirements.py`) — the closed vocabulary the LLM must pick from when tagging a requirement. Also used by `pipeline/parse_and_normalize.py` (Step D) to silently drop any tag the LLM returned that isn't in this list. |
-| `requirement_types` | `string[]`, non-empty | Same two extraction/enrichment prompts, and the same Step D drop-if-invalid behavior, but for the requirement's type classification instead of its tags. |
+| `domain_tags` | `string[]`, non-empty | **Not Step C** — `PASS1_PROMPT_TEMPLATE` only asks the LLM for `source_quote`/`source_ref`, it never references tags. The real prompting happens in Step D.5's enrichment prompt (`pipeline/enrich_requirements.py`'s `{valid_tags}` placeholder) — that's where the LLM is actually told to pick from this vocabulary. `pipeline/parse_and_normalize.py` (Step D) then silently drops any tag Step D.5 returned that isn't in this list. (Step C's `validate_requirement()`/`process_chunk()` do accept a `valid_domain_tags` parameter, but since Pass-1's prompt never asks the LLM for a `domain_tags` field, that filter always runs against empty input today — effectively inert, not a live consumer.) |
+| `requirement_types` | `string[]`, non-empty | Same story as `domain_tags`: Step D.5's enrichment prompt (`{valid_types}`) is the real consumer, Step D enforces it afterward, and Step C's equivalent parameter is inert for the same reason. |
 
 ### Optional fields
 
@@ -30,8 +32,10 @@ is the only supported way to read a profile; nothing else parses `profiles/*.jso
 
 ### Validation rules
 
-- **Unknown fields are rejected outright** — `load_profile()` raises `ValueError` on any key not in
-  the required/optional lists above. There's no forward-compatible "extra fields are ignored" mode.
+- **Unknown top-level fields are rejected outright** — `load_profile()` raises `ValueError` on any
+  top-level key not in the required/optional lists above. This does not apply recursively:
+  `checklist_guidance` accepts arbitrary unvalidated nested keys other than `evidence_categories`
+  (e.g. `{"checklist_guidance": {"typo": 123}}` loads without error).
 - `obligation_verbs`, `domain_tags`, and `requirement_types` must be **non-empty** lists of strings —
   an empty list here would produce either a broken prompt or validation that silently
   accepts/rejects everything. `skip_sections` is the one list field allowed to be empty.
@@ -62,9 +66,10 @@ whenever testing a profile other than `cybersecurity`.
 
 1. Create `profiles/<name>.json` with the five required fields above, matching `name` to the
    filename.
-2. Decide `obligation_verbs` and `domain_tags`/`requirement_types` for the new domain — these
-   directly shape what Step C extracts and how Step D.5 classifies it, so get them right before a
-   real ingest run rather than iterating against production data.
+2. Decide `obligation_verbs` (shapes what Step C's extraction prompt asks for) and
+   `domain_tags`/`requirement_types` (shapes what Step D.5's enrichment prompt classifies into) for
+   the new domain — get them right before a real ingest run rather than iterating against
+   production data.
 3. Pick `skip_sections` knowing it only applies under `--layout-mode docling` (see above) — if
    you're using the default pymupdf path, this field is a no-op for now.
 4. Run `python3 cli/reqbot.py ingest <doc.pdf> --profile <name>` and expect a full extraction pass

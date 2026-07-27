@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as api from '../api/client'
@@ -40,6 +40,12 @@ export default function SearchView() {
 
   const synth = useSynthesis()
   const { reset: synthReset } = synth
+
+  // Tracks the current search identity so a late-arriving Generate Answer response
+  // doesn't overwrite results from a since-changed search with a stale/mismatched set
+  // (Codex review, PR #142) -- mirrors EvidenceView's existing searchKeyRef pattern.
+  const searchKeyRef = useRef('')
+  searchKeyRef.current = `${q} ${doc} ${urlTopK} ${fastMode}`
 
   // Sync input fields when q/top_k change via browser back/forward.
   useEffect(() => {
@@ -121,6 +127,14 @@ export default function SearchView() {
 
   function handleGenerateAnswer() {
     if (!q || synth.loading) return
+    // Under HyDE (the default), this fetch's hypothesis leg is a fresh, nondeterministic
+    // LLM sample -- its retrieval can genuinely differ from the search that's currently
+    // displayed. The synthesis text's [N] citations are numbered against THIS fetch's
+    // results, so the displayed cards must be replaced with them, not left as-is, or
+    // clicking a citation can silently land on an unrelated requirement (Codex review,
+    // PR #142). Guarded by searchKeyRef so a stale response (query changed while this
+    // was in flight) can't clobber a newer, correct result set.
+    const requestKey = searchKeyRef.current
     synth.run(() =>
       api.ask({
         question: q,
@@ -128,7 +142,14 @@ export default function SearchView() {
         document_ids: doc ? [doc] : undefined,
         synthesize: true,
         hyde: !fastMode,
-      }).then(res => res.metadata.synthesis || null)
+      }).then(res => {
+        if (searchKeyRef.current === requestKey) {
+          setResults(res.results)
+          setRetrievalMs(res.metadata.retrieval_ms)
+          setWarnings(res.warnings)
+        }
+        return res.metadata.synthesis || null
+      })
     )
   }
 
@@ -263,7 +284,9 @@ export default function SearchView() {
             )}
 
             {/* Synthesis output */}
-            {synth.text && <SynthesisBox text={synth.text} />}
+            {synth.text && (
+              <SynthesisBox text={synth.text} citationCount={results?.length ?? 0} />
+            )}
 
             {results.length === 0 ? (
               <p className="text-sm text-gray-500">
@@ -271,8 +294,8 @@ export default function SearchView() {
               </p>
             ) : (
               <div className="space-y-3">
-                {results.map(r => (
-                  <ResultCard key={r.requirement_id} result={r} />
+                {results.map((r, i) => (
+                  <ResultCard key={r.requirement_id} result={r} index={i + 1} />
                 ))}
               </div>
             )}

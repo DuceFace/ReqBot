@@ -138,9 +138,20 @@ export default function EvidenceView() {
 
   function handleGenerateAnswer() {
     if (!urlQ || synth.loading) return
+    // Retrieval here can differ from what's currently displayed (e.g. HyDE's
+    // nondeterministic hypothesis leg), and the synthesis text's [N] citations are
+    // numbered against THIS fetch's group_order -- so the displayed groups must be
+    // replaced with it, or clicking a citation can silently land on an unrelated
+    // requirement (Codex review, PR #142). Guarded by the existing searchKeyRef so a
+    // stale response (topic/depth changed while this was in flight) can't clobber a
+    // newer, correct result set.
+    const requestKey = searchKeyRef.current
     synth.run(() =>
       api.evidence({ topic: urlQ, top_k: urlTopK, synthesize: true })
-        .then(res => res.synthesis_text || null)
+        .then(res => {
+          if (searchKeyRef.current === requestKey) setData(res)
+          return res.synthesis_text || null
+        })
     )
   }
 
@@ -271,7 +282,7 @@ export default function EvidenceView() {
             {/* Synthesis output */}
             {synth.text && (
               <div className="mb-6">
-                <SynthesisBox text={synth.text} />
+                <SynthesisBox text={synth.text} citationCount={data.group_order.length} />
               </div>
             )}
 
@@ -282,14 +293,20 @@ export default function EvidenceView() {
               </p>
             ) : (
               <div className="space-y-6">
-                {data.group_order.map(ref => {
+                {data.group_order.map((ref, i) => {
                   const group = data.groups[ref]
                   if (!group) return null
                   const sourcesShown = expandedSources.has(ref)
                   const contextShown = expandedContext.has(ref) && contextByRef !== null
                   return (
-                    <section key={ref}>
+                    // id/number match the [N] citation core/ask.py's evidence_service.py
+                    // already uses for synthesis input, via group_order's position (WP-31.2).
+                    // One number per group, not per individual source row.
+                    <section key={ref} id={`citation-${i + 1}`} className="rounded-lg transition-shadow">
                       <div className="flex items-center gap-2 mb-2">
+                        <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold tabular-nums">
+                          {i + 1}
+                        </span>
                         <h2 className="text-sm font-semibold text-gray-700 truncate">
                           {ref}
                         </h2>

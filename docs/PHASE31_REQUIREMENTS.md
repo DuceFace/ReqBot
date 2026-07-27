@@ -18,7 +18,7 @@ not in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-31.1 — Fix `section_title_path` Type Mismatch | Complete |
-| WP-31.2 — Citation Numbering & Linking (Search/Evidence) | Not started |
+| WP-31.2 — Citation Numbering & Linking (Search/Evidence) | Complete |
 | WP-31.3 — Profile Schema Documentation | Not started |
 
 ---
@@ -177,11 +177,23 @@ a Generated Answer currently has no way to find which card that refers to.
   correctly).
 - No visual redesign of `ResultCard`/`EvidenceCard` beyond adding the number badge and id.
 
+**Implementation notes:** used a single shared `citation-{n}` DOM id on both `ResultCard` and
+`EvidenceView`'s per-group `<section>` (rather than the `result-`/`evidence-` prefixes sketched
+above) so `SynthesisBox` needs no view-specific prop to know what to scroll to — it always looks
+for `citation-{n}`. `parseCitations`/`scrollToCitation` are exported directly from
+`SynthesisBox.tsx` rather than relocated into `utils/ui.ts`, since nothing else uses them (matches
+this codebase's convention of only sharing functions that have more than one caller).
+
 **Tests/verification:**
-- Unit test for the `[N]`-parsing logic added to `SynthesisBox` (via WP-30.1's harness) — covers
-  multiple citations, no citations, and a citation number with no matching card.
-- Manual: run a synthesized search/evidence query, confirm card numbers match the `[N]`s in the
-  generated answer, and confirm clicking a citation scrolls to and highlights the right card.
+- Unit test for `parseCitations` (pure function: text in, segments out) and `scrollToCitation`
+  (DOM-level, no component rendering) via WP-30.1's harness — covers multiple/adjacent citations,
+  no citations, and a citation number with no matching card.
+- Manual: ran a live `reqbot serve` against real Ollama/Qdrant, called `/api/ask` and `/api/evidence`
+  with `synthesize: true` directly, and confirmed the returned `[N]` citations line up exactly with
+  each result's/group's 1-indexed position in `results`/`group_order` on real data (e.g. Evidence's
+  synthesis correctly called out "Control [5]" as the 5th entry in `group_order`). Browser-level
+  click-to-scroll behavior itself wasn't visually verified — no browser tooling available in this
+  environment — but the underlying DOM logic (`scrollToCitation`) is unit-tested directly.
 
 **Gate:** Search and Evidence result cards show stable visible numbers matching the synthesis
 citation order, and clicking a `[N]` in a Generated Answer jumps to the matching card.

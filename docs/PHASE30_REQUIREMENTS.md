@@ -19,7 +19,7 @@ not in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-30.1 — Frontend Test Infrastructure | Complete |
 | WP-30.2 — SearchView: Configurable Result Depth | Complete |
-| WP-30.3 — Runtime Response Validation (Zod) | Not started |
+| WP-30.3 — Runtime Response Validation (Zod) | Complete |
 
 ---
 

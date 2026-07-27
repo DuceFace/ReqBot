@@ -211,7 +211,12 @@ export interface EvidenceRequirement {
   confidence?: number
   page_start?: number
   page_end?: number
-  section_title_path?: string
+  // list[str] hierarchy breadcrumb on the Python side (pipeline/chunk_text.py),
+  // same shape as ChecklistItem's below -- was wrongly typed as a single
+  // string here; caught by WP-30.3's Zod validation against real evidence_service
+  // output (see docs/TODO_future_improvements.txt for the sibling bug on
+  // Requirement/ComparePayload, deliberately left alone in this WP).
+  section_title_path?: string[]
 }
 
 /**

@@ -14,12 +14,15 @@ const MIN_TOP_K = 1
 const MAX_TOP_K = 100
 const DEFAULT_TOP_K = 20
 
-function clampTopK(value: number): number {
+// Exported for unit testing (WP-30.1). WP-30.2 relocates these into
+// utils/ui.ts as shared code once SearchView needs the same logic — this
+// export is an interim step, not the final home.
+export function clampTopK(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_TOP_K
   return Math.min(MAX_TOP_K, Math.max(MIN_TOP_K, Math.round(value)))
 }
 
-function parseTopKParam(raw: string | null): number {
+export function parseTopKParam(raw: string | null): number {
   if (raw === null || raw.trim() === '') return DEFAULT_TOP_K
   return clampTopK(Number(raw))
 }

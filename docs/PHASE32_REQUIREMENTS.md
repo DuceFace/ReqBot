@@ -19,7 +19,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Not started |
+| WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Spike complete — systemic, root cause confirmed; fix decision pending (see Findings) |
 | WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Not started |
 | WP-32.3 — Evidence Grouping Fallback Fix | Not started |
 | WP-32.4 — Context Excerpt Labeling | Not started |
@@ -169,6 +169,67 @@ evidence above — not a guess.
 - If systemic: do not attempt the fix inside this WP. Write up the confirmed root cause and scope a
   dedicated follow-up WP (likely its own small phase, given a Step C prompt/pipeline fix carries
   real regression risk against the existing corpus) rather than bolting a rushed fix onto a spike.
+
+**Findings (2026-07-27) — SYSTEMIC, root cause confirmed:**
+
+Checked all 10 records above against `grc_context` using the exact logic
+`services/evidence_service.py` uses (`quote in ctx`). **10/10 mismatched** — every single one's
+`chunk_id` points to a References/Glossary/Definitions/Introduction-type section that has nothing
+to do with password policy. All 10 share the same `extraction_model`
+(`llama3.1:8b-instruct-q4_K_M`) but span 8 different ingest runs on different dates, ruling out a
+one-off bad run.
+
+Pulled the actual raw Step C output for one case directly (`NIST.SP.800-37r2.pdf`, chunk_id 51,
+`documents/processed/NIST.SP.800-37r2_20260405_064552/NIST.SP.800-37r2_raw_responses.jsonl`).
+Chunk 51's real text is the document's introduction — definitions of "information system," "risk,"
+a citation to a Defense Science Board report — nothing about passwords or MFA. The LLM's raw
+response for that chunk was:
+
+```json
+[
+  {"source_quote": "shall implement multi-factor authentication for all privileged user accounts.", "source_ref": "3.2.1"},
+  {"source_quote": "shall conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters.", "source_ref": "3.2.2"}
+]
+```
+
+That is a near-verbatim copy of `PASS1_PROMPT_TEMPLATE`'s own **Example 2** few-shot content
+(`source_ref` values `3.2.1`/`3.2.2` match the example exactly). **Root cause: the model regurgitates
+its own few-shot example when a chunk has no real extractable requirements, instead of correctly
+returning `{"requirements": []}`** — which is exactly what the prompt's Example 3 (a References
+section) tells it to do in that situation. It isn't following that instruction reliably on
+low-signal chunks.
+
+Contributing factor: these are exactly the kind of chunks `skip_sections` (`GLOSSARY`,
+`REFERENCES`, `DEFINITIONS`, etc.) exists to filter out — but per `docs/PROFILES.md`
+(WP-31.3), that filter only applies under `--layout-mode docling`. Every affected record here came
+from the default pymupdf path, which sends these sections to Step C at all.
+
+Ran a corpus-wide check (not just the original 10) for `source_quote` matching each example
+sentence via Qdrant full-text match against all 31,725 indexed requirements:
+
+| Example sentence (from `PASS1_PROMPT_TEMPLATE`'s Example 2) | Matches |
+|---|---|
+| "shall implement multi-factor authentication for all privileged user accounts." | 165 |
+| "All DoD information systems shall implement multi-factor authentication for all privileged user accounts." | 14 |
+| "conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters." | 30 |
+
+(Qdrant's full-text match is token-based, not exact-substring, so treat these as order-of-magnitude,
+not precise counts — but confirms this is not a 10-record fluke; it recurs corpus-wide.)
+
+**Recommended fix direction for the follow-up WP (not implemented here, per Reject-If above):** the
+most robust fix is a cheap, deterministic, non-LLM guard — reject any extracted requirement whose
+`source_quote` does not literally appear as a substring of the actual chunk text being processed.
+This would catch this failure mode (and any other hallucination shaped like it) regardless of which
+few-shot example got copied, without needing to re-tune the prompt or model. Applying
+`skip_sections` filtering to the default pymupdf path too would reduce exposure but wouldn't fully
+close the hole on its own — any sufficiently low-signal chunk could trigger the same regurgitation,
+not just labeled Glossary/References sections.
+
+**This is a real data-integrity bug with corpus-wide reach, not a cosmetic finding.** Recommend
+deciding explicitly whether the fix (likely a small, low-risk addition to Step D normalization) gets
+folded into this phase as its own WP or deferred to a dedicated follow-up — flagging for Tyler
+rather than deciding unilaterally, given it changes ingest-pipeline behavior with corpus-wide blast
+radius.
 
 ---
 

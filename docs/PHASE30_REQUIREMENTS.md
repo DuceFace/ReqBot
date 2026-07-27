@@ -148,6 +148,12 @@ WP-29.1 just fixed in `EvidenceView.tsx`. Not touched by WP-29.1, which was scop
   filter) on form submit — same UX shape as `EvidenceView`'s.
 - Update both `api.ask()` call sites (initial search effect, `handleGenerateAnswer`) to use the
   committed `urlTopK` instead of the `20` literal.
+- Update `handleDocChange` to carry the committed `top_k` forward too — it currently rebuilds the
+  URL params from scratch with only `q`/`doc` (`SearchView.tsx`'s `params.q`/`params.doc`
+  construction), so changing the document filter would silently drop `top_k` back to the default 20
+  the moment this control exists, unlike `EvidenceView.tsx` (which has no equivalent second filter
+  control to lose the param against, so this failure mode is specific to `SearchView`, not a copy of
+  something WP-29.1 already handled).
 
 **Non-goals:**
 - No change to the default top-k value (still 20) or to the 1–100 clamp range.
@@ -183,11 +189,14 @@ triggers ("API surface grows further").
   complex contracts first (`ConfigResponse`, `EvidenceResponse`) rather than attempting full
   coverage in one pass — decide the remaining rollout order during implementation based on which
   types have actually drifted or caused confusion, not upfront guessing.
-- Wire schema parsing into the relevant `api/client.ts` fetch wrappers.
-- **Explicit design decision to make during implementation, not silently default:** fail-open
-  (log a warning, pass the raw response through) vs. fail-closed (throw, surface as a visible error
-  matching this codebase's existing `ErrorBanner`/`try`/`catch`/`setError` convention). Document
-  whichever is chosen and why.
+- Wire schema parsing into the relevant `api/client.ts` fetch wrappers as **fail-closed**: a schema
+  mismatch throws, surfacing as a visible error through this codebase's existing
+  `ErrorBanner`/`try`/`catch`/`setError` convention — same path a network failure already takes.
+  Fail-open (log and pass the raw response through anyway) is ruled out, not left as an
+  implementation choice: it would let `undefined` propagate into the UI exactly as it does today,
+  directly contradicting this phase's own Goal of surfacing contract mismatches as clear, visible
+  failures (Codex review, PR #136) — a warning nobody looks at isn't a fix for that. A `console.warn`
+  alongside the thrown error is fine as an additional diagnostic aid, but does not replace the throw.
 - Keep snake_case field naming in the Zod schemas, matching `types.ts`'s existing documented
   convention — no camelCase conversion layer.
 
@@ -203,7 +212,8 @@ triggers ("API surface grows further").
   schemas (no false-positive rejections of legitimate data).
 
 **Gate:** At least `ConfigResponse` and `EvidenceResponse` are Zod-validated at the `api/client.ts`
-boundary, with a clear, tested, explicitly-chosen fail-open/fail-closed behavior on mismatch.
+boundary, and a schema mismatch fails closed — a tested, visible error, not a logged-and-ignored
+pass-through.
 
 ---
 
@@ -231,7 +241,13 @@ Phase 30 is complete when:
 3. WP-30.2 must relocate `clampTopK`/`parseTopKParam` into `utils/ui.ts` as shared code, not
    duplicate them into `SearchView.tsx` — matches this codebase's established convention for shared
    pure functions (`docValue`/`pageRange`).
-4. WP-30.3's fail-open vs. fail-closed behavior on schema mismatch must be an explicit, documented
-   decision made during implementation — not silently defaulted either way.
+4. WP-30.3 must fail closed on a schema mismatch (throw, surface via the existing `ErrorBanner`
+   convention) — fail-open (log and pass the malformed response through) is explicitly ruled out,
+   since it would defeat this phase's own Goal of surfacing contract drift as a visible failure
+   (Codex review, PR #136).
 5. No CLI/API/MCP behavior changes anywhere in this phase — all three WPs are frontend/test-tooling
    only.
+6. WP-30.2 must update every `SearchView` code path that rebuilds the URL's search params
+   (`handleSubmit` and `handleDocChange` both), not just the form-submit path — `handleDocChange`
+   rebuilds params from scratch today and would silently drop `top_k` back to the default the
+   moment the new control exists otherwise (Codex review, PR #136).

@@ -112,7 +112,7 @@ ACTIVE BACKLOG
       re-ingested document that produces the same requirement_ids will
       correctly re-associate assessor notes
 
-18. SearchView has the same hardcoded top_k as EvidenceView did (found during
+18. [RESOLVED — Phase 30, WP-30.2] SearchView has the same hardcoded top_k as EvidenceView did (found during
     Phase 29, WP-29.1)
     frontend/src/views/SearchView.tsx calls api.ask() with a fixed top_k: 20
     literal at both of its call sites (initial search and re-run-with-

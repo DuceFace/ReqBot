@@ -9,7 +9,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import SynthesisBox from '../components/SynthesisBox'
 import AppShell from '../components/AppShell'
 import { useSynthesis } from '../hooks/useSynthesis'
-import { docValue } from '../utils/ui'
+import { clampTopK, DEFAULT_TOP_K, docValue, MAX_TOP_K, MIN_TOP_K, parseTopKParam } from '../utils/ui'
 
 export default function SearchView() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -19,6 +19,12 @@ export default function SearchView() {
   // input tracks the text field; q tracks the committed (URL) query.
   // They diverge while the user is typing a new query.
   const [input, setInput] = useState(q)
+
+  // topK tracks the number input; urlTopK tracks the committed (URL) value.
+  // They diverge while the user is editing the field, mirroring EvidenceView's
+  // topic/urlQ split (WP-30.2, same pattern WP-29.1 established).
+  const urlTopK = parseTopKParam(searchParams.get('top_k'))
+  const [topK, setTopK] = useState<number | ''>(urlTopK)
 
   const [docOptions, setDocOptions] = useState<DocsEntry[]>([])
   const [docLoadError, setDocLoadError] = useState(false)
@@ -35,17 +41,20 @@ export default function SearchView() {
   const synth = useSynthesis()
   const { reset: synthReset } = synth
 
-  // Sync input field when q changes via browser back/forward.
+  // Sync input fields when q/top_k change via browser back/forward.
   useEffect(() => {
     setInput(q)
   }, [q])
+  useEffect(() => {
+    setTopK(urlTopK)
+  }, [urlTopK])
 
-  // Reset synthesis when the committed query, doc filter, or fast mode changes —
+  // Reset synthesis when the committed query, doc filter, result depth, or fast mode changes —
   // toggling fast mode changes the underlying evidence set, so a previously
   // generated answer may no longer match what's on screen.
   useEffect(() => {
     synthReset()
-  }, [q, doc, fastMode, synthReset])
+  }, [q, doc, urlTopK, fastMode, synthReset])
 
   // Load document list once on mount for the filter dropdown.
   useEffect(() => {
@@ -54,7 +63,7 @@ export default function SearchView() {
       .catch(() => { setDocLoadError(true) })
   }, [])
 
-  // Run search whenever the committed query, doc filter, or retry count changes.
+  // Run search whenever the committed query, doc filter, result depth, or retry count changes.
   // A `cancelled` flag prevents stale responses from superseded requests
   // overwriting the UI when the query changes before the previous fetch completes.
   useEffect(() => {
@@ -74,7 +83,7 @@ export default function SearchView() {
     api
       .ask({
         question: q,
-        top_k: 20,
+        top_k: urlTopK,
         document_ids: doc ? [doc] : undefined,
         hyde: !fastMode,
       })
@@ -95,16 +104,17 @@ export default function SearchView() {
     // retries is intentionally included (not referenced in the body) so the
     // retry button can re-run the same query without changing the URL params.
     // Every other dependency this effect actually closes over — q, doc,
-    // fastMode — is listed above, so this disable covers only that one
-    // deliberate exception, not a genuinely missing dependency.
+    // urlTopK, fastMode — is listed above, so this disable covers only that
+    // one deliberate exception, not a genuinely missing dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, doc, fastMode, retries])
+  }, [q, doc, urlTopK, fastMode, retries])
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const trimmed = input.trim()
     if (!trimmed) return
-    const params: Record<string, string> = { q: trimmed }
+    const submittedTopK = topK === '' ? DEFAULT_TOP_K : clampTopK(topK)
+    const params: Record<string, string> = { q: trimmed, top_k: String(submittedTopK) }
     if (doc) params.doc = doc
     setSearchParams(params)
   }
@@ -114,7 +124,7 @@ export default function SearchView() {
     synth.run(() =>
       api.ask({
         question: q,
-        top_k: 20,
+        top_k: urlTopK,
         document_ids: doc ? [doc] : undefined,
         synthesize: true,
         hyde: !fastMode,
@@ -124,7 +134,11 @@ export default function SearchView() {
 
   function handleDocChange(e: ChangeEvent<HTMLSelectElement>) {
     const newDoc = e.target.value
-    const params: Record<string, string> = {}
+    // Carry top_k forward -- this previously rebuilt params from scratch with
+    // only q/doc, so changing the document filter silently reset result depth
+    // back to the default the moment this control existed (Codex review,
+    // PR #136).
+    const params: Record<string, string> = { top_k: String(urlTopK) }
     if (q) params.q = q
     if (newDoc) params.doc = newDoc
     setSearchParams(params)
@@ -141,6 +155,20 @@ export default function SearchView() {
             onChange={e => setInput(e.target.value)}
             placeholder="Search compliance requirements…"
             className="flex-1 border border-gray-300 rounded px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <label htmlFor="search-top-k" className="sr-only">
+            Result depth
+          </label>
+          <input
+            id="search-top-k"
+            type="number"
+            min={MIN_TOP_K}
+            max={MAX_TOP_K}
+            value={topK}
+            onChange={e => setTopK(e.target.value === '' ? '' : Number(e.target.value))}
+            title="Result depth (number of results to retrieve, 1–100)"
+            aria-label="Result depth"
+            className="w-20 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="submit"

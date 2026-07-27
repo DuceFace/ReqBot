@@ -71,7 +71,7 @@ ACTIVE BACKLOG
    - blank is better than an unsupported rephrase
    - generated questions should be marked as generated text
 
-7. MCP tool surface (Phase 26 active work — see docs/PHASE26_REQUIREMENTS.md; original idea archived at archive/FUTURE_MCP_IDEA.md)
+7. [RESOLVED — Phase 26] MCP tool surface (see archive/PHASE26_REQUIREMENTS.md; original idea archived at archive/FUTURE_MCP_IDEA.md)
    Expose ReqBot as a tool server so external assistants can query a self-hosted
    ReqBot instance.
 
@@ -118,7 +118,7 @@ ACTIVE BACKLOG
     literal at both of its call sites (initial search and re-run-with-
     synthesis) -- the exact same pattern WP-29.1 just fixed in
     EvidenceView.tsx. Not touched by WP-29.1, which was scoped to the
-    evidence view specifically (see docs/PHASE29_REQUIREMENTS.md, WP-29.1).
+    evidence view specifically (see archive/PHASE29_REQUIREMENTS.md, WP-29.1).
     Needs its own small WP: add the same URL-persisted numeric control,
     following the pattern WP-29.1 established (topK/urlTopK split, clamped
     1-100, submitted together with the query on form submit).
@@ -165,6 +165,67 @@ ACTIVE BACKLOG
     add Zod coverage for AskResponse/CompareResponse while in there if
     that's judged in scope.
 
+21. Citation numbering and linking in Search/Evidence
+    Synthesized answers cite sources, but result cards aren't numbered and
+    citations don't link back to the matching requirement.
+
+    Do first:
+    - Add stable visible numbers to Search and Evidence result cards.
+    - Make synthesis prompts use the same numbering shown in the UI.
+    - Make citation references in synthesis output clickable, or at least
+      jump/highlight the matching result.
+
+    Why: high provenance/trust value, bounded GUI-only work.
+
+22. Profile schema documentation pass
+    profiles/*.json's real schema (obligation_verbs, skip_sections,
+    domain_tags, requirement_types, checklist guidance) has never had a
+    dedicated documentation pass. Cheap cleanup, worth doing before adding
+    any profile beyond cybersecurity. Note skip_sections only affects the
+    docling layout-mode path today (see item 5 above) -- document that
+    limitation explicitly rather than letting it stay a code-only fact.
+
+23. Actionability self-verification for extracted requirements
+    Some extracted requirements are syntactically obligation-shaped ("shall",
+    "must", "will") but not independently auditable/verifiable -- too vague,
+    contextual, administrative, or dependent on parent context. Confirmed
+    against current code: Step C's prompt (pipeline/llm_extract_requirements.py)
+    only screens for obligation language; Step D normalization
+    (pipeline/parse_and_normalize.py) only drops empty source_quote,
+    "not explicitly stated" descriptions, and short errata entries; Step D.5
+    enrichment (pipeline/enrich_requirements.py) is pure classification
+    (description/domain_tags/requirement_type) -- no auditability signal
+    exists anywhere in the pipeline today.
+
+    Leaning towards: fold into Step D.5 rather than adding a new pipeline
+    stage. D.5 already makes one LLM round-trip per requirement/batch, so an
+    extra "is_verifiable" + reason key on that same JSON output avoids a new
+    ingest stage or LLM call. Try the cheaper fix first, though: test whether
+    stricter Step C prompt wording alone reduces weak extractions before
+    building a separate judgment pass.
+
+    Do first:
+    - Sample weak extracted requirements and label failure modes.
+    - Test stricter Step C prompt wording first (cheaper than a new pass).
+    - If still needed, prototype the check as an extra key in Step D.5's
+      existing enrichment call rather than a standalone verifier.
+    - For context-dependent cases, retry with parent_context/
+      section_title_path before dropping.
+    - Measure false positives/negatives against a small hand-labeled set --
+      reuse eval_harness.py's gold-labeling pattern (gold_eval_chunks_curated.jsonl)
+      rather than building new eval infra.
+
+    Connects to item 6 above (audit_question generation): both are an extra
+    per-requirement LLM judgment made after extraction. If both get built,
+    do them as one combined Step D.5 call, not two separate ingest-time LLM
+    passes.
+
+24. Search/Evidence screen consolidation (IA review)
+    Search and Evidence overlap enough to warrant a focused review. Compare
+    and Checklists are distinct workflows and likely stay separate screens
+    even if they share retrieval plumbing. Revisit after item 21 (citation
+    linking) and Search/Evidence parity are in place -- not urgent now.
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS
@@ -174,15 +235,48 @@ These are quality experiments, not guaranteed product work.
 
 1. Reranker spike
    Add a local reranker stage after RRF fusion for precision improvement.
+   Prior planning exists but was deferred before execution -- see
+   archive/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md (WP-15.5) for the fuller
+   architecture writeup (candidate pool sizing, reject-if criteria).
+
+   Insertion point (verified in code): core/ask.py's retrieve() is the one
+   RRF fusion call shared by ask_service and evidence_service, and therefore
+   by Search, Evidence, CLI, and MCP (mcp_server/server.py calls those same
+   services) -- reranking there covers all four in one place.
+
+   Known gap: services/compare_service.py has its OWN independent RRF
+   query_points() call, not routed through retrieve(). A reranker added only
+   at the shared choke point will NOT cover Compare. Decide explicitly
+   whether Compare is in scope before calling this "done" -- don't assume it
+   rides along for free.
+
+   Blocking prerequisite: there is no retrieval-precision eval set today.
+   eval/eval_harness.py measures Step C extraction precision/recall (gold
+   chunk -> extracted requirements), not query -> ranked-result relevance.
+   The archived PHASE15 plan assumed a "Phase 15 evaluation query set"
+   existed as a success-criteria reference, but that phase was deferred
+   before one was ever built. Build a small query -> relevant-requirement_ids
+   gold set (reusing the existing gold_eval_chunks hand-labeling pattern)
+   before any Precision@5 number can mean anything.
+
+   Secondary implementation notes:
+   - retrieve()'s fusion_limit is only widened past top_k when min_score > 0
+     (max(top_k*3, 50) if min_score > 0 else top_k) -- the "retrieve 40-50
+     candidates" headroom a reranker needs isn't guaranteed unconditionally
+     yet; decouple candidate-pool size from min_score.
+   - min_score is calibrated to RRF's score scale today. If reranker scores
+     later become the confidence signal (see corrective retrieval gate
+     below), that threshold needs recalibrating, not reusing as-is.
 
    Candidate approaches:
-   - FlashRank for fast local reranking
+   - FlashRank for fast local reranking (cheapest first spike)
    - cross-encoder for higher quality with more cost
 
    Gate:
-   - Precision@5 improvement
+   - Precision@5 improvement on the new eval set
    - no regression on known good queries
    - acceptable latency on target hardware
+   - do not make default unless it clears the gate
 
 2. Multi-vector retrieval
    Index multiple semantic surfaces per requirement, such as description and
@@ -205,6 +299,27 @@ These are quality experiments, not guaranteed product work.
    result is still weak.
 
    Depends on having calibrated reranking or confidence signals.
+
+5. Raw-context search as an explicit MCP tool (distinct from item 4)
+   grc_context is indexed but only used today for context around existing
+   requirement hits (core/ask.py's retrieve_context_chunks) -- it isn't
+   exposed as a general "search the raw ingested text" capability. Primary
+   use case: an MCP agent gets curated requirements first, then deliberately
+   wants to search grc_context as a follow-up, rather than ReqBot's UI
+   inventing a weak-confidence fallback path.
+
+   This is a different thing from item 4 above: item 4 is an automatic
+   system-triggered retry, this is an agent-triggered deliberate tool call.
+   Keep them separate -- item 4 still needs a trustworthy confidence signal
+   (reranker scores, see item 1) before it's safe to trigger automatically;
+   this one doesn't, since a human/agent is deciding to reach for it.
+
+   Do first:
+   - Add an MCP-facing raw-context search tool.
+   - Compare grc_requirements vs. direct grc_context search on representative
+     queries to know what it's actually good for.
+   - Clearly label grc_context results as lower-confidence than curated
+     requirements.
 
 
 ================================================================

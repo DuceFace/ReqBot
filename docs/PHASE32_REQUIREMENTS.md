@@ -19,7 +19,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Spike complete — systemic, root cause confirmed; fix decision pending (see Findings) |
+| WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Complete — fix shipped and validated against 2 fresh re-ingests; rest-of-corpus re-ingest tracked separately, not part of this WP |
 | WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Not started |
 | WP-32.3 — Evidence Grouping Fallback Fix | Not started |
 | WP-32.4 — Context Excerpt Labeling | Not started |
@@ -83,9 +83,11 @@ WP-32.2's findings — but severity does. Do the spikes first.
 
 ## 3. Non-Goals
 
-- No retroactive correction of every mis-attributed record already in an indexed corpus — WP-32.1's
-  spike determines *whether* a pipeline fix is needed; whatever's already indexed stays as-is until
-  a reindex, which is a separate, later decision (not blocking this phase).
+- No retroactive correction/flagging of the pre-WP-32.1 corpus — superseded by what actually
+  happened: the corpus was disposable test data, so it was nuked outright (both Qdrant collections
+  deleted, `~/documents/processed/` archived, not migrated) rather than patched in place. Re-ingesting
+  the remaining 43 documents through the fixed pipeline is a separate, later decision, not assumed by
+  this phase.
 - No markdown rendering anywhere except the Generated Answer synthesis text (WP-32.6) —
   `source_quote`/`description`/context excerpts stay as plain escaped text; they're verbatim source
   material and rendering them as markdown risks misrepresenting the original document.
@@ -230,6 +232,64 @@ deciding explicitly whether the fix (likely a small, low-risk addition to Step D
 folded into this phase as its own WP or deferred to a dedicated follow-up — flagging for Tyler
 rather than deciding unilaterally, given it changes ingest-pipeline behavior with corpus-wide blast
 radius.
+
+**Resolution (2026-07-27):** Tyler's call — fold the fix into this WP. The existing corpus is
+disposable test data, not worth preserving/flagging/migrating; nuke it and rebuild through a
+controlled, single-document iteration loop rather than trying to patch or retroactively flag what's
+already indexed. Full design went through a formal plan-mode review before any code changed (Tyler's
+explicit ask: high-risk decisions get debated, not one-shotted).
+
+**Implementation — three things changed from the original naive idea:**
+
+1. **Exact substring matching would have been a worse bug than the one it fixed.** Testing a random
+   30-record sample of the original raw flags showed 16/30 were real quotes reformatted from tabular
+   source text (heavy in `NIST.SP.800-53Ar5`'s assessment-procedure tables, e.g.
+   `"CA-2(2) Integrity.M = ."`), not fabrications. Switched to `rapidfuzz.fuzz.partial_ratio` — the
+   right tool specifically because it scores how well a *short* string matches the best-aligned
+   *substring* of a *long* one, unlike `eval/eval_harness.py`'s existing `fuzz.token_sort_ratio`
+   usage (built for comparing two same-length quotes, not a quote against a whole chunk).
+2. **The corrected corpus-wide fabrication rate is ~5.6%, not 21.55%.** Re-running the fuzzy check
+   (threshold 80) against all 45 locally-processed documents flagged 1,888/33,462 requirements — most
+   of the original raw 21.55% really was reformatting noise, not fabrication, confirming finding #1.
+3. **Threshold calibrated empirically, not guessed.** Swept thresholds 50-80 against both
+   `eval/gold_eval_chunks_curated.jsonl`'s 2,452 hand-verified real quotes (false-positive side) and
+   the full local corpus (catch-rate side):
+
+   | threshold | gold false-positive rate | corpus flagged rate |
+   |---|---|---|
+   | 50 | 0.86% | 3.51% |
+   | 60 | 1.75% | 4.42% |
+   | 80 | 4.61% | 5.64% |
+
+   Diminishing returns above ~60 — pushing to 80 nearly triples the gold false-positive rate for
+   comparatively little extra catch. Landed on **60**. The confirmed hallucination that motivated this
+   whole spike scores 44 — well clear of 60 either way.
+
+**Shipped:** `QUOTE_GROUNDING_THRESHOLD = 60` added to `pipeline/parse_and_normalize.py`'s existing
+per-requirement validation loop (`build_chunk_text_map()` alongside the file's existing
+`build_chunk_page_map`/`build_chunk_hierarchy_map` helpers; new `"quote_not_grounded_in_chunk"`
+failure reason in the same fail-list pattern as the existing `empty_source_quote`/`not_actionable`
+checks). `rapidfuzz` moved from `pyproject.toml`'s `dev` extra to base `dependencies` — it's now a
+genuine runtime pipeline dependency, not just an eval-only tool (incidentally resolves the
+dependency-drift concern `docs/TODO_future_improvements.txt`'s dependency backlog already tracked).
+
+**Validated against real data, not just unit tests:** nuked both Qdrant collections (backing
+collections deleted directly per `docs/OPERATIONS.md`'s documented procedure) and archived
+`~/documents/processed/` to `~/documents/processed.pre-wp32.1/` (not deleted — free undo at zero
+cost). Re-ingested two documents fresh through the fixed pipeline:
+- `afpd_17-1.pdf` — 102/105 requirements normalized, 0 grounding rejections, all real scores
+  computed (min 68.5, confirmed the check is actually running, not silently passing everything).
+- `CJCSI 6510.02G.pdf` — 71/72 normalized, **1 grounding rejection**: `"shall implement
+  multi-factor authentication for all privileged user accounts."` (the exact same Example-2-derived
+  boilerplate from the original spike), `grounding_score: 46.8`. Verified chunk 12's real text
+  directly — it's a references/citation list (`source_ref: "GL-1"`), zero relation to MFA. Caught
+  live, on a fresh pipeline run, not just reproduced synthetically.
+
+**Explicitly deferred, not assumed:** re-ingesting the remaining 43 documents is a separate decision,
+not folded into this WP. No change to Step C's prompt itself (the few-shot examples that get
+regurgitated) — this WP catches the symptom deterministically after the fact rather than trying to
+stop the model from fabricating in the first place; worth a future look if the rejection rate stays
+high on further re-ingests, but out of scope here.
 
 ---
 

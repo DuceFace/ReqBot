@@ -123,6 +123,44 @@ describe('evidenceResponseSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('parses a requirement with explicit null metadata fields (legacy/unmapped record)', () => {
+    // pipeline/embed_and_index.py's build_payload() has no default for
+    // page_start/page_end, so a legacy or otherwise-unmapped requirement
+    // genuinely stores an explicit JSON null here, not a missing key
+    // (Codex + Gemini review, PR #139).
+    const fixture = {
+      query: 'access control',
+      timestamp: '2026-07-25T00:00:00Z',
+      group_order: ['3.1.1'],
+      groups: {
+        '3.1.1': {
+          source_ref: '3.1.1',
+          representative: {
+            requirement_id: 'REQ-legacy1',
+            description: null,
+            source_quote: null,
+            source_ref: null,
+            source_pdf: null,
+            document_id: null,
+            domain_tags: null,
+            requirement_type: null,
+            confidence: null,
+            page_start: null,
+            page_end: null,
+            section_title_path: null,
+          },
+          sources: [{ requirement_id: 'REQ-legacy1' }],
+          context_text: null,
+        },
+      },
+      total_sources: 1,
+      synthesis_text: '',
+      warnings: [],
+    }
+    const result = evidenceResponseSchema.safeParse(fixture)
+    expect(result.success).toBe(true)
+  })
+
   it('parses the empty-result shape (no groups, no matches)', () => {
     const fixture = {
       query: 'access control',

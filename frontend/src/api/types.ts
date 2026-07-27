@@ -196,27 +196,31 @@ export interface EvidenceRequest {
 
 /**
  * Raw Qdrant payload for a single requirement returned by evidence_service.
- * Uses optional fields because payload values are not guaranteed for every
- * record (esp. older ingested docs). requirement_id is always present.
+ * Fields are optional *and* nullable, not just optional — pipeline/embed_and_index.py's
+ * build_payload() stores several of these (page_start/page_end in particular)
+ * with no default, so a legacy or otherwise-unmapped record genuinely returns
+ * an explicit `null`, not just a missing key (Codex + Gemini review, PR #139;
+ * the corresponding Zod schema in schemas.ts uses .nullish() to match).
+ * requirement_id is always present.
  */
 export interface EvidenceRequirement {
   requirement_id: string
-  description?: string
-  source_quote?: string
-  source_ref?: string
-  source_pdf?: string
-  document_id?: string
-  domain_tags?: string[]
-  requirement_type?: string
-  confidence?: number
-  page_start?: number
-  page_end?: number
+  description?: string | null
+  source_quote?: string | null
+  source_ref?: string | null
+  source_pdf?: string | null
+  document_id?: string | null
+  domain_tags?: string[] | null
+  requirement_type?: string | null
+  confidence?: number | null
+  page_start?: number | null
+  page_end?: number | null
   // list[str] hierarchy breadcrumb on the Python side (pipeline/chunk_text.py),
   // same shape as ChecklistItem's below -- was wrongly typed as a single
   // string here; caught by WP-30.3's Zod validation against real evidence_service
   // output (see docs/TODO_future_improvements.txt for the sibling bug on
   // Requirement/ComparePayload, deliberately left alone in this WP).
-  section_title_path?: string[]
+  section_title_path?: string[] | null
 }
 
 /**

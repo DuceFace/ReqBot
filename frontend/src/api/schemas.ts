@@ -13,21 +13,31 @@ import { z } from 'zod'
 
 // ─── Evidence ────────────────────────────────────────────────────────────────
 
+// .nullish() (not .optional()) on every field below -- pipeline/embed_and_index.py's
+// build_payload() stores several of these with no default (page_start,
+// page_end in particular), so a legacy or otherwise-unmapped requirement
+// payload genuinely returns an explicit JSON `null`, not just an absent key.
+// evidence_service.build() passes the raw Qdrant payload straight through
+// with no reconstruction, so this reaches the API response as-is. .optional()
+// only accepts a missing key (undefined); it rejects an explicit null, which
+// would have made this WP's fail-closed validation break the evidence view
+// for exactly the legacy-data case it needs to tolerate (Codex + Gemini
+// review, PR #139).
 const evidenceRequirementSchema = z.object({
   requirement_id: z.string(),
-  description: z.string().optional(),
-  source_quote: z.string().optional(),
-  source_ref: z.string().optional(),
-  source_pdf: z.string().optional(),
-  document_id: z.string().optional(),
-  domain_tags: z.array(z.string()).optional(),
-  requirement_type: z.string().optional(),
-  confidence: z.number().optional(),
-  page_start: z.number().optional(),
-  page_end: z.number().optional(),
+  description: z.string().nullish(),
+  source_quote: z.string().nullish(),
+  source_ref: z.string().nullish(),
+  source_pdf: z.string().nullish(),
+  document_id: z.string().nullish(),
+  domain_tags: z.array(z.string()).nullish(),
+  requirement_type: z.string().nullish(),
+  confidence: z.number().nullish(),
+  page_start: z.number().nullish(),
+  page_end: z.number().nullish(),
   // list[str] hierarchy breadcrumb -- see the matching comment on
   // EvidenceRequirement in types.ts for how this was caught.
-  section_title_path: z.array(z.string()).optional(),
+  section_title_path: z.array(z.string()).nullish(),
 })
 
 const evidenceGroupSchema = z.object({

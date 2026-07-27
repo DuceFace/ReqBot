@@ -17,7 +17,7 @@ not in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-31.1 — Fix `section_title_path` Type Mismatch | Not started |
+| WP-31.1 — Fix `section_title_path` Type Mismatch | Complete |
 | WP-31.2 — Citation Numbering & Linking (Search/Evidence) | Not started |
 | WP-31.3 — Profile Schema Documentation | Not started |
 
@@ -117,6 +117,13 @@ JSX, which concatenates the array elements with no separator instead of the inte
   done — confirmed during phase planning that `TraceView.tsx:197` is currently the only one
   (`CompareView.tsx`/`SearchView.tsx` don't render this field at all today), but re-check at
   implementation time in case that's changed.
+
+**Found during implementation:** `Requirement.section_ref_path` (`types.ts:34`) has the identical
+bug — same `string` vs. actual `list[str]` mistype, same raw-render symptom at
+`TraceView.tsx:288`. Same root cause, same fix shape, directly adjacent in the same interface —
+fixed alongside `section_title_path` rather than filed as a separate backlog item to rediscover
+later. Verified against the same Python source (`parse_and_normalize.py`) that it's never `null`,
+only possibly absent on pre-schema-v2.0 records, same as `section_title_path`.
 
 **Non-goals:**
 - No Zod coverage for `AskResponse`/`CompareResponse` (see Phase Non-Goals).

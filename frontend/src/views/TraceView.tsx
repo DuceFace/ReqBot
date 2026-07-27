@@ -7,7 +7,7 @@ import type { TraceResponse, Requirement } from '../api/types'
 import AppShell from '../components/AppShell'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
-import { pageRange } from '../utils/ui'
+import { pageRange, formatPath } from '../utils/ui'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -194,7 +194,9 @@ export default function TraceView() {
               </h1>
               <p className="mt-1 text-sm text-gray-500">
                 {req.source_pdf}
-                {req.section_title_path && <> · {req.section_title_path}</>}
+                {req.section_title_path && req.section_title_path.length > 0 && (
+                  <> · {formatPath(req.section_title_path)}</>
+                )}
                 {pages && <> · {pages}</>}
               </p>
             </div>
@@ -280,10 +282,10 @@ export default function TraceView() {
                   </>
                 )}
 
-                {req.section_ref_path && (
+                {req.section_ref_path && req.section_ref_path.length > 0 && (
                   <>
                     <dt className="text-gray-400 whitespace-nowrap">Section ref</dt>
-                    <dd className="text-gray-700 text-xs">{req.section_ref_path}</dd>
+                    <dd className="text-gray-700 text-xs">{formatPath(req.section_ref_path)}</dd>
                   </>
                 )}
 

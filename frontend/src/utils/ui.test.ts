@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampTopK, docValue, pageRange, parseTopKParam } from './ui'
+import { clampTopK, docValue, formatPath, pageRange, parseTopKParam } from './ui'
 
 describe('pageRange', () => {
   it('returns null when start is missing', () => {
@@ -35,6 +35,24 @@ describe('docValue', () => {
   it('falls back to doc_key when source_pdf is blank/whitespace-only', () => {
     expect(docValue({ source_pdf: '', doc_key: 'afi17-101' })).toBe('afi17-101')
     expect(docValue({ source_pdf: '   ', doc_key: 'afi17-101' })).toBe('afi17-101')
+  })
+})
+
+// formatPath originated in ChecklistTable.tsx and was relocated here as shared code
+// (WP-31.1) once TraceView needed the same join logic for section_title_path/
+// section_ref_path -- previously duplicated the wrong way (rendering a string[]
+// directly into JSX instead of joining it, see api/types.ts's WP-31.1 type fix).
+describe('formatPath', () => {
+  it('joins multiple parts with the breadcrumb separator', () => {
+    expect(formatPath(['3', '3.2', '3.2.1 Access Control'])).toBe('3 › 3.2 › 3.2.1 Access Control')
+  })
+
+  it('returns a single part unchanged', () => {
+    expect(formatPath(['AC-3'])).toBe('AC-3')
+  })
+
+  it('returns an em dash for an empty array', () => {
+    expect(formatPath([])).toBe('—')
   })
 })
 

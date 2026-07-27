@@ -170,7 +170,7 @@ def build_chunk_text_map(chunks: list[dict]) -> dict[int, str]:
     requirement's source_quote against anything other than what the LLM actually
     saw would be checking against the wrong text (WP-32.1).
     """
-    return {c["chunk_id"]: c.get("text", "") for c in chunks}
+    return {c["chunk_id"]: c.get("text") or "" for c in chunks}
 
 
 def build_chunk_hierarchy_map(chunks: list[dict]) -> dict[int, dict]:

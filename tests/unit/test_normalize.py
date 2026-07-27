@@ -140,6 +140,17 @@ def test_build_chunk_text_map():
     assert build_chunk_text_map(chunks) == {1: "First chunk text.", 2: "Second chunk text."}
 
 
+def test_build_chunk_text_map_null_text_becomes_empty_string(tmp_path):
+    # An explicit "text": null (not just a missing key) must still produce "" to honor
+    # this function's dict[int, str] contract -- dict.get(key, default) only substitutes
+    # default when the key is absent, not when present with an explicit None (Gemini
+    # review, PR #144).
+    chunks = [{"chunk_id": 1, "text": None}, {"chunk_id": 2, "text": ""}]
+    result = build_chunk_text_map(chunks)
+    assert result == {1: "", 2: ""}
+    assert all(isinstance(v, str) for v in result.values())
+
+
 def _chunk(chunk_id: int, text: str) -> dict:
     return {
         "chunk_id": chunk_id,

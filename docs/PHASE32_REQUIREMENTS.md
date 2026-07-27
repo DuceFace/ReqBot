@@ -34,9 +34,11 @@ in `CLAUDE.md` or anywhere else.
 Every item here came out of one live manual test: Tyler ran an Evidence query for "how long should
 my password be?" against the real corpus, walked through the rendered result page end to end, and
 found it confusing/wrong in more places than expected for a screen that's supposedly finished
-product work. The full rendered page is saved at `docs/ReqBot.html` — treat it as reproduction
-evidence, not just a description; every finding below cites exact `requirement_id`/document/page
-values pulled directly from it.
+product work. That page was saved locally as a diagnostic aid during the walkthrough but was never
+committed to this repo and no longer exists — it isn't available as a reproduction artifact. Every
+finding below instead cites the exact `requirement_id`/document/page/quote values transcribed
+directly from that walkthrough at the time, in-line in each WP's own text, so nothing here depends
+on a file that doesn't exist in the tree.
 
 **This phase mixes two very different kinds of work, and the doc is organized so that distinction
 stays visible:**
@@ -105,12 +107,12 @@ WP-32.2's findings — but severity does. Do the spikes first.
 
 ### WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination
 
-**Source:** Live Evidence query walkthrough, 2026-07-27 (`docs/ReqBot.html`).
+**Source:** Live Evidence query walkthrough, 2026-07-27 (Tyler; the saved page no longer exists, see Phase Framing above -- citations below are transcribed directly).
 
 **Goal:** Determine whether the mismatched context found on one requirement is an isolated
 chunk_id error or a systemic Step C extraction defect affecting an identifiable class of records.
 
-**Rationale:** Citation 7 in `docs/ReqBot.html` (`REQ-fde1b60fd22c`, `NIST.SP.800-37r2.pdf`, p.20)
+**Rationale:** Citation 7 in the walkthrough (`REQ-fde1b60fd22c`, `NIST.SP.800-37r2.pdf`, p.20)
 shows the quote *"shall conform to NIST SP 800-63B guidelines. Minimum password length is 12
 characters."* — but its context panel shows unrelated introductory text about information systems
 and the Defense Science Board Task Force. Traced this to `services/evidence_service.py`'s context
@@ -295,7 +297,7 @@ high on further re-ingests, but out of scope here.
 
 ### WP-32.2 — Spike: Ligature/Text-Extraction Corruption
 
-**Source:** Live Evidence query walkthrough, 2026-07-27 (`docs/ReqBot.html`).
+**Source:** Live Evidence query walkthrough, 2026-07-27 (Tyler; the saved page no longer exists, see Phase Framing above -- citations below are transcribed directly).
 
 **Goal:** Determine whether the character-dropping pattern found in one document is isolated to
 that PDF or affects other documents sharing the same problematic font/encoding.
@@ -333,7 +335,7 @@ documents), and whether an existing `--layout-mode` option already avoids the pr
 
 ### WP-32.3 — Evidence Grouping Fallback Fix
 
-**Source:** Live Evidence query walkthrough, 2026-07-27 (`docs/ReqBot.html`).
+**Source:** Live Evidence query walkthrough, 2026-07-27 (Tyler; the saved page no longer exists, see Phase Framing above -- citations below are transcribed directly).
 
 **Problem:** `services/evidence_service.py`'s grouping key is `ref = p.get("source_ref") or "(no
 ref)"` — every result with an empty `source_ref` collapses into one literal `"(no ref)"` group,
@@ -380,7 +382,7 @@ unrelated requirements from other documents under one meaningless label.
 
 ### WP-32.4 — Context Excerpt Labeling
 
-**Source:** Live Evidence query walkthrough, 2026-07-27 (`docs/ReqBot.html`).
+**Source:** Live Evidence query walkthrough, 2026-07-27 (Tyler; the saved page no longer exists, see Phase Framing above -- citations below are transcribed directly).
 
 **Problem:** `evidence_service.py`'s "Show source context" is a deliberate ±300-character window
 around the matched quote (working as designed), but the GUI gives no indication of that — a context
@@ -405,8 +407,9 @@ excerpt, not a rendering bug.
 
 ### WP-32.5 — Evidence/Search Card Visual Hierarchy Rework
 
-**Source:** Live Evidence query walkthrough, 2026-07-27 (`docs/ReqBot.html`); Tyler's repeated prior
-feedback that `requirement_id` is "totally useless to a human" (noted before WP-30's UI work too).
+**Source:** Live Evidence query walkthrough, 2026-07-27 (Tyler; the saved page no longer exists, see
+Phase Framing above); Tyler's repeated prior feedback that `requirement_id` is "totally useless to a
+human" (noted before WP-30's UI work too).
 
 **Problem:** In both `ResultCard.tsx` and `EvidenceView.tsx`'s inline `EvidenceCard`, the most
 visually prominent element on each card is `requirement_id` — a synthetic hash with no human
@@ -427,8 +430,9 @@ tucked in a corner or footer.
 - No redesign of `TraceView.tsx`'s header (out of scope — that's a detail page, not a result list;
   revisit separately if it turns out to have the same problem).
 
-**Tests/verification:** Manual — visual comparison against the current layout using
-`docs/ReqBot.html` as the "before" reference.
+**Tests/verification:** Manual — visual comparison against the current layout (the saved "before"
+page no longer exists; compare directly against a fresh Search/Evidence query against the live GUI
+instead).
 
 **Gate:** Document name, page, and paragraph/control reference are the most visually prominent
 elements on a result card; `requirement_id` is present but clearly de-emphasized.
@@ -437,7 +441,7 @@ elements on a result card; `requirement_id` is present but clearly de-emphasized
 
 ### WP-32.6 — Render Generated Answer as Markdown
 
-**Source:** Live Evidence query walkthrough, 2026-07-27 (`docs/ReqBot.html`).
+**Source:** Live Evidence query walkthrough, 2026-07-27 (Tyler; the saved page no longer exists, see Phase Framing above -- citations below are transcribed directly).
 
 **Problem:** `core/ask.py`'s `SYNTHESIS_PROMPT` and `evidence_service.py`'s
 `_EVIDENCE_AUDITOR_PROMPT` both produce markdown-formatted output (`**bold**`, `- ` bullet lists),
@@ -471,7 +475,7 @@ visible to the user instead of being rendered.
 
 ### WP-32.7 — Profile-Aware Evidence Synthesis Vocabulary
 
-**Source:** Live Evidence query walkthrough, 2026-07-27 (`docs/ReqBot.html`).
+**Source:** Live Evidence query walkthrough, 2026-07-27 (Tyler; the saved page no longer exists, see Phase Framing above -- citations below are transcribed directly).
 
 **Problem:** `services/evidence_service.py`'s `_EVIDENCE_AUDITOR_PROMPT` hardcodes cybersecurity-
 specific vocabulary directly into the prompt text: *"Identify the dominant control families present
@@ -492,6 +496,13 @@ agnostic; this prompt quietly breaks that for the one LLM-facing piece of the ev
 - Thread the active profile through to `evidence_service.build()` if it isn't already available
   there — check `domain_profile` on the retrieved requirement payloads first before adding a new
   parameter; it may already be present.
+- **Mixed-profile results:** the Evidence API filters by document/domain-tag/requirement-type, not
+  by profile, so a query could in principle return results spanning more than one `domain_profile`.
+  Handle this simply, not cleverly: if every result's `domain_profile` agrees, use that profile's
+  `domain_tags`. If they disagree, fall back to the existing hardcoded prompt text rather than
+  guessing which profile's vocabulary should win or merging vocabularies from unrelated domains —
+  a wrong-but-old failure mode is better than a new, confidently-wrong one. Cover this case in
+  WP-32.7's tests explicitly (Codex review, PR #144).
 
 **Non-goals:**
 - No change to `core/profiles.py`'s schema/validation (see Phase Non-Goals).
@@ -499,6 +510,11 @@ agnostic; this prompt quietly breaks that for the one LLM-facing piece of the ev
   whether it has the same hardcoding problem during implementation, but this WP is scoped to the
   Evidence auditor prompt specifically; if Ask's prompt needs the same fix, that's a follow-up, not
   silently expanded scope here.
+- No real mixed-profile handling beyond the same-profile-or-fallback rule above — every indexed
+  requirement is `cybersecurity` today (`docs/TODO_future_improvements.txt`'s Decisions and
+  Guardrails #8: no second profile until Phase 32 proves the core is actually domain-neutral), so
+  this scenario can't occur in practice yet. Building anything more sophisticated now would be
+  designing for data that doesn't exist.
 
 **Tests/verification:**
 - Test with at least two different profiles (`cybersecurity` and `test-domain.json`) confirming the

@@ -239,16 +239,28 @@ These are quality experiments, not guaranteed product work.
    archive/PHASE15_EXTENSION_RETRIEVAL_HARDENING.md (WP-15.5) for the fuller
    architecture writeup (candidate pool sizing, reject-if criteria).
 
-   Insertion point (verified in code): core/ask.py's retrieve() is the one
-   RRF fusion call shared by ask_service and evidence_service, and therefore
-   by Search, Evidence, CLI, and MCP (mcp_server/server.py calls those same
-   services) -- reranking there covers all four in one place.
+   Insertion point -- corrected after Codex review on PR #140 caught this
+   stated wrong: core/ask.py's retrieve() is NOT a single shared choke point.
+   It only backs the Ask/Search path (ask_service.py -> CLI `ask`,
+   SearchView, and MCP's search tool). Evidence (services/evidence_service.py)
+   and Compare (services/compare_service.py) each run their own independent
+   dense+sparse+RRF query_points() call -- neither goes through retrieve() at
+   all. So there are three separate hybrid-retrieval implementations today,
+   and a reranker added only to retrieve() covers Ask/Search/CLI/MCP-search
+   but NOT Evidence or Compare (including MCP's evidence tool, which calls
+   evidence_service.build() the same way the GUI does).
 
-   Known gap: services/compare_service.py has its OWN independent RRF
-   query_points() call, not routed through retrieve(). A reranker added only
-   at the shared choke point will NOT cover Compare. Decide explicitly
-   whether Compare is in scope before calling this "done" -- don't assume it
-   rides along for free.
+   Evidence's copy is also missing pieces retrieve() already has: no HyDE
+   leg, no min_score filtering, and no headroom past top_k for a reranker to
+   reorder within (limit=top_k directly, no separate fusion_limit) --
+   giving it that headroom is its own prerequisite, separate from adding the
+   reranker itself.
+
+   Before reranking ships, decide: centralize the three retrieval paths into
+   one shared implementation first (this already violates the "no separate
+   logic for CLI/GUI/API/MCP" guardrail below), or add reranking to each
+   path deliberately and accept the duplication. Don't assume fixing one
+   path covers the others.
 
    Blocking prerequisite: there is no retrieval-precision eval set today.
    eval/eval_harness.py measures Step C extraction precision/recall (gold

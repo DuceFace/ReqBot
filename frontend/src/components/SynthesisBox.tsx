@@ -36,19 +36,26 @@ export function scrollToCitation(n: number): void {
 
 interface Props {
   text: string
+  // Number of valid citation targets currently rendered (results.length for Search,
+  // group_order.length for Evidence) -- a citation is only clickable if its number
+  // falls in [1, citationCount]. Anything outside that range (e.g. an LLM-hallucinated
+  // out-of-range citation) renders as plain text instead of a dead-looking, styled
+  // button that does nothing on click (Codex review, PR #142).
+  citationCount: number
 }
 
-export default function SynthesisBox({ text }: Props) {
+export default function SynthesisBox({ text, citationCount }: Props) {
   return (
     <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5 mb-4">
       <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
         Generated Answer
       </p>
       <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-        {parseCitations(text).map((seg, i) =>
-          seg.type === 'text' ? (
-            <span key={i}>{seg.value}</span>
-          ) : (
+        {parseCitations(text).map((seg, i) => {
+          if (seg.type === 'text') return <span key={i}>{seg.value}</span>
+          const hasTarget = seg.index >= 1 && seg.index <= citationCount
+          if (!hasTarget) return <span key={i}>{seg.raw}</span>
+          return (
             <button
               key={i}
               type="button"
@@ -58,7 +65,7 @@ export default function SynthesisBox({ text }: Props) {
               {seg.raw}
             </button>
           )
-        )}
+        })}
       </p>
     </div>
   )

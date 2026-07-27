@@ -138,9 +138,20 @@ export default function EvidenceView() {
 
   function handleGenerateAnswer() {
     if (!urlQ || synth.loading) return
+    // Retrieval here can differ from what's currently displayed (e.g. HyDE's
+    // nondeterministic hypothesis leg), and the synthesis text's [N] citations are
+    // numbered against THIS fetch's group_order -- so the displayed groups must be
+    // replaced with it, or clicking a citation can silently land on an unrelated
+    // requirement (Codex review, PR #142). Guarded by the existing searchKeyRef so a
+    // stale response (topic/depth changed while this was in flight) can't clobber a
+    // newer, correct result set.
+    const requestKey = searchKeyRef.current
     synth.run(() =>
       api.evidence({ topic: urlQ, top_k: urlTopK, synthesize: true })
-        .then(res => res.synthesis_text || null)
+        .then(res => {
+          if (searchKeyRef.current === requestKey) setData(res)
+          return res.synthesis_text || null
+        })
     )
   }
 
@@ -271,7 +282,7 @@ export default function EvidenceView() {
             {/* Synthesis output */}
             {synth.text && (
               <div className="mb-6">
-                <SynthesisBox text={synth.text} />
+                <SynthesisBox text={synth.text} citationCount={data.group_order.length} />
               </div>
             )}
 

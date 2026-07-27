@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { parseCitations, scrollToCitation } from './SynthesisBox'
+import { render, screen } from '@testing-library/react'
+import SynthesisBox, { parseCitations, scrollToCitation } from './SynthesisBox'
 
 describe('parseCitations', () => {
   it('returns a single text segment when there are no citations', () => {
@@ -31,6 +32,7 @@ describe('parseCitations', () => {
 describe('scrollToCitation', () => {
   afterEach(() => {
     document.body.innerHTML = ''
+    vi.useRealTimers()
   })
 
   it('does nothing when no matching card exists (e.g. a hallucinated citation)', () => {
@@ -51,7 +53,22 @@ describe('scrollToCitation', () => {
 
     vi.advanceTimersByTime(1500)
     expect(el.classList.contains('ring-2')).toBe(false)
+  })
+})
 
-    vi.useRealTimers()
+// Citations outside [1, citationCount] (e.g. an LLM-hallucinated out-of-range number)
+// must render as plain text, not a styled button that no-ops on click (Codex review,
+// PR #142) -- this is React's conditional-element-type output, not pure arithmetic,
+// so it's verified by rendering rather than by inspecting parseCitations alone.
+describe('SynthesisBox citation rendering', () => {
+  it('renders an in-range citation as a clickable button', () => {
+    render(<SynthesisBox text="See [1] for details." citationCount={3} />)
+    expect(screen.getByRole('button', { name: '[1]' })).toBeInTheDocument()
+  })
+
+  it('renders an out-of-range citation as plain text, not a button', () => {
+    render(<SynthesisBox text="See [5] for details." citationCount={3} />)
+    expect(screen.queryByRole('button', { name: '[5]' })).not.toBeInTheDocument()
+    expect(screen.getByText('[5]', { exact: false })).toBeInTheDocument()
   })
 })

@@ -378,11 +378,15 @@ def run(
         # its own chunk's text -- Step C's extraction model was found to sometimes
         # fabricate plausible-sounding requirements (confirmed at 21.55% across the
         # existing corpus during this WP's spike) rather than only extracting what's
-        # present. Skipped (not rejected) when chunk_id/chunk text isn't available to
-        # verify against -- this check only fires when it can actually check, it
-        # doesn't punish missing chunk metadata, a separate pre-existing condition.
-        chunk_text = chunk_text_map.get(chunk_id) if chunk_id is not None else None
-        if chunk_text:
+        # present. Skipped (not rejected) only when the chunk itself is unverifiable
+        # (chunk_id missing or not present in chunks.jsonl) -- a chunk that IS present
+        # but has empty text is verifiable and must still be checked: any non-empty
+        # quote scores 0 against empty text and correctly fails, rather than silently
+        # passing through on an `if chunk_text:` truthiness check that treated "empty
+        # but real" the same as "unverifiable" (Gemini review, PR #144).
+        chunk_known = chunk_id is not None and chunk_id in chunk_text_map
+        if chunk_known:
+            chunk_text = chunk_text_map[chunk_id]
             grounding_score = fuzz.partial_ratio(normalize_text(source_quote), normalize_text(chunk_text))
             if grounding_score < QUOTE_GROUNDING_THRESHOLD:
                 failures.append({

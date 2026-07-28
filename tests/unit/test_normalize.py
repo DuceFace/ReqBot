@@ -226,3 +226,23 @@ def test_missing_chunk_passes_through_unchecked(tmp_path):
     out_dir = tmp_path / "out"
     run(str(req_path), str(chunks_path), "", str(out_dir))
     assert len(_read_jsonl(out_dir / "test_requirements_normalized.jsonl")) == 1
+
+
+def test_empty_chunk_text_still_rejects_fabricated_quote(tmp_path):
+    # Distinct from test_missing_chunk_passes_through_unchecked above: chunk_id 1
+    # DOES exist in chunks.jsonl, it's just empty -- verifiable, not the same as
+    # unknown, and any non-empty quote against empty text is automatically
+    # ungrounded. An earlier version of this check used `if chunk_text:` (a
+    # truthiness test), which treated "chunk present but empty" the same as
+    # "chunk unknown" and silently let this pass -- caught by Gemini review, PR #144.
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="Some fabricated requirement text.")
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, "")])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert _read_jsonl(out_dir / "test_requirements_normalized.jsonl") == []
+    failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
+    assert len(failures) == 1
+    assert failures[0]["error"] == "quote_not_grounded_in_chunk"

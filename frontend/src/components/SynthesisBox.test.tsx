@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import SynthesisBox, { parseCitations, scrollToCitation } from './SynthesisBox'
+
+// vite.config.ts doesn't set test.globals, so @testing-library/react's automatic
+// afterEach-based cleanup never registers -- without this, DOM from one render()
+// call leaks into the next test in the same file, which only stayed invisible
+// pre-WP-32.6 because the two pre-existing tests happened to query for
+// differently-numbered citations. New markdown tests below reuse [1]/[2] across
+// multiple it() blocks, so unmounting between tests is no longer optional.
+afterEach(cleanup)
 
 describe('parseCitations', () => {
   it('returns a single text segment when there are no citations', () => {
@@ -70,5 +78,62 @@ describe('SynthesisBox citation rendering', () => {
     render(<SynthesisBox text="See [5] for details." citationCount={3} />)
     expect(screen.queryByRole('button', { name: '[5]' })).not.toBeInTheDocument()
     expect(screen.getByText('[5]', { exact: false })).toBeInTheDocument()
+  })
+})
+
+// WP-32.6: SYNTHESIS_PROMPT and _EVIDENCE_AUDITOR_PROMPT produce **bold** and
+// '- ' bullet-list markdown; SynthesisBox now renders it instead of showing the
+// raw syntax, without breaking WP-31.2's citation-token linking.
+describe('SynthesisBox markdown rendering', () => {
+  it('renders **bold** text as a <strong> element, not raw asterisks', () => {
+    const { container } = render(<SynthesisBox text="**Important:** do the thing." citationCount={0} />)
+    const strong = container.querySelector('strong')
+    expect(strong).toBeInTheDocument()
+    expect(strong).toHaveTextContent('Important:')
+    expect(container.textContent).not.toContain('**')
+  })
+
+  it('renders a "- " bullet list as real <ul>/<li> elements, not raw dashes', () => {
+    const { container } = render(
+      <SynthesisBox text={'- First item\n- Second item'} citationCount={0} />
+    )
+    const items = container.querySelectorAll('ul > li')
+    expect(items).toHaveLength(2)
+    expect(items[0]).toHaveTextContent('First item')
+    expect(items[1]).toHaveTextContent('Second item')
+  })
+
+  it('renders a numbered list as real <ol>/<li> elements', () => {
+    const { container } = render(
+      <SynthesisBox text={'1. First step\n2. Second step'} citationCount={0} />
+    )
+    expect(container.querySelectorAll('ol > li')).toHaveLength(2)
+  })
+
+  it('keeps citation links clickable inside bullet-list items', () => {
+    render(<SynthesisBox text={'- Claim one [1]\n- Claim two [2]'} citationCount={2} />)
+    expect(screen.getByRole('button', { name: '[1]' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '[2]' })).toBeInTheDocument()
+  })
+
+  it('keeps citation links clickable inside bold text', () => {
+    render(<SynthesisBox text="**Finding [1]:** something happened." citationCount={1} />)
+    const button = screen.getByRole('button', { name: '[1]' })
+    expect(button).toBeInTheDocument()
+    // The citation must actually be nested inside the bold element, not just
+    // present somewhere on the page -- confirms linkifyCitations recursed into
+    // <strong>'s children rather than only handling the <p> level.
+    expect(button.closest('strong')).not.toBeNull()
+  })
+
+  it('does not render raw HTML from the synthesis text as live elements', () => {
+    // LLM-generated text is untrusted; react-markdown is safe by default here
+    // only because no HTML-passthrough plugin (e.g. rehype-raw) is registered.
+    // This guards against that safety property being silently broken later.
+    const { container } = render(
+      <SynthesisBox text={'<img src=x onerror="window.__pwned = true">'} citationCount={0} />
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect((window as unknown as { __pwned?: boolean }).__pwned).toBeUndefined()
   })
 })

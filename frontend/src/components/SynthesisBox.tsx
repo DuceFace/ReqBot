@@ -1,3 +1,6 @@
+import { Children, cloneElement, isValidElement, type ReactNode } from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
+
 export type SynthesisSegment =
   | { type: 'text'; value: string }
   | { type: 'citation'; index: number; raw: string }
@@ -34,6 +37,79 @@ export function scrollToCitation(n: number): void {
   window.setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400'), 1500)
 }
 
+function renderSegment(seg: SynthesisSegment, key: string, citationCount: number): ReactNode {
+  if (seg.type === 'text') return <span key={key}>{seg.value}</span>
+  const hasTarget = seg.index >= 1 && seg.index <= citationCount
+  if (!hasTarget) return <span key={key}>{seg.raw}</span>
+  return (
+    <button
+      key={key}
+      type="button"
+      onClick={() => scrollToCitation(seg.index)}
+      className="font-semibold text-emerald-800 hover:underline bg-transparent border-0 p-0 cursor-pointer"
+    >
+      {seg.raw}
+    </button>
+  )
+}
+
+/**
+ * Walks react-markdown's rendered children, splitting every plain-text leaf into
+ * citation-aware segments (WP-31.2's [N] linking) while leaving markdown elements
+ * (e.g. <strong>) structurally intact -- a citation can land inside or outside
+ * bold text (SYNTHESIS_PROMPT's own rule 2 puts one right after a bolded label in
+ * practice), so this recurses into element children rather than only handling the
+ * top-level string case.
+ */
+// p/li are the tags markdownComponents overrides below -- react-markdown invokes
+// that override directly wherever they occur in the tree, including nested (e.g.
+// a sub-bullet <ul><li> inside a parent <li>, which is valid CommonMark for a
+// multi-step answer). Recursing into an already-self-processed p/li/ul/ol from an
+// ancestor's linkifyCitations call would re-run parseCitations on text that's
+// already been converted to citation buttons, wrapping a <button> inside another
+// <button> (invalid DOM, and double-registers the click handler).
+const SELF_PROCESSED_TAGS = new Set(['p', 'li', 'ul', 'ol'])
+
+function linkifyCitations(node: ReactNode, citationCount: number, keyPrefix = 'n'): ReactNode {
+  if (typeof node === 'string') {
+    return parseCitations(node).map((seg, i) => renderSegment(seg, `${keyPrefix}-${i}`, citationCount))
+  }
+  if (Array.isArray(node)) {
+    return node.map((child, i) => linkifyCitations(child, citationCount, `${keyPrefix}-${i}`))
+  }
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    if (typeof node.type === 'string' && SELF_PROCESSED_TAGS.has(node.type)) {
+      return node
+    }
+    return cloneElement(
+      node,
+      undefined,
+      linkifyCitations(node.props.children, citationCount, keyPrefix)
+    )
+  }
+  return node
+}
+
+/**
+ * Markdown element overrides, scoped to exactly the syntax SYNTHESIS_PROMPT and
+ * _EVIDENCE_AUDITOR_PROMPT actually produce (bold, bullet/numbered lists) --
+ * WP-32.6's non-goal is markdown rendering anywhere else, so this isn't trying to
+ * be a general-purpose renderer. Only block-level containers (p, li) need the
+ * citation-linking override; linkifyCitations recurses into their children, which
+ * already reaches nested <strong>/<em> text without a separate override for those.
+ *
+ * react-markdown does not render raw HTML from the source text by default (no
+ * rehype-raw plugin is registered here) -- LLM-generated text staying inert as
+ * markdown-only, never live HTML, is the sanitization this WP calls for. Don't
+ * add rehype-raw/dangerouslySetInnerHTML without re-deciding that.
+ */
+function markdownComponents(citationCount: number): Components {
+  return {
+    p: ({ children }) => <p>{linkifyCitations(Children.toArray(children), citationCount)}</p>,
+    li: ({ children }) => <li>{linkifyCitations(Children.toArray(children), citationCount)}</li>,
+  }
+}
+
 interface Props {
   text: string
   // Number of valid citation targets currently rendered (results.length for Search,
@@ -50,23 +126,13 @@ export default function SynthesisBox({ text, citationCount }: Props) {
       <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
         Generated Answer
       </p>
-      <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-        {parseCitations(text).map((seg, i) => {
-          if (seg.type === 'text') return <span key={i}>{seg.value}</span>
-          const hasTarget = seg.index >= 1 && seg.index <= citationCount
-          if (!hasTarget) return <span key={i}>{seg.raw}</span>
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => scrollToCitation(seg.index)}
-              className="font-semibold text-emerald-800 hover:underline bg-transparent border-0 p-0 cursor-pointer"
-            >
-              {seg.raw}
-            </button>
-          )
-        })}
-      </p>
+      <div
+        className="text-sm text-gray-800 leading-relaxed space-y-2
+          [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
+          [&_strong]:font-semibold"
+      >
+        <ReactMarkdown components={markdownComponents(citationCount)}>{text}</ReactMarkdown>
+      </div>
     </div>
   )
 }

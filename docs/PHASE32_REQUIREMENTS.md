@@ -24,7 +24,7 @@ in `CLAUDE.md` or anywhere else.
 | WP-32.3 — Evidence Grouping Fallback Fix | Complete — shipped and verified live against the current corpus |
 | WP-32.4 — Context Excerpt Labeling | Complete — caption added above the context block in `EvidenceView.tsx`; verified against a real truncated excerpt from the live corpus |
 | WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Complete — `ResultCard.tsx` and `EvidenceView.tsx`'s `EvidenceCard` both swapped to promote doc name/page/source_ref, demote `requirement_id` |
-| WP-32.6 — Render Generated Answer as Markdown | Not started |
+| WP-32.6 — Render Generated Answer as Markdown | Complete — `react-markdown` added (Tyler's call over hand-rolling, see WP-32.6 notes below); citation-token linking preserved through nested lists |
 | WP-32.7 — Profile-Aware Evidence Synthesis Vocabulary | Not started |
 
 ---
@@ -669,6 +669,23 @@ visible to the user instead of being rendered.
   raw markdown syntax.
 
 **Gate:** Generated Answer text renders bold/bullets properly; citation links (WP-31.2) still work.
+
+**Resolution:** Weighed hand-rolling a minimal bold/bullet parser against adding `react-markdown`
+(the scope only needed CommonMark bold + bullet/numbered lists, no GFM extensions) — Tyler's call
+was to add the dependency. `SynthesisBox.tsx` now overrides react-markdown's `p`/`li` renderers to
+re-run WP-31.2's `parseCitations` on their text, keeping `[N]` citation buttons clickable inside
+both bold text and list items. No `rehype-raw` plugin is registered, so raw HTML in
+LLM-generated text stays inert rather than executing — verified by a unit test.
+
+Manual verification against a real synthesized answer (`POST /api/ask`, CJCSI 6510.02G.pdf corpus,
+"What is the process for cryptographic key extension?") caught a real bug the hand-picked unit
+tests hadn't: a nested bullet list (a top-level bullet with indented sub-bullets, which the real
+LLM output actually produced) caused double-processing — an ancestor list item's citation-linking
+pass was re-running over a descendant list item's already-built citation button, nesting a
+`<button>` inside another `<button>` (invalid DOM, double click handler). Fixed by having the
+recursive linker skip back into `p`/`li`/`ul`/`ol` elements, since those are already
+self-processed by react-markdown invoking the same overrides directly wherever they occur in the
+tree — an ancestor never needs to re-walk a descendant's own self-processed subtree.
 
 ---
 

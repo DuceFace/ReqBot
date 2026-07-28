@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-33.1 — Deduplicate Profile Vocabulary Constants | Complete — 4 files now derive from `core.profiles.default_profile()`; `pipeline/parse_and_normalize.py`'s dead copies deleted outright |
 | WP-33.2 — Surface the Skip-Section Docling-Only Gap | Complete — new `layout_mode_used`/`skip_sections_applied` fields in `stats.json`, surfaced via `reqbot docs`'s new Skip-Sect column; also fixed a discovered pre-existing bug where `mode` mislabeled every docling document as `pymupdf` |
-| WP-33.3 — Spike: Actionability Self-Verification | Not started |
+| WP-33.3 — Spike: Actionability Self-Verification | Spike complete — real, sizable problem confirmed, but not the single-cause "vagueness" problem the backlog assumed; it decomposes into 4 distinct root causes. Prompt-wording-alone tested empirically and does not close the two largest. No fix shipped this phase — scoped as a follow-up backlog item (`docs/TODO_future_improvements.txt` item 23) |
 
 ---
 
@@ -303,6 +303,78 @@ the hand-labeled sample, not just "seems better."
   generation) end up warranted, implement them as one combined Step D.5 call, not two separate
   ingest-time LLM passes — but only decide that once (if) this spike concludes a fix is warranted at
   all.
+
+**Findings:** The live corpus is small (2 documents, `afpd_17-1.pdf` and `CJCSI 6510.02G.pdf`,
+173 enriched requirements total — the post-WP-32.1-nuke controlled rebuild hadn't grown past the
+single-document loop yet) but real, not synthetic. A random uniform sample of 40/173 records was
+hand-labeled; 15/40 (37.5%) showed some form of "cannot be trusted/verified as extracted," which
+confirms the problem is real and sizable — but it does **not** decompose into one "too vague"
+category the way the backlog item assumed. Four distinct root causes, each independently confirmed
+against real corpus records and (for the two largest) against a live A/B prompt test on the actual
+offending chunks via Ollama (`llama3.1:8b-instruct-q4_K_M`, the same extraction model the corpus was
+built with):
+
+1. **Reference/bibliography-list entries mis-extracted as requirements (7/40, 17.5% — the largest
+   category).** A document's References section (e.g. `afpd_17-1.pdf` chunk 8, a dense list of
+   `"DoDI 8500.01, Cybersecurity, March 14, 2014"`-shaped citations) gets extracted line-by-line as
+   individual "requirements," even though the prompt already has an explicit "DO NOT extract...
+   Cross-references to other controls" rule and a worked example (Example 3) showing a references
+   section should yield `{"requirements": []}`. Worse, Step D.5 enrichment then fabricates a
+   plausible-sounding `description` with content that appears nowhere in the `source_quote` (e.g.
+   `source_quote: "JP 3-12, Cyberspace Operations, February 5, 2013"` →
+   `description: "Provides guidance on cyberspace operations, including requirements for planning,
+   executing, and assessing the effectiveness of these operations."` — invented, not grounded).
+   **A/B test result:** a revised prompt adding an explicit "reference/bibliography lists of
+   external documents, even when long" exclusion reduced chunk 8's extractions from 16 to 14 —
+   effectively no improvement; the model still treats most citation lines as individual
+   requirements. Prompt wording alone does not close this.
+2. **Genuine vagueness/administrative meta-statements (5/40, 12.5% — the pattern the backlog
+   originally hypothesized).** Real examples: `"COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"`
+   (standard AF publication boilerplate, all-caps, appears on page 1 of every AFPD), `"Ensure
+   compliance with Electromagnetic Spectrum Operations (EMSO) policy"` (points at an external policy
+   with no stated criteria), `"All alternative approaches... must be fully considered"` ("fully
+   considered" has no independently checkable definition). **A/B test result (chunk 0, the MANDATORY
+   line):** the revised prompt still extracted a reworded version of the same line, AND separately
+   fabricated a second "requirement" that is a verbatim copy of the prompt's own Example 1 text
+   (`"The information system enforces approved authorizations..."`) — text that does not appear
+   anywhere in that chunk. This is the same few-shot-regurgitation failure mode WP-32.1's spike
+   found (Phase 32) — confirmation that editing Step C's prompt carries real regression risk of
+   *introducing* new fabrications, not just failing to fix old ones, on this model.
+3. **Truncated/fragment quotes with fabricated completions (1/40, 2.5%; 2/173 corpus-wide).** A
+   list-header sentence ending in a colon (e.g. `"The MC4EB will:"`, from `CJCSI 6510.02G.pdf`
+   chunk 3) gets extracted as its own `source_quote` with nothing after the colon — but Step D.5's
+   enrichment `description` for that same record contains full obligation text
+   (`"...will: Address the operational readiness of cybersecurity solutions..."`) that isn't in the
+   `source_quote` at all. Neither `ENRICH_SINGLE_PROMPT_TEMPLATE` nor `ENRICH_BATCH_PROMPT_TEMPLATE`
+   passes `parent_context` to the enrichment call, so this can't be legitimate context-following —
+   it's the enrichment LLM pattern-completing a truncated legal-style sentence. This is the most
+   dangerous failure mode of the four: a low-word-count `source_quote` (which existing tooling could
+   flag) accompanied by a *confident, complete-reading* `description` that quietly invents content.
+   **A/B test result:** the revised prompt (explicitly instructing "do not extract a fragment ending
+   in a colon") had zero effect — chunk 3 still produced `"The MC4EB will:"` as a standalone
+   extraction both before and after.
+4. **Background/definitional prose extracted despite no obligation language (1/40, 2.5%).** A
+   glossary/definitions chunk (`afpd_17-1.pdf` chunk 9) yielded a "requirement" that is pure
+   descriptive narrative (`"...the DoD current business and financial management infrastructure...
+   are being transformed..."` — passive voice, no "shall/must/will"). **A/B test result:** this was
+   the one category where the revised prompt actually helped — the background sentence was no
+   longer extracted (4 extractions → 2, with the remaining 2 being genuine, differently-phrased
+   sentences from elsewhere in the same chunk).
+
+**Conclusion, per the Reject-If criteria above:** the second branch applies — the problem is real
+and sizable (~37.5% of a random sample, well above noise), but stricter Step C prompt wording alone
+does **not** close it for the two largest and most concerning categories (1 and 3), only helps
+partially for the smallest (4), and measurably regressed category 2 by introducing a fresh
+fabrication on the same chunk it was meant to fix. No Step D.5 prompt/schema change is merged in
+this spike (per Guardrail #2 and the empirical result above). The actual fix is scoped as a follow-up
+in `docs/TODO_future_improvements.txt` item 23, rewritten with these four categories and the
+recommendation that they likely need different mechanisms rather than one `is_verifiable` classifier:
+a chunk-level or Step-D structural filter for citation-list-shaped chunks (category 1), a minimum-
+predicate/no-trailing-colon structural check in Step D similar to the existing `errata_change_entry`
+check (category 3), and — the one gap most worth prioritizing — extending WP-32.1's Step D fuzzy
+grounding check (which today only validates `source_quote` against its chunk) to also validate Step
+D.5's generated `description` against `source_quote`, since categories 1 and 3 both involve
+Step D.5 fabricating description content ungrounded in the quote it was given.
 
 ---
 

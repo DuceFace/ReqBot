@@ -193,35 +193,46 @@ ACTIVE BACKLOG
     docling layout-mode path today (see item 5 above) -- document that
     limitation explicitly rather than letting it stay a code-only fact.
 
-23. Actionability self-verification for extracted requirements
-    Some extracted requirements are syntactically obligation-shaped ("shall",
-    "must", "will") but not independently auditable/verifiable -- too vague,
-    contextual, administrative, or dependent on parent context. Confirmed
-    against current code: Step C's prompt (pipeline/llm_extract_requirements.py)
-    only screens for obligation language; Step D normalization
-    (pipeline/parse_and_normalize.py) only drops empty source_quote,
-    "not explicitly stated" descriptions, and short errata entries; Step D.5
-    enrichment (pipeline/enrich_requirements.py) is pure classification
-    (description/domain_tags/requirement_type) -- no auditability signal
-    exists anywhere in the pipeline today.
+23. [SPIKE COMPLETE — Phase 33, WP-33.3] Actionability self-verification for
+    extracted requirements
+    The spike confirmed a real, sizable problem (37.5% of a random 40-record
+    corpus sample), but it is NOT the single "too vague" pattern this item
+    originally assumed -- it decomposes into 4 distinct root causes, only one
+    of which is genuine vagueness. Full writeup, real examples, and the A/B
+    prompt-test methodology: `docs/PHASE33_REQUIREMENTS.md`'s WP-33.3
+    Findings.
 
-    Leaning towards: fold into Step D.5 rather than adding a new pipeline
-    stage. D.5 already makes one LLM round-trip per requirement/batch, so an
-    extra "is_verifiable" + reason key on that same JSON output avoids a new
-    ingest stage or LLM call. Try the cheaper fix first, though: test whether
-    stricter Step C prompt wording alone reduces weak extractions before
-    building a separate judgment pass.
+    The four causes, largest first:
+    1. Reference/bibliography-list entries mis-extracted as requirements
+       (17.5%), often with Step D.5 fabricating a description not grounded
+       in the quote. Prompt-wording fix tested empirically -- did not close
+       the gap (16 -> 14 false extractions on the test chunk).
+    2. Genuine vagueness/administrative meta-statements (12.5%) -- the
+       originally-assumed pattern. Prompt-wording fix tested -- regressed:
+       introduced a new fabrication (verbatim copy of the prompt's own
+       few-shot example) on the same test chunk.
+    3. Truncated/fragment quotes (list headers ending in ":") paired with a
+       Step D.5 description that fabricates the missing content (2.5% by
+       count, but the most dangerous -- a confident-sounding description
+       with no real source). Prompt-wording fix tested -- zero effect.
+    4. Background/definitional prose extracted despite no obligation
+       language (2.5%). Prompt-wording fix tested -- this is the one
+       category it actually helped (4 -> 2 false extractions).
 
-    Do first:
-    - Sample weak extracted requirements and label failure modes.
-    - Test stricter Step C prompt wording first (cheaper than a new pass).
-    - If still needed, prototype the check as an extra key in Step D.5's
-      existing enrichment call rather than a standalone verifier.
-    - For context-dependent cases, retry with parent_context/
-      section_title_path before dropping.
-    - Measure false positives/negatives against a small hand-labeled set --
-      reuse eval_harness.py's gold-labeling pattern (gold_eval_chunks_curated.jsonl)
-      rather than building new eval infra.
+    Recommended fix, next time this is picked up (do not assume a single
+    is_verifiable classifier -- these need different mechanisms):
+    - Category 1: a chunk-level or Step D structural filter for
+      citation-list-shaped chunks/quotes.
+    - Category 3: a minimum-predicate / no-trailing-colon structural check
+      in Step D, alongside the existing errata_change_entry check.
+    - Highest priority: extend WP-32.1's Step D fuzzy grounding check
+      (currently validates only source_quote against its chunk) to also
+      validate Step D.5's generated description against source_quote --
+      categories 1 and 3 are both instances of D.5 fabricating description
+      content that isn't grounded in the quote it was given.
+    - Category 2 (genuine vagueness) is the smallest and the one Step C
+      prompt changes are riskiest for (demonstrated regression above) --
+      lowest priority of the four, and may not be worth a dedicated fix.
 
     Connects to item 6 above (audit_question generation): both are an extra
     per-requirement LLM judgment made after extraction. If both get built,

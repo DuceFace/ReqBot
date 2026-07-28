@@ -127,7 +127,7 @@ def test_all_records_missing_source_quote(tmp_path):
 
 
 # WP-32.1: build_chunk_text_map + the quote-grounding gate in run(). See
-# docs/PHASE32_REQUIREMENTS.md for the corpus-wide investigation (21.55% of
+# archive/PHASE32_REQUIREMENTS.md for the corpus-wide investigation (21.55% of
 # indexed requirements failed this check; confirmed genuine Step C fabrication,
 # not a chunking bug) that motivated this and ruled out exact-substring matching
 # in favor of fuzz.partial_ratio.

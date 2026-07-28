@@ -3,7 +3,7 @@
 
 Not part of the default ingest pipeline (run_pipeline.py never imports or calls
 this) -- it targets one confirmed, document-specific font defect, not general
-garbled-text repair. See docs/PHASE32_REQUIREMENTS.md's WP-32.2 findings for the
+garbled-text repair. See archive/PHASE32_REQUIREMENTS.md's WP-32.2 findings for the
 full investigation: NIST.SP.800-53Ar5.pdf's embedded font has no ToUnicode CMap
 entry for its "ti"/"tt"/"ft"/"tf" ligature glyphs, so every extraction backend
 (docling, pymupdf, pdfplumber -- confirmed empirically, all three) substitutes a
@@ -37,7 +37,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # Confirmed by direct inspection of NIST.SP.800-53Ar5.pdf's raw extracted text
-# (docs/PHASE32_REQUIREMENTS.md, WP-32.2 Findings) -- each codepoint is a
+# (archive/PHASE32_REQUIREMENTS.md, WP-32.2 Findings) -- each codepoint is a
 # distinct font glyph ID with no ToUnicode entry, resolved by reading the
 # surrounding word context (e.g. U+E001 sits between "a" and "ributes" in
 # "attributes").

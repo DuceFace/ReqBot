@@ -118,7 +118,8 @@ frontend/          ← React + TypeScript + Tailwind web GUI (Phase 18+)
       TraceView.tsx         ← full requirement detail + cross-matches + context expand;
                                back-link derives label from route state (not hardcoded)
       CompareView.tsx       ← two-doc topic comparison; three result sections; URL-driven (?doc1=&doc2=&topic=)
-      EvidenceView.tsx      ← topic → grouped requirements by document; synthesis; URL-driven
+      EvidenceView.tsx      ← topic → requirements grouped by control/citation reference
+                               (source_ref); synthesis; URL-driven
       CorpusView.tsx        ← corpus browse; name filter + sort; rows link to /corpus/:docId
                                (renamed from DocsView.tsx in Phase 22; /docs redirects here)
       CorpusDetailView.tsx  ← single-doc detail; Search/Compare quick actions;
@@ -261,9 +262,9 @@ Both service URLs are configurable via `~/.config/reqbot/config.json` or environ
 
 | Package | pip name | Used By | Notes |
 |---------|----------|---------|-------|
-| `fitz` | `pymupdf` | extract_pdf_to_text | Default PDF backend |
+| `fitz` | `pymupdf` | extract_pdf_to_text | `--layout-mode` fallback backend -- always installed; used when `auto` can't find docling, or when passed explicitly |
 | `pdfplumber` | `pdfplumber` | extract_pdf_to_text | Optional; lazy import; table-aware backend |
-| `docling` | `docling` | section_parser, chunk_text | Optional; lazy import; structure-aware backend (Phase 14) |
+| `docling` | `docling` | section_parser, chunk_text | Optional; lazy import; structure-aware backend (Phase 14); `--layout-mode` default (`auto`) uses this when installed (WP, PR #147) |
 | `requests` | `requests` | llm_extract_requirements, reqbot | HTTP calls to Ollama REST API |
 | `ollama` | `ollama` | core/ask, embed_and_index, embed_context_index, synthesis, services/compare_service, services/evidence_service | Ollama Python client |
 | `fastembed` | `fastembed` | core/ask, embed_and_index, embed_context_index, services/compare_service, services/evidence_service | BM25 sparse embeddings (CPU-only) |

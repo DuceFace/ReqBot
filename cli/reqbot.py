@@ -1445,10 +1445,12 @@ def main() -> None:
     p_ingest.add_argument("--index", action="store_true", help=argparse.SUPPRESS)
     p_ingest.add_argument(
         "--layout-mode",
-        choices=["pymupdf", "pdfplumber", "docling"],
-        default="pymupdf",
+        choices=["auto", "pymupdf", "pdfplumber", "docling"],
+        default="auto",
         dest="layout_mode",
-        help="PDF extraction backend (default: pymupdf). Use 'docling' for structure-aware chunking (Phase 14).",
+        help="PDF extraction backend (default: auto -- uses docling when installed, "
+             "falls back to pymupdf otherwise or on failure). Pass 'docling' "
+             "explicitly to fail loudly instead of falling back.",
     )
     p_ingest.add_argument(
         "--skip-enrichment",
@@ -1512,10 +1514,12 @@ def main() -> None:
     )
     p_batch.add_argument(
         "--layout-mode",
-        choices=["pymupdf", "pdfplumber", "docling"],
-        default="pymupdf",
+        choices=["auto", "pymupdf", "pdfplumber", "docling"],
+        default="auto",
         dest="layout_mode",
-        help="PDF extraction backend (default: pymupdf). Use 'docling' for structure-aware chunking (Phase 14).",
+        help="PDF extraction backend (default: auto -- uses docling when installed, "
+             "falls back to pymupdf otherwise or on failure). Pass 'docling' "
+             "explicitly to fail loudly instead of falling back.",
     )
     p_batch.add_argument(
         "--skip-enrichment",

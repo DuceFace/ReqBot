@@ -225,11 +225,17 @@ def test_run_pipeline_passes_profile_to_step_c(tmp_path):
         fake_pdf = tmp_path / "doc.pdf"
         fake_pdf.write_bytes(b"%PDF-1.4")
 
+        # Explicit layout_mode: this test is about profile passing, not layout-mode
+        # resolution -- leaving it at the "auto" default would make this test's
+        # behavior (and runtime) depend on whether docling happens to be installed
+        # in whatever environment runs it (WP-32.4 added a real docling attempt +
+        # fallback under "auto").
         run_pipeline.run(
             str(fake_pdf),
             str(tmp_path),
             skip_enrichment=True,
             profile_name="test-domain",
+            layout_mode="pymupdf",
         )
 
     assert captured.get("profile") is not None

@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, type ReactNode } from 'react'
+import { Children, cloneElement, isValidElement, useMemo, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 
 export type SynthesisSegment =
@@ -61,14 +61,30 @@ function renderSegment(seg: SynthesisSegment, key: string, citationCount: number
  * practice), so this recurses into element children rather than only handling the
  * top-level string case.
  */
-// p/li are the tags markdownComponents overrides below -- react-markdown invokes
-// that override directly wherever they occur in the tree, including nested (e.g.
-// a sub-bullet <ul><li> inside a parent <li>, which is valid CommonMark for a
-// multi-step answer). Recursing into an already-self-processed p/li/ul/ol from an
-// ancestor's linkifyCitations call would re-run parseCitations on text that's
-// already been converted to citation buttons, wrapping a <button> inside another
-// <button> (invalid DOM, and double-registers the click handler).
-const SELF_PROCESSED_TAGS = new Set(['p', 'li', 'ul', 'ol'])
+// ul/ol are plain string-tag elements react-markdown builds directly (no override
+// below), so recursing into them just reaches their <li> children -- harmless, but
+// skipped anyway since diving in accomplishes nothing.
+//
+// p/li are NOT plain string-tag elements at the point linkifyCitations first sees
+// them as an unresolved child: react-markdown passes them down as
+// `{ type: components.p, ... }` / `{ type: components.li, ... }` -- the *function*
+// reference, not yet invoked -- and only React's own render pass later calls that
+// function to produce a real <p>/<li> DOM element. So `typeof node.type === 'string'`
+// never matches a not-yet-rendered p/li, and a naive string-tag-only skip list lets
+// linkifyCitations recurse straight through into a nested p/li's raw (unprocessed)
+// children -- which get citation-linked once here, then AGAIN when React actually
+// invokes that p/li's own override moments later, wrapping an already-built
+// <button> in a second <button> (invalid DOM, double click handler). Skipping any
+// function-typed element covers this for every current and future component
+// override, not just p/li by name (Gemini, PR #151).
+//
+// button is the element renderSegment() itself produces -- recursing into one
+// (e.g. because it survived some other skip-list gap) would re-run parseCitations
+// on its own already-final "[N]" text and wrap it in a second button.
+function isAlreadyProcessed(type: unknown): boolean {
+  if (typeof type === 'function') return true
+  return typeof type === 'string' && (type === 'button' || type === 'ul' || type === 'ol')
+}
 
 function linkifyCitations(node: ReactNode, citationCount: number, keyPrefix = 'n'): ReactNode {
   if (typeof node === 'string') {
@@ -78,7 +94,7 @@ function linkifyCitations(node: ReactNode, citationCount: number, keyPrefix = 'n
     return node.map((child, i) => linkifyCitations(child, citationCount, `${keyPrefix}-${i}`))
   }
   if (isValidElement<{ children?: ReactNode }>(node)) {
-    if (typeof node.type === 'string' && SELF_PROCESSED_TAGS.has(node.type)) {
+    if (isAlreadyProcessed(node.type)) {
       return node
     }
     return cloneElement(
@@ -121,6 +137,12 @@ interface Props {
 }
 
 export default function SynthesisBox({ text, citationCount }: Props) {
+  // react-markdown identifies component overrides by referential identity -- a
+  // fresh object/functions every render would make it remount the entire rendered
+  // tree (losing any DOM state) on every unrelated re-render of this component,
+  // not just when citationCount actually changes (Gemini, PR #151).
+  const components = useMemo(() => markdownComponents(citationCount), [citationCount])
+
   return (
     <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5 mb-4">
       <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
@@ -131,7 +153,7 @@ export default function SynthesisBox({ text, citationCount }: Props) {
           [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
           [&_strong]:font-semibold"
       >
-        <ReactMarkdown components={markdownComponents(citationCount)}>{text}</ReactMarkdown>
+        <ReactMarkdown components={components}>{text}</ReactMarkdown>
       </div>
     </div>
   )

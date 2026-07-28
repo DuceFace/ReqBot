@@ -116,6 +116,22 @@ describe('SynthesisBox markdown rendering', () => {
     expect(screen.getByRole('button', { name: '[2]' })).toBeInTheDocument()
   })
 
+  // A "loose" list (blank line between items, valid CommonMark and plausible LLM
+  // output) makes react-markdown wrap each item's content in a nested <p>, a
+  // different path than the tight list above. Regression test for a real bug
+  // (Gemini, PR #151): the citation-linking recursion didn't recognize a not-yet-
+  // rendered <p>/<li> component override (its `type` is a function reference at
+  // that point, not the string 'p'/'li'), so it recursed straight through and
+  // double-processed the citation, nesting a <button> inside another <button>.
+  it('keeps citation links clickable inside a loose list, without nesting buttons', () => {
+    const { container } = render(
+      <SynthesisBox text={'- Claim one [1]\n\n- Claim two [2]'} citationCount={2} />
+    )
+    expect(screen.getByRole('button', { name: '[1]' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '[2]' })).toBeInTheDocument()
+    expect(container.querySelectorAll('button button')).toHaveLength(0)
+  })
+
   it('keeps citation links clickable inside bold text', () => {
     render(<SynthesisBox text="**Finding [1]:** something happened." citationCount={1} />)
     const button = screen.getByRole('button', { name: '[1]' })

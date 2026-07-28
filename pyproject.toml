@@ -20,6 +20,7 @@ dependencies = [
     "fastapi==0.115.12",
     "uvicorn==0.34.3",
     "aiofiles==25.1.0",
+    "rapidfuzz>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -32,7 +33,7 @@ dependencies = [
 docling = ["docling==2.84.0"]
 remote = ["anthropic>=0.40.0", "openai>=1.50.0"]
 mcp = ["mcp>=1.0.0"]  # WP-26.1-approved: official Python MCP SDK (mcp.server.fastmcp)
-dev = ["pytest==9.1.1", "ruff==0.15.22", "pytest-cov==7.1.0", "rapidfuzz>=3.0.0"]
+dev = ["pytest==9.1.1", "ruff==0.15.22", "pytest-cov==7.1.0"]
 
 [project.scripts]
 reqbot = "cli.reqbot:main"

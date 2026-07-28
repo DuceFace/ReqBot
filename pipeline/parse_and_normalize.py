@@ -21,6 +21,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from rapidfuzz import fuzz
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -30,6 +32,30 @@ log = logging.getLogger(__name__)
 
 SCHEMA_VERSION = "2.0"
 PIPELINE_VERSION = "1.0"
+
+# WP-32.1: minimum fuzz.partial_ratio (0-100) between a requirement's source_quote
+# and its own chunk's text before it's trusted as actually grounded in the source
+# document, rather than fabricated by Step C. partial_ratio (not token_sort_ratio,
+# which eval/eval_harness.py uses for a different comparison -- two same-length
+# quotes) is the right tool here: it scores how well a short string matches the
+# best-aligned substring of a long one, which is exactly "is this quote actually
+# in this chunk." Exact substring matching was tried first and rejected -- it
+# would have flagged ~16/30 real quotes reformatted from tabular source text
+# (e.g. NIST.SP.800-53Ar5's assessment procedures) as fabricated.
+#
+# 60 was chosen by sweeping thresholds against eval/gold_eval_chunks_curated.jsonl's
+# 2,452 hand-verified real quotes (the false-positive side) and the full local
+# corpus's 33,462 requirements (the catch-rate side):
+#   threshold  gold false-positive rate   corpus flagged rate
+#       50            0.86%                     3.51%
+#       60            1.75%                     4.42%
+#       80            4.61%                     5.64%
+# Diminishing returns above ~60: pushing to 80 nearly triples the gold
+# false-positive rate for comparatively little extra corpus coverage -- most
+# genuine fabrications score far below 60 anyway (the confirmed hallucination
+# that motivated this WP scored 44). See docs/PHASE32_REQUIREMENTS.md for the
+# full investigation.
+QUOTE_GROUNDING_THRESHOLD = 60
 
 VALID_DOMAIN_TAGS = {
     "access-control",
@@ -133,6 +159,18 @@ def build_chunk_page_map(chunks: list[dict]) -> dict[int, tuple[int, int]]:
         c["chunk_id"]: (c["page_start"], c["page_end"])
         for c in chunks
     }
+
+
+def build_chunk_text_map(chunks: list[dict]) -> dict[int, str]:
+    """Build a mapping from chunk_id to its chunk text.
+
+    Uses the "text" field specifically -- the same field
+    pipeline/llm_extract_requirements.py substitutes into Step C's prompt via
+    {chunk_text}, not "raw_text" (a different, pre-cleaning field). Grounding a
+    requirement's source_quote against anything other than what the LLM actually
+    saw would be checking against the wrong text (WP-32.1).
+    """
+    return {c["chunk_id"]: c.get("text") or "" for c in chunks}
 
 
 def build_chunk_hierarchy_map(chunks: list[dict]) -> dict[int, dict]:
@@ -302,12 +340,14 @@ def run(
     chunk_page_map: dict[int, tuple[int, int]] = {}
     chunk_hierarchy_map: dict[int, dict] = {}
     section_children_map: dict[str, list[str]] = {}
+    chunk_text_map: dict[int, str] = {}
     if chunks_path.exists():
         log.info("Loading chunk metadata from: %s", chunks_path)
         chunks = load_jsonl(chunks_path)
         chunk_page_map = build_chunk_page_map(chunks)
         chunk_hierarchy_map = build_chunk_hierarchy_map(chunks)
         section_children_map = build_section_children_map(chunks)
+        chunk_text_map = build_chunk_text_map(chunks)
         log.info("Loaded page references for %d chunks", len(chunk_page_map))
         sections_with_children = sum(1 for v in section_children_map.values() if v)
         log.info(
@@ -333,6 +373,30 @@ def run(
         if not source_quote:
             failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "empty_source_quote", "raw": req})
             continue
+
+        # WP-32.1: reject requirements whose source_quote isn't actually grounded in
+        # its own chunk's text -- Step C's extraction model was found to sometimes
+        # fabricate plausible-sounding requirements (confirmed at 21.55% across the
+        # existing corpus during this WP's spike) rather than only extracting what's
+        # present. Skipped (not rejected) only when the chunk itself is unverifiable
+        # (chunk_id missing or not present in chunks.jsonl) -- a chunk that IS present
+        # but has empty text is verifiable and must still be checked: any non-empty
+        # quote scores 0 against empty text and correctly fails, rather than silently
+        # passing through on an `if chunk_text:` truthiness check that treated "empty
+        # but real" the same as "unverifiable" (Gemini review, PR #144).
+        chunk_known = chunk_id is not None and chunk_id in chunk_text_map
+        if chunk_known:
+            chunk_text = chunk_text_map[chunk_id]
+            grounding_score = fuzz.partial_ratio(normalize_text(source_quote), normalize_text(chunk_text))
+            if grounding_score < QUOTE_GROUNDING_THRESHOLD:
+                failures.append({
+                    "requirement_id": req.get("requirement_id", "UNKNOWN"),
+                    "chunk_id": chunk_id,
+                    "error": "quote_not_grounded_in_chunk",
+                    "grounding_score": round(grounding_score, 1),
+                    "raw": req,
+                })
+                continue
 
         if description:
             desc_lower = description.lower()

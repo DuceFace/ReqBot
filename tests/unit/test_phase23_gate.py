@@ -158,7 +158,7 @@ def test_recovered_truncated_true_preserved_in_normalized(normalize_dir):
         "requirement_type": "",
         "recovered_truncated": True,
     }])
-    _write_jsonl(chunks_path, [{"chunk_id": 1, "page_start": 1, "page_end": 1, "text": "x"}])
+    _write_jsonl(chunks_path, [{"chunk_id": 1, "page_start": 1, "page_end": 1, "text": "Systems shall encrypt data at rest."}])
     out_path = normalize_run(str(reqs_path), str(chunks_path), "", str(normalize_dir))
     records = [json.loads(line) for line in Path(out_path).read_text().splitlines() if line.strip()]
     assert len(records) == 1
@@ -177,7 +177,7 @@ def test_recovered_truncated_false_for_normal_extraction(normalize_dir):
         "domain_tags": [],
         "requirement_type": "",
     }])
-    _write_jsonl(chunks_path, [{"chunk_id": 1, "page_start": 1, "page_end": 1, "text": "x"}])
+    _write_jsonl(chunks_path, [{"chunk_id": 1, "page_start": 1, "page_end": 1, "text": "Organizations must implement access controls."}])
     out_path = normalize_run(str(reqs_path), str(chunks_path), "", str(normalize_dir))
     records = [json.loads(line) for line in Path(out_path).read_text().splitlines() if line.strip()]
     assert len(records) == 1

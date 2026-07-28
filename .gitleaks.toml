@@ -1,0 +1,19 @@
+title = "ReqBot gitleaks config"
+
+# Extends gitleaks' default ruleset (see .github/workflows/ci.yml's secrets job) rather
+# than replacing it -- this file only adds an allowlist on top, it doesn't relax any
+# actual detection rule.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "ReqBot's own deterministic, non-sensitive synthetic identifiers, not credentials"
+regexes = [
+  # requirement_id, e.g. REQ-25980e46a83b -- core.stable_id.compute_stable_id() /
+  # pipeline/parse_and_normalize.py's compute_stable_id(): f"REQ-{sha256(...).hexdigest()[:12]}".
+  # A deterministic hash of document content, not a secret -- cited throughout docs/*.md as
+  # reproduction/example data (first tripped gitleaks' generic-api-key heuristic in
+  # docs/PHASE32_REQUIREMENTS.md, PR #144, purely because of nearby wording, not the value
+  # itself).
+  '''REQ-[0-9a-f]{12}''',
+]

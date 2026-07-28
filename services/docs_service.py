@@ -70,27 +70,32 @@ def list_docs(processed_dir: Path) -> dict:
         # fixes a real pre-existing bug: the old logic only ever checked for the
         # pdfplumber sentinel, so it silently mislabeled every already-ingested
         # docling document as "pymupdf".
+        # Resolve this document's own stats/chunks files by deterministic name
+        # (doc_key-prefixed), not a directory-wide glob()[0] -- an explicitly
+        # shared --output-dir holding artifacts for more than one PDF stem would
+        # otherwise let one document's stats/chunks leak into another's row
+        # (Codex review, PR #155).
         mode = "pymupdf"
         skip_sections_applied = None
-        stats_files = list(path.parent.glob("*_stats.json"))
+        stats_path = path.parent / f"{doc_key}_stats.json"
         stats_layout_mode = ""
-        if stats_files:
+        if stats_path.exists():
             try:
-                with open(stats_files[0], encoding="utf-8") as f:
+                with open(stats_path, encoding="utf-8") as f:
                     stats = json.load(f)
                 pipeline_stats = stats.get("pipeline", {})
                 stats_layout_mode = pipeline_stats.get("layout_mode_used", "")
                 if "skip_sections_applied" in pipeline_stats:
                     skip_sections_applied = pipeline_stats["skip_sections_applied"]
             except Exception as e:
-                log.warning("Could not read %s: %s", stats_files[0], e)
+                log.warning("Could not read %s: %s", stats_path, e)
 
         if stats_layout_mode:
             mode = stats_layout_mode
         else:
-            chunks = list(path.parent.glob("*_chunks.jsonl"))
-            if chunks:
-                with open(chunks[0], encoding="utf-8") as f:
+            chunks_path = path.parent / f"{doc_key}_chunks.jsonl"
+            if chunks_path.exists():
+                with open(chunks_path, encoding="utf-8") as f:
                     for line in f:
                         if not line.strip():
                             continue

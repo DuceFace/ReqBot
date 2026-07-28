@@ -108,3 +108,67 @@ def test_auto_does_not_fall_back_mid_resume(tmp_path):
     here must not silently rewrite the resume into a fresh legacy extraction."""
     with pytest.raises(RuntimeError, match="Docling"):
         _run_with_mocked_steps(tmp_path, layout_mode="auto", skip_to="B")
+
+
+# ---------------------------------------------------------------------------
+# WP-33.2 fix (Codex review, PR #155): layout_mode_used recorded for Step E
+# must describe the chunks actually being aggregated, not a fresh "auto"
+# resolution that can disagree with what an earlier run actually produced.
+# ---------------------------------------------------------------------------
+
+def test_detect_layout_mode_from_chunks_docling_signature(tmp_path):
+    chunks = tmp_path / "doc_chunks.jsonl"
+    chunks.write_text('{"chunk_id": 0, "text": "x", "section_ref_path": []}\n')
+    assert run_pipeline._detect_layout_mode_from_chunks(chunks) == "docling"
+
+
+def test_detect_layout_mode_from_chunks_pdfplumber_signature(tmp_path):
+    chunks = tmp_path / "doc_chunks.jsonl"
+    chunks.write_text('{"chunk_id": 0, "text": "<<<TABLE_START>>>a|b<<<TABLE_END>>>"}\n')
+    assert run_pipeline._detect_layout_mode_from_chunks(chunks) == "pdfplumber"
+
+
+def test_detect_layout_mode_from_chunks_defaults_pymupdf(tmp_path):
+    chunks = tmp_path / "doc_chunks.jsonl"
+    chunks.write_text('{"chunk_id": 0, "text": "plain text"}\n')
+    assert run_pipeline._detect_layout_mode_from_chunks(chunks) == "pymupdf"
+
+
+def test_detect_layout_mode_from_chunks_missing_file_returns_empty(tmp_path):
+    assert run_pipeline._detect_layout_mode_from_chunks(tmp_path / "missing.jsonl") == ""
+
+
+def test_resume_past_step_b_records_actual_chunks_mode_not_fresh_resolution(tmp_path):
+    """Reproduces the exact bug Codex flagged: an earlier run fell back to
+    pymupdf (chunks.jsonl has no docling signature), but docling is available
+    NOW -- a --skip-to C resume must still record layout_mode_used="pymupdf",
+    matching the chunks Step E is actually aggregating, not "docling" (what
+    resolve_layout_mode("auto") would freshly resolve to today)."""
+    chunks = tmp_path / "doc_chunks.jsonl"
+    chunks.write_text('{"chunk_id": 0, "text": "plain pymupdf text"}\n')
+
+    def fake_step_c(chunks_jsonl, output_dir, **kwargs):
+        out = Path(output_dir) / "doc_extracted_requirements.jsonl"
+        out.write_text("", encoding="utf-8")
+        return str(out)
+
+    def fake_step_d(reqs_jsonl, chunks_jsonl, pdf_path, output_dir, **kwargs):
+        norm = Path(output_dir) / "doc_requirements_normalized.jsonl"
+        norm.write_text("", encoding="utf-8")
+        return str(norm)
+
+    fake_pdf = tmp_path / "doc.pdf"
+    fake_pdf.write_bytes(b"%PDF-1.4")
+
+    with (
+        patch("pipeline.run_pipeline._docling_available", return_value=True),
+        patch("pipeline.llm_extract_requirements.run", side_effect=fake_step_c),
+        patch("pipeline.parse_and_normalize.run", side_effect=fake_step_d),
+        patch("pipeline.aggregate_and_export.run") as mock_step_e,
+    ):
+        run_pipeline.run(
+            str(fake_pdf), str(tmp_path),
+            layout_mode="auto", skip_to="C", skip_enrichment=True,
+        )
+
+    assert mock_step_e.call_args.kwargs["layout_mode_used"] == "pymupdf"

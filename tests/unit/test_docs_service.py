@@ -124,6 +124,31 @@ def _write_stats(run_dir: Path, pipeline_stats: dict) -> None:
     )
 
 
+def test_stats_json_resolved_by_doc_key_not_first_glob_match(tmp_path):
+    """Regression test (Codex review, PR #155): an explicitly shared --output-dir
+    holding artifacts for more than one PDF stem must not let one document's
+    stats.json leak into another's row via glob()[0] picking whichever file the
+    filesystem happens to return first."""
+    run_dir = tmp_path / "shared_run"
+    run_dir.mkdir()
+    _write_jsonl(run_dir / "alpha_requirements_normalized.jsonl", [SAMPLE_REQ])
+    _write_jsonl(run_dir / "beta_requirements_normalized.jsonl", [SAMPLE_REQ])
+    (run_dir / "alpha_stats.json").write_text(
+        json.dumps({"pipeline": {"layout_mode_used": "docling", "skip_sections_applied": True}}),
+        encoding="utf-8",
+    )
+    (run_dir / "beta_stats.json").write_text(
+        json.dumps({"pipeline": {"layout_mode_used": "pymupdf", "skip_sections_applied": False}}),
+        encoding="utf-8",
+    )
+    result = list_docs(tmp_path)
+    by_key = {d["doc_key"]: d for d in result["docs"]}
+    assert by_key["alpha"]["mode"] == "docling"
+    assert by_key["alpha"]["skip_sections_applied"] is True
+    assert by_key["beta"]["mode"] == "pymupdf"
+    assert by_key["beta"]["skip_sections_applied"] is False
+
+
 def test_stats_json_layout_mode_and_skip_sections_used_when_present(tmp_path):
     run_dir = tmp_path / "doc_20260101_120000"
     run_dir.mkdir()

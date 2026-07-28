@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-33.1 — Deduplicate Profile Vocabulary Constants | Complete — 4 files now derive from `core.profiles.default_profile()`; `pipeline/parse_and_normalize.py`'s dead copies deleted outright |
 | WP-33.2 — Surface the Skip-Section Docling-Only Gap | Complete — new `layout_mode_used`/`skip_sections_applied` fields in `stats.json`, surfaced via `reqbot docs`'s new Skip-Sect column; also fixed a discovered pre-existing bug where `mode` mislabeled every docling document as `pymupdf` |
-| WP-33.3 — Spike: Actionability Self-Verification | Spike complete — real, sizable problem confirmed, but not the single-cause "vagueness" problem the backlog assumed; it decomposes into 4 distinct root causes. Prompt-wording-alone tested empirically and does not close the two largest. No fix shipped this phase — scoped as a follow-up backlog item (`docs/TODO_future_improvements.txt` item 23) |
+| WP-33.3 — Spike: Actionability Self-Verification | Spike complete — real, sizable problem confirmed, but not the single-cause "vagueness" problem the backlog assumed; it decomposes into 5 distinct root causes. Prompt-wording-alone tested empirically (twice, for stability) and does not reliably close any of them — actively counterproductive for the most dangerous category and for few-shot regurgitation risk. No fix shipped this phase — scoped as a follow-up backlog item (`docs/TODO_future_improvements.txt` item 23) |
 
 ---
 

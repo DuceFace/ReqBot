@@ -138,7 +138,12 @@ def _run_one(chunk: dict, template: str, ollama_url: str, profile: dict) -> dict
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="WP-33.3 actionability spike A/B test")
-    parser.add_argument("--ollama-url", default="http://192.168.90.100:11434")
+    parser.add_argument(
+        "--ollama-url", default="http://localhost:11434",
+        help="Ollama API base URL. Defaults to localhost, which resolves to this "
+             "container, not a real Ollama host -- always pass this explicitly "
+             "(matches every other pipeline script's convention).",
+    )
     parser.add_argument(
         "--processed-dir", default=str(Path.home() / "documents/processed"),
         help="Directory holding <doc>_chunks.jsonl (default: ~/documents/processed)",

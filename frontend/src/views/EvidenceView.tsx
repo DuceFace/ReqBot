@@ -27,19 +27,25 @@ function EvidenceCard({ req, from }: { req: EvidenceRequirement; from: string })
       className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-sm transition-all no-underline"
     >
       <div className="flex items-center justify-between mb-1.5 gap-4">
-        <span className="font-mono text-xs font-semibold text-blue-700 truncate">
+        <div className="flex items-center gap-2 min-w-0">
+          {req.source_pdf && (
+            <span className="text-sm font-semibold text-gray-900 truncate">
+              {req.source_pdf}
+            </span>
+          )}
+          {pages && <span className="text-xs text-gray-500 shrink-0">{pages}</span>}
+          {req.source_ref && (
+            <span className="text-xs font-medium text-gray-700 shrink-0 truncate">
+              {req.source_ref}
+            </span>
+          )}
+        </div>
+        <span className="font-mono text-xs text-gray-400 shrink-0 truncate max-w-[10rem]">
           {req.requirement_id}
         </span>
-        <div className="flex items-center gap-3 text-xs text-gray-400 shrink-0">
-          {req.source_pdf && <span>{req.source_pdf}</span>}
-          {pages && <span>{pages}</span>}
-        </div>
       </div>
       {snippet && (
         <p className="text-sm text-gray-700 leading-snug">{snippet}</p>
-      )}
-      {req.source_ref && (
-        <p className="mt-1.5 text-xs text-gray-400 truncate">{req.source_ref}</p>
       )}
     </Link>
   )

@@ -101,6 +101,8 @@ KNOWN_GOOD_CHUNKS = [
 
 
 def _get_chunk(chunks_path: Path, chunk_id: int) -> dict | None:
+    if not chunks_path.exists():
+        return None
     with open(chunks_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()

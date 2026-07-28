@@ -237,7 +237,10 @@ export interface EvidenceGroup {
 
 /**
  * Full response from POST /api/evidence.
- * groups is keyed by source_ref; group_order preserves the RRF rank order.
+ * groups is keyed by an internal group key, usually the source_ref itself -- but an empty
+ * or bare sub-item ref (e.g. "(f)") gets a synthetic per-requirement key instead of merging
+ * unrelated documents under one label (WP-32.3). Always render groups[key].source_ref for
+ * display, never the key itself. group_order preserves the RRF rank order.
  * synthesis_text is empty string when synthesize=false.
  */
 export interface EvidenceResponse {

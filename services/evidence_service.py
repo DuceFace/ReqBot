@@ -4,6 +4,7 @@ for compliance evidence packs.
 Returns structured data; all rendering (markdown/JSON) stays in cli/reqbot.py.
 """
 import logging
+import re
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -61,6 +62,51 @@ def _embedding_warnings(payloads: list[dict], configured_embedding_model: str) -
         f"({configured_embedding_model}) and may be unreliable; run 'reqbot reindex' "
         "to refresh them."
     ]
+
+
+# A source_ref that's just a bare sub-item fragment ("(f)", "(a)", "(12)") with no
+# parent control ID attached -- as opposed to a full ref like "IA-05(01)(b)", which
+# already carries its own control ID and needs no disambiguation.
+_BARE_FRAGMENT_RE = re.compile(r"^\(\w{1,4}\)$")
+
+
+def _group_key_and_label(p: dict) -> tuple[str, str]:
+    """Return (dict_key, display_label) for grouping one search hit (WP-32.3).
+
+    A real, full source_ref (e.g. "IA-05(01)(b)") groups as before -- the same
+    ref can legitimately span multiple documents (several DoD instructions
+    citing the same NIST control), and that's the point of grouping. Left
+    untouched here, per this WP's Non-Goals.
+
+    An empty source_ref, or a bare sub-item fragment with no hierarchy
+    metadata available to disambiguate it, has no real shared identity across
+    records -- grouping those under one shared literal key ("(no ref)", "(f)")
+    was silently merging unrelated documents. Singleton-key those by
+    requirement_id instead; the dict_key just needs to be unique, so the
+    display label stays the plain "(no ref)"/bare-fragment text.
+
+    A bare fragment WITH section_ref_path or parent_section_ref available (the
+    common case in practice: section_ref_path covers ~13x more records than
+    parent_section_ref alone, per WP-32.3's corpus check) gets a fuller,
+    disambiguating label built from the closest available ancestor -- e.g.
+    "3.4" + "(a)" -> "3.4(a)" -- which both groups and displays as that
+    combined ref.
+    """
+    ref = (p.get("source_ref") or "").strip()
+    req_id = p.get("requirement_id", "")
+
+    if not ref:
+        return f"__no_ref__{req_id}", "(no ref)"
+
+    if _BARE_FRAGMENT_RE.match(ref):
+        path = p.get("section_ref_path") or []
+        ancestor = path[-1] if path else p.get("parent_section_ref")
+        if ancestor:
+            label = f"{ancestor}{ref}"
+            return label, label
+        return f"__bare_fragment__{req_id}", ref
+
+    return ref, ref
 
 
 def build(
@@ -201,25 +247,26 @@ def build(
     if not hits:
         raise ValueError(f"No results found for: {query}")
 
-    # --- Group by source_ref ---
+    # --- Group by source_ref (WP-32.3: see _group_key_and_label for the empty/
+    #     bare-fragment fallback that used to silently merge unrelated documents) ---
     # Every result in a group becomes a "source" row in the evidence table.
     # The representative (canonical description) is the highest-confidence result per group.
     groups: dict[str, dict] = {}
     group_order: list[str] = []
     for hit in hits:
         p = hit.payload or {}
-        ref = p.get("source_ref") or "(no ref)"
-        if ref not in groups:
-            groups[ref] = {
-                "source_ref": ref,
+        key, label = _group_key_and_label(p)
+        if key not in groups:
+            groups[key] = {
+                "source_ref": label,
                 "representative": p,
                 "sources": [],
                 "context_text": None,
             }
-            group_order.append(ref)
-        groups[ref]["sources"].append(p)
-        if (p.get("confidence") or 0) > (groups[ref]["representative"].get("confidence") or 0):
-            groups[ref]["representative"] = p
+            group_order.append(key)
+        groups[key]["sources"].append(p)
+        if (p.get("confidence") or 0) > (groups[key]["representative"].get("confidence") or 0):
+            groups[key]["representative"] = p
 
     # --- Context retrieval — batch fetch for all group representatives ---
     if show_context:
@@ -278,7 +325,11 @@ def build(
             # the canonical asset in all other contexts (trace, evidence table rows).
             primary = rep.get("description") or rep.get("source_quote") or "(no text)"
             evidence_lines.append(
-                f"[{i}] Control: {ref}  |  Sources: {len(g['sources'])}\n"
+                # g["source_ref"] is the display label (e.g. "(no ref)", "3.4(a)") -- ref
+                # itself is groups' internal dict key, which for the empty/bare-fragment
+                # fallback (WP-32.3) is an unlabeled-looking singleton like
+                # "__no_ref__REQ-xxxx" and must never reach the LLM prompt.
+                f"[{i}] Control: {g['source_ref']}  |  Sources: {len(g['sources'])}\n"
                 f"    {primary}"
             )
 

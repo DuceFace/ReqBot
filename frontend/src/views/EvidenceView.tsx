@@ -308,7 +308,7 @@ export default function EvidenceView() {
                           {i + 1}
                         </span>
                         <h2 className="text-sm font-semibold text-gray-700 truncate">
-                          {ref}
+                          {group.source_ref}
                         </h2>
                         <span className="text-xs text-gray-400 shrink-0">
                           ({group.sources.length} source{group.sources.length !== 1 ? 's' : ''})

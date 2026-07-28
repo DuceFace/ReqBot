@@ -21,23 +21,34 @@ import numpy as np
 import pytest
 
 
-def _fake_hit(source_ref="AC-2", score=0.9):
+def _fake_hit(
+    source_ref="AC-2",
+    score=0.9,
+    requirement_id="REQ-fake",
+    document_id="doc1",
+    section_ref_path=None,
+    parent_section_ref=None,
+):
     hit = MagicMock()
     hit.payload = {
+        "requirement_id": requirement_id,
+        "document_id": document_id,
         "source_ref": source_ref,
         "source_quote": "The organization shall enforce access control.",
         "description": "Access control requirement.",
         "confidence": 0.9,
+        "section_ref_path": section_ref_path or [],
+        "parent_section_ref": parent_section_ref,
     }
     hit.score = score
     return hit
 
 
-def _run_build(document_id_counts: dict[str, int] | None = None, **overrides):
+def _run_build(document_id_counts: dict[str, int] | None = None, hits=None, **overrides):
     from services import evidence_service
 
     fake_qdrant_client = MagicMock()
-    fake_qdrant_client.query_points.return_value.points = [_fake_hit()]
+    fake_qdrant_client.query_points.return_value.points = hits or [_fake_hit()]
 
     counts = document_id_counts or {}
 
@@ -152,3 +163,116 @@ def test_no_document_ids_applies_no_filter():
     _, _, fake_client = _run_build(document_ids=None)
     _, kwargs = fake_client.query_points.call_args
     assert kwargs["prefetch"][0].filter is None
+
+
+# ---------------------------------------------------------------------------
+# Grouping fallback fix (Phase 32, WP-32.3)
+#
+# _group_key_and_label() unit tests exercise the pure logic directly; the
+# build()-level tests below confirm it's actually wired into the grouping
+# loop and that unrelated documents no longer collapse into one group.
+# ---------------------------------------------------------------------------
+
+def test_group_key_full_ref_groups_and_labels_as_itself():
+    from services.evidence_service import _group_key_and_label
+
+    p = {"source_ref": "IA-05(01)(b)", "requirement_id": "REQ-a"}
+    key, label = _group_key_and_label(p)
+    assert key == "IA-05(01)(b)"
+    assert label == "IA-05(01)(b)"
+
+
+def test_group_key_empty_ref_is_singleton_per_requirement():
+    from services.evidence_service import _group_key_and_label
+
+    key_a, label_a = _group_key_and_label({"source_ref": "", "requirement_id": "REQ-a"})
+    key_b, label_b = _group_key_and_label({"source_ref": None, "requirement_id": "REQ-b"})
+    assert key_a != key_b
+    assert label_a == "(no ref)"
+    assert label_b == "(no ref)"
+
+
+def test_group_key_bare_fragment_uses_section_ref_path_last_element():
+    from services.evidence_service import _group_key_and_label
+
+    p = {
+        "source_ref": "(a)",
+        "requirement_id": "REQ-a",
+        "section_ref_path": ["SECTION-3", "3.4"],
+        "parent_section_ref": "SECTION-3",
+    }
+    key, label = _group_key_and_label(p)
+    # the closer ancestor (path[-1]) wins over the coarser parent_section_ref
+    assert key == "3.4(a)"
+    assert label == "3.4(a)"
+
+
+def test_group_key_bare_fragment_falls_back_to_parent_section_ref():
+    from services.evidence_service import _group_key_and_label
+
+    p = {
+        "source_ref": "(b)",
+        "requirement_id": "REQ-a",
+        "section_ref_path": [],
+        "parent_section_ref": "SECTION-5",
+    }
+    key, label = _group_key_and_label(p)
+    assert key == "SECTION-5(b)"
+    assert label == "SECTION-5(b)"
+
+
+def test_group_key_bare_fragment_with_no_hierarchy_is_singleton():
+    from services.evidence_service import _group_key_and_label
+
+    key_a, label_a = _group_key_and_label({"source_ref": "(f)", "requirement_id": "REQ-a"})
+    key_b, label_b = _group_key_and_label({"source_ref": "(f)", "requirement_id": "REQ-b"})
+    assert key_a != key_b
+    assert label_a == "(f)"
+    assert label_b == "(f)"
+
+
+def test_build_does_not_merge_unrelated_documents_under_empty_ref():
+    """The original bug: 14 requirements from ~10 unrelated documents all
+    fell into one literal "(no ref)" bucket. Two hits with an empty
+    source_ref from different documents must land in separate groups."""
+    hits = [
+        _fake_hit(source_ref="", requirement_id="REQ-a", document_id="docA"),
+        _fake_hit(source_ref="", requirement_id="REQ-b", document_id="docB"),
+    ]
+    result, _, _ = _run_build(hits=hits, synthesize=False)
+    assert len(result["groups"]) == 2
+    assert all(g["source_ref"] == "(no ref)" for g in result["groups"].values())
+
+
+def test_build_does_not_merge_unrelated_documents_under_bare_fragment_no_hierarchy():
+    hits = [
+        _fake_hit(source_ref="(f)", requirement_id="REQ-a", document_id="docA"),
+        _fake_hit(source_ref="(f)", requirement_id="REQ-b", document_id="docB"),
+    ]
+    result, _, _ = _run_build(hits=hits, synthesize=False)
+    assert len(result["groups"]) == 2
+
+
+def test_build_still_merges_same_full_ref_across_documents():
+    """Non-goal, confirmed as a regression guard: a real, full source_ref
+    shared across documents (e.g. multiple DoD instructions citing the same
+    NIST control) keeps grouping together -- only the empty/bare-fragment
+    fallback paths changed."""
+    hits = [
+        _fake_hit(source_ref="IA-05(01)(b)", requirement_id="REQ-a", document_id="docA"),
+        _fake_hit(source_ref="IA-05(01)(b)", requirement_id="REQ-b", document_id="docB"),
+    ]
+    result, _, _ = _run_build(hits=hits, synthesize=False)
+    assert len(result["groups"]) == 1
+    assert result["groups"]["IA-05(01)(b)"]["sources"] == [h.payload for h in hits]
+
+
+def test_build_synthesis_prompt_uses_display_label_not_internal_key():
+    """The synthesis evidence_lines must never leak an internal singleton key
+    like "__no_ref__REQ-a" into the LLM prompt."""
+    hits = [_fake_hit(source_ref="", requirement_id="REQ-a", document_id="docA")]
+    _, mock_synthesize, _ = _run_build(hits=hits, synthesize=True)
+    _, kwargs = mock_synthesize.call_args
+    prompt = kwargs["raw_prompt"]
+    assert "__no_ref__" not in prompt
+    assert "(no ref)" in prompt

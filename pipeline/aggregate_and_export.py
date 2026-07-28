@@ -51,16 +51,30 @@ def count_lines(path: Path) -> int:
     return count
 
 
-def run(requirements_jsonl: str, output_dir: str, source_pdf: str = "") -> dict:
+def run(
+    requirements_jsonl: str,
+    output_dir: str,
+    source_pdf: str = "",
+    layout_mode_used: str = "",
+    skip_sections_configured: list[str] | None = None,
+) -> dict:
     """Aggregate normalized requirements and write final_output.json and stats.json.
 
     Callable interface for in-process use by run_pipeline.py.
     Standalone CLI usage is unchanged via main() / __main__.
 
     Args:
-        requirements_jsonl: Path to requirements_normalized.jsonl from Step D.
-        output_dir:         Directory to write output files into.
-        source_pdf:         Original PDF filename for metadata (optional).
+        requirements_jsonl:       Path to requirements_normalized.jsonl from Step D.
+        output_dir:               Directory to write output files into.
+        source_pdf:               Original PDF filename for metadata (optional).
+        layout_mode_used:         The actual layout mode this ingest ran with
+                                   ("docling"/"pymupdf"/"pdfplumber") -- the final
+                                   resolved value after any auto-fallback, not the
+                                   requested one. Empty when unknown (standalone
+                                   CLI usage with no caller context).
+        skip_sections_configured: The active profile's skip_sections value at
+                                   ingest time (WP-33.2) -- used only to compute
+                                   skip_sections_applied below, not stored verbatim.
 
     Returns:
         stats dict — the same content written to stats.json.
@@ -136,6 +150,16 @@ def run(requirements_jsonl: str, output_dir: str, source_pdf: str = "") -> dict:
         if raw_response_count > 0 else 0
     )
 
+    # WP-33.2: skip_sections only takes effect on the docling layout mode -- a
+    # profile can configure it while the actual ingest silently no-ops on it (no
+    # docling installed, a per-document auto-fallback, or an explicit
+    # --layout-mode pymupdf/pdfplumber). None means "nothing configured to
+    # surface," not "unknown" -- distinct from False ("configured but didn't
+    # apply").
+    skip_sections_applied = (
+        (layout_mode_used == "docling") if skip_sections_configured else None
+    )
+
     stats = {
         "pipeline": {
             "pages_extracted": page_count,
@@ -148,6 +172,8 @@ def run(requirements_jsonl: str, output_dir: str, source_pdf: str = "") -> dict:
             "requirements_before_normalization": len(requirements) + norm_failure_count,
             "requirements_after_normalization": len(requirements),
             "requirements_per_1000_chars": round(reqs_per_1k, 3),
+            "layout_mode_used": layout_mode_used,
+            "skip_sections_applied": skip_sections_applied,
         },
         "requirements": {
             "total": len(requirements),

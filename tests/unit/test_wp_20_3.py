@@ -206,7 +206,7 @@ def test_run_pipeline_passes_profile_to_step_c(tmp_path):
         norm.write_text("", encoding="utf-8")
         return str(norm)
 
-    def fake_step_e(jsonl, output_dir, source_pdf):
+    def fake_step_e(jsonl, output_dir, source_pdf, **kwargs):
         pass
 
     # Provide a minimal chunks.jsonl so Step C is called

@@ -61,15 +61,54 @@ def list_docs(processed_dir: Path) -> dict:
             log.warning("Could not read %s: %s", path, e)
         total_reqs += count
 
-        # Detect pdfplumber by scanning chunks for TABLE_START sentinels
-        chunks = list(path.parent.glob("*_chunks.jsonl"))
+        # WP-33.2: prefer stats.json's authoritative layout_mode_used (written by
+        # run_pipeline.py since this WP) over guessing. Falls back to inspecting
+        # chunks.jsonl for documents ingested before this field existed --
+        # section_ref_path key presence on any chunk is docling's own signature
+        # (legacy chunking never writes that key at all, confirmed during Phase 32's
+        # investigation); a TABLE_START sentinel is pdfplumber's. This fallback also
+        # fixes a real pre-existing bug: the old logic only ever checked for the
+        # pdfplumber sentinel, so it silently mislabeled every already-ingested
+        # docling document as "pymupdf".
+        # Resolve this document's own stats/chunks files by deterministic name
+        # (doc_key-prefixed), not a directory-wide glob()[0] -- an explicitly
+        # shared --output-dir holding artifacts for more than one PDF stem would
+        # otherwise let one document's stats/chunks leak into another's row
+        # (Codex review, PR #155).
         mode = "pymupdf"
-        if chunks:
-            with open(chunks[0], encoding="utf-8") as f:
-                for line in f:
-                    if "<<<TABLE_START>>>" in line:
-                        mode = "pdfplumber"
-                        break
+        skip_sections_applied = None
+        stats_path = path.parent / f"{doc_key}_stats.json"
+        stats_layout_mode = ""
+        if stats_path.exists():
+            try:
+                with open(stats_path, encoding="utf-8") as f:
+                    stats = json.load(f)
+                pipeline_stats = stats.get("pipeline", {})
+                stats_layout_mode = pipeline_stats.get("layout_mode_used", "")
+                if "skip_sections_applied" in pipeline_stats:
+                    skip_sections_applied = pipeline_stats["skip_sections_applied"]
+            except Exception as e:
+                log.warning("Could not read %s: %s", stats_path, e)
+
+        if stats_layout_mode:
+            mode = stats_layout_mode
+        else:
+            chunks_path = path.parent / f"{doc_key}_chunks.jsonl"
+            if chunks_path.exists():
+                with open(chunks_path, encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        if "<<<TABLE_START>>>" in line:
+                            mode = "pdfplumber"
+                            break
+                        try:
+                            data = json.loads(line)
+                            if isinstance(data, dict) and "section_ref_path" in data:
+                                mode = "docling"
+                                break
+                        except json.JSONDecodeError:
+                            pass
 
         # Run date from directory timestamp suffix
         dir_name = path.parent.name
@@ -87,6 +126,11 @@ def list_docs(processed_dir: Path) -> dict:
             "mode": mode,
             "run_date": run_date,
             "profile": domain_profile,
+            # WP-33.2: True/False if the profile's skip_sections was configured for
+            # this ingest, None if nothing was configured to apply in the first
+            # place. Only known for documents ingested since this WP (stats.json
+            # written before it has no skip_sections_applied key at all).
+            "skip_sections_applied": skip_sections_applied,
         })
 
     return {

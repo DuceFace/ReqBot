@@ -41,6 +41,41 @@ def _docling_available() -> bool:
     return importlib.util.find_spec("docling") is not None
 
 
+def _detect_layout_mode_from_chunks(chunks_path: Path) -> str:
+    """Determine which backend actually produced an existing chunks.jsonl file,
+    by inspecting its content rather than trusting the current invocation's
+    layout_mode resolution (WP-33.2 fix, Codex review PR #155).
+
+    Needed when resuming past Step B (--skip-to C/D/E): resolve_layout_mode()
+    reflects what "auto" resolves to *right now* (e.g. docling being installed
+    today), which can differ from what actually ran when chunks.jsonl was
+    originally written (e.g. a prior per-document auto-fallback to pymupdf).
+    Recording the wrong value would make layout_mode_used/skip_sections_applied
+    describe a resolution that never touched these chunks.
+
+    Same signature docs_service.py uses: section_ref_path key presence is
+    docling's own signature (legacy chunking never writes that key at all,
+    confirmed during Phase 32); a TABLE_START sentinel is pdfplumber's.
+    """
+    import json
+
+    if not chunks_path.exists():
+        return ""
+    with open(chunks_path, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            if "<<<TABLE_START>>>" in line:
+                return "pdfplumber"
+            try:
+                data = json.loads(line)
+                if isinstance(data, dict) and "section_ref_path" in data:
+                    return "docling"
+            except json.JSONDecodeError:
+                pass
+    return "pymupdf"
+
+
 def resolve_layout_mode(layout_mode: str) -> str:
     """Resolve "auto" (the CLI default) to a concrete backend.
 
@@ -295,8 +330,22 @@ def run(
         log.info("=" * 60)
         log.info("Starting Step E (Aggregate)")
         log.info("=" * 60)
+        # layout_mode reflects what "auto" resolves to in THIS invocation, which
+        # is only guaranteed to describe chunks_path's actual content when Step B
+        # ran this same invocation. Resuming past it (--skip-to C/D/E) means
+        # chunks_path is a pre-existing artifact from a possibly-different prior
+        # resolution -- detect the real value from the file itself in that case
+        # (Codex review, PR #155).
+        layout_mode_for_stats = (
+            layout_mode if "B" in steps_to_run
+            else _detect_layout_mode_from_chunks(chunks_path)
+        )
         try:
-            aggregate_and_export.run(str(index_path), str(out_dir), source_pdf=pdf.name)
+            aggregate_and_export.run(
+                str(index_path), str(out_dir), source_pdf=pdf.name,
+                layout_mode_used=layout_mode_for_stats,
+                skip_sections_configured=profile.get("skip_sections", []),
+            )
         except Exception as e:
             raise RuntimeError(f"Step E failed: {e}") from e
 

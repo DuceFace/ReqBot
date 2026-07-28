@@ -555,11 +555,23 @@ def cmd_docs(args: argparse.Namespace) -> int:
 
     result = docs_service.list_docs(processed_dir)
 
-    print(f"\n{'Document':<30} {'Reqs':>6}  {'Extraction':<12}  {'Run Date'}")
-    print("-" * 68)
+    # WP-33.2: skip_sections_applied is None (nothing configured to surface),
+    # True, or False ("configured but silently didn't apply" -- the exact gap
+    # this column exists to make visible without reading pipeline logs).
+    def _skip_sections_display(applied: bool | None) -> str:
+        if applied is None:
+            return "-"
+        return "yes" if applied else "no (!)"
+
+    print(f"\n{'Document':<30} {'Reqs':>6}  {'Extraction':<12}  {'Skip-Sect':<10}  {'Run Date'}")
+    print("-" * 82)
     for doc in result["docs"]:
-        print(f"{doc['doc_key']:<30} {doc['count']:>6}  {doc['mode']:<12}  {doc['run_date']}")
-    print("-" * 68)
+        skip_sect = _skip_sections_display(doc.get("skip_sections_applied"))
+        print(
+            f"{doc['doc_key']:<30} {doc['count']:>6}  {doc['mode']:<12}  "
+            f"{skip_sect:<10}  {doc['run_date']}"
+        )
+    print("-" * 82)
     print(f"{'TOTAL':<30} {result['total_reqs']:>6}  ({result['total_docs']} documents)")
     print()
     return 0

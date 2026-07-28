@@ -296,7 +296,11 @@ def run(
         log.info("Starting Step E (Aggregate)")
         log.info("=" * 60)
         try:
-            aggregate_and_export.run(str(index_path), str(out_dir), source_pdf=pdf.name)
+            aggregate_and_export.run(
+                str(index_path), str(out_dir), source_pdf=pdf.name,
+                layout_mode_used=layout_mode,
+                skip_sections_configured=profile.get("skip_sections", []),
+            )
         except Exception as e:
             raise RuntimeError(f"Step E failed: {e}") from e
 

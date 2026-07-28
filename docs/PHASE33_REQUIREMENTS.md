@@ -19,7 +19,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-33.1 — Deduplicate Profile Vocabulary Constants | Complete — 4 files now derive from `core.profiles.default_profile()`; `pipeline/parse_and_normalize.py`'s dead copies deleted outright |
-| WP-33.2 — Surface the Skip-Section Docling-Only Gap | Not started |
+| WP-33.2 — Surface the Skip-Section Docling-Only Gap | Complete — new `layout_mode_used`/`skip_sections_applied` fields in `stats.json`, surfaced via `reqbot docs`'s new Skip-Sect column; also fixed a discovered pre-existing bug where `mode` mislabeled every docling document as `pymupdf` |
 | WP-33.3 — Spike: Actionability Self-Verification | Not started |
 
 ---
@@ -212,6 +212,30 @@ that one log line.
 
 **Gate:** A user can tell, after an ingest run completes, whether their profile's `skip_sections`
 actually took effect for that run — without reading pipeline logs.
+
+**Resolution:** Chose `stats.json` (Step E's existing metrics file) over a requirement-record field —
+it's pure diagnostics, not the requirement JSONL/Qdrant payload schema those files stop-and-ask
+protects, so no schema-change consultation was needed. `run_pipeline.py` now passes the final
+resolved `layout_mode` and the profile's `skip_sections` into `aggregate_and_export.run()`, which
+computes `skip_sections_applied` (`None` if nothing was configured, `True`/`False` if something was
+and either did or didn't apply) and writes both alongside the existing `layout_mode_used` field.
+`docs_service.list_docs()` reads it and surfaces it through `reqbot docs`'s new Skip-Sect column
+(CLI-only for now — GUI/Corpus-view surfacing is a natural follow-up, not done here to keep this WP
+bounded to what the Scope called "cheapest to thread through cleanly").
+
+While implementing, found and fixed (confirmed with the user first, since it's a separate bug) a
+real pre-existing issue in the same function: `docs_service.py`'s `mode` field only ever checked for
+a pdfplumber `TABLE_START` sentinel, so it silently mislabeled every already-ingested docling
+document as `pymupdf`. Fixed using `section_ref_path` key presence (docling's own signature,
+confirmed during Phase 32) as a second signal, with `stats.json`'s new authoritative
+`layout_mode_used` preferred when present. Backward-compatible: documents ingested before this WP
+(no `layout_mode_used` in their `stats.json`) fall back to the corrected heuristic instead of
+showing nothing.
+
+Verified: 660/660 `pytest` (13 new tests), `ruff` clean. Manual — ingested `afpd_17-1.pdf` with
+`--layout-mode pymupdf` (cybersecurity profile's `skip_sections` is non-empty) and confirmed
+`reqbot docs` showed `no (!)` for that document while a pre-existing (pre-WP) document correctly
+showed `-` rather than being misreported as `no`.
 
 ---
 

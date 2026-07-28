@@ -498,6 +498,8 @@ Useful flags:
 - [docs/PROFILES.md](docs/PROFILES.md) - `profiles/*.json` schema, validation rules, and what each
   field actually does at runtime
 - [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document
-- [docs/TODO_future_improvements.txt](docs/TODO_future_improvements.txt) - live backlog; no phase is
-  currently active (Phase 32 closed) -- the next phase gets drafted from this list
+- [docs/PHASE33_REQUIREMENTS.md](docs/PHASE33_REQUIREMENTS.md) - Phase 33 plan (profile vocabulary
+  dedup, skip-section gap visibility, actionability self-verification spike)
+- [docs/TODO_future_improvements.txt](docs/TODO_future_improvements.txt) - live backlog the next
+  phase gets drafted from once Phase 33 closes
 - [archive/](archive/) - completed phase plans (Phases 7–32)

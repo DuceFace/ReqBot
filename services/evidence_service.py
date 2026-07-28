@@ -93,14 +93,20 @@ def _group_key_and_label(p: dict) -> tuple[str, str]:
     combined ref.
     """
     ref = (p.get("source_ref") or "").strip()
-    req_id = p.get("requirement_id", "")
+    # A missing/None/empty requirement_id must still get a unique key -- otherwise
+    # multiple such records collapse back into one shared key, defeating the whole
+    # point of this function (Gemini review, PR #146).
+    req_id = p.get("requirement_id") or uuid.uuid4().hex
 
     if not ref:
         return f"__no_ref__{req_id}", "(no ref)"
 
     if _BARE_FRAGMENT_RE.match(ref):
-        path = p.get("section_ref_path") or []
-        ancestor = path[-1] if path else p.get("parent_section_ref")
+        raw_path = p.get("section_ref_path")
+        path = raw_path if isinstance(raw_path, list) else []
+        # path[-1] can itself be falsy (an empty string); don't let that mask a
+        # real parent_section_ref (Gemini review, PR #146).
+        ancestor = (path[-1] if path else None) or p.get("parent_section_ref")
         if ancestor:
             label = f"{ancestor}{ref}"
             return label, label
@@ -270,7 +276,12 @@ def build(
 
     # --- Context retrieval — batch fetch for all group representatives ---
     if show_context:
-        pid_to_ref: dict[str, str] = {}
+        # One pid (document_id:chunk_id) can now back multiple groups -- WP-32.3's
+        # singleton keys mean two different empty-ref/bare-fragment requirements can
+        # legitimately share the same source chunk. Map pid -> every group key that
+        # needs it, not just the last one seen, or all but one silently lose their
+        # context_text (Codex review, PR #146).
+        pid_to_refs: dict[str, list[str]] = {}
         pids: list[str] = []
         for ref in group_order:
             rep = groups[ref]["representative"]
@@ -278,8 +289,9 @@ def build(
             chunk_id = rep.get("chunk_id")
             if doc_id and chunk_id is not None:
                 pid = str(uuid.uuid5(_const.CONTEXT_UUID_NS, f"{doc_id}:{chunk_id}"))
-                pids.append(pid)
-                pid_to_ref[pid] = ref
+                if pid not in pid_to_refs:
+                    pids.append(pid)
+                pid_to_refs.setdefault(pid, []).append(ref)
         if pids:
             try:
                 ctx_hits = client.retrieve(
@@ -288,26 +300,27 @@ def build(
                     with_payload=True,
                 )
                 for point in ctx_hits:
-                    ref = pid_to_ref.get(str(point.id))
-                    if not ref:
+                    refs = pid_to_refs.get(str(point.id))
+                    if not refs:
                         continue
                     ctx = (point.payload or {}).get("text", "")
                     if not ctx:
                         continue
-                    rep = groups[ref]["representative"]
-                    quote = rep.get("source_quote", "")
-                    window = 300
-                    if quote and quote in ctx:
-                        idx = ctx.find(quote)
-                        start = max(0, idx - window)
-                        end = min(len(ctx), idx + len(quote) + window)
-                        prefix = "..." if start > 0 else ""
-                        suffix = "..." if end < len(ctx) else ""
-                        groups[ref]["context_text"] = prefix + ctx[start:end] + suffix
-                    else:
-                        groups[ref]["context_text"] = (
-                            ctx[:window * 2] + ("..." if len(ctx) > window * 2 else "")
-                        )
+                    for ref in refs:
+                        rep = groups[ref]["representative"]
+                        quote = rep.get("source_quote", "")
+                        window = 300
+                        if quote and quote in ctx:
+                            idx = ctx.find(quote)
+                            start = max(0, idx - window)
+                            end = min(len(ctx), idx + len(quote) + window)
+                            prefix = "..." if start > 0 else ""
+                            suffix = "..." if end < len(ctx) else ""
+                            groups[ref]["context_text"] = prefix + ctx[start:end] + suffix
+                        else:
+                            groups[ref]["context_text"] = (
+                                ctx[:window * 2] + ("..." if len(ctx) > window * 2 else "")
+                            )
             except Exception as e:
                 log.warning("Context batch retrieval failed: %s", e)
 

@@ -498,10 +498,11 @@ def test_map_evidence_falls_back_to_local_when_remote_key_missing():
     from mcp_server import server
 
     cfg = _mock_cfg(synthesis_backend="remote", remote_provider="anthropic", api_key_env="ANTHROPIC_API_KEY")
+    fake_result = {"query": "question", "groups": {}, "group_order": [], "total_sources": 0, "synthesis_text": ""}
     with (
         patch("mcp_server.server._config.load", return_value=cfg),
         patch.dict("os.environ", {}, clear=False),
-        patch("mcp_server.server.evidence_service.build", return_value={}) as mock_build,
+        patch("mcp_server.server.evidence_service.build", return_value=fake_result) as mock_build,
     ):
         import os as _os
         _os.environ.pop("ANTHROPIC_API_KEY", None)
@@ -515,10 +516,11 @@ def test_map_evidence_uses_remote_backend_when_key_present():
     from mcp_server import server
 
     cfg = _mock_cfg(synthesis_backend="remote", remote_provider="anthropic", api_key_env="ANTHROPIC_API_KEY")
+    fake_result = {"query": "question", "groups": {}, "group_order": [], "total_sources": 0, "synthesis_text": ""}
     with (
         patch("mcp_server.server._config.load", return_value=cfg),
         patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-fake"}),
-        patch("mcp_server.server.evidence_service.build", return_value={}) as mock_build,
+        patch("mcp_server.server.evidence_service.build", return_value=fake_result) as mock_build,
     ):
         server.map_evidence("question")
 
@@ -553,6 +555,45 @@ def test_map_evidence_grouped_output_preserves_sources_and_warnings():
 
     assert result["groups"]["AC-2"]["sources"] == fake_result["groups"]["AC-2"]["sources"]
     assert result["warnings"] == fake_result["warnings"]
+
+
+def test_map_evidence_hides_internal_singleton_keys_from_mcp_client():
+    """Codex review, PR #146: WP-32.3's empty-ref/hierarchy-less-bare-fragment
+    fallback keys groups by a synthetic "__no_ref__REQ-xxxx" string internally --
+    an MCP client (and the LLM consuming this tool's result) must never see that,
+    same as the CLI/frontend/synthesis-prompt boundaries already don't."""
+    from mcp_server import server
+
+    fake_result = {
+        "query": "x",
+        "groups": {
+            "__no_ref__REQ-a": {
+                "source_ref": "(no ref)",
+                "representative": {"requirement_id": "REQ-a", "source_ref": ""},
+                "sources": [{"requirement_id": "REQ-a", "source_ref": ""}],
+                "context_text": None,
+            },
+            "AC-2": {
+                "source_ref": "AC-2",
+                "representative": {"requirement_id": "REQ-b", "source_ref": "AC-2"},
+                "sources": [{"requirement_id": "REQ-b", "source_ref": "AC-2"}],
+                "context_text": None,
+            },
+        },
+        "group_order": ["__no_ref__REQ-a", "AC-2"],
+        "total_sources": 2,
+        "synthesis_text": "",
+    }
+    with (
+        patch("mcp_server.server._config.load", return_value=_mock_cfg()),
+        patch("mcp_server.server.evidence_service.build", return_value=fake_result),
+    ):
+        result = server.map_evidence("question")
+
+    assert result["group_order"] == ["REQ-a", "AC-2"]
+    assert "__no_ref__REQ-a" not in result["groups"]
+    assert result["groups"]["REQ-a"]["source_ref"] == "(no ref)"
+    assert result["groups"]["AC-2"]["source_ref"] == "AC-2"
 
 
 def test_map_evidence_service_failure_becomes_structured_mcp_error():

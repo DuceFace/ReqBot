@@ -28,6 +28,7 @@ def _fake_hit(
     document_id="doc1",
     section_ref_path=None,
     parent_section_ref=None,
+    chunk_id=1,
 ):
     hit = MagicMock()
     hit.payload = {
@@ -39,16 +40,18 @@ def _fake_hit(
         "confidence": 0.9,
         "section_ref_path": section_ref_path or [],
         "parent_section_ref": parent_section_ref,
+        "chunk_id": chunk_id,
     }
     hit.score = score
     return hit
 
 
-def _run_build(document_id_counts: dict[str, int] | None = None, hits=None, **overrides):
+def _run_build(document_id_counts: dict[str, int] | None = None, hits=None, context_points=None, **overrides):
     from services import evidence_service
 
     fake_qdrant_client = MagicMock()
     fake_qdrant_client.query_points.return_value.points = hits or [_fake_hit()]
+    fake_qdrant_client.retrieve.return_value = context_points or []
 
     counts = document_id_counts or {}
 
@@ -276,3 +279,78 @@ def test_build_synthesis_prompt_uses_display_label_not_internal_key():
     prompt = kwargs["raw_prompt"]
     assert "__no_ref__" not in prompt
     assert "(no ref)" in prompt
+
+
+# ---------------------------------------------------------------------------
+# Gemini + Codex review fixes, PR #146
+# ---------------------------------------------------------------------------
+
+def test_group_key_missing_requirement_id_still_gets_unique_key():
+    """A falsy/missing requirement_id must not collapse multiple empty-ref
+    records back into one shared key -- exactly the bug this WP exists to fix,
+    just triggered a different way. Both records genuinely lack requirement_id
+    (key absent, not just falsy) -- the exact input shape that collided under
+    the old `p.get("requirement_id", "")` (a missing key returns the same "").
+    """
+    from services.evidence_service import _group_key_and_label
+
+    key_a, _ = _group_key_and_label({"source_ref": ""})
+    key_b, _ = _group_key_and_label({"source_ref": ""})
+    assert key_a != key_b
+
+
+def test_group_key_bare_fragment_string_section_ref_path_ignored():
+    """section_ref_path stored as a plain string (not a list) must not be
+    indexed into character-by-character -- fall back as if it were absent."""
+    from services.evidence_service import _group_key_and_label
+
+    p = {
+        "source_ref": "(a)",
+        "requirement_id": "REQ-a",
+        "section_ref_path": "3.4",  # malformed: string, not list[str]
+        "parent_section_ref": "3.0",
+    }
+    key, label = _group_key_and_label(p)
+    assert key == label == "3.0(a)"  # falls back to parent_section_ref, not "4(a)"
+
+
+def test_group_key_bare_fragment_falsy_last_path_element_falls_back_to_parent():
+    """A falsy trailing section_ref_path element must not mask a real
+    parent_section_ref."""
+    from services.evidence_service import _group_key_and_label
+
+    p = {
+        "source_ref": "(a)",
+        "requirement_id": "REQ-a",
+        "section_ref_path": ["3.4", ""],
+        "parent_section_ref": "3.0",
+    }
+    key, label = _group_key_and_label(p)
+    assert key == label == "3.0(a)"
+
+
+def test_context_text_populated_for_all_singletons_sharing_same_chunk():
+    """Two empty-ref requirements from the same document chunk each become
+    their own singleton group (WP-32.3) -- both must still get context_text,
+    not just whichever group happened to be assigned last in pid_to_refs."""
+    import uuid
+
+    from core import constants as _const
+
+    hits = [
+        _fake_hit(source_ref="", requirement_id="REQ-a", document_id="docA", chunk_id=7),
+        _fake_hit(source_ref="", requirement_id="REQ-b", document_id="docA", chunk_id=7),
+    ]
+    pid = str(uuid.uuid5(_const.CONTEXT_UUID_NS, "docA:7"))
+    context_point = MagicMock()
+    context_point.id = pid
+    context_point.payload = {"text": "shared chunk context text"}
+
+    result, _, _ = _run_build(
+        hits=hits, context_points=[context_point], synthesize=False, show_context=True
+    )
+
+    assert len(result["groups"]) == 2
+    for g in result["groups"].values():
+        assert g["context_text"] is not None
+        assert "shared chunk context text" in g["context_text"]

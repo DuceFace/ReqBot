@@ -17,13 +17,14 @@ if str(_ROOT) not in sys.path:
 log = logging.getLogger(__name__)
 
 from core import constants as _const
+from core.profiles import load_profile as _load_profile
 
 _EVIDENCE_AUDITOR_PROMPT = """You are a strict compliance auditor reviewing evidence for a System Security Plan (SSP).
 You have been given a set of retrieved compliance requirements grouped by control ID.
 Your task is to produce a concise Executive Summary for the evidence pack.
 
 Rules you MUST follow:
-1. Identify the dominant control families present in the evidence (e.g., AC, IA, AU).
+1. {category_rule}
 2. Summarize what the evidence collectively requires — in plain, precise language an auditor would use.
 3. Flag any gaps: controls that appear in only one framework, or controls with conflicting language across frameworks.
 4. Do NOT invent requirements not present in the evidence.
@@ -36,6 +37,55 @@ EVIDENCE GROUPS ({group_count} control groups, {source_count} sources):
 {evidence_summary}
 
 Write the Executive Summary now:"""
+
+# Original hardcoded rule -- NIST/RMF control-family abbreviations that mean nothing
+# outside cybersecurity. Kept as the fallback for mixed-profile results (WP-32.7):
+# a wrong-but-old failure mode is better than guessing which profile's vocabulary
+# should win, or merging tag vocabularies from unrelated domains together.
+_DEFAULT_CATEGORY_RULE = "Identify the dominant control families present in the evidence (e.g., AC, IA, AU)."
+
+
+def _category_rule(domain_tags: list[str] | None) -> str:
+    """Build rule #1's text from the active profile's own domain_tags, so the
+    auditor prompt's vocabulary is meaningful regardless of which profile is
+    active (WP-32.7). domain_tags is None when results span more than one
+    profile, or that profile's file failed to load -- _resolve_synthesis_domain_tags
+    already logged why; the caller just gets the safe fallback here.
+    """
+    if not domain_tags:
+        return _DEFAULT_CATEGORY_RULE
+    sample = ", ".join(domain_tags[:3])
+    return (
+        "Identify the dominant categories present in the evidence, using this domain's own "
+        f"vocabulary (e.g., {sample})."
+    )
+
+
+def _resolve_synthesis_domain_tags(hits: list) -> list[str] | None:
+    """Return the shared domain_tags for a set of Qdrant search hits, or None if
+    they don't share exactly one profile (WP-32.7).
+
+    Every indexed requirement carries a domain_profile field -- defaulted to
+    "cybersecurity" for pre-WP-25.x records, the same fallback idiom already used
+    by trace_service.py/checklist_service.py/docs_service.py. The Evidence API
+    filters by document/domain-tag/requirement-type, not by profile, so results
+    spanning more than one profile aren't structurally prevented even though
+    today's corpus is cybersecurity-only end to end (docs/TODO_future_improvements.txt
+    Decisions and Guardrails #8). Handled simply per this WP's scope: agree on one
+    profile or fall back, never guess or merge vocabularies.
+    """
+    profile_names = {(hit.payload or {}).get("domain_profile") or "cybersecurity" for hit in hits}
+    if len(profile_names) != 1:
+        return None
+    try:
+        profile = _load_profile(next(iter(profile_names)))
+    except (FileNotFoundError, ValueError) as e:
+        log.warning(
+            "Could not load profile '%s' for evidence synthesis vocabulary (%s) — "
+            "using generic prompt", next(iter(profile_names)), e
+        )
+        return None
+    return profile["domain_tags"]
 
 
 def _embedding_warnings(payloads: list[dict], configured_embedding_model: str) -> list[str]:
@@ -347,6 +397,7 @@ def build(
             )
 
         auditor_prompt = _EVIDENCE_AUDITOR_PROMPT.format(
+            category_rule=_category_rule(_resolve_synthesis_domain_tags(hits)),
             query=query,
             group_count=len(groups),
             source_count=total_sources,

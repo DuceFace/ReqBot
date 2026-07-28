@@ -25,7 +25,7 @@ in `CLAUDE.md` or anywhere else.
 | WP-32.4 — Context Excerpt Labeling | Complete — caption added above the context block in `EvidenceView.tsx`; verified against a real truncated excerpt from the live corpus |
 | WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Complete — `ResultCard.tsx` and `EvidenceView.tsx`'s `EvidenceCard` both swapped to promote doc name/page/source_ref, demote `requirement_id` |
 | WP-32.6 — Render Generated Answer as Markdown | Complete — `react-markdown` added (Tyler's call over hand-rolling, see WP-32.6 notes below); citation-token linking preserved through nested lists |
-| WP-32.7 — Profile-Aware Evidence Synthesis Vocabulary | Not started |
+| WP-32.7 — Profile-Aware Evidence Synthesis Vocabulary | Complete — `_EVIDENCE_AUDITOR_PROMPT` now derives its category-vocabulary rule from the active profile's `domain_tags`; falls back to the original hardcoded text on mixed-profile results |
 
 ---
 
@@ -738,6 +738,24 @@ agnostic; this prompt quietly breaks that for the one LLM-facing piece of the ev
 
 **Gate:** The evidence synthesis prompt's vocabulary is derived from the active profile, not
 hardcoded cybersecurity/NIST terms.
+
+**Resolution:** `domain_profile` was already present on every retrieved requirement payload (no new
+parameter needed to thread through `evidence_service.build()`/CLI/API/MCP). Added
+`_resolve_synthesis_domain_tags()` — resolves the shared profile across all hits (defaulting a
+missing field to `"cybersecurity"`, the same fallback idiom `trace_service.py`/`checklist_service.py`/
+`docs_service.py` already use) and loads its real `domain_tags` via `core.profiles.load_profile()`;
+returns `None` on a mixed-profile result set or a profile file that fails to load, either of which
+falls back to the original hardcoded "control families (e.g., AC, IA, AU)" text. Rule #1 itself was
+reworded, not just its examples — "control families" is NIST/RMF-specific phrasing that would be
+wrong guidance for any other domain, same as the abbreviations were.
+
+Confirmed during implementation (per this WP's non-goals) that `core/ask.py`'s `SYNTHESIS_PROMPT`
+(the Ask/Search prompt, as opposed to Evidence's auditor prompt) has no equivalent hardcoded
+vocabulary — nothing to fix there.
+
+Verified against the live corpus: a real synthesized Evidence answer now reads "Dominant Categories:
+Cryptographic Key Management, Authorization and Approval Processes" instead of the old "Dominant
+Control Families: AC, IA, AU" framing.
 
 ---
 

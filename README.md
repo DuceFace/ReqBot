@@ -206,7 +206,7 @@ reqbot ingest <pdf> [options]
 Important options:
 
 - `--no-index` - skip indexing, write pipeline artifacts only (debug/inspection)
-- `--layout-mode {pymupdf,pdfplumber,docling}` - PDF extraction backend
+- `--layout-mode {auto,pymupdf,pdfplumber,docling}` - PDF extraction backend (default: auto)
 - `--output-dir DIR` - write artifacts to a specific directory
 - `--extraction-model M` - Step C model
 - `--enrichment-model M` - Step D.5 model
@@ -375,9 +375,17 @@ Advanced behavior:
 
 ## Layout-Aware Extraction
 
-ReqBot supports three PDF extraction backends via `--layout-mode`.
+ReqBot supports three PDF extraction backends via `--layout-mode`, plus an `auto` mode (the
+default) that picks between them automatically.
 
-**`pymupdf` (default)** — fast text extraction for prose-heavy documents (NIST SPs, AFIs, DAF manuals).
+**`auto` (default)** — uses `docling` when it's installed (`pip install "reqbot[docling]"`), since
+structure-aware chunking is strictly better when available. Falls back to `pymupdf` if docling
+isn't installed, or if docling fails on a specific document (logged as a warning, not silent).
+Pass `--layout-mode docling` explicitly instead of relying on `auto` if you want a docling failure
+to raise loudly rather than fall back.
+
+**`pymupdf`** — fast text extraction for prose-heavy documents (NIST SPs, AFIs, DAF manuals). What
+`auto` falls back to when docling isn't available.
 
 **`pdfplumber`** — table-aware extraction for documents with structured tables (DODIs, DoDMs):
 
@@ -389,7 +397,7 @@ reqbot ingest "DODI 5200.01_vol2.pdf" --layout-mode pdfplumber
 - preserves table boundaries during chunking
 - falls back per page if table extraction fails
 
-**`docling`** — structure-aware chunking that preserves section hierarchy:
+**`docling`** (explicit) — same backend `auto` uses when installed; pass it explicitly to fail loudly instead of falling back to pymupdf on a per-document docling error:
 
 ```bash
 reqbot ingest "NIST.SP.800-53r5.pdf" --layout-mode docling
@@ -475,7 +483,7 @@ Useful flags:
 
 - `--skip-to {A,B,C,D,E}` - resume from an existing output directory
 - `--skip-enrichment` - stop after Step D
-- `--layout-mode {pymupdf,pdfplumber,docling}` - PDF extraction backend
+- `--layout-mode {auto,pymupdf,pdfplumber,docling}` - PDF extraction backend (default: auto)
 - `--extraction-model M`
 - `--enrichment-model M`
 - `--model M` - set both

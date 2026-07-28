@@ -675,7 +675,7 @@ class GrcaiConsole(cmd.Cmd):
     def do_ingest(self, arg: str) -> None:
         """Run the full extraction pipeline on a PDF.
 
-        Usage: ingest <pdf_path> [--no-index] [--layout-mode pymupdf|pdfplumber]
+        Usage: ingest <pdf_path> [--no-index] [--layout-mode auto|pymupdf|pdfplumber|docling]
                                  [--model MODEL] [--output-dir DIR]
                                  [--max-chunks N]
         """
@@ -693,8 +693,8 @@ class GrcaiConsole(cmd.Cmd):
         parser.add_argument("--index", action="store_true", help=argparse.SUPPRESS)
         parser.add_argument(
             "--layout-mode",
-            choices=["pymupdf", "pdfplumber"],
-            default="pymupdf",
+            choices=["auto", "pymupdf", "pdfplumber", "docling"],
+            default="auto",
             dest="layout_mode",
         )
 
@@ -794,15 +794,15 @@ class GrcaiConsole(cmd.Cmd):
     def do_batch(self, arg: str) -> None:
         """Run the full pipeline on every PDF in a directory.
 
-        Usage: batch <pdf_dir> [--layout-mode pymupdf|pdfplumber] [--model MODEL]
+        Usage: batch <pdf_dir> [--layout-mode auto|pymupdf|pdfplumber|docling] [--model MODEL]
         """
         parser = argparse.ArgumentParser(prog="batch", add_help=True)
         parser.add_argument("pdf_dir", help="Directory containing PDF files")
         parser.add_argument("--model", type=str, default=None)
         parser.add_argument(
             "--layout-mode",
-            choices=["pymupdf", "pdfplumber"],
-            default="pymupdf",
+            choices=["auto", "pymupdf", "pdfplumber", "docling"],
+            default="auto",
             dest="layout_mode",
         )
 

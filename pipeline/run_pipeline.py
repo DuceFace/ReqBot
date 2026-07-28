@@ -31,6 +31,39 @@ log = logging.getLogger(__name__)
 SCRIPTS_DIR = Path(__file__).resolve().parent
 
 
+def _docling_available() -> bool:
+    """Cheap check for the optional docling extra (`pip install "reqbot[docling]"`).
+
+    Uses find_spec instead of a real import -- docling pulls in torch, and actually
+    importing it just to check availability would cost real time on every ingest.
+    """
+    import importlib.util
+    return importlib.util.find_spec("docling") is not None
+
+
+def resolve_layout_mode(layout_mode: str) -> str:
+    """Resolve "auto" (the CLI default) to a concrete backend.
+
+    docling gives structure-aware chunking (section hierarchy, breadcrumbs) that the
+    legacy pymupdf/pdfplumber paths can't -- prefer it whenever it's actually
+    installed. It's a real ~700MB dependency (torch), so it stays an optional extra
+    rather than a hard requirement; "auto" is what lets ingest use it automatically
+    when available without forcing it on every install.
+
+    Explicit "docling"/"pymupdf"/"pdfplumber" choices pass through unchanged --
+    this only affects the "auto" default.
+    """
+    if layout_mode != "auto":
+        return layout_mode
+    if _docling_available():
+        log.info("layout-mode=auto -> docling (installed)")
+        return "docling"
+    log.info(
+        'layout-mode=auto -> pymupdf (docling not installed -- '
+        'pip install "reqbot[docling]" for structure-aware chunking)'
+    )
+    return "pymupdf"
+
 
 def run(
     pdf_path: str,
@@ -44,7 +77,7 @@ def run(
     max_chunks: int | None = None,
     timeout: int = 120,
     skip_to: str = "A",
-    layout_mode: str = "pymupdf",
+    layout_mode: str = "auto",
     skip_enrichment: bool = False,
     profile_name: str = "cybersecurity",
 ) -> str:
@@ -64,7 +97,12 @@ def run(
         max_chunks:        Limit LLM processing to first N chunks.
         timeout:           Per-request LLM timeout in seconds.
         skip_to:           Skip to step ('A'-'E'). Requires prior artifacts.
-        layout_mode:       PDF extraction backend ('pymupdf' or 'pdfplumber').
+        layout_mode:       PDF extraction backend ('auto', 'docling', 'pymupdf', or
+                           'pdfplumber'). 'auto' (default) uses docling when
+                           installed for structure-aware chunking, falling back to
+                           pymupdf if docling isn't installed or fails on this specific
+                           document. Pass 'docling' explicitly to raise loudly instead
+                           of falling back.
         skip_enrichment:   Skip Step D.5 enrichment. Returns normalized JSONL path directly.
         profile_name:      Domain profile name to load from profiles/<name>.json.
                            Default 'cybersecurity'. Profile is loaded once and passed to
@@ -88,6 +126,9 @@ def run(
     from pipeline import llm_extract_requirements
     from pipeline import parse_and_normalize
     from pipeline import aggregate_and_export
+
+    requested_layout_mode = layout_mode
+    layout_mode = resolve_layout_mode(layout_mode)
 
     pdf = Path(pdf_path).resolve()
     out_dir = Path(output_dir).resolve()
@@ -123,38 +164,51 @@ def run(
     ancestry_result = None  # populated by Step A in docling mode; used in Step B
 
     if layout_mode == "docling":
-        if "A" in steps_to_run:
-            log.info("=" * 60)
-            log.info("Starting Step A (PDF → Docling ancestry map)")
-            log.info("=" * 60)
-            try:
+        docling_step = None
+        try:
+            if "A" in steps_to_run:
+                docling_step = "A"
+                log.info("=" * 60)
+                log.info("Starting Step A (PDF → Docling ancestry map)")
+                log.info("=" * 60)
                 from pipeline import section_parser as _section_parser
                 ancestry_result = _section_parser.run(str(pdf), str(out_dir))
-            except Exception as e:
-                raise RuntimeError(f"Step A (Docling) failed: {e}") from e
 
-        if "B" in steps_to_run:
-            log.info("=" * 60)
-            log.info("Starting Step B (Docling HybridChunker + breadcrumb injection)")
-            log.info("=" * 60)
-            # If --skip-to B in docling mode, Step A was skipped so we need the ancestry
-            if ancestry_result is None:
-                log.info("Step A was skipped — running section_parser to obtain DoclingDocument")
-                try:
+            if "B" in steps_to_run:
+                docling_step = "B"
+                log.info("=" * 60)
+                log.info("Starting Step B (Docling HybridChunker + breadcrumb injection)")
+                log.info("=" * 60)
+                # If --skip-to B in docling mode, Step A was skipped so we need the ancestry
+                if ancestry_result is None:
+                    log.info("Step A was skipped — running section_parser to obtain DoclingDocument")
                     from pipeline import section_parser as _section_parser
                     ancestry_result = _section_parser.run(str(pdf), str(out_dir))
-                except Exception as e:
-                    raise RuntimeError(f"Step A (Docling, skip-to-B recovery) failed: {e}") from e
-            try:
                 chunk_text_mod.run_structure_aware(
                     str(chunks_path),
                     ancestry_result=ancestry_result,
                     skip_sections=profile.get("skip_sections", []),
                 )
-            except Exception as e:
-                raise RuntimeError(f"Step B (Docling) failed: {e}") from e
+        except Exception as e:
+            # Only auto-downgrade when the caller didn't explicitly ask for docling
+            # -- an explicit --layout-mode docling request fails loudly, same
+            # as before. Also don't downgrade mid-resume (skip_to != "A"): a partial
+            # docling run's artifacts aren't compatible with restarting under legacy,
+            # and silently rewriting a resume into a fresh extraction would be worse
+            # than just failing.
+            if requested_layout_mode == "auto" and skip_to == "A":
+                log.warning(
+                    "Docling Step %s failed (%s) -- falling back to pymupdf for this "
+                    "document since layout-mode=auto. Pass --layout-mode docling "
+                    "explicitly to see the full error instead of silently falling back.",
+                    docling_step, e,
+                )
+                layout_mode = "pymupdf"
+                ancestry_result = None
+            else:
+                raise RuntimeError(f"Step {docling_step} (Docling) failed: {e}") from e
 
-    else:
+    if layout_mode != "docling":
         # Legacy path
         if "A" in steps_to_run:
             log.info("=" * 60)
@@ -336,11 +390,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--layout-mode",
-        choices=["pymupdf", "pdfplumber", "docling"],
-        default="pymupdf",
-        help="PDF extraction backend for Step A (default: pymupdf). "
-             "Use 'pdfplumber' for table-aware extraction. "
-             "Use 'docling' for structure-aware chunking (WP-14.2 path).",
+        choices=["auto", "pymupdf", "pdfplumber", "docling"],
+        default="auto",
+        help="PDF extraction backend for Step A (default: auto -- uses docling when "
+             "installed for structure-aware chunking, falls back to pymupdf otherwise "
+             "or if docling fails on this document). "
+             "Use 'pdfplumber' for table-aware extraction without docling. "
+             "Use 'docling' explicitly to fail loudly instead of falling back.",
     )
     parser.add_argument(
         "--skip-enrichment",

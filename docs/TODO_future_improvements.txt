@@ -441,3 +441,19 @@ DECISIONS AND GUARDRAILS
    gaps (hardcoded cybersecurity vocabulary in evidence_service.py's synthesis
    prompt -- see Phase 32's WP-32.7). Revisit once Phase 32 proves the core is
    actually domain-neutral, not just documented as intending to be.
+
+9. `--layout-mode` default changed from `pymupdf` to `auto` (2026-07-28)
+   Docling gives structure-aware chunking (section hierarchy, breadcrumbs,
+   skip_sections filtering) that pymupdf/pdfplumber can't -- came up because a real
+   empty-source_ref example turned out to be from a document ingested via pymupdf,
+   prompting the question of why docling wasn't the default already. Answer: it's a
+   real ~700MB dependency (torch), so it's kept as an optional extra
+   (`pip install "reqbot[docling]"`) rather than a hard requirement -- "auto" is
+   what lets ingest use it automatically when installed without forcing the weight
+   on every install. Falls back to pymupdf per-document (logged as a warning, not
+   silent) if docling isn't installed or errors on a specific PDF; `--layout-mode
+   docling` explicitly still fails loudly instead of falling back. Standalone fix,
+   not part of Phase 32 (Phase 32's own framing is scoped to one Evidence-query
+   walkthrough; this didn't come from that). Considered, and rejected: making
+   docling a hard base dependency -- would add ~700MB to every install including CI,
+   for a benefit ("auto" already delivers) that most deployments may not need.

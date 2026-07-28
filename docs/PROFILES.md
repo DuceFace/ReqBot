@@ -18,7 +18,7 @@ supported way to read a profile; nothing else parses `profiles/*.json` directly.
 |---|---|---|
 | `name` | `string` | Must match the filename (`profiles/foo.json` must have `"name": "foo"`) — checked last, after every other validation passes. |
 | `obligation_verbs` | `string[]`, non-empty | Step C (`pipeline/llm_extract_requirements.py`) — substituted into the extraction prompt's `{obligation_verbs}` placeholder, joined with `", "`. This is the literal list of words the LLM is told signal an actionable requirement. |
-| `skip_sections` | `string[]`, empty allowed | Chunking (`pipeline/chunk_text.py`) — section headings to exclude from the corpus (e.g. `"GLOSSARY"`, `"REFERENCES"`). **Only takes effect on the docling structure-aware layout mode.** The default legacy pymupdf chunking path has no section hierarchy to filter on and just logs a warning and no-ops on this field. If your ingest run doesn't pass `--layout-mode docling`, `skip_sections` is silently doing nothing. |
+| `skip_sections` | `string[]`, empty allowed | Chunking (`pipeline/chunk_text.py`) — section headings to exclude from the corpus (e.g. `"GLOSSARY"`, `"REFERENCES"`). **Only takes effect on the docling structure-aware layout mode.** The legacy pymupdf/pdfplumber chunking path has no section hierarchy to filter on and just logs a warning and no-ops on this field. `--layout-mode` defaults to `auto` (docling when installed, pymupdf fallback otherwise) — if docling isn't installed, or you pass `--layout-mode pymupdf`/`pdfplumber` explicitly, `skip_sections` is silently doing nothing. |
 | `domain_tags` | `string[]`, non-empty | **Not Step C** — `PASS1_PROMPT_TEMPLATE` only asks the LLM for `source_quote`/`source_ref`, it never references tags. The real prompting happens in Step D.5's enrichment prompt (`pipeline/enrich_requirements.py`'s `{valid_tags}` placeholder) — that's where the LLM is actually told to pick from this vocabulary. `pipeline/parse_and_normalize.py` (Step D) then silently drops any tag Step D.5 returned that isn't in this list. (Step C's `validate_requirement()`/`process_chunk()` do accept a `valid_domain_tags` parameter, but since Pass-1's prompt never asks the LLM for a `domain_tags` field, that filter always runs against empty input today — effectively inert, not a live consumer.) |
 | `requirement_types` | `string[]`, non-empty | Same story as `domain_tags`: Step D.5's enrichment prompt (`{valid_types}`) is the real consumer, Step D enforces it afterward, and Step C's equivalent parameter is inert for the same reason. |
 
@@ -81,8 +81,9 @@ tracked as Phase 32's WP-32.7). Revisit once that's actually fixed, not before.
    `domain_tags`/`requirement_types` (shapes what Step D.5's enrichment prompt classifies into) for
    the new domain — get them right before a real ingest run rather than iterating against
    production data.
-3. Pick `skip_sections` knowing it only applies under `--layout-mode docling` (see above) — if
-   you're using the default pymupdf path, this field is a no-op for now.
+3. Pick `skip_sections` knowing it only applies under `--layout-mode docling` (see above) — the
+   `auto` default uses docling when installed, but if it's not installed (or you pass
+   `--layout-mode pymupdf`/`pdfplumber` explicitly), this field is a no-op.
 4. Run `python3 cli/reqbot.py ingest <doc.pdf> --profile <name>` and expect a full extraction pass
    (no cache) per the operational note above.
 5. `checklist_guidance` can be included for forward-compatibility but has no effect today — don't

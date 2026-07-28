@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Complete — fix shipped and validated against 2 fresh re-ingests; rest-of-corpus re-ingest tracked separately, not part of this WP |
-| WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Not started |
+| WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Complete — isolated to `NIST.SP.800-53Ar5.pdf`, no layout-mode fixes it; repair-table fix tracked as a new backlog item, not a Phase 32 WP |
 | WP-32.3 — Evidence Grouping Fallback Fix | Not started |
 | WP-32.4 — Context Excerpt Labeling | Not started |
 | WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Not started |
@@ -330,6 +330,68 @@ documents), and whether an existing `--layout-mode` option already avoids the pr
 - If it recurs across multiple documents and no existing layout mode avoids it: scope a proper fix
   (e.g. a ligature-repair post-processing step) as separate follow-up work — not attempted in this
   spike.
+
+**Findings (2026-07-28) — isolated to one document; neither Reject-If branch cleanly fits:**
+
+Corrected the original rationale's mechanism first: the "ti" isn't dropped, it's *replaced*. Every
+occurrence is a literal Unicode Private Use Area character (`U+E000`), not a deletion — e.g. the
+actual `source_quote` on `REQ-f7dd494f5d87` is `"authen<U+E000>ca<U+E000>on"`
+(`for password-based authen<U+E000>ca<U+E000>on, a list of commonly used...`), confirmed by
+inspecting the raw JSON bytes, not just how it renders. That distinction matters for the fix
+direction: a real character is present and addressable, not information that's gone.
+
+- **Backend confirmation:** `NIST.SP.800-53Ar5_ancestry.json`'s presence in the archived processing
+  directory confirms `--layout-mode docling` was used for the original ingest (per
+  `README.md`, `_ancestry.json` is docling-only output) — all 45 archived documents were, in fact,
+  ingested via docling; there's no non-docling ingest anywhere in the corpus to compare against.
+- **Corpus-wide PUA scan** (regex scan for the Unicode Private Use Area range U+E000–U+F8FF across
+  all 45 archived documents' `*_chunks.jsonl`): 5 documents show hits, not 1.
+  - `NIST.SP.800-53Ar5` — **53,078 hits**, five distinct codepoints (`U+E000`–`U+E004`). Inspecting
+    surrounding context for each resolved the actual ligature each represents: `U+E000` = "ti",
+    `U+E001` = "tt", `U+E002` = "ft", `U+E003` = "tt" (a second, distinct glyph ID for the same
+    ligature — likely a separate font-weight subset), `U+E004` = "tf". This is genuine word-internal
+    corruption, matching the original report.
+  - `CNSSI_No1253` (312 hits, `U+F0B7`), `NIST.SP.800-125` (135 hits, `U+F06E`), `NIST.SP.800-161r1`
+    (28 hits, `U+F0E0`), `dafpam90-803` (367 hits, `U+F0B7`) — checked context for each: these are
+    Wingdings/Symbol-font bullet (`•`) and arrow (`→`) glyphs rendered as their raw PUA codepoint
+    instead of the intended symbol, e.g. `"- <U+F0B7> NIST SP 800-30..."` and `"Moderate <U+F0E0> Low"`.
+    Cosmetic — an extra stray character before a bullet or inside an arrow substitution, never
+    word-internal, never corrupts a requirement's actual text. **A different bug class from
+    `NIST.SP.800-53Ar5`'s, not the same font/generator issue recurring.**
+  - No document anywhere in the corpus shows the *fully-silent-deletion* form the original rationale
+    described (searched for `informaon`, `organizaon`, `applicaon`, `noficaon` — zero hits
+    everywhere). Every real instance of this failure mode is a PUA substitution, never a bare drop.
+- **Layout-mode test:** re-ran Step A directly against `raw_pdfs/NIST.SP.800-53Ar5.pdf` with both
+  `pymupdf` and `pdfplumber` (docling was already the original backend). **Both reproduce the
+  identical corruption at the identical passage**: page 268's `IA-05(01)(a)` text comes out as
+  `"...authen<U+E000>ca<U+E000>on, a list of commonly used..."` under all three backends, same codepoints,
+  same characters affected. Raw PUA counts differ somewhat by backend (docling 53,078 / pymupdf
+  17,786 / pdfplumber 17,206) but all three are substantial — this is not a small edge case for any
+  of them. **No existing `--layout-mode` avoids the problem.** This is conclusive: the defect is in
+  `NIST.SP.800-53Ar5.pdf`'s own embedded font (missing `ToUnicode` CMap entries for its "ti"/"tt"/
+  "ft"/"tf" ligature glyphs), not in any extraction library's behavior — every Python PDF library
+  available to this pipeline reads the same broken font data the same way.
+- **Scope within the document:** 1,746 of 6,899 (25.3%) of `NIST.SP.800-53Ar5`'s normalized
+  requirements have at least one PUA character in `source_quote` or `description`.
+- **Interaction with WP-32.1's grounding check, worth flagging explicitly:** the fuzzy
+  quote-grounding fix shipped in WP-32.1 does **not** catch this. A PUA-corrupted quote and its own
+  source chunk both carry the identical corruption (extraction happens once, upstream of both), so
+  `fuzz.partial_ratio` correctly scores them as a strong match — it's genuinely grounded, just
+  grounded in garbled text. This is a different bug class (verbatim-but-corrupted vs. fabricated)
+  that WP-32.1 was never designed to catch and doesn't claim to.
+
+**Resolution:** Neither pre-written Reject-If branch cleanly fits the actual result — the two
+branches assumed "isolated" and "fixable by switching layout mode" move together, and they don't.
+Reality: isolated to one document (in the corrupting sense — the other 4 hits are a different,
+cosmetic issue), *and* no layout-mode switch avoids it. Per this WP's own rule, no fix is
+implemented here. Recommended follow-up, scoped narrowly per this phase's existing Non-Goal against
+building a general garbled-text detector: a small deterministic repair table
+(`{U+E000: "ti", U+E001: "tt", U+E002: "ft", U+E003: "tt", U+E004: "tf"}`) applied as a
+post-extraction pass — cheap, precise, and grounded in the exact codepoints confirmed above, not a
+speculative general-purpose fix. Track as a new backlog item
+(`docs/TODO_future_improvements.txt`) rather than a Phase 32 WP, since it only matters once
+`NIST.SP.800-53Ar5.pdf` is re-ingested — not assumed by this phase (see Non-Goals: rest-of-corpus
+re-ingest is a separate, later decision).
 
 ---
 

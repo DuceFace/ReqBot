@@ -211,13 +211,25 @@ a code-verified signature, not inferred from `_ancestry.json`'s mere presence, w
 flagged as unreliable on PR #145) for all 8 distinct source documents in the table above: **6 of 8
 were docling, not pymupdf** (`CJCSI6510_01F`, `NIST.SP.800-161r1`, `NIST.SP.800-53r5`,
 `DODI 5200.01_vol3`, `NIST.SP.800-92`, `NIST.SP.800-37r2` — including chunk_id 51 itself, the exact
-smoking-gun chunk cited above). Only `NIST.SP.800-30r1` and `NIST.SP.800-137` were pymupdf.
+smoking-gun chunk cited above). ~~Only `NIST.SP.800-30r1` and `NIST.SP.800-137` were pymupdf.~~ **See
+the second correction below — this specific claim is also wrong.**
 
-That also makes the `skip_sections` gap explanation moot for the smoking-gun case regardless of
-backend: chunk 51's `section_title_path` is `["INTRODUCTION"]`, and `INTRODUCTION` isn't in
-`profiles/cybersecurity.json`'s `skip_sections` list (`GLOSSARY`, `REFERENCES`, `ACRONYMS`,
-`DEFINITIONS`, `ABBREVIATIONS`, `TABLE OF CONTENTS`) — it would never have been filtered under
-docling *or* pymupdf. The original paragraph's diagnosis was simply incorrect, not backend-dependent.
+**Correction #2 (2026-07-28, found while answering a follow-up question about docling's real-world
+impact):** the "6 of 8" / "31 docling, 14 legacy" numbers above (and in WP-32.2's Findings, below)
+were computed by checking only each document's *first* chunk for docling's signature. That method
+is flawed — a document's first chunk is frequently title-page/cover content that predates any
+heading, so it legitimately lacks docling's breadcrumb even in a fully-docling-produced document.
+Redone properly: check for the `section_ref_path` *key's presence* anywhere in the file (legacy
+`chunk_text()` never writes that key at all, not even empty — a stronger signature than a single
+sampled chunk). Re-verified all 45 archived documents individually, plus all 8 documents cited in
+the table above specifically: **every single one, all 45, all 8, was docling.** There was no
+legacy-mode document anywhere in the archived corpus. `NIST.SP.800-30r1` and `NIST.SP.800-137` are
+docling too.
+
+None of this changes the actual conclusion — chunk 51's `section_title_path` is `["INTRODUCTION"]`,
+which isn't in `skip_sections`' list regardless of backend, so the diagnosis below was wrong either
+way. It does mean the "6 of 8 were docling" framing understated how wrong the original paragraph
+was — it wasn't a backend split at all, every cited record came from docling.
 
 This doesn't change WP-32.1's shipped fix — the grounding check rejects fabricated quotes by
 comparing them against their own chunk's real text, which works identically regardless of which
@@ -362,16 +374,17 @@ actual `source_quote` on `REQ-f7dd494f5d87` is `"authen<U+E000>ca<U+E000>on"`
 inspecting the raw JSON bytes, not just how it renders. That distinction matters for the fix
 direction: a real character is present and addressable, not information that's gone.
 
-- **Backend confirmation — corrected (2026-07-28):** originally inferred from `_ancestry.json`'s
-  mere presence, which Codex correctly flagged on PR #145 as unreliable (`run_pipeline.py` never
-  deletes a stale `_ancestry.json` if a directory is reused, and every archived document happens to
-  have one, docling or not). Re-verified with a real signature instead: docling's
-  `run_structure_aware()` prefixes every chunk's `text` with `[{breadcrumb}]\n\n`
-  (`pipeline/chunk_text.py`); legacy `chunk_text()` never does. Checked chunk 0 of all 45 archived
-  documents against that signature: **31 docling, 14 legacy** (pymupdf/pdfplumber) — a real mix, not
-  all-docling as first claimed. `NIST.SP.800-53Ar5` itself is docling (chunk 0 starts
-  `"[Assessing Security and Privacy Controls...]"`, `breadcrumb` populated) — re-confirmed the same
-  way as the corpus scan, not just asserted from the archive directory's file listing.
+- **Backend confirmation — corrected twice (2026-07-28):** originally inferred from
+  `_ancestry.json`'s mere presence, which Codex correctly flagged on PR #145 as unreliable
+  (`run_pipeline.py` never deletes a stale `_ancestry.json` if a directory is reused, and every
+  archived document happens to have one, docling or not). First re-verification checked only chunk 0
+  of each document for docling's `[{breadcrumb}]\n\n` text-prefix signature and concluded "31
+  docling, 14 legacy" — also wrong, because a document's first chunk is frequently title-page/cover
+  content that predates any heading and legitimately lacks the breadcrumb even under docling. Fixed
+  properly by checking for the `section_ref_path` *key's presence* anywhere in the file (legacy
+  `chunk_text()` never writes that key at all): **all 45 archived documents were docling**, with no
+  exceptions. `NIST.SP.800-53Ar5` itself is docling (confirmed the same way) — this was correct in
+  both prior passes, only the corpus-wide split was wrong.
 - **Corpus-wide PUA scan** (regex scan for the Unicode Private Use Area range U+E000–U+F8FF across
   all 45 archived documents' `*_chunks.jsonl`): 5 documents show hits, not 1.
   - `NIST.SP.800-53Ar5` — **53,078 hits**, five distinct codepoints (`U+E000`–`U+E004`). Inspecting

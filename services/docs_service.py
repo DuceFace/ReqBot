@@ -103,7 +103,8 @@ def list_docs(processed_dir: Path) -> dict:
                             mode = "pdfplumber"
                             break
                         try:
-                            if "section_ref_path" in json.loads(line):
+                            data = json.loads(line)
+                            if isinstance(data, dict) and "section_ref_path" in data:
                                 mode = "docling"
                                 break
                         except json.JSONDecodeError:

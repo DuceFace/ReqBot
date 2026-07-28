@@ -134,6 +134,16 @@ def test_detect_layout_mode_from_chunks_defaults_pymupdf(tmp_path):
     assert run_pipeline._detect_layout_mode_from_chunks(chunks) == "pymupdf"
 
 
+@pytest.mark.parametrize("non_dict_line", ["null", "123", '"just a string"', "[1, 2, 3]"])
+def test_detect_layout_mode_from_chunks_non_dict_json_line_does_not_crash(tmp_path, non_dict_line):
+    """Gemini review, PR #155: a valid-JSON-but-not-a-dict line (null, a bare
+    number, etc.) must not raise TypeError from `"section_ref_path" in data`
+    -- only json.JSONDecodeError was being caught, not the type mismatch."""
+    chunks = tmp_path / "doc_chunks.jsonl"
+    chunks.write_text(non_dict_line + "\n")
+    assert run_pipeline._detect_layout_mode_from_chunks(chunks) == "pymupdf"
+
+
 def test_detect_layout_mode_from_chunks_missing_file_returns_empty(tmp_path):
     assert run_pipeline._detect_layout_mode_from_chunks(tmp_path / "missing.jsonl") == ""
 

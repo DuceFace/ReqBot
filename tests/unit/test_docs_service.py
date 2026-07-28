@@ -205,6 +205,19 @@ def test_mode_falls_back_to_pdfplumber_sentinel_when_stats_json_missing(tmp_path
     assert result["docs"][0]["mode"] == "pdfplumber"
 
 
+@pytest.mark.parametrize("non_dict_line", ["null", "123", '"just a string"', "[1, 2, 3]"])
+def test_mode_detection_non_dict_json_chunk_line_does_not_crash(tmp_path, non_dict_line):
+    """Gemini review, PR #155: a valid-JSON-but-not-a-dict chunk line (null, a
+    bare number, etc.) must not raise TypeError from `"section_ref_path" in data`
+    -- only json.JSONDecodeError was being caught, not the type mismatch."""
+    run_dir = tmp_path / "doc_20260101_120000"
+    run_dir.mkdir()
+    _write_jsonl(run_dir / "doc_requirements_normalized.jsonl", [SAMPLE_REQ])
+    (run_dir / "doc_chunks.jsonl").write_text(non_dict_line + "\n")
+    result = list_docs(tmp_path)
+    assert result["docs"][0]["mode"] == "pymupdf"
+
+
 def test_mode_defaults_pymupdf_when_neither_signature_present(tmp_path):
     run_dir = tmp_path / "doc_20260101_120000"
     run_dir.mkdir()

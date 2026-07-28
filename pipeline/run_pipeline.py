@@ -68,7 +68,8 @@ def _detect_layout_mode_from_chunks(chunks_path: Path) -> str:
             if "<<<TABLE_START>>>" in line:
                 return "pdfplumber"
             try:
-                if "section_ref_path" in json.loads(line):
+                data = json.loads(line)
+                if isinstance(data, dict) and "section_ref_path" in data:
                     return "docling"
             except json.JSONDecodeError:
                 pass

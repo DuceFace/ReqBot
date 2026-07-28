@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Complete — fix shipped and validated against 2 fresh re-ingests; rest-of-corpus re-ingest tracked separately, not part of this WP |
-| WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Not started |
+| WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Complete — isolated to `NIST.SP.800-53Ar5.pdf`, no layout-mode fixes it; repair tool shipped (`pipeline/repair_ligatures.py`), validated against real archived data; actual re-ingest of the document deferred with the rest of the corpus |
 | WP-32.3 — Evidence Grouping Fallback Fix | Not started |
 | WP-32.4 — Context Excerpt Labeling | Not started |
 | WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Not started |
@@ -203,10 +203,32 @@ returning `{"requirements": []}`** — which is exactly what the prompt's Exampl
 section) tells it to do in that situation. It isn't following that instruction reliably on
 low-signal chunks.
 
-Contributing factor: these are exactly the kind of chunks `skip_sections` (`GLOSSARY`,
+**Correction (2026-07-28, found during WP-32.2):** the paragraph below, as originally written, is
+wrong. It claimed every affected record here came from the pymupdf path with `skip_sections`
+unavailable. Checked the actual chunk-text signature (docling's `run_structure_aware()` prefixes
+`text` with `[{breadcrumb}]\n\n`, per `pipeline/chunk_text.py`; legacy `chunk_text()` never does —
+a code-verified signature, not inferred from `_ancestry.json`'s mere presence, which Codex correctly
+flagged as unreliable on PR #145) for all 8 distinct source documents in the table above: **6 of 8
+were docling, not pymupdf** (`CJCSI6510_01F`, `NIST.SP.800-161r1`, `NIST.SP.800-53r5`,
+`DODI 5200.01_vol3`, `NIST.SP.800-92`, `NIST.SP.800-37r2` — including chunk_id 51 itself, the exact
+smoking-gun chunk cited above). Only `NIST.SP.800-30r1` and `NIST.SP.800-137` were pymupdf.
+
+That also makes the `skip_sections` gap explanation moot for the smoking-gun case regardless of
+backend: chunk 51's `section_title_path` is `["INTRODUCTION"]`, and `INTRODUCTION` isn't in
+`profiles/cybersecurity.json`'s `skip_sections` list (`GLOSSARY`, `REFERENCES`, `ACRONYMS`,
+`DEFINITIONS`, `ABBREVIATIONS`, `TABLE OF CONTENTS`) — it would never have been filtered under
+docling *or* pymupdf. The original paragraph's diagnosis was simply incorrect, not backend-dependent.
+
+This doesn't change WP-32.1's shipped fix — the grounding check rejects fabricated quotes by
+comparing them against their own chunk's real text, which works identically regardless of which
+backend produced that chunk. Only the "why does this happen" narrative below was wrong; leaving the
+original paragraph in place (struck through in spirit, not literally) for the record, corrected here
+rather than silently rewritten.
+
+~~Contributing factor: these are exactly the kind of chunks `skip_sections` (`GLOSSARY`,
 `REFERENCES`, `DEFINITIONS`, etc.) exists to filter out — but per `docs/PROFILES.md`
 (WP-31.3), that filter only applies under `--layout-mode docling`. Every affected record here came
-from the default pymupdf path, which sends these sections to Step C at all.
+from the default pymupdf path, which sends these sections to Step C at all.~~
 
 Ran a corpus-wide check (not just the original 10) for `source_quote` matching each example
 sentence via Qdrant full-text match against all 31,725 indexed requirements:
@@ -330,6 +352,121 @@ documents), and whether an existing `--layout-mode` option already avoids the pr
 - If it recurs across multiple documents and no existing layout mode avoids it: scope a proper fix
   (e.g. a ligature-repair post-processing step) as separate follow-up work — not attempted in this
   spike.
+
+**Findings (2026-07-28) — isolated to one document; neither Reject-If branch cleanly fits:**
+
+Corrected the original rationale's mechanism first: the "ti" isn't dropped, it's *replaced*. Every
+occurrence is a literal Unicode Private Use Area character (`U+E000`), not a deletion — e.g. the
+actual `source_quote` on `REQ-f7dd494f5d87` is `"authen<U+E000>ca<U+E000>on"`
+(`for password-based authen<U+E000>ca<U+E000>on, a list of commonly used...`), confirmed by
+inspecting the raw JSON bytes, not just how it renders. That distinction matters for the fix
+direction: a real character is present and addressable, not information that's gone.
+
+- **Backend confirmation — corrected (2026-07-28):** originally inferred from `_ancestry.json`'s
+  mere presence, which Codex correctly flagged on PR #145 as unreliable (`run_pipeline.py` never
+  deletes a stale `_ancestry.json` if a directory is reused, and every archived document happens to
+  have one, docling or not). Re-verified with a real signature instead: docling's
+  `run_structure_aware()` prefixes every chunk's `text` with `[{breadcrumb}]\n\n`
+  (`pipeline/chunk_text.py`); legacy `chunk_text()` never does. Checked chunk 0 of all 45 archived
+  documents against that signature: **31 docling, 14 legacy** (pymupdf/pdfplumber) — a real mix, not
+  all-docling as first claimed. `NIST.SP.800-53Ar5` itself is docling (chunk 0 starts
+  `"[Assessing Security and Privacy Controls...]"`, `breadcrumb` populated) — re-confirmed the same
+  way as the corpus scan, not just asserted from the archive directory's file listing.
+- **Corpus-wide PUA scan** (regex scan for the Unicode Private Use Area range U+E000–U+F8FF across
+  all 45 archived documents' `*_chunks.jsonl`): 5 documents show hits, not 1.
+  - `NIST.SP.800-53Ar5` — **53,078 hits**, five distinct codepoints (`U+E000`–`U+E004`). Inspecting
+    surrounding context for each resolved the actual ligature each represents: `U+E000` = "ti",
+    `U+E001` = "tt", `U+E002` = "ft", `U+E003` = "tt" (a second, distinct glyph ID for the same
+    ligature — likely a separate font-weight subset), `U+E004` = "tf". This is genuine word-internal
+    corruption, matching the original report.
+  - `CNSSI_No1253` (312 hits, `U+F0B7`), `NIST.SP.800-125` (135 hits, `U+F06E`), `NIST.SP.800-161r1`
+    (28 hits, `U+F0E0`), `dafpam90-803` (367 hits, `U+F0B7`) — checked context for each: these are
+    Wingdings/Symbol-font bullet (`•`) and arrow (`→`) glyphs rendered as their raw PUA codepoint
+    instead of the intended symbol, e.g. `"- <U+F0B7> NIST SP 800-30..."` and `"Moderate <U+F0E0> Low"`.
+    Cosmetic — an extra stray character before a bullet or inside an arrow substitution, never
+    word-internal, never corrupts a requirement's actual text. **A different bug class from
+    `NIST.SP.800-53Ar5`'s, not the same font/generator issue recurring.**
+  - **Qualified, per Codex feedback on PR #145:** searched for the *fully-silent-deletion* form the
+    original rationale described (`informaon`, `organizaon`, `applicaon`, `noficaon`) — zero hits
+    anywhere in the corpus. That only rules out silent deletion for the specific "ti"-word spellings
+    checked; a different dropped ligature, or a "ti" word not on this list, wouldn't show up in this
+    search and a true silent deletion leaves no marker for a broader scan to catch either. Every
+    instance actually *found* by this WP is a PUA substitution, not a bare drop — but that is a
+    statement about what was found, not proof nothing else exists uncaught.
+- **Layout-mode test:** re-ran Step A directly against `raw_pdfs/NIST.SP.800-53Ar5.pdf` with both
+  `pymupdf` and `pdfplumber` (docling was already the original backend). **Both reproduce the
+  identical corruption at the identical passage**: page 268's `IA-05(01)(a)` text comes out as
+  `"...authen<U+E000>ca<U+E000>on, a list of commonly used..."` under all three backends, same codepoints,
+  same characters affected. Raw PUA counts differ somewhat by backend (docling 53,078 / pymupdf
+  17,786 / pdfplumber 17,206) but all three are substantial — this is not a small edge case for any
+  of them. **No existing `--layout-mode` avoids the problem.** This is conclusive: the defect is in
+  `NIST.SP.800-53Ar5.pdf`'s own embedded font (missing `ToUnicode` CMap entries for its "ti"/"tt"/
+  "ft"/"tf" ligature glyphs), not in any extraction library's behavior — every Python PDF library
+  available to this pipeline reads the same broken font data the same way.
+- **Scope within the document:** 1,746 of 6,899 (25.3%) of `NIST.SP.800-53Ar5`'s normalized
+  requirements have at least one PUA character in `source_quote` or `description`.
+- **Interaction with WP-32.1's grounding check, worth flagging explicitly:** the fuzzy
+  quote-grounding fix shipped in WP-32.1 does **not** catch this. A PUA-corrupted quote and its own
+  source chunk both carry the identical corruption (extraction happens once, upstream of both), so
+  `fuzz.partial_ratio` correctly scores them as a strong match — it's genuinely grounded, just
+  grounded in garbled text. This is a different bug class (verbatim-but-corrupted vs. fabricated)
+  that WP-32.1 was never designed to catch and doesn't claim to.
+
+**Not a download/transfer artifact:** Tyler asked whether this could simply be a corrupted local
+copy rather than a real defect in the published document, given how important this one is. Checked:
+`raw_pdfs/NIST.SP.800-53Ar5.pdf` is `sha256:75665570...b21be47`. The document's own embedded DOI
+link (`https://doi.org/10.6028/NIST.SP.800-53Ar5`) resolves to
+`https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-53Ar5.pdf` — downloaded that
+fresh and it hashes **byte-for-byte identical** to the local copy, same 7,469,808 bytes. The
+corruption is baked into the PDF exactly as NIST currently hosts it, not something introduced in a
+prior download. PDF metadata (`Creator: Acrobat PDFMaker 21 for Word`, `Producer: Acrobat Pro DC
+21.11.20039`) points at *why*: this is a well-documented Word→PDF export failure mode — OpenType
+ligature substitution in the source Word document paired with `PDFMaker`/Distiller not always
+generating a correct `ToUnicode` CMap entry for less-common ligature glyphs (`ti`/`tt`/`ft`/`tf`,
+beyond the usual `fi`/`fl`). Re-downloading won't help; a repair pass is the only path to clean text
+short of NIST re-publishing the source document.
+
+**Resolution:** Neither pre-written Reject-If branch cleanly fits the actual result — the two
+branches assumed "isolated" and "fixable by switching layout mode" move together, and they don't.
+Reality: isolated to one document (in the corrupting sense — the other 4 hits are a different,
+cosmetic issue), *and* no layout-mode switch avoids it. Per this WP's own rule, no fix was written
+during the investigation itself — scoped narrowly per this phase's existing Non-Goal against
+building a general garbled-text detector: a small deterministic repair table
+(`{U+E000: "ti", U+E001: "tt", U+E002: "ft", U+E003: "tt", U+E004: "tf"}`) applied as a
+post-extraction pass — cheap, precise, and grounded in the exact codepoints confirmed above, not a
+speculative general-purpose fix.
+
+**Shipped (2026-07-28):** Tyler's call — `NIST.SP.800-53Ar5` is an important document (it's the
+assessment-procedures companion to 800-53, used for control-assessment work specifically), and the
+fix is small, so implement it now rather than leave it as a pure backlog item. Explicit constraint:
+keep it out of the default ingest path, callable only when needed, rather than adding a
+general-purpose repair step that runs on every document. Shipped as `pipeline/repair_ligatures.py`
+— a standalone module with its own CLI, **not imported or called anywhere in `run_pipeline.py` or
+`cli/reqbot.py`** (confirmed via grep, not just by omission). Operates on a `*_chunks.jsonl` file
+after Step B and before Step C, repairing the `text`/`raw_text` fields (and any other string or
+list-of-string field) that carry the known bad codepoints; the normal resume flow is:
+
+```bash
+python3 cli/reqbot.py ingest "raw_pdfs/NIST.SP.800-53Ar5.pdf" --layout-mode docling --no-index
+python3 pipeline/repair_ligatures.py ~/documents/processed/NIST.SP.800-53Ar5_.../NIST.SP.800-53Ar5_chunks.jsonl
+python3 cli/reqbot.py ingest "raw_pdfs/NIST.SP.800-53Ar5.pdf" --skip-to C --output-dir ~/documents/processed/NIST.SP.800-53Ar5_...
+```
+
+**Validated against the real archived data**, not just synthetic unit tests: ran it against a copy
+of the pre-WP-32.1 archived `NIST.SP.800-53Ar5_chunks.jsonl` — repaired **53,078 characters across
+2,658/3,092 chunks** (matches the corpus-wide PUA scan count above exactly, as it should — same file,
+same codepoints). Spot-checked chunk_id 1131 (the original `REQ-f7dd494f5d87` source chunk) directly:
+now reads `"...for password-based authentication, a list of commonly used, expected, or compromised
+passwords is maintained and updated <IA-05(01)_ODP[01] frequency> and when organizational
+passwords..."` — fully clean. Confirmed zero PUA characters remain anywhere in the repaired file.
+10 unit tests in `tests/unit/test_repair_ligatures.py` cover the replacement logic, record-level
+field handling (string and list-of-string fields, non-string fields left untouched), and the file-
+level `run()` entry point (in-place and separate-output-path modes).
+
+Tracked as `[RESOLVED — Phase 32, WP-32.2]` in `docs/TODO_future_improvements.txt` item 25.
+Re-ingesting `NIST.SP.800-53Ar5.pdf` itself through this repaired flow is not done as part of this
+WP — the tool is validated and ready, but actually running it against the live corpus is bundled
+with the same later, separate re-ingest decision as the rest of the corpus (see Non-Goals above).
 
 ---
 

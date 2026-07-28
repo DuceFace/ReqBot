@@ -231,6 +231,16 @@ ACTIVE BACKLOG
     even if they share retrieval plumbing. Revisit after item 21 (citation
     linking) and Search/Evidence parity are in place -- not urgent now.
 
+25. [RESOLVED -- Phase 32, WP-32.2] Ligature-repair post-processing step for
+    NIST.SP.800-53Ar5.pdf. Shipped as pipeline/repair_ligatures.py -- a small
+    standalone tool, deliberately not wired into run_pipeline.py's default
+    ingest flow. Run it by hand against a document's *_chunks.jsonl after
+    Step B, before resuming with `--skip-to C`. See its module docstring for
+    the exact invocation, and docs/PHASE32_REQUIREMENTS.md's WP-32.2 Findings
+    for the full root-cause writeup and validation against real archived data
+    (53,078 characters repaired across 2,658/3,092 chunks, spot-checked
+    against the original reported passage).
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS

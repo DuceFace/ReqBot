@@ -110,6 +110,39 @@ KNOWN_GOOD_CHUNKS = [
 ]
 
 
+def _resolve_chunks_path(processed_dir: Path, run_dir: str, stem: str) -> Path:
+    """Resolve the chunks.jsonl for a target document.
+
+    Prefers the exact timestamped run directory this script's target lists
+    were built against -- that's the only way to guarantee the chunk_id ->
+    text mapping is byte-identical to what docs/PHASE33_REQUIREMENTS.md's
+    Findings quotes and eval/spike_results/wp_33_3/report.md's committed
+    output actually describe. Falls back to the newest {stem}_*/ directory
+    (e.g. after a corpus re-ingest changes the timestamp) so the script
+    doesn't just go silent -- but loudly warns when it does, since a
+    different ingest run isn't guaranteed to produce the same chunk_id
+    boundaries (Gemini review, PR #156).
+    """
+    exact = processed_dir / run_dir / f"{stem}_chunks.jsonl"
+    if exact.exists():
+        return exact
+
+    matches = sorted(processed_dir.glob(f"{stem}_*/{stem}_chunks.jsonl"), reverse=True)
+    if matches:
+        print(
+            f"WARNING: expected run dir '{run_dir}' not found under {processed_dir} "
+            f"(corpus likely re-ingested with a new timestamp). Falling back to "
+            f"{matches[0]} -- chunk_id boundaries are NOT guaranteed to match what "
+            f"docs/PHASE33_REQUIREMENTS.md's Findings and "
+            f"eval/spike_results/wp_33_3/report.md describe; treat results against "
+            f"this fallback path as a fresh data point, not a reproduction.",
+            file=sys.stderr,
+        )
+        return matches[0]
+
+    return exact  # doesn't exist either -- _get_chunk's exists() check will skip cleanly
+
+
 def _get_chunk(chunks_path: Path, chunk_id: int) -> dict | None:
     if not chunks_path.exists():
         return None
@@ -162,7 +195,7 @@ def main() -> None:
     all_results = []
     for group_name, targets in [("known_bad", KNOWN_BAD_CHUNKS), ("known_good", KNOWN_GOOD_CHUNKS)]:
         for label, run_dir, stem, chunk_id, note in targets:
-            chunks_path = processed / run_dir / f"{stem}_chunks.jsonl"
+            chunks_path = _resolve_chunks_path(processed, run_dir, stem)
             chunk = _get_chunk(chunks_path, chunk_id)
             if chunk is None:
                 print(f"SKIP {label}: chunk {chunk_id} not found in {chunks_path}", file=sys.stderr)

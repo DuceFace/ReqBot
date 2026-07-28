@@ -31,22 +31,26 @@ export default function ResultCard({ result, index }: Props) {
           <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold tabular-nums">
             {index}
           </span>
-          <span className="font-mono text-xs font-semibold text-blue-700 truncate">
-            {result.requirement_id}
+          <span className="text-sm font-semibold text-gray-900 truncate min-w-0">
+            {result.source_pdf}
           </span>
+          {pages && <span className="text-xs text-gray-500 shrink-0">{pages}</span>}
+          {result.source_ref && (
+            <span className="text-xs font-medium text-gray-700 truncate max-w-[12rem] min-w-0">
+              {result.source_ref}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-400 shrink-0">
-          <span>{result.source_pdf}</span>
-          {pages && <span>{pages}</span>}
           <span className="font-medium text-gray-600 tabular-nums">
             {result.score.toFixed(3)}
+          </span>
+          <span className="font-mono text-gray-400 truncate max-w-[10rem]">
+            {result.requirement_id}
           </span>
         </div>
       </div>
       <p className="text-sm text-gray-700 leading-snug">{snippet}</p>
-      {result.source_ref && (
-        <p className="mt-1.5 text-xs text-gray-400 truncate">{result.source_ref}</p>
-      )}
     </Link>
   )
 }

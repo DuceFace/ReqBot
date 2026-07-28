@@ -23,7 +23,7 @@ in `CLAUDE.md` or anywhere else.
 | WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Complete — isolated to `NIST.SP.800-53Ar5.pdf`, no layout-mode fixes it; repair tool shipped (`pipeline/repair_ligatures.py`), validated against real archived data; actual re-ingest of the document deferred with the rest of the corpus |
 | WP-32.3 — Evidence Grouping Fallback Fix | Complete — shipped and verified live against the current corpus |
 | WP-32.4 — Context Excerpt Labeling | Complete — caption added above the context block in `EvidenceView.tsx`; verified against a real truncated excerpt from the live corpus |
-| WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Not started |
+| WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Complete — `ResultCard.tsx` and `EvidenceView.tsx`'s `EvidenceCard` both swapped to promote doc name/page/source_ref, demote `requirement_id` |
 | WP-32.6 — Render Generated Answer as Markdown | Not started |
 | WP-32.7 — Profile-Aware Evidence Synthesis Vocabulary | Not started |
 

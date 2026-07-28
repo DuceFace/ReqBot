@@ -29,7 +29,7 @@ function EvidenceCard({ req, from }: { req: EvidenceRequirement; from: string })
       <div className="flex items-center justify-between mb-1.5 gap-4">
         <div className="flex items-center gap-2 min-w-0">
           {req.source_pdf && (
-            <span className="text-sm font-semibold text-gray-900 truncate">
+            <span className="text-sm font-semibold text-gray-900 truncate min-w-0">
               {req.source_pdf}
             </span>
           )}

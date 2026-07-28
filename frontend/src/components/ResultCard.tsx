@@ -31,7 +31,7 @@ export default function ResultCard({ result, index }: Props) {
           <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold tabular-nums">
             {index}
           </span>
-          <span className="text-sm font-semibold text-gray-900 truncate">
+          <span className="text-sm font-semibold text-gray-900 truncate min-w-0">
             {result.source_pdf}
           </span>
           {pages && <span className="text-xs text-gray-500 shrink-0">{pages}</span>}

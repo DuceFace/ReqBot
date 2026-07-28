@@ -35,7 +35,7 @@ function EvidenceCard({ req, from }: { req: EvidenceRequirement; from: string })
           )}
           {pages && <span className="text-xs text-gray-500 shrink-0">{pages}</span>}
           {req.source_ref && (
-            <span className="text-xs font-medium text-gray-700 shrink-0 truncate">
+            <span className="text-xs font-medium text-gray-700 shrink-0 truncate max-w-[12rem]">
               {req.source_ref}
             </span>
           )}

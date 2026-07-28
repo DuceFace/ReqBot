@@ -21,7 +21,7 @@ in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Complete — fix shipped and validated against 2 fresh re-ingests; rest-of-corpus re-ingest tracked separately, not part of this WP |
 | WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Complete — isolated to `NIST.SP.800-53Ar5.pdf`, no layout-mode fixes it; repair tool shipped (`pipeline/repair_ligatures.py`), validated against real archived data; actual re-ingest of the document deferred with the rest of the corpus |
-| WP-32.3 — Evidence Grouping Fallback Fix | Not started |
+| WP-32.3 — Evidence Grouping Fallback Fix | Complete — shipped and verified live against the current corpus |
 | WP-32.4 — Context Excerpt Labeling | Not started |
 | WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Not started |
 | WP-32.6 — Render Generated Answer as Markdown | Not started |
@@ -514,6 +514,55 @@ that isn't being used to disambiguate this label.
 
 **Gate:** Requirements with an empty or bare-fragment `source_ref` no longer silently merge with
 unrelated requirements from other documents under one meaningless label.
+
+**Resolution (2026-07-28):** Checked real data before deciding the empty-ref default the Scope
+section deliberately left open. Across the pre-WP-32.1 archived corpus (31,725 requirements):
+24% (7,621) have an empty `source_ref`; of the bare-fragment cases (1,249, e.g. `"(f)"`, `"(1)"`),
+only 2.6% (32) have a `parent_section_ref`, but 33.8% (422) have a non-empty `section_ref_path` —
+and every record with `parent_section_ref` also has `section_ref_path`, so the path is the more
+complete signal. `section_ref_path`'s *last* element is also more specific than
+`parent_section_ref` (e.g. path `["SECTION-3", "3.4"]` vs. `parent_section_ref: "SECTION-3"` for
+the same record) — prefer it.
+
+**Shipped:** `_group_key_and_label()` in `services/evidence_service.py`:
+- A real, full `source_ref` groups exactly as before — same ref can legitimately span multiple
+  documents (e.g. several DoD instructions citing the same NIST control), which is the point of
+  grouping and explicitly out of scope to change (see Non-Goals).
+- An empty `source_ref` gets a singleton key (`f"__no_ref__{requirement_id}"`) but still displays
+  as `"(no ref)"` — no more silent cross-document merging, one row per requirement.
+- A bare fragment (`^\(\w{1,4}\)$` — "(f)", "(a)", "(12)", etc.) with `section_ref_path` or
+  `parent_section_ref` available gets a fuller label built from the closest ancestor
+  (`section_ref_path[-1]` preferred over `parent_section_ref`, per the data above) — e.g.
+  `"3.4" + "(a)"` → `"3.4(a)"`.
+- A bare fragment with *no* hierarchy available (66% of bare-fragment cases) falls back to the
+  same singleton treatment as the empty-ref case — there's no real disambiguating signal to build
+  a fuller label from, so pretending otherwise would be worse than being honest about it.
+
+Fixed three downstream leaks of the new internal singleton key format
+(`__no_ref__REQ-xxxx`/`__bare_fragment__REQ-xxxx`) found while wiring this in — all now correctly
+read the group's `source_ref` display field instead of the raw dict key: the LLM synthesis prompt
+in `evidence_service.py` itself, `cli/reqbot.py`'s JSON and markdown evidence output, and
+`EvidenceView.tsx`'s group header. Also corrected `api/routes/evidence.py`'s and
+`frontend/src/api/types.ts`'s docstrings, which claimed `groups` is keyed by `source_ref` — no
+longer exactly true.
+
+**Validated against the live corpus**, not just unit tests: queried `services/evidence_service.py`
+directly against the current 173-point index (`afpd_17-1.pdf` + `CJCSI 6510.02G.pdf`). Before this
+fix, 8 empty-ref requirements spanning both documents would have collapsed into one `"(no ref)"`
+group; confirmed they now land in 8 separate groups, still correctly labeled `"(no ref)"`. Also
+confirmed 2 live bare-fragment records (`"(1)"`, `"(i)"`, both with no hierarchy metadata) stay
+separate rather than merging. Confirmed via `cli/reqbot.py evidence` (the real CLI path, not just
+`build()` in isolation) that no internal key ever reaches the JSON output.
+
+13 new unit/service-level tests in `tests/unit/test_evidence_service.py`: 5 direct tests of
+`_group_key_and_label()`'s branches, 4 `build()`-level integration tests (no-merge for empty ref,
+no-merge for hierarchy-less bare fragment, same-full-ref-still-merges regression guard, and a test
+confirming the internal key never reaches the synthesis prompt).
+
+No frontend test added for the one-line `EvidenceView.tsx` display fix (`{ref}` →
+`{group.source_ref}`) — this codebase doesn't carry view-level test scaffolding for one-line JSX
+changes (see WP-31.2's `SynthesisBox.test.tsx`, added only because it was genuinely new logic), and
+the backend tests already pin down that `source_ref` is always the correct display value.
 
 ---
 

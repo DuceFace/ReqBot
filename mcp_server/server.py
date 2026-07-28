@@ -159,6 +159,37 @@ def compare_documents(doc_id_1: str, doc_id_2: str, topic: str, top_k: int = 10)
     return result
 
 
+def _mcp_safe_evidence_groups(groups: dict, group_order: list[str]) -> tuple[dict, list[str]]:
+    """Replace WP-32.3's internal singleton group keys with something an MCP client
+    should actually see.
+
+    evidence_service.build()'s empty-ref/hierarchy-less-bare-fragment fallback keys
+    groups by a synthetic "__no_ref__REQ-xxxx"/"__bare_fragment__REQ-xxxx" string --
+    unique for the grouping logic's own purposes, but meaningless (and confusing) as
+    a value returned to an MCP client or the LLM consuming this tool's result. Every
+    other consumer (CLI, frontend, synthesis prompt) already reads the group's own
+    source_ref display field instead of the raw key; do the same reshaping here
+    rather than duplicating that display field into the key. A group keyed by a real
+    source_ref (the common case) is returned unchanged.
+
+    Re-keying on the group's own requirement_id (rather than the display label, e.g.
+    "(no ref)") is deliberate -- display labels are NOT guaranteed unique across
+    singleton groups in one response, and colliding dict keys would silently drop
+    groups exactly the way WP-32.3 was written to stop happening.
+    """
+    new_groups: dict = {}
+    new_order: list[str] = []
+    for key in group_order:
+        g = groups[key]
+        if key.startswith("__no_ref__") or key.startswith("__bare_fragment__"):
+            new_key = g.get("representative", {}).get("requirement_id") or key
+        else:
+            new_key = key
+        new_groups[new_key] = g
+        new_order.append(new_key)
+    return new_groups, new_order
+
+
 @mcp.tool()
 def map_evidence(
     topic: str,
@@ -193,7 +224,7 @@ def map_evidence(
         if not syn_api_key:
             syn_backend = "local"
 
-    return evidence_service.build(
+    result = evidence_service.build(
         query=topic,
         qdrant_url=cfg.qdrant_url,
         ollama_url=cfg.ollama_url,
@@ -210,6 +241,10 @@ def map_evidence(
         api_key=syn_api_key,
         embedding_model=cfg.embedding_model,
     )
+    result["groups"], result["group_order"] = _mcp_safe_evidence_groups(
+        result["groups"], result["group_order"]
+    )
+    return result
 
 
 @mcp.tool()

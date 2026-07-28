@@ -912,7 +912,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
             g = groups[ref]
             rep = g["representative"]
             entry: dict = {
-                "source_ref": ref,
+                "source_ref": g["source_ref"],
                 "description": rep.get("description", ""),
                 "source_quote": rep.get("source_quote", ""),
                 "primary_text": rep.get("description") or rep.get("source_quote", ""),
@@ -964,7 +964,7 @@ def cmd_evidence(args: argparse.Namespace) -> int:
 
             lines.append("---")
             lines.append("")
-            lines.append(f"## Requirement Group {i} — {ref}")
+            lines.append(f"## Requirement Group {i} — {g['source_ref']}")
             lines.append("")
             lines.append("**Requirement:**")
             lines.append(rep.get("description") or rep.get("source_quote", ""))

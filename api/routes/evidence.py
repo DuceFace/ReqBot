@@ -29,8 +29,11 @@ def post_evidence(req: EvidenceRequest) -> dict:
     Returns the evidence_service result:
       query:          the topic string
       timestamp:      ISO 8601 UTC string
-      group_order:    list of source_ref strings in rank order
-      groups:         dict[source_ref, {source_ref, representative, sources, context_text}]
+      group_order:    list of internal group keys in rank order -- usually the source_ref
+                      itself, but an empty or bare sub-item ref (e.g. "(f)") gets a synthetic
+                      per-requirement key instead of merging unrelated documents (WP-32.3);
+                      always resolve display text from groups[key]["source_ref"], not the key
+      groups:         dict[group_key, {source_ref (display label), representative, sources, context_text}]
       total_sources:  total matched requirement count
       synthesis_text: executive summary (empty string when synthesize=false)
     """

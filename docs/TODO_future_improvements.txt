@@ -231,28 +231,15 @@ ACTIVE BACKLOG
     even if they share retrieval plumbing. Revisit after item 21 (citation
     linking) and Search/Evidence parity are in place -- not urgent now.
 
-25. Ligature-repair post-processing step for NIST.SP.800-53Ar5.pdf
-    (Phase 32, WP-32.2 spike finding, 2026-07-28.) NIST.SP.800-53Ar5.pdf's
-    embedded font is missing ToUnicode CMap entries for its "ti"/"tt"/"ft"/
-    "tf" ligature glyphs, so every extraction backend (docling, pymupdf,
-    pdfplumber -- confirmed empirically, all three reproduce the identical
-    corruption on the identical passage) substitutes a Private Use Area
-    character instead: U+E000="ti", U+E001="tt", U+E002="ft", U+E003="tt"
-    (second glyph ID, same ligature), U+E004="tf". Affects 25.3% of this
-    document's requirements (1,746/6,899 in the pre-WP-32.1 archived output).
-    Confirmed isolated to this one document -- the corpus's other PUA hits
-    (CNSSI_No1253, NIST.SP.800-125, NIST.SP.800-161r1, dafpam90-803) are an
-    unrelated, cosmetic Wingdings/Symbol-font bullet/arrow substitution, not
-    word-internal corruption. See docs/PHASE32_REQUIREMENTS.md's WP-32.2
-    Findings for full detail.
-
-    Fix: a small deterministic repair table
-    ({U+E000: "ti", U+E001: "tt", U+E002: "ft", U+E003: "tt", U+E004: "tf"})
-    applied as a post-extraction pass. Scoped narrowly per Phase 32's Non-
-    Goals -- not a general garbled-text detector. Only matters once this
-    document is re-ingested; rest-of-corpus re-ingest is a separate, later
-    decision (WP-32.1's resolution, docs/PHASE32_REQUIREMENTS.md), so this
-    isn't urgent on its own.
+25. [RESOLVED -- Phase 32, WP-32.2] Ligature-repair post-processing step for
+    NIST.SP.800-53Ar5.pdf. Shipped as pipeline/repair_ligatures.py -- a small
+    standalone tool, deliberately not wired into run_pipeline.py's default
+    ingest flow. Run it by hand against a document's *_chunks.jsonl after
+    Step B, before resuming with `--skip-to C`. See its module docstring for
+    the exact invocation, and docs/PHASE32_REQUIREMENTS.md's WP-32.2 Findings
+    for the full root-cause writeup and validation against real archived data
+    (53,078 characters repaired across 2,658/3,092 chunks, spot-checked
+    against the original reported passage).
 
 
 ================================================================

@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-32.1 — Spike: Provenance Mismatch / Possible Extraction Hallucination | Complete — fix shipped and validated against 2 fresh re-ingests; rest-of-corpus re-ingest tracked separately, not part of this WP |
-| WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Complete — isolated to `NIST.SP.800-53Ar5.pdf`, no layout-mode fixes it; repair-table fix tracked as a new backlog item, not a Phase 32 WP |
+| WP-32.2 — Spike: Ligature/Text-Extraction Corruption | Complete — isolated to `NIST.SP.800-53Ar5.pdf`, no layout-mode fixes it; repair tool shipped (`pipeline/repair_ligatures.py`), validated against real archived data; actual re-ingest of the document deferred with the rest of the corpus |
 | WP-32.3 — Evidence Grouping Fallback Fix | Not started |
 | WP-32.4 — Context Excerpt Labeling | Not started |
 | WP-32.5 — Evidence/Search Card Visual Hierarchy Rework | Not started |
@@ -429,15 +429,44 @@ short of NIST re-publishing the source document.
 **Resolution:** Neither pre-written Reject-If branch cleanly fits the actual result — the two
 branches assumed "isolated" and "fixable by switching layout mode" move together, and they don't.
 Reality: isolated to one document (in the corrupting sense — the other 4 hits are a different,
-cosmetic issue), *and* no layout-mode switch avoids it. Per this WP's own rule, no fix is
-implemented here. Recommended follow-up, scoped narrowly per this phase's existing Non-Goal against
+cosmetic issue), *and* no layout-mode switch avoids it. Per this WP's own rule, no fix was written
+during the investigation itself — scoped narrowly per this phase's existing Non-Goal against
 building a general garbled-text detector: a small deterministic repair table
 (`{U+E000: "ti", U+E001: "tt", U+E002: "ft", U+E003: "tt", U+E004: "tf"}`) applied as a
 post-extraction pass — cheap, precise, and grounded in the exact codepoints confirmed above, not a
-speculative general-purpose fix. Track as a new backlog item
-(`docs/TODO_future_improvements.txt`) rather than a Phase 32 WP, since it only matters once
-`NIST.SP.800-53Ar5.pdf` is re-ingested — not assumed by this phase (see Non-Goals: rest-of-corpus
-re-ingest is a separate, later decision).
+speculative general-purpose fix.
+
+**Shipped (2026-07-28):** Tyler's call — `NIST.SP.800-53Ar5` is an important document (it's the
+assessment-procedures companion to 800-53, used for control-assessment work specifically), and the
+fix is small, so implement it now rather than leave it as a pure backlog item. Explicit constraint:
+keep it out of the default ingest path, callable only when needed, rather than adding a
+general-purpose repair step that runs on every document. Shipped as `pipeline/repair_ligatures.py`
+— a standalone module with its own CLI, **not imported or called anywhere in `run_pipeline.py` or
+`cli/reqbot.py`** (confirmed via grep, not just by omission). Operates on a `*_chunks.jsonl` file
+after Step B and before Step C, repairing the `text`/`raw_text` fields (and any other string or
+list-of-string field) that carry the known bad codepoints; the normal resume flow is:
+
+```bash
+python3 cli/reqbot.py ingest "raw_pdfs/NIST.SP.800-53Ar5.pdf" --layout-mode docling --no-index
+python3 pipeline/repair_ligatures.py ~/documents/processed/NIST.SP.800-53Ar5_.../NIST.SP.800-53Ar5_chunks.jsonl
+python3 cli/reqbot.py ingest "raw_pdfs/NIST.SP.800-53Ar5.pdf" --skip-to C --output-dir ~/documents/processed/NIST.SP.800-53Ar5_...
+```
+
+**Validated against the real archived data**, not just synthetic unit tests: ran it against a copy
+of the pre-WP-32.1 archived `NIST.SP.800-53Ar5_chunks.jsonl` — repaired **53,078 characters across
+2,658/3,092 chunks** (matches the corpus-wide PUA scan count above exactly, as it should — same file,
+same codepoints). Spot-checked chunk_id 1131 (the original `REQ-f7dd494f5d87` source chunk) directly:
+now reads `"...for password-based authentication, a list of commonly used, expected, or compromised
+passwords is maintained and updated <IA-05(01)_ODP[01] frequency> and when organizational
+passwords..."` — fully clean. Confirmed zero PUA characters remain anywhere in the repaired file.
+10 unit tests in `tests/unit/test_repair_ligatures.py` cover the replacement logic, record-level
+field handling (string and list-of-string fields, non-string fields left untouched), and the file-
+level `run()` entry point (in-place and separate-output-path modes).
+
+Tracked as `[RESOLVED — Phase 32, WP-32.2]` in `docs/TODO_future_improvements.txt` item 25.
+Re-ingesting `NIST.SP.800-53Ar5.pdf` itself through this repaired flow is not done as part of this
+WP — the tool is validated and ready, but actually running it against the live corpus is bundled
+with the same later, separate re-ingest decision as the rest of the corpus (see Non-Goals above).
 
 ---
 

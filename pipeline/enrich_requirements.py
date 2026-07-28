@@ -19,6 +19,14 @@ from pathlib import Path
 
 import requests
 
+# Ensure repo root is on sys.path when run as a standalone script from pipeline/
+# (matches core/ask.py's precedent) -- needed for the core.profiles import below.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from core.profiles import default_profile
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -26,34 +34,13 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-VALID_DOMAIN_TAGS = [
-    "access-control",
-    "authentication-and-identity",
-    "audit-and-logging",
-    "configuration-management",
-    "contingency-and-recovery",
-    "data-protection-and-encryption",
-    "incident-response",
-    "maintenance",
-    "media-protection",
-    "network-security",
-    "personnel-security",
-    "physical-security",
-    "privacy",
-    "risk-management",
-    "security-assessment",
-    "supply-chain-security",
-    "system-integrity",
-    "training-and-awareness",
-]
-
-VALID_REQUIREMENT_TYPES = [
-    "policy",
-    "technical-control",
-    "procedural-control",
-    "assessment",
-    "guidance",
-]
+# Only used as a fallback default for process_batch()/process_single() when called
+# directly without a profile (run(), the real Step D.5 entry point, always passes
+# profile["domain_tags"]/["requirement_types"] explicitly instead -- WP-33.1).
+# Derived from core.profiles rather than hardcoded so there's exactly one place
+# that defines the cybersecurity vocabulary, not a second copy that can drift.
+VALID_DOMAIN_TAGS = default_profile()["domain_tags"]
+VALID_REQUIREMENT_TYPES = default_profile()["requirement_types"]
 
 _VALID_TAGS_STR = ", ".join(VALID_DOMAIN_TAGS)
 _VALID_TYPES_STR = ", ".join(VALID_REQUIREMENT_TYPES)

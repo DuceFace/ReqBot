@@ -46,6 +46,12 @@ def test_cybersecurity_all_required_fields_present():
         assert field in result, f"Missing required field: {field}"
 
 
+# WP-33.1: these five pairs of tests are structural, not incidental, now -- each
+# module's VALID_DOMAIN_TAGS/VALID_REQUIREMENT_TYPES (or cli/console.py's
+# differently-named equivalents) is itself derived from core.profiles.default_profile()
+# at import time, not an independently hardcoded copy. Kept as explicit tests anyway,
+# as a regression guard against a future accidental re-hardcoding in any one file.
+
 def test_cybersecurity_domain_tags_match_pipeline_constants():
     from pipeline.llm_extract_requirements import VALID_DOMAIN_TAGS
     result = load_profile("cybersecurity")
@@ -56,6 +62,51 @@ def test_cybersecurity_requirement_types_match_pipeline_constants():
     from pipeline.llm_extract_requirements import VALID_REQUIREMENT_TYPES
     result = load_profile("cybersecurity")
     assert result["requirement_types"] == VALID_REQUIREMENT_TYPES
+
+
+def test_enrich_requirements_domain_tags_match_profile():
+    from pipeline.enrich_requirements import VALID_DOMAIN_TAGS
+    result = load_profile("cybersecurity")
+    assert result["domain_tags"] == VALID_DOMAIN_TAGS
+
+
+def test_enrich_requirements_requirement_types_match_profile():
+    from pipeline.enrich_requirements import VALID_REQUIREMENT_TYPES
+    result = load_profile("cybersecurity")
+    assert result["requirement_types"] == VALID_REQUIREMENT_TYPES
+
+
+def test_core_ask_domain_tags_match_profile():
+    from core.ask import VALID_DOMAIN_TAGS
+    result = load_profile("cybersecurity")
+    assert set(result["domain_tags"]) == VALID_DOMAIN_TAGS
+
+
+def test_core_ask_requirement_types_match_profile():
+    from core.ask import VALID_REQUIREMENT_TYPES
+    result = load_profile("cybersecurity")
+    assert set(result["requirement_types"]) == VALID_REQUIREMENT_TYPES
+
+
+def test_cli_console_domain_tags_match_profile():
+    from cli.console import _DOMAIN_TAGS
+    result = load_profile("cybersecurity")
+    assert set(result["domain_tags"]) == _DOMAIN_TAGS
+
+
+def test_cli_console_requirement_types_match_profile():
+    from cli.console import _VALID_REQUIREMENT_TYPES
+    result = load_profile("cybersecurity")
+    assert set(result["requirement_types"]) == _VALID_REQUIREMENT_TYPES
+
+
+def test_parse_and_normalize_no_longer_has_dead_vocabulary_constants():
+    """WP-33.1: these were unused (not referenced anywhere in the file or
+    imported anywhere else in the repo) -- deleted outright rather than kept as
+    unused profile-derived constants, unlike the other four files above."""
+    import pipeline.parse_and_normalize as pan
+    assert not hasattr(pan, "VALID_DOMAIN_TAGS")
+    assert not hasattr(pan, "VALID_REQUIREMENT_TYPES")
 
 
 def test_cybersecurity_obligation_verbs_is_nonempty_list():

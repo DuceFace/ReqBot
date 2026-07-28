@@ -26,6 +26,8 @@ import ollama
 from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient, models
 
+from core.profiles import default_profile
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -56,19 +58,14 @@ Return ONLY valid JSON. No explanation, no markdown, no other text.
 
 QUESTION: {question}"""
 
-# Valid filter values (must match parse_and_normalize.py)
-VALID_DOMAIN_TAGS = {
-    "access-control", "authentication-and-identity", "audit-and-logging",
-    "configuration-management", "contingency-and-recovery",
-    "data-protection-and-encryption", "incident-response", "maintenance",
-    "media-protection", "network-security", "personnel-security",
-    "physical-security", "privacy", "risk-management", "security-assessment",
-    "supply-chain-security", "system-integrity", "training-and-awareness",
-}
-
-VALID_REQUIREMENT_TYPES = {
-    "policy", "technical-control", "procedural-control", "assessment", "guidance",
-}
+# Query-time filter validation (warn-only, see build_query_filter() below) against
+# the cybersecurity profile's vocabulary -- derived from core.profiles rather than
+# hardcoded so there's exactly one place that defines it (WP-33.1). Not
+# profile-aware for a hypothetical multi-profile corpus: there's no single "active
+# profile" concept at query time the way there is per-document at ingest time, and
+# it's moot today since no second profile exists yet.
+VALID_DOMAIN_TAGS = set(default_profile()["domain_tags"])
+VALID_REQUIREMENT_TYPES = set(default_profile()["requirement_types"])
 
 # HyDE prompt — generates a single hypothetical requirement statement in corpus register.
 # Explicitly prohibits control IDs and numeric thresholds to avoid introducing fabricated

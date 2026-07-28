@@ -25,6 +25,12 @@ from pathlib import Path
 
 import requests
 
+# Ensure repo root is on sys.path when run as a standalone script from pipeline/
+# (matches core/ask.py's precedent) -- needed for the core.profiles import below.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 from core.profiles import default_profile
 
 logging.basicConfig(

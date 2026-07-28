@@ -1,0 +1,25 @@
+{
+  "label": "afpd_glossary",
+  "group": "known_bad",
+  "chunk_id": 9,
+  "stem": "afpd_17-1",
+  "note": "Definitions/Terms section -- category 4, background prose misextraction",
+  "baseline": {
+    "count": 2,
+    "quotes": [
+      "In order to cost-effectively meet these requirements, the DoD current business and financial management infrastructure - processes, systems, and data standards - are being transformed to ensure better support to the warfighter and improve accountability to the taxpayer.",
+      "CFLs integrate Total Force concepts, capabilities, modernization, and resourcing to ensure future assigned core capabilities across the range of military operations as directed by AF Strategy and Strategic Planning Guidance."
+    ],
+    "failure": null
+  },
+  "revised": {
+    "count": 4,
+    "quotes": [
+      "The DoD current business and financial management infrastructure - processes, systems, and data standards - are being transformed to ensure better support to the warfighter and improve accountability to the taxpayer.",
+      "CFLs integrate Total Force concepts, capabilities, modernization, and resourcing to ensure future assigned core capabilities across the range of military operations as directed by AF Strategy and Strategic Planning Guidance.",
+      "CFLs are responsible for the Core Function Support Plan and recommendations for the development of the POM for the assigned CF.",
+      "CFLs have tasking authority regarding CF issues to identify enabling capabilities and integration requirements/opportunities."
+    ],
+    "failure": null
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "label": "cjcsi_chunk0_regression",
+  "group": "known_good",
+  "chunk_id": 0,
+  "stem": "CJCSI 6510.02G",
+  "note": "2 clean baseline requirements -- regression check",
+  "baseline": {
+    "count": 2,
+    "quotes": [
+      "The organizations to which this instruction applies must act IAW its policy objectives and in compliance with reference (b).",
+      "DoD Components will use only NSA-approved cryptographic products to protect classified and/or sensitive national security information processed and transmitted over National Security Systems (NSS)."
+    ],
+    "failure": null
+  },
+  "revised": {
+    "count": 2,
+    "quotes": [
+      "The organizations to which this instruction applies must act IAW its policy objectives and in compliance with reference (b).",
+      "DoD Components will use only NSA-approved cryptographic products to protect classified and/or sensitive national security information processed and transmitted over National Security Systems (NSS)."
+    ],
+    "failure": null
+  }
+}

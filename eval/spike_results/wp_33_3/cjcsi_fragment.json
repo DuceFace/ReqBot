@@ -1,0 +1,37 @@
+{
+  "label": "cjcsi_fragment",
+  "group": "known_bad",
+  "chunk_id": 3,
+  "stem": "CJCSI 6510.02G",
+  "note": "'The MC4EB will:' list header -- category 3, truncated fragment",
+  "baseline": {
+    "count": 8,
+    "quotes": [
+      "The PO, in conjunction with Service Principal/CIO and AO will:",
+      "a. Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "b. Initiate materiel and fiscal planning to replace and modernize cryptographic products entering the YELLOW category, pursuant to implementing the direction, objectives, timelines, and requirements of reference (b).",
+      "c. Develop a POA&M, to include an architecture overview of the systems and networks, a fielding plan, schedule, and programmatic funding profile for cryptographic products entering the YELLOW category.",
+      "d. Identify critical replacement needs and modernization requirements (to include space and Nuclear Command, Control, and Communications applications) IAW references (d) and (e).",
+      "e. Address capability requirements for modernized, cryptographic cybersecurity solutions for C4ISR, IT, and weapons systems developments that are intended to replace operational systems that employ at-risk or obsolescent cryptographic products IAW reference (g).",
+      "f. Identify, evaluate, and approve/disapprove development of cryptographic cybersecurity solutions for C4ISR, IT, and weapons systems capability requirements in compliance with reference (b).",
+      "g. Consult and act IAW reference (e) when releases to foreign nations are considered, or when a key extension is operationally necessary."
+    ],
+    "failure": null
+  },
+  "revised": {
+    "count": 10,
+    "quotes": [
+      "The PO, in conjunction with Service Principal/CIO and AO will:",
+      "a. Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "b. Initiate materiel and fiscal planning to replace and modernize cryptographic products entering the YELLOW category, pursuant to implementing the direction, objectives, timelines, and requirements of reference (b).",
+      "c. Develop a POA&M, to include an architecture overview of the systems and networks, a fielding plan, schedule, and programmatic funding profile for cryptographic products entering the YELLOW category.",
+      "d. Identify critical replacement needs and modernization requirements (to include space and Nuclear Command, Control, and Communications applications) IAW references (d) and (e).",
+      "e. Address capability requirements for modernized, cryptographic cybersecurity solutions for C4ISR, IT, and weapons systems developments that are intended to replace operational systems that employ at-risk or obsolescent cryptographic products IAW reference (g).",
+      "f. Identify, evaluate, and approve/disapprove development of cryptographic cybersecurity solutions for C4ISR, IT, and weapons systems capability requirements in compliance with reference (b).",
+      "g. Consult and act IAW reference (e) when releases to foreign nations are considered, or when a key extension is operationally necessary.",
+      "The MC4EB will:",
+      "a. Validate and monitor plans for programmed transformation, modernization, and replacement of cryptographic items presented by the PO."
+    ],
+    "failure": null
+  }
+}

@@ -29,6 +29,7 @@ Outputs:
   eval/spike_results/wp_33_3/<label>.json — per-chunk raw baseline/revised output
 
 Usage:
+  python3 eval/actionability_spike.py
   python3 eval/actionability_spike.py --ollama-url http://192.168.90.100:11434
 """
 
@@ -41,7 +42,10 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from core import config as _config
 from core.profiles import default_profile
+
+_cfg = _config.load()
 from pipeline.llm_extract_requirements import (
     PASS1_PROMPT_TEMPLATE,
     _PASS1_FORMAT_SCHEMA,
@@ -139,10 +143,10 @@ def _run_one(chunk: dict, template: str, ollama_url: str, profile: dict) -> dict
 def main() -> None:
     parser = argparse.ArgumentParser(description="WP-33.3 actionability spike A/B test")
     parser.add_argument(
-        "--ollama-url", default="http://localhost:11434",
-        help="Ollama API base URL. Defaults to localhost, which resolves to this "
-             "container, not a real Ollama host -- always pass this explicitly "
-             "(matches every other pipeline script's convention).",
+        "--ollama-url", default=_cfg.ollama_url,
+        help="Ollama API base URL (default: from ~/.config/reqbot/config.json / "
+             "REQBOT_OLLAMA_URL, same resolution cli/reqbot.py's own subcommands "
+             "use -- falls back to http://localhost:11434 if nothing is configured).",
     )
     parser.add_argument(
         "--processed-dir", default=str(Path.home() / "documents/processed"),

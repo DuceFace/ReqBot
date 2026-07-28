@@ -29,6 +29,7 @@ def _fake_hit(
     section_ref_path=None,
     parent_section_ref=None,
     chunk_id=1,
+    domain_profile=None,
 ):
     hit = MagicMock()
     hit.payload = {
@@ -42,6 +43,11 @@ def _fake_hit(
         "parent_section_ref": parent_section_ref,
         "chunk_id": chunk_id,
     }
+    # Omitted by default (None) rather than always set to "cybersecurity" -- WP-32.7's
+    # tests need to cover the pre-WP-25.x records that never carry this field at all,
+    # not just records that explicitly say "cybersecurity".
+    if domain_profile is not None:
+        hit.payload["domain_profile"] = domain_profile
     hit.score = score
     return hit
 
@@ -354,3 +360,100 @@ def test_context_text_populated_for_all_singletons_sharing_same_chunk():
     for g in result["groups"].values():
         assert g["context_text"] is not None
         assert "shared chunk context text" in g["context_text"]
+
+
+# ---------------------------------------------------------------------------
+# Profile-aware synthesis vocabulary (WP-32.7)
+#
+# _EVIDENCE_AUDITOR_PROMPT's rule #1 used to hardcode NIST/RMF-specific
+# "control families (e.g., AC, IA, AU)" -- meaningless, and actively wrong
+# guidance, outside cybersecurity. It must now reference the active profile's
+# real domain_tags, falling back to the old hardcoded text only when results
+# span more than one profile (never guess or merge unrelated vocabularies).
+# ---------------------------------------------------------------------------
+
+def test_resolve_synthesis_domain_tags_defaults_missing_field_to_cybersecurity():
+    """Pre-WP-25.x records carry no domain_profile field at all -- the same
+    fallback idiom already used by trace_service.py/checklist_service.py/
+    docs_service.py applies here too."""
+    from core.profiles import load_profile
+    from services.evidence_service import _resolve_synthesis_domain_tags
+
+    hits = [_fake_hit(domain_profile=None), _fake_hit(domain_profile=None)]
+    tags = _resolve_synthesis_domain_tags(hits)
+    assert tags == load_profile("cybersecurity")["domain_tags"]
+
+
+def test_resolve_synthesis_domain_tags_loads_active_non_cybersecurity_profile():
+    from services.evidence_service import _resolve_synthesis_domain_tags
+
+    hits = [_fake_hit(domain_profile="test-domain")]
+    tags = _resolve_synthesis_domain_tags(hits)
+    assert tags == ["test-tag-alpha", "test-tag-beta"]
+
+
+def test_resolve_synthesis_domain_tags_none_on_mixed_profiles():
+    from services.evidence_service import _resolve_synthesis_domain_tags
+
+    hits = [_fake_hit(domain_profile="cybersecurity"), _fake_hit(domain_profile="test-domain")]
+    assert _resolve_synthesis_domain_tags(hits) is None
+
+
+def test_resolve_synthesis_domain_tags_none_on_unknown_profile_name():
+    """A domain_profile value with no matching profiles/<name>.json (e.g. a
+    profile that existed at ingest time but was later removed/renamed) must
+    fall back, not raise FileNotFoundError out of the synthesis path."""
+    from services.evidence_service import _resolve_synthesis_domain_tags
+
+    hits = [_fake_hit(domain_profile="nonexistent-profile-xyz")]
+    assert _resolve_synthesis_domain_tags(hits) is None
+
+
+def test_category_rule_default_matches_original_hardcoded_text():
+    from services.evidence_service import _DEFAULT_CATEGORY_RULE, _category_rule
+
+    assert _category_rule(None) == _DEFAULT_CATEGORY_RULE
+    assert "AC, IA, AU" in _DEFAULT_CATEGORY_RULE
+
+
+def test_category_rule_uses_given_domain_tags_not_hardcoded_text():
+    from services.evidence_service import _category_rule
+
+    rule = _category_rule(["test-tag-alpha", "test-tag-beta"])
+    assert "test-tag-alpha" in rule
+    assert "AC, IA, AU" not in rule
+    assert "control families" not in rule  # NIST/RMF-specific phrasing, not domain-neutral
+
+
+def test_build_synthesis_prompt_uses_real_cybersecurity_domain_tags_by_default():
+    """Hits with no domain_profile field (the common case today) must still
+    produce a prompt reflecting cybersecurity's real domain_tags -- not the
+    literal "AC, IA, AU" abbreviations, which don't even appear in
+    profiles/cybersecurity.json's domain_tags list."""
+    hits = [_fake_hit(domain_profile=None)]
+    _, mock_synthesize, _ = _run_build(hits=hits, synthesize=True)
+    prompt = mock_synthesize.call_args.kwargs["raw_prompt"]
+    assert "access-control" in prompt
+    assert "AC, IA, AU" not in prompt
+
+
+def test_build_synthesis_prompt_uses_active_test_domain_profile():
+    hits = [_fake_hit(domain_profile="test-domain")]
+    _, mock_synthesize, _ = _run_build(hits=hits, synthesize=True)
+    prompt = mock_synthesize.call_args.kwargs["raw_prompt"]
+    assert "test-tag-alpha" in prompt
+    assert "AC, IA, AU" not in prompt
+    assert "access-control" not in prompt  # cybersecurity's vocabulary must not leak in
+
+
+def test_build_synthesis_prompt_falls_back_to_default_rule_on_mixed_profiles():
+    """Codex review, PR #144: results spanning more than one profile must fall
+    back to the original hardcoded rule rather than guessing or merging
+    vocabularies -- covered explicitly per WP-32.7's scope."""
+    hits = [
+        _fake_hit(requirement_id="REQ-a", document_id="docA", domain_profile="cybersecurity"),
+        _fake_hit(requirement_id="REQ-b", document_id="docB", domain_profile="test-domain"),
+    ]
+    _, mock_synthesize, _ = _run_build(hits=hits, synthesize=True)
+    prompt = mock_synthesize.call_args.kwargs["raw_prompt"]
+    assert "AC, IA, AU" in prompt

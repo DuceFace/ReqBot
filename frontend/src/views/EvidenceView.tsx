@@ -337,6 +337,10 @@ export default function EvidenceView() {
                       <div className="mt-2">
                         {contextShown ? (
                           <>
+                            <p className="text-xs text-gray-500 mb-1">
+                              Excerpt around the matched quote, not the full source chunk — trimmed
+                              text may start or end mid-sentence.
+                            </p>
                             <pre className="text-xs text-gray-600 bg-gray-100 rounded p-3 whitespace-pre-wrap leading-relaxed overflow-x-auto">
                               {contextByRef?.[ref] || '(no context available)'}
                             </pre>

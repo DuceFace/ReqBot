@@ -77,6 +77,12 @@ REVISED_TEMPLATE = PASS1_PROMPT_TEMPLATE.replace(
 - General background, context, or informational text""",
     _REVISED_DO_NOT_EXTRACT,
 )
+if REVISED_TEMPLATE == PASS1_PROMPT_TEMPLATE:
+    raise RuntimeError(
+        "REVISED_TEMPLATE substitution failed -- PASS1_PROMPT_TEMPLATE's "
+        "'DO NOT extract:' block no longer matches the expected text. "
+        "Update the substring above to match its current wording."
+    )
 
 # (label, pdf processed-dir name, chunk_id, why it's in this set)
 KNOWN_BAD_CHUNKS = [

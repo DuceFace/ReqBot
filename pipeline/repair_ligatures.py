@@ -91,10 +91,19 @@ def load_jsonl(path: Path) -> list[dict]:
 
 
 def write_jsonl(records: list[dict], output_path: Path) -> None:
+    """Write records as JSONL, replacing output_path atomically.
+
+    Matters most in the default in-place mode, where output_path is the same
+    file repair() just read from -- an interrupted write (SIGINT, disk full)
+    must not leave that source *_chunks.jsonl truncated with no recovery
+    short of re-running Steps A/B.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
+    tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
         for record in records:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    tmp_path.replace(output_path)
 
 
 def run(chunks_path: str, output_path: str | None = None) -> str:

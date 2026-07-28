@@ -11,6 +11,8 @@ from pipeline.repair_ligatures import (
 _TI = "\ue000"
 _TT = "\ue001"
 _FT = "\ue002"
+_TT2 = "\ue003"
+_TF = "\ue004"
 
 
 def test_repair_text_replaces_known_codepoint():
@@ -28,6 +30,11 @@ def test_repair_text_no_op_on_clean_text():
 
 def test_all_five_known_codepoints_covered():
     assert len(KNOWN_LIGATURE_REPAIRS) == 5
+
+
+def test_repair_text_resolves_every_known_codepoint():
+    corrupted = f"{_TI} {_TT} {_FT} {_TT2} {_TF}"
+    assert repair_text(corrupted) == "ti tt ft tt tf"
 
 
 def test_repair_record_fixes_text_and_raw_text_fields():

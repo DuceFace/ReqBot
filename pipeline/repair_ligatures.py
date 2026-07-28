@@ -70,12 +70,15 @@ def repair_record(record: dict) -> tuple[dict, int]:
             hits = sum(value.count(bad) for bad in KNOWN_LIGATURE_REPAIRS)
             replaced += hits
             repaired[key] = repair_text(value) if hits else value
-        elif isinstance(value, list) and all(isinstance(v, str) for v in value):
+        elif isinstance(value, list):
             new_list = []
             for v in value:
-                hits = sum(v.count(bad) for bad in KNOWN_LIGATURE_REPAIRS)
-                replaced += hits
-                new_list.append(repair_text(v) if hits else v)
+                if isinstance(v, str):
+                    hits = sum(v.count(bad) for bad in KNOWN_LIGATURE_REPAIRS)
+                    replaced += hits
+                    new_list.append(repair_text(v) if hits else v)
+                else:
+                    new_list.append(v)
             repaired[key] = new_list
         else:
             repaired[key] = value
@@ -88,6 +91,7 @@ def load_jsonl(path: Path) -> list[dict]:
 
 
 def write_jsonl(records: list[dict], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         for record in records:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")

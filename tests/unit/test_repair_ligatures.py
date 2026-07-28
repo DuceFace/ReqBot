@@ -51,6 +51,13 @@ def test_repair_record_fixes_list_of_string_fields():
     assert replaced == 1
 
 
+def test_repair_record_fixes_strings_in_mixed_type_list():
+    record = {"section_title_path": [f"composi{_TI}on", None, "clean"]}
+    repaired, replaced = repair_record(record)
+    assert repaired["section_title_path"] == ["composition", None, "clean"]
+    assert replaced == 1
+
+
 def test_repair_record_untouched_when_no_corruption():
     record = {"chunk_id": 5, "text": "clean text", "page_start": 3}
     repaired, replaced = repair_record(record)
@@ -98,3 +105,16 @@ def test_run_writes_to_separate_output_path_when_given(tmp_path):
     with open(chunks_path, encoding="utf-8") as f:
         original = [json.loads(line) for line in f]
     assert original[0]["text"] == f"a{_FT}er"
+
+
+def test_run_creates_missing_output_parent_directory(tmp_path):
+    chunks_path = tmp_path / "doc_chunks.jsonl"
+    out_path = tmp_path / "nested" / "does" / "not" / "exist" / "out.jsonl"
+    with open(chunks_path, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"chunk_id": 0, "text": f"a{_FT}er"}) + "\n")
+
+    run(str(chunks_path), str(out_path))
+
+    with open(out_path, encoding="utf-8") as f:
+        repaired = [json.loads(line) for line in f]
+    assert repaired[0]["text"] == "after"

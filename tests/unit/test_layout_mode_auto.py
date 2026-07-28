@@ -69,6 +69,11 @@ def _run_with_mocked_steps(tmp_path, **run_kwargs):
     fake_pdf.write_bytes(b"%PDF-1.4")
 
     with (
+        # Force docling "available" regardless of whether it's actually installed in
+        # whatever environment runs this test (CI's base install doesn't have it) --
+        # these tests are about the fallback wiring, not about detection itself
+        # (that's covered separately by test_docling_available_*).
+        patch("pipeline.run_pipeline._docling_available", return_value=True),
         patch("pipeline.section_parser.run", side_effect=RuntimeError("docling boom")) as mock_docling,
         patch("pipeline.extract_pdf_to_text.run") as mock_legacy,
         patch("pipeline.chunk_text.run", return_value=str(tmp_path / "doc_chunks.jsonl")),

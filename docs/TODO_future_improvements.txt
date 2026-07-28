@@ -52,12 +52,15 @@ ACTIVE BACKLOG
 5. Profile-based skip-section filtering — docling-only gap
    profiles/*.json's skip_sections field is consumed when the docling engine is
    used (pipeline/run_pipeline.py passes it into chunk_text.run_structure_aware,
-   which filters via _should_skip_chunk/_should_skip_section). But the default
-   chunking engine is still the legacy pymupdf path, which has no section
-   hierarchy and no-ops on skip_sections (pipeline/chunk_text.py logs a warning
-   and ignores the field). So skip-section filtering only applies when a caller
-   explicitly opts into docling. Revisit once docling is closer to being the
-   default engine, or if legacy chunking gains its own section awareness.
+   which filters via _should_skip_chunk/_should_skip_section). The legacy
+   pymupdf/pdfplumber chunking path has no section hierarchy and no-ops on
+   skip_sections (pipeline/chunk_text.py logs a warning and ignores the field).
+   `--layout-mode` now defaults to `auto` (docling when installed, pymupdf
+   fallback otherwise -- see Decisions and Guardrails #9 below), so this gap is
+   narrower than it used to be but not closed: skip-section filtering is
+   silently a no-op whenever docling isn't installed, or a caller passes
+   `--layout-mode pymupdf`/`pdfplumber` explicitly. Revisit if legacy chunking
+   ever gains its own section awareness.
 
 6. Optional LLM-backed audit question generation
    Phase 21 intentionally leaves audit_question blank. A future opt-in feature
@@ -236,7 +239,7 @@ ACTIVE BACKLOG
     standalone tool, deliberately not wired into run_pipeline.py's default
     ingest flow. Run it by hand against a document's *_chunks.jsonl after
     Step B, before resuming with `--skip-to C`. See its module docstring for
-    the exact invocation, and docs/PHASE32_REQUIREMENTS.md's WP-32.2 Findings
+    the exact invocation, and archive/PHASE32_REQUIREMENTS.md's WP-32.2 Findings
     for the full root-cause writeup and validation against real archived data
     (53,078 characters repaired across 2,658/3,092 chunks, spot-checked
     against the original reported passage).

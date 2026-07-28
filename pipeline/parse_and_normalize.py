@@ -53,7 +53,7 @@ PIPELINE_VERSION = "1.0"
 # Diminishing returns above ~60: pushing to 80 nearly triples the gold
 # false-positive rate for comparatively little extra corpus coverage -- most
 # genuine fabrications score far below 60 anyway (the confirmed hallucination
-# that motivated this WP scored 44). See docs/PHASE32_REQUIREMENTS.md for the
+# that motivated this WP scored 44). See archive/PHASE32_REQUIREMENTS.md for the
 # full investigation.
 QUOTE_GROUNDING_THRESHOLD = 60
 

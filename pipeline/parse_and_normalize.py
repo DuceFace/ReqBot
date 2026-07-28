@@ -57,35 +57,6 @@ PIPELINE_VERSION = "1.0"
 # full investigation.
 QUOTE_GROUNDING_THRESHOLD = 60
 
-VALID_DOMAIN_TAGS = {
-    "access-control",
-    "authentication-and-identity",
-    "audit-and-logging",
-    "configuration-management",
-    "contingency-and-recovery",
-    "data-protection-and-encryption",
-    "incident-response",
-    "maintenance",
-    "media-protection",
-    "network-security",
-    "personnel-security",
-    "physical-security",
-    "privacy",
-    "risk-management",
-    "security-assessment",
-    "supply-chain-security",
-    "system-integrity",
-    "training-and-awareness",
-}
-
-VALID_REQUIREMENT_TYPES = {
-    "policy",
-    "technical-control",
-    "procedural-control",
-    "assessment",
-    "guidance",
-}
-
 
 def compute_document_identity(pdf_path: Path) -> dict:
     """Compute document identity from PDF file bytes.

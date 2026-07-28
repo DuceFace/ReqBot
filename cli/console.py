@@ -24,6 +24,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core import config as _config
+from core.profiles import default_profile as _default_profile
 from cli import reqbot as _reqbot
 
 # Readline history — graceful fallback if not available
@@ -94,27 +95,11 @@ _SESSION_KEYS = [
 # Keys that can be unset (filter vars). Connection/model keys must use `set`.
 _FILTER_KEYS = {"document_id", "domain_tag", "requirement_type"}
 
-# Known domain tags (inlined to avoid parse_and_normalize import side-effects)
-_DOMAIN_TAGS = {
-    "access-control",
-    "authentication-and-identity",
-    "audit-and-logging",
-    "configuration-management",
-    "contingency-and-recovery",
-    "data-protection-and-encryption",
-    "incident-response",
-    "maintenance",
-    "media-protection",
-    "network-security",
-    "personnel-security",
-    "physical-security",
-    "privacy",
-    "risk-management",
-    "security-assessment",
-    "supply-chain-security",
-    "system-integrity",
-    "training-and-awareness",
-}
+# Known domain tags for inline --domain-tag warn-only validation, derived from
+# core.profiles rather than hardcoded (WP-33.1) -- core.profiles has no heavy
+# import chain (json + pathlib only), unlike pipeline.parse_and_normalize, which
+# used to be the reason this was inlined instead of imported.
+_DOMAIN_TAGS = set(_default_profile()["domain_tags"])
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +107,8 @@ _DOMAIN_TAGS = {
 # Argparse type validators (reused across shell command parsers)
 # ---------------------------------------------------------------------------
 
-_VALID_REQUIREMENT_TYPES = {"policy", "technical-control", "procedural-control", "assessment", "guidance"}
+# Derived from core.profiles rather than hardcoded (WP-33.1) -- see _DOMAIN_TAGS above.
+_VALID_REQUIREMENT_TYPES = set(_default_profile()["requirement_types"])
 
 
 def _normalize_filter_flags(

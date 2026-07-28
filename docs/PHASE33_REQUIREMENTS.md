@@ -18,7 +18,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-33.1 — Deduplicate Profile Vocabulary Constants | Not started |
+| WP-33.1 — Deduplicate Profile Vocabulary Constants | Complete — 4 files now derive from `core.profiles.default_profile()`; `pipeline/parse_and_normalize.py`'s dead copies deleted outright |
 | WP-33.2 — Surface the Skip-Section Docling-Only Gap | Not started |
 | WP-33.3 — Spike: Actionability Self-Verification | Not started |
 
@@ -147,6 +147,21 @@ already anticipated, just didn't structurally prevent.
 
 **Gate:** Exactly one place defines the cybersecurity vocabulary (`profiles/cybersecurity.json`,
 read via `core.profiles`); every other file's copy is derived from it, not independently hardcoded.
+
+**Resolution:** Implementation decided the consistency-vs-delete question this WP's Scope left open
+for `pipeline/parse_and_normalize.py`'s two dead constants: deleted them outright (confirmed via a
+new test asserting the module no longer has these attributes) rather than keeping them as unused
+profile-derived constants, since nothing referenced them and the project's own convention prefers
+deleting confirmed-unused code. The other four files' constants now derive from
+`core.profiles.default_profile()` at module load time. `cli/console.py`'s own comment about avoiding
+`pipeline.parse_and_normalize`'s import side-effects no longer applies (was never actually about
+`core.profiles`, which has no heavy import chain) and was updated accordingly.
+
+Verified: full `pytest` suite (648 tests, 7 new) plus a clean module-import + value-equality check
+against `profiles/cybersecurity.json` directly for all four remaining files, plus a real 3-chunk
+`--no-index` ingest of `afpd_17-1.pdf` through Steps A-E confirming the whole pipeline still runs
+end to end with the refactored constants (Step D.5 correctly assigned `requirement_type: "policy"`
+using the now-profile-derived value).
 
 ---
 

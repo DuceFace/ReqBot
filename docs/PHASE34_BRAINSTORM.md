@@ -267,8 +267,9 @@ not hand-waved:
   directly as part of implementing this WP, not part of any PR diff. Codex's round-4 review correctly
   flagged that it can't see this file in the PR tree and asked whether that was expected — it is.
 
-This is real enough scope that it should land as **its own WP, before WP-34.1/34.2** (see §7) — the
-actionability fixes get simpler once it's done, not the other way around.
+This is real enough scope that it should land as its own WP, first (see §7 — this became WP-34.1
+once the strawman below was renumbered) — the actionability fixes get simpler once it's done, not the
+other way around.
 
 ## 7. Revised strawman WP breakdown
 

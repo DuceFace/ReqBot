@@ -176,6 +176,15 @@ Step D implementation detail and NLI model guidance) or below (§6, §7). One po
 via `reqbot docs`'s Skip-Sect column) *if* the legacy path stayed supported — since it didn't, there's
 no silent-no-op case left to make loud.
 
+**Round 3** (after the docling-only decision landed) found real gaps in §6's migration list — folded
+in above: `cli/console.py` has its own separate `--layout-mode` parser, `test_extract_pdf.py` and
+`test_wp_20_3.py` both need attention, and (the more consequential one, extending Codex's point rather
+than just confirming it) `requirements.txt` doesn't just pin the legacy libraries — it has no docling
+option at all today, so it needs either updating or retiring, not just having two lines deleted. One
+claim in round 3 didn't hold up: `build/bundle.sh` doesn't exist anywhere in this repo (checked
+directly) — likely a stale reference to the bundle installer `CLAUDE.md` already documents as retired
+in WP-25.4. Not folded in.
+
 ## 6. Decided: ReqBot goes docling-only
 
 **Decision (2026-07-29): drop pymupdf/pdfplumber legacy chunking entirely, docling becomes the only
@@ -202,19 +211,42 @@ not hand-waved:
   (`_should_skip_section`, `_normalize_heading`, `_should_skip_chunk`) stay.
 - **`--layout-mode` CLI flag**: drop the `pymupdf`/`pdfplumber`/`auto` choices, or keep them
   rejected-with-a-clear-error for one release as a migration aid — worth a call at implementation
-  time, not here.
+  time, not here. Exists in **two** places, not one: `cli/reqbot.py`'s argparse subcommands *and*
+  `cli/console.py`'s separate interactive-shell `ingest`/`batch` parsers (Codex review round 3,
+  verified — `cli/console.py` has its own `--layout-mode pymupdf|pdfplumber|auto|docling` argument,
+  independent of `cli/reqbot.py`'s).
+- **`pipeline/extract_pdf_to_text.py`** (264 lines) — Step A's legacy PDF-to-text path. Removable
+  entirely once nothing calls it. `tests/unit/test_extract_pdf.py` (88 lines) exists solely to test
+  this file's low-text-page detection (`_LOW_TEXT_THRESHOLD`/`warn_low_text_pages`) — verified, should
+  be removed alongside it, not left testing dead code.
+- **`pipeline/chunk_text.py`** (797 lines) — legacy-only: `run()` (the pymupdf/pdfplumber chunker,
+  ~60 lines) plus its supporting helpers (`chunk_text()`, `load_pages`, `build_page_index`,
+  `pages_for_span`, `find_table_spans`, `table_span_at`, `validate_page_contiguity` — another ~250
+  lines combined). `run_structure_aware()` (the docling chunker) and the shared helpers
+  (`_should_skip_section`, `_normalize_heading`, `_should_skip_chunk`) stay.
 - **`tests/unit/test_layout_mode_auto.py`**: this file's whole point today is testing the
   auto-fallback behavior — most of it needs rewriting around "docling failure is a hard error," not
   incremental patching.
-- **`pyproject.toml`**: the `docling` extra (`archive/PHASE25_REQUIREMENTS.md`'s "gated purely for
-  weight" decision) should likely move into the base install, or `ingest` should fail with a clear
-  "pip install reqbot[docling]" message rather than a confusing downstream error — worth deciding
-  which, not assuming.
+- **`tests/unit/test_wp_20_3.py`**: patches `pipeline.extract_pdf_to_text.run` and
+  `pipeline.chunk_text.run` directly (verified, lines 218-219) as part of its `run_pipeline.run()`
+  profile-plumbing test — needs rewriting around the docling/`section_parser` path instead of just
+  deleted, since the profile-plumbing behavior it's actually testing still needs coverage.
+- **Dependency declarations — two separate files, both need attention, not just one:**
+  `pyproject.toml`'s `docling` extra (`archive/PHASE25_REQUIREMENTS.md`'s "gated purely for weight"
+  decision) should move into the base install. Separately, `requirements.txt` still pins
+  `pymupdf==1.27.1`/`pdfplumber==0.11.9` and — checked directly — **has no docling entry at all
+  today**, on either path. `README.md` already documents `requirements.txt` as a legacy,
+  pre-WP-25.2-packaging install path ("kept for compatibility, not recommended for new setups",
+  `pip install .` being "the supported path going forward") — so this WP either needs to add
+  `docling==2.84.0` to it (so that path doesn't go from "works" to "can't ingest anything" once
+  pymupdf/pdfplumber are dropped) or retire the file entirely in favor of `pip install .` — a real
+  decision, not pre-made here, but one this WP can't skip.
 - **Keep, don't remove**: `services/docs_service.py`'s backward-compatible mode-detection fallback
   (WP-33.2) — it correctly labels already-ingested legacy documents that predate this migration; no
   reason to break display of historical data just because new ingestion is docling-only.
-- **Docs**: `CLAUDE.md`, `ARCHITECTURE.md`, `docs/OPERATIONS.md` all reference `--layout-mode auto`
-  and dual-path behavior (Decisions and Guardrails #9) — need updating, not just the pipeline code.
+- **Docs**: `CLAUDE.md`, `ARCHITECTURE.md`, `docs/OPERATIONS.md`, `README.md` all reference
+  `--layout-mode auto` and/or dual-path behavior (Decisions and Guardrails #9) — need updating, not
+  just the pipeline code.
 
 This is real enough scope that it should land as **its own WP, before WP-34.1/34.2** (see §7) — the
 actionability fixes get simpler once it's done, not the other way around.

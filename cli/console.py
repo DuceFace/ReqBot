@@ -661,8 +661,7 @@ class GrcaiConsole(cmd.Cmd):
     def do_ingest(self, arg: str) -> None:
         """Run the full extraction pipeline on a PDF.
 
-        Usage: ingest <pdf_path> [--no-index] [--layout-mode auto|pymupdf|pdfplumber|docling]
-                                 [--model MODEL] [--output-dir DIR]
+        Usage: ingest <pdf_path> [--no-index] [--model MODEL] [--output-dir DIR]
                                  [--max-chunks N]
         """
         parser = argparse.ArgumentParser(prog="ingest", add_help=True)
@@ -677,12 +676,6 @@ class GrcaiConsole(cmd.Cmd):
         # Deprecated: indexing is now the default, so --index is an inert no-op,
         # kept accepted so old shell history doesn't suddenly fail to parse.
         parser.add_argument("--index", action="store_true", help=argparse.SUPPRESS)
-        parser.add_argument(
-            "--layout-mode",
-            choices=["auto", "pymupdf", "pdfplumber", "docling"],
-            default="auto",
-            dest="layout_mode",
-        )
 
         parsed = self._parse_shell_args(parser, arg)
         if parsed is None:
@@ -694,7 +687,6 @@ class GrcaiConsole(cmd.Cmd):
             model=parsed.model if parsed.model else self._session["default_model"],
             max_chunks=parsed.max_chunks,
             no_index=parsed.no_index,
-            layout_mode=parsed.layout_mode,
             # cmd_ingest reads these unconditionally; the interactive shell has
             # no --skip-enrichment/--profile flags of its own, so supply the
             # same defaults cli/reqbot.py's argparse would (this Namespace was
@@ -780,17 +772,11 @@ class GrcaiConsole(cmd.Cmd):
     def do_batch(self, arg: str) -> None:
         """Run the full pipeline on every PDF in a directory.
 
-        Usage: batch <pdf_dir> [--layout-mode auto|pymupdf|pdfplumber|docling] [--model MODEL]
+        Usage: batch <pdf_dir> [--model MODEL]
         """
         parser = argparse.ArgumentParser(prog="batch", add_help=True)
         parser.add_argument("pdf_dir", help="Directory containing PDF files")
         parser.add_argument("--model", type=str, default=None)
-        parser.add_argument(
-            "--layout-mode",
-            choices=["auto", "pymupdf", "pdfplumber", "docling"],
-            default="auto",
-            dest="layout_mode",
-        )
 
         parsed = self._parse_shell_args(parser, arg)
         if parsed is None:
@@ -799,7 +785,11 @@ class GrcaiConsole(cmd.Cmd):
         ns = Namespace(
             pdf_dir=parsed.pdf_dir,
             model=parsed.model if parsed.model else self._session["default_model"],
-            layout_mode=parsed.layout_mode,
+            # cmd_batch reads this unconditionally; the interactive shell has no
+            # --skip-enrichment flag of its own, so supply the same default
+            # cli/reqbot.py's argparse would (same pre-existing gap do_ingest's
+            # Namespace was already fixed for -- this one was missed).
+            skip_enrichment=False,
             ollama_url=self._session["ollama_url"],
             qdrant_url=self._session["qdrant_url"],
         )

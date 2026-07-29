@@ -6,11 +6,14 @@ manual browser verification).
 
 Features exercised:
   WP-23.2 — XLSX export via checklist service → to_xlsx()
-  WP-23.3 — quality warnings wired into chunk_text (overlap guard, contiguity)
-  WP-23.4 — cybersecurity profile has skip_sections; param accepted by both
-             chunk_text entry points
+  WP-23.4 — cybersecurity profile has skip_sections; param accepted by the
+             structure-aware chunk_text entry point
   WP-23.5 — recovered_truncated flows from extraction through parse_and_normalize
   Regression — CSV/JSON/MD checklist generation unchanged by Phase 23
+
+WP-23.3's overlap-guard/page-contiguity tests were removed under WP-34.1 (legacy
+pymupdf/pdfplumber chunking, the only thing those functions applied to, was
+deleted -- see docs/PHASE34_REQUIREMENTS.md).
 """
 import io
 import json
@@ -22,7 +25,6 @@ import pytest
 
 from core.profiles import load_profile
 from pipeline.checklist_export import to_csv, to_json, to_markdown, to_xlsx
-from pipeline.chunk_text import chunk_text, validate_page_contiguity
 from pipeline.llm_extract_requirements import extract_json_array
 from pipeline.parse_and_normalize import run as normalize_run
 from services.checklist_service import generate
@@ -74,27 +76,6 @@ def test_xlsx_api_route_format_accepted(processed_dir):
 
 
 # ---------------------------------------------------------------------------
-# WP-23.3 — quality warning functions wired correctly
-# ---------------------------------------------------------------------------
-
-def test_overlap_guard_raises_on_equal_size():
-    with pytest.raises(ValueError, match="overlap"):
-        chunk_text("text content here", [(0, 16, 1)], chunk_size=10, overlap=10)
-
-
-def test_contiguity_validates_without_raising():
-    # validate_page_contiguity logs warnings for gaps/duplicates but must not raise.
-    # Warning content is verified in test_chunk_text.py.
-    pages = [{"page_num": 1, "text": "a"}, {"page_num": 3, "text": "b"}]
-    validate_page_contiguity(pages)
-
-
-def test_overlap_guard_forward_progress_caught():
-    with pytest.raises(ValueError, match="forward progress"):
-        chunk_text("hello world foo bar", [(0, 19, 1)], chunk_size=10, overlap=9)
-
-
-# ---------------------------------------------------------------------------
 # WP-23.4 — skip_sections in cybersecurity profile + param threading
 # ---------------------------------------------------------------------------
 
@@ -111,15 +92,6 @@ def test_cybersecurity_profile_skip_sections_contains_expected_entries():
     skip_upper = [s.upper() for s in profile["skip_sections"]]
     for expected in ("GLOSSARY", "REFERENCES", "ACRONYMS"):
         assert expected in skip_upper, f"Expected '{expected}' in skip_sections"
-
-
-def test_chunk_text_run_accepts_skip_sections_param():
-    # Legacy run() accepts skip_sections without raising
-    import inspect
-
-    import pipeline.chunk_text as ct
-    sig = inspect.signature(ct.run)
-    assert "skip_sections" in sig.parameters
 
 
 def test_chunk_text_run_structure_aware_accepts_skip_sections_param():

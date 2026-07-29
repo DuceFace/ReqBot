@@ -62,20 +62,18 @@ pip install .
 reqbot --help
 ```
 
+Docling (structure-aware PDF extraction) is a base dependency as of WP-34.1 — it's the only
+ingestion path, so `pip install .` alone is enough to ingest documents.
+
 Optional extras:
 
 ```bash
-pip install ".[docling]"   # structure-aware PDF extraction (Docling + torch)
 pip install ".[remote]"    # remote synthesis via Anthropic/OpenAI
 pip install ".[dev]"       # test/lint tooling
 ```
 
-**Legacy/source-development path:** a source checkout can still run directly against
-`requirements.txt` (`pip install -r requirements.txt`) without installing the package at all —
-this predates WP-25.2's packaging and is kept for compatibility, not recommended for new setups.
-Some externally-managed Python environments (e.g. Debian/Ubuntu) require an extra flag for this
-path; see `docs/OPERATIONS.md` for that environment-specific detail rather than baking it in here.
-`pip install .` above is the supported path going forward.
+`pip install .` is the only supported install path — the older `requirements.txt`
+(`pip install -r requirements.txt`, predating WP-25.2's packaging) was retired in WP-34.1.
 
 ### 3. Air-gapped Docker image transfer
 
@@ -206,7 +204,6 @@ reqbot ingest <pdf> [options]
 Important options:
 
 - `--no-index` - skip indexing, write pipeline artifacts only (debug/inspection)
-- `--layout-mode {auto,pymupdf,pdfplumber,docling}` - PDF extraction backend (default: auto)
 - `--output-dir DIR` - write artifacts to a specific directory
 - `--extraction-model M` - Step C model
 - `--enrichment-model M` - Step D.5 model
@@ -222,7 +219,7 @@ Run the pipeline on every PDF in a directory.
 reqbot batch <pdf_dir> [options]
 ```
 
-Supports the same `--layout-mode`, model, and enrichment flags as `ingest`.
+Supports the same model and enrichment flags as `ingest`.
 
 ### `reindex`
 
@@ -353,8 +350,8 @@ ReqBot uses a two-pass extraction pipeline by default.
 
 | Step | Script | Input | Output | LLM? |
 |---|---|---|---|---|
-| A | `extract_pdf_to_text.py` | PDF | `*_pages.jsonl` | No |
-| B | `chunk_text.py` | pages JSONL (legacy) or ancestry map (docling) | `*_chunks.jsonl` | No |
+| A | `section_parser.py` | PDF | `*_ancestry.json` (in-memory `AncestryResult`) | No |
+| B | `chunk_text.py` | ancestry map | `*_chunks.jsonl` | No |
 | C | `llm_extract_requirements.py` | chunks JSONL | `*_extracted_requirements.jsonl` | Yes |
 | D | `parse_and_normalize.py` | extracted requirements JSONL | `*_requirements_normalized.jsonl` | No |
 | D.5 | `enrich_requirements.py` | normalized JSONL | `*_requirements_enriched.jsonl` | Yes |
@@ -376,32 +373,13 @@ Advanced behavior:
 
 ## Layout-Aware Extraction
 
-ReqBot supports three PDF extraction backends via `--layout-mode`, plus an `auto` mode (the
-default) that picks between them automatically.
-
-**`auto` (default)** — uses `docling` when it's installed (`pip install "reqbot[docling]"`), since
-structure-aware chunking is strictly better when available. Falls back to `pymupdf` if docling
-isn't installed, or if docling fails on a specific document (logged as a warning, not silent).
-Pass `--layout-mode docling` explicitly instead of relying on `auto` if you want a docling failure
-to raise loudly rather than fall back.
-
-**`pymupdf`** — fast text extraction for prose-heavy documents (NIST SPs, AFIs, DAF manuals). What
-`auto` falls back to when docling isn't available.
-
-**`pdfplumber`** — table-aware extraction for documents with structured tables (DODIs, DoDMs):
+ReqBot ingests exclusively through Docling (structure-aware PDF parsing) as of WP-34.1 — the
+earlier `pymupdf`/`pdfplumber` fallback backends and `--layout-mode` flag were removed, along with
+the silent per-document fallback between them. A missing or broken Docling install now fails
+loudly with an actionable error (`pip install .`) instead of silently downgrading.
 
 ```bash
-reqbot ingest "DODI 5200.01_vol2.pdf" --layout-mode pdfplumber
-```
-
-- extracts tables as structured rows
-- preserves table boundaries during chunking
-- falls back per page if table extraction fails
-
-**`docling`** (explicit) — same backend `auto` uses when installed; pass it explicitly to fail loudly instead of falling back to pymupdf on a per-document docling error:
-
-```bash
-reqbot ingest "NIST.SP.800-53r5.pdf" --layout-mode docling
+reqbot ingest "NIST.SP.800-53r5.pdf"
 ```
 
 - parses document structure with Docling's `DocumentConverter`
@@ -409,9 +387,9 @@ reqbot ingest "NIST.SP.800-53r5.pdf" --layout-mode docling
 - attaches `parent_context` (first ~600 chars of the parent section body) to each requirement
 - filters table-of-contents noise automatically
 - produces schema v2.0 records with full hierarchy fields
-- **required** for profile `skip_sections` filtering to take effect — legacy `pymupdf`/
-  `pdfplumber` chunking has no section hierarchy to filter on, so `skip_sections` is a no-op
-  under those two modes
+- profile `skip_sections` filtering (e.g. dropping `REFERENCES`/`GLOSSARY` sections) takes effect
+  on every ingest — this used to be a no-op under the now-removed legacy backends, since they had
+  no section hierarchy to filter on
 
 ## Qdrant Collections
 
@@ -457,9 +435,8 @@ Supported environment overrides:
 Typical processed output includes:
 
 ```text
-*_pages.jsonl                    # Step A
-*_chunks.jsonl                   # Step B (includes breadcrumb/hierarchy fields in docling mode)
-*_ancestry.json                  # Step A (docling mode only — section ancestry map)
+*_ancestry.json                  # Step A — section ancestry map
+*_chunks.jsonl                   # Step B — includes breadcrumb/hierarchy fields
 *_raw_responses.jsonl            # Raw Step C model responses
 *_extracted_requirements.jsonl   # Parsed Step C output
 *_parse_failures.jsonl           # Step C parse failures
@@ -484,7 +461,6 @@ Useful flags:
 
 - `--skip-to {A,B,C,D,E}` - resume from an existing output directory
 - `--skip-enrichment` - stop after Step D
-- `--layout-mode {auto,pymupdf,pdfplumber,docling}` - PDF extraction backend (default: auto)
 - `--extraction-model M`
 - `--enrichment-model M`
 - `--model M` - set both
@@ -498,8 +474,8 @@ Useful flags:
 - [docs/PROFILES.md](docs/PROFILES.md) - `profiles/*.json` schema, validation rules, and what each
   field actually does at runtime
 - [docs/PRODUCT_PRD.md](docs/PRODUCT_PRD.md) - product requirements document
-- [docs/PHASE33_REQUIREMENTS.md](docs/PHASE33_REQUIREMENTS.md) - Phase 33 plan (profile vocabulary
-  dedup, skip-section gap visibility, actionability self-verification spike)
+- [docs/PHASE34_REQUIREMENTS.md](docs/PHASE34_REQUIREMENTS.md) - Phase 34 plan (docling-only
+  migration, actionability structural fixes)
 - [docs/TODO_future_improvements.txt](docs/TODO_future_improvements.txt) - live backlog the next
-  phase gets drafted from once Phase 33 closes
+  phase gets drafted from once Phase 34 closes
 - [archive/](archive/) - completed phase plans (Phases 7–32)

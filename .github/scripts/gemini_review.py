@@ -60,8 +60,8 @@ analysis.
 
 ## Pipeline Architecture
 
-- Step A: PDF -> pages JSONL (extract_pdf_to_text.py)
-- Step B: pages -> chunks JSONL (chunk_text.py)
+- Step A: PDF -> Docling ancestry map (section_parser.py)
+- Step B: ancestry map -> chunks JSONL (chunk_text.py)
 - Step C: chunks -> extracted requirements via LLM (llm_extract_requirements.py) -- the expensive step
 - Step D: normalize, validate, deduplicate (parse_and_normalize.py)
 - Step E: aggregate stats (aggregate_and_export.py)

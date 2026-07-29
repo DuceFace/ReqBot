@@ -12,8 +12,7 @@ Private Use Area character instead of the real two-character sequence.
 Usage: re-ingest normally through Step B (chunking), then run this against the
 resulting *_chunks.jsonl before Step C (LLM extraction) sees it:
 
-    python3 cli/reqbot.py ingest "raw_pdfs/NIST.SP.800-53Ar5.pdf" \\
-        --layout-mode docling --no-index
+    python3 cli/reqbot.py ingest "raw_pdfs/NIST.SP.800-53Ar5.pdf" --no-index
     python3 pipeline/repair_ligatures.py \\
         ~/documents/processed/NIST.SP.800-53Ar5_.../NIST.SP.800-53Ar5_chunks.jsonl
     python3 cli/reqbot.py ingest "raw_pdfs/NIST.SP.800-53Ar5.pdf" --skip-to C \\

@@ -69,7 +69,7 @@ def synthesize_local(
     except ImportError:
         # ollama is a base dependency of the reqbot package (pyproject.toml) — this
         # should be unreachable in a properly installed package. Left as a defensive
-        # message for source/dev checkouts that haven't installed requirements.txt.
+        # message for source/dev checkouts that haven't run `pip install .`.
         raise RuntimeError(
             "[-] Ollama package not found: pip3 install --break-system-packages ollama"
         )

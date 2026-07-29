@@ -49,18 +49,12 @@ ACTIVE BACKLOG
    truth. Consider deriving fallback defaults from core.profiles when the profile
    plumbing is stable enough.
 
-5. Profile-based skip-section filtering — docling-only gap
-   profiles/*.json's skip_sections field is consumed when the docling engine is
-   used (pipeline/run_pipeline.py passes it into chunk_text.run_structure_aware,
-   which filters via _should_skip_chunk/_should_skip_section). The legacy
-   pymupdf/pdfplumber chunking path has no section hierarchy and no-ops on
-   skip_sections (pipeline/chunk_text.py logs a warning and ignores the field).
-   `--layout-mode` now defaults to `auto` (docling when installed, pymupdf
-   fallback otherwise -- see Decisions and Guardrails #9 below), so this gap is
-   narrower than it used to be but not closed: skip-section filtering is
-   silently a no-op whenever docling isn't installed, or a caller passes
-   `--layout-mode pymupdf`/`pdfplumber` explicitly. Revisit if legacy chunking
-   ever gains its own section awareness.
+5. [RESOLVED — Phase 34, WP-34.1] Profile-based skip-section filtering — docling-only gap
+   Was: profiles/*.json's skip_sections field only took effect on the docling
+   path; the legacy pymupdf/pdfplumber chunking path had no section hierarchy
+   and silently no-op'd on it. WP-34.1 removed the legacy path entirely --
+   docling is now the only ingestion backend, so skip_sections always applies.
+   No remaining gap; see docs/PHASE34_REQUIREMENTS.md.
 
 6. Optional LLM-backed audit question generation
    Phase 21 intentionally leaves audit_question blank. A future opt-in feature
@@ -397,17 +391,13 @@ These are quality experiments, not guaranteed product work.
 DEPENDENCY / TOOLCHAIN BACKLOG
 ================================================================
 
-4. requirements.txt vs. pyproject.toml drift (Codex review, WP-25.2)
-   WP-25.2 moved rapidfuzz into pyproject.toml's reqbot[dev] extra, since its
-   only consumer (eval/eval_harness.py) isn't reachable through any product
-   surface — but requirements.txt still lists it as a runtime dependency.
-   Acceptable for now since requirements.txt is the legacy/source-install path,
-   not actively wrong, but Phase 25 should eventually decide requirements.txt's
-   fate: kept in sync with pyproject.toml's extras split, explicitly demoted to
-   a "legacy path, may drift" doc note, or removed outright. WP-25.4 has now
-   retired the bundle system, so requirements.txt's only remaining reason to
-   exist is as the documented legacy/source-development path (README.md) —
-   the decision is still open, just no longer tied to the bundle system.
+4. [RESOLVED — Phase 34, WP-34.1] requirements.txt vs. pyproject.toml drift (Codex review, WP-25.2)
+   Was: requirements.txt had drifted from pyproject.toml (still listing
+   rapidfuzz as a runtime dep after WP-25.2 moved it to the dev extra), with
+   its ultimate fate left an open decision. WP-34.1 decided it: requirements.txt
+   is retired entirely (it had no docling entry on either path once WP-34.1
+   made docling a base dependency, and was already documented as a legacy
+   pre-WP-25.2 path). `pip install .` is the only supported install path now.
 
 5. React Router v7 major upgrade (found during WP-28.2's npm audit, 2026-07-25)
    `npm audit` flags 2 moderate CVEs in react-router 6.0.0–7.17.0 (open redirect
@@ -472,8 +462,9 @@ DECISIONS AND GUARDRAILS
    interfaces over the same service layer.
 
 7. Marker remains decided against for now
-   Docling has been adopted as an optional structure-aware path. Marker remains
-   out unless a specific need beats its dependency and operational cost.
+   Docling has been adopted as the (now base-dependency, as of WP-34.1 --
+   see item 9 below) structure-aware path. Marker remains out unless a
+   specific need beats its dependency and operational cost.
 
 8. Do not build a second domain profile yet (2026-07-27)
    Cybersecurity is architecturally meant to be the first domain, not the only one
@@ -486,18 +477,28 @@ DECISIONS AND GUARDRAILS
    prompt -- see Phase 32's WP-32.7). Revisit once Phase 32 proves the core is
    actually domain-neutral, not just documented as intending to be.
 
-9. `--layout-mode` default changed from `pymupdf` to `auto` (2026-07-28)
-   Docling gives structure-aware chunking (section hierarchy, breadcrumbs,
-   skip_sections filtering) that pymupdf/pdfplumber can't -- came up because a real
-   empty-source_ref example turned out to be from a document ingested via pymupdf,
-   prompting the question of why docling wasn't the default already. Answer: it's a
-   real ~700MB dependency (torch), so it's kept as an optional extra
+9. [SUPERSEDED — Phase 34, WP-34.1] `--layout-mode` default changed from `pymupdf` to `auto` (2026-07-28)
+   Original decision (kept below for history): Docling gives structure-aware
+   chunking (section hierarchy, breadcrumbs, skip_sections filtering) that
+   pymupdf/pdfplumber can't -- came up because a real empty-source_ref example
+   turned out to be from a document ingested via pymupdf, prompting the
+   question of why docling wasn't the default already. Answer at the time: it's
+   a real ~700MB dependency (torch), so it's kept as an optional extra
    (`pip install "reqbot[docling]"`) rather than a hard requirement -- "auto" is
-   what lets ingest use it automatically when installed without forcing the weight
-   on every install. Falls back to pymupdf per-document (logged as a warning, not
-   silent) if docling isn't installed or errors on a specific PDF; `--layout-mode
-   docling` explicitly still fails loudly instead of falling back. Standalone fix,
-   not part of Phase 32 (Phase 32's own framing is scoped to one Evidence-query
-   walkthrough; this didn't come from that). Considered, and rejected: making
-   docling a hard base dependency -- would add ~700MB to every install including CI,
-   for a benefit ("auto" already delivers) that most deployments may not need.
+   what lets ingest use it automatically when installed without forcing the
+   weight on every install. Falls back to pymupdf per-document (logged as a
+   warning, not silent) if docling isn't installed or errors on a specific PDF;
+   `--layout-mode docling` explicitly still fails loudly instead of falling
+   back. Standalone fix, not part of Phase 32. Considered, and rejected at the
+   time: making docling a hard base dependency -- would add ~700MB to every
+   install including CI, for a benefit ("auto" already delivers) that most
+   deployments may not need.
+
+   Superseded 2026-07-29 (WP-34.1, docs/PHASE34_REQUIREMENTS.md): the ~700MB
+   weight tradeoff above was reconsidered given ReqBot's actual deployment
+   context (IT admins standing it up on a real network, not a
+   storage-constrained device) and the legacy path's own real cost (no section
+   hierarchy, permitting/causing several WP-33.3 actionability failure modes).
+   `--layout-mode` and the entire pymupdf/pdfplumber path were removed; docling
+   is now a base dependency and the only ingestion backend. A docling failure
+   is now an unconditional hard error, not a per-document fallback.

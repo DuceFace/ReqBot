@@ -1,10 +1,15 @@
 # Phase 34 Brainstorm — Actionability Fix Options
 
-**Status:** Brainstorm / discussion draft — **not** a locked phase doc yet. This intentionally
-carries more "why" narrative than a normal phase doc would (see
-`~/reqbot-agent-docs/reqbot/references/work-package-workflow.md` for the normal format) — the goal
-here is to react to and refine the approach before it gets locked into WP scope, success criteria,
-and guardrails.
+**Status:** Superseded by the locked phase doc — `docs/PHASE34_REQUIREMENTS.md`. Kept as-is for the
+narrative "why" behind that doc's decisions (including the full three-round external-review history)
+in more detail than belongs in a locked phase doc; the phase doc is the source of truth for current
+WP scope/status.
+
+**Original status note (accurate for most of this doc's life, kept for context):** this started as a
+brainstorm / discussion draft, explicitly not a locked phase doc, carrying more "why" narrative than a
+normal phase doc would (see `~/reqbot-agent-docs/reqbot/references/work-package-workflow.md` for the
+normal format) — the goal was to react to and refine the approach before locking it into WP scope,
+success criteria, and guardrails. That process is what produced `docs/PHASE34_REQUIREMENTS.md`.
 
 **Source:** WP-33.3's spike (`docs/PHASE33_REQUIREMENTS.md`'s WP-33.3 Findings, PR #156).
 

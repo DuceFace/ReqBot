@@ -279,6 +279,85 @@ ACTIVE BACKLOG
     (53,078 characters repaired across 2,658/3,092 chunks, spot-checked
     against the original reported passage).
 
+26. Impact analysis via MCP -- diff two versions of a document, surface corpus
+    dependents (ChatGPT strategy conversation + Claude follow-up, 2026-07-29;
+    full discussion at reqbot-agent-docs/reqbot/references/ReqbotConvo.md)
+    Pitch: a regulation or STIG updates, and instead of manually diffing old
+    vs. new and hunting for what else in the corpus depended on it, ReqBot
+    answers both inside the same MCP conversation.
+
+    What already exists toward this: compare_documents(doc_id_1, doc_id_2,
+    topic) already has an "exact" mode keyed on source_ref, returning which
+    control IDs appear in doc1 only, doc2 only, or both -- most of a document
+    diff already, just scoped to one topic/control per call. trace_requirement
+    (requirement_id) already returns "cross-framework matches sharing the
+    same source_ref in other documents" -- a real, if narrow, dependency
+    signal.
+
+    Gaps, not yet built:
+    - No exhaustive sweep. Nothing diffs every source_ref in doc1 against
+      doc2 in one call -- the caller has to already know which topics to
+      compare. Building this is mostly a batch wrapper: iterate every
+      distinct source_ref in the old doc, run compare_documents' exact mode
+      against the new doc, roll up added/removed/reworded (text-similarity
+      on source_quote for shared source_ref pairs -- the same kind of check
+      WP-32.1 already built for grounding).
+    - No document version identity. Re-ingesting a new STIG revision just
+      creates another doc_key next to the old one; nothing records "this
+      supersedes that." Fine for a manually-pointed compare_documents call,
+      but means the assistant can't proactively flag that a newer version
+      exists.
+    - Cross-reference is control-ID-literal only. trace_requirement's
+      cross-framework matching only catches cases where the same source_ref
+      string appears elsewhere -- a policy discussing a control conceptually
+      without citing its literal ID won't surface. Closing this needs either
+      explicit citation extraction during Step C/D, or an approximate
+      semantic fallback (weaker, more false positives/negatives).
+
+    Do first if picked up: the exhaustive-diff wrapper (smallest, reuses
+    existing tools) before tackling version identity or citation-aware
+    cross-referencing.
+
+27. Multi-document concept mapping, N-way (same source conversation as item 26)
+    "These six controls, three STIG findings, and two internal policies all
+    relate to the same concept." compare_documents already does this
+    pairwise (two doc_ids at a time), and trace_requirement's cross-framework
+    matching starts from one already-known requirement_id. Neither discovers
+    a cluster across the whole corpus starting from a free-text concept.
+    Would need a new tool: given a topic, return every source_ref cluster
+    across all indexed documents that maps to it, not two documents at a
+    time.
+
+28. Gap identification against a user-supplied document (same source
+    conversation as item 26)
+    "Your SSP discusses AC-2 but never addresses account review frequency" --
+    checking a user's own document (SSP, policy) for coverage against the
+    corpus of extracted requirements. None of the current MCP tools take an
+    ad-hoc external document as input; this needs its own extraction/matching
+    pass (does each of a control's sub-requirements have a corresponding
+    statement in the user's document, not just a mention of the control ID)
+    rather than reusing existing retrieval as-is. More novel than items
+    26-27 -- scope as its own investigation before committing to a WP.
+
+29. Cross-document consistency / contradiction detection (same source
+    conversation as item 26)
+    Example: a policy says "MFA required everywhere," the SSP says "MFA only
+    for privileged accounts." compare_documents can already show that two
+    documents both touch a topic (ref_groups), but detecting an actual
+    contradiction is a judgment task, not a presence/absence check -- needs
+    an LLM comparison step over matched passages, not just retrieval. The
+    most novel of items 26-29; scope after the others land, since it's the
+    least like anything that exists today.
+
+    Deliberately not added alongside 26-29: "evidence suggestions" (canned
+    typical-evidence-per-control knowledge, e.g. "AC-2 usually uses an AD
+    export, an HR onboarding SOP, quarterly review logs"). map_evidence
+    already covers the corpus-grounded version of this (builds an evidence
+    pack per topic from indexed source material) -- the remaining gap is a
+    general knowledge layer independent of any ingested document, which is a
+    different and much fuzzier thing to build, not an extension of what's
+    here.
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS
@@ -502,3 +581,21 @@ DECISIONS AND GUARDRAILS
    `--layout-mode` and the entire pymupdf/pdfplumber path were removed; docling
    is now a base dependency and the only ingestion backend. A docling failure
    is now an unconditional hard error, not a per-document fallback.
+
+10. ReqBot stays a compliance research/verification tool, not an
+    enterprise-architecture-design consultant (2026-07-29, ChatGPT strategy
+    conversation + Claude follow-up; see
+    reqbot-agent-docs/reqbot/references/ReqbotConvo.md)
+    Explored and declined: generating reference architectures, technology
+    stack recommendations, draft SSPs/network diagrams, or a "compliance
+    compiler" that takes a description of a target environment and outputs a
+    full build plan. That's solution synthesis and opinionated engineering
+    advice -- a different, harder product, competing in a different market,
+    and it drops ReqBot's actual differentiator (a curated, provenance-
+    tracked requirement corpus) in favor of one nobody has validated demand
+    for. Tyler's own read at the time: "I'm not sure the marketability for
+    ...an AI consultant on enterprise architecture. I don't know who the
+    heck would buy that." Stay close to the existing premise -- extensions
+    of the corpus/relationship data (see ACTIVE BACKLOG items 26-29), not a
+    pivot into architecture design. Revisit only with real evidence of
+    demand, not just that it would be technically possible to build.

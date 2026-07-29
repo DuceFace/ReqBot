@@ -1,0 +1,22 @@
+{
+  "label": "afpd_mandatory_boilerplate",
+  "group": "known_bad",
+  "chunk_id": 0,
+  "stem": "afpd_17-1",
+  "note": "COMPLIANCE...MANDATORY boilerplate -- category 2, vague meta-statement",
+  "baseline": {
+    "count": 1,
+    "quotes": [
+      "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+    ],
+    "failure": null
+  },
+  "revised": {
+    "count": 2,
+    "quotes": [
+      "Compliance with this publication is mandatory.",
+      "The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies."
+    ],
+    "failure": null
+  }
+}

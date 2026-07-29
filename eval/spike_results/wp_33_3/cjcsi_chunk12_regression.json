@@ -1,0 +1,23 @@
+{
+  "label": "cjcsi_chunk12_regression",
+  "group": "known_good",
+  "chunk_id": 12,
+  "stem": "CJCSI 6510.02G",
+  "note": "1 clean baseline requirement -- regression check",
+  "baseline": {
+    "count": 1,
+    "quotes": [
+      "The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies."
+    ],
+    "failure": null
+  },
+  "revised": {
+    "count": 3,
+    "quotes": [
+      "The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies.",
+      "All DoD information systems shall implement multi-factor authentication for all privileged user accounts.",
+      "Password complexity requirements shall conform to NIST SP 800-63B guidelines. Minimum password length is 12 characters."
+    ],
+    "failure": null
+  }
+}

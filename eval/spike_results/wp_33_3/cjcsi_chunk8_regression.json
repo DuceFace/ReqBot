@@ -1,0 +1,30 @@
+{
+  "label": "cjcsi_chunk8_regression",
+  "group": "known_good",
+  "chunk_id": 8,
+  "stem": "CJCSI 6510.02G",
+  "note": "6 clean baseline requirements -- regression check",
+  "baseline": {
+    "count": 5,
+    "quotes": [
+      "The PO will notify the Service Principal/CIO in order to inform the MC4EB CSP that the system affected requires a key extension and to have an LO appointed as necessary.",
+      "The Service Principal/CIO will submit a petition to the Joint Staff J-6 to request continued use of a system containing specific cryptographic equipment that has surpassed its published cease key dates.",
+      "NSA will review the KER and AoA, determine and describe the resulting risk, establish criteria for risk acceptance (when applicable), and identify steps to be taken to mitigate risk and minimize negative consequences.",
+      "The MC4EB will decide through its governance structure outlined in reference (f) to approve or deny a request for continued use of systems utilizing cryptographic products past their published cease key dates.",
+      "If the petition is approved, the PO will be able to operate within the established parameters recommended by the NSA and approved by the MC4EB."
+    ],
+    "failure": null
+  },
+  "revised": {
+    "count": 6,
+    "quotes": [
+      "The PO will notify the Service Principal/CIO in order to inform the MC4EB CSP that the system affected requires a key extension and to have an LO appointed as necessary.",
+      "The Service Principal/CIO will submit a petition to the Joint Staff J-6 to request continued use of a system containing specific cryptographic equipment that has surpassed its published cease key dates.",
+      "The Joint Staff J-6 will process the request and have it prepared for the MC4EB. The J-6 will also forward the KER and AoA to the NSA for review and assessment.",
+      "NSA will review the KER and AoA, determine and describe the resulting risk, establish criteria for risk acceptance (when applicable), and identify steps to be taken to mitigate risk and minimize negative consequences.",
+      "The MC4EB will decide through its governance structure outlined in reference (f) to approve or deny a request for continued use of systems utilizing cryptographic products past their published cease key dates.",
+      "If the petition is approved, the PO will be able to operate within the established parameters recommended by the NSA and approved by the MC4EB. The Service PO shall provide notification of key extension to the appropriate user community, including allies."
+    ],
+    "failure": null
+  }
+}

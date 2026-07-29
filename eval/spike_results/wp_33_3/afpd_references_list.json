@@ -1,0 +1,40 @@
+{
+  "label": "afpd_references_list",
+  "group": "known_bad",
+  "chunk_id": 8,
+  "stem": "afpd_17-1",
+  "note": "References section -- category 1, reference-list misextraction",
+  "baseline": {
+    "count": 15,
+    "quotes": [
+      "DoDI 8500.01, Cybersecurity, March 14, 2014",
+      "DoDI 8115.02, Information Technology Portfolio Management Implementation, October 30, 2006",
+      "DoDD 8220.1, Single Agency Manager (SAF) for Pentagon Information Technology Services (ITS), March 1, 1995",
+      "DoDI 8310.01, Information Technology Standards in the DoD, February 2, 2015",
+      "DoDI 8320.05, Electromagnetic Spectrum Data Sharing, August 18, 2011",
+      "DoDI 8330.01, Interoperability of Information Technology (IT), including National Security Systems (NSS), May 21, 2014",
+      "DoDI 8500.01, Cybersecurity, March 14, 2014",
+      "DoDI 8510.01, Risk Management Framework (RMF) for DoD Information Technology (IT), March 12, 2014",
+      "CJCSI 5116.05, Military Command, Control, Communications, and Computers Executive Board, April 23, 2014",
+      "CJCSI 5123.01G Charter of the Joint Requirements Oversight Council, February 12, 2015",
+      "JP 3-12, Cyberspace Operations, February 5, 2013",
+      "AFPD 16-14, Security Enterprise Governance, July 24, 2014",
+      "AFI 31-101, Integrated Defense, October 8, 2009",
+      "AFI 38-101, Air Force Organization, March 16, 2011",
+      "AFMAN 33-363, Management of Records, March 1, 2008"
+    ],
+    "failure": null
+  },
+  "revised": {
+    "count": 6,
+    "quotes": [
+      "DoDI 8500.01, Cybersecurity, March 14, 2014; DoDI 8115.02, Information Technology Portfolio Management Implementation, October 30, 2006; DoDD 8220.1, Single Agency Manager (SAF) for Pentagon Information Technology Services (ITS), March 1, 1995;",
+      "DoDI 8310.01, Information Technology Standards in the DoD, February 2, 2015",
+      "DoDI 8320.05, Electromagnetic Spectrum Data Sharing, August 18, 2011",
+      "DoDI 8330.01, Interoperability of Information Technology (IT), including National Security Systems (NSS), May 21, 2014",
+      "DoDI 8500.01, Cybersecurity, March 14, 2014",
+      "DoDI 8510.01, Risk Management Framework (RMF) for DoD Information Technology (IT), March 12, 2014"
+    ],
+    "failure": null
+  }
+}

@@ -6,166 +6,186 @@ carries more "why" narrative than a normal phase doc would (see
 here is to react to and refine the approach before it gets locked into WP scope, success criteria,
 and guardrails.
 
-**Source:** WP-33.3's spike (`docs/PHASE33_REQUIREMENTS.md`'s WP-33.3 Findings, PR #156). This
-doc assumes that write-up as background; the recap below is short on purpose.
+**Source:** WP-33.3's spike (`docs/PHASE33_REQUIREMENTS.md`'s WP-33.3 Findings, PR #156).
+
+**Revision note (2026-07-29):** the first version of this doc (reviewed by Codex, see §5) assumed
+the corpus it was reasoning about was representative. It wasn't — see §2. Re-ingesting via docling
+changed the picture enough that this is close to a rewrite, not a patch. Kept for the record: Codex's
+review of the first draft was directionally right (Step D as the home for these checks, use
+`section_title_path` context, don't rely on citation-list quote-shape alone) even though the specific
+scenario it was reasoning about (our corpus) turned out to be an edge case, not the norm.
 
 ---
 
 ## 1. The problem, briefly
 
-WP-33.3 hand-labeled a random sample of the (small — 2 documents, 173 records) live corpus and
-found 37.5% of requirements show some form of "cannot be trusted/verified as extracted." That
-decomposes into five distinct failure modes, not one "too vague" problem:
+WP-33.3 hand-labeled a random sample of the live corpus and found 37.5% of requirements show some
+form of "cannot be trusted/verified as extracted," decomposing into five failure modes (full detail:
+`docs/PHASE33_REQUIREMENTS.md`'s WP-33.3 Findings). **Why this matters enough to fix:** ReqBot's
+value proposition is verbatim, trustworthy extraction — "ingestion captures verbatim... do not invent
+obligations" is a core architecture principle, and at least one of these failure modes (fabricated
+`description` content completing a truncated quote) already violates it in production today.
 
-| # | Failure mode | Size (of 40) | Danger |
-|---|---|---|---|
-| 1 | Reference/bibliography-list entries extracted as requirements, often with a fabricated `description` | 7 (17.5%) | High volume, but usually recognizable |
-| 2 | Genuine vagueness/administrative meta-statements ("comply with X policy") | 5 (12.5%) | Real but least tractable |
-| 3 | Truncated list-header fragments (`"The MC4EB will:"`) with a **fabricated** `description` completing them | 1 (2.5%) | **Most dangerous** — confident-reading, invented content |
-| 4 | Background/definitional prose extracted despite no obligation language | 1 (2.5%) | Low |
-| 5 | Form/questionnaire content mis-extracted as an obligation | 1 (2.5%) | Low, rare |
+## 2. Correction: the corpus this was all based on was an edge case, not the norm
 
-We also live-tested whether stricter Step C prompt wording alone fixes this. It doesn't, reliably —
-categories 1 and 3 never fully closed across two independent test runs, and the revised (longer)
-prompt reproducibly made the model regurgitate its own few-shot examples verbatim on a chunk that
-normally extracts cleanly (identical fabricated text, twice). Prompt-only fixes are off the table for
-categories 1 and 3; WP-32.1's existing Step D grounding check already happens to catch the
-regurgitation failure mode as a side effect, which is reassuring but not something to lean on as a
-plan.
+Both documents in the current corpus (`afpd_17-1.pdf`, `CJCSI 6510.02G.pdf` — the only two re-ingested
+since WP-32.1's corpus nuke) turned out to have been ingested via **legacy pymupdf chunking**, not
+docling — despite `--layout-mode auto` defaulting to docling when available, and despite docling
+being installed and working fine in this environment right now (confirmed live, 2026-07-29). Root
+cause is most likely that docling wasn't installed yet at the time of that specific ingest
+(2026-07-27); not a reproduced bug.
 
-**Why this matters enough to fix:** ReqBot's whole value proposition is "verbatim, trustworthy
-extraction — ingestion captures verbatim, never invents obligations" (`REQBOT_SKILL.md`'s own core
-architecture principle). Category 3 in particular is a direct violation of that principle already in
-production: a record that *reads* like a complete, sourced requirement but whose obligation content
-was invented by Step D.5, not the source document. That's the one I'd weight most heavily regardless
-of its small sample count.
+This matters because legacy chunking has no section-hierarchy metadata at all — every finding in
+WP-33.3's spike, and everything Codex's review of this doc's first draft reasoned about, was
+implicitly scoped to a corpus that doesn't represent how ReqBot is actually meant to run. So before
+going further, both documents were re-ingested via `--layout-mode docling` (`--no-index`, so this
+didn't touch Qdrant) to see whether the same failure modes even look the same under real conditions.
+They don't, uniformly.
 
----
+**This also reframes an earlier open question in this doc's first draft** ("is a 2-document corpus
+enough to validate a detection rule on") — re-ingesting the existing two documents via docling alone
+already surfaced a materially different, better picture. A broader re-ingest is still worth doing
+eventually (see §6), but it's no longer a blocker for scoping Tier 1.
 
-## 2. Candidate fixes, per category — open questions, not decisions
+## 3. Revised findings, per category (now evidence-based across both documents' docling re-ingests)
 
-### Category 3 — fragment quotes with fabricated completions (recommend: fix first)
+### Category 1 (reference-list misextraction) — likely already solved, no new code needed
 
-**Idea:** a structural rejection check in Step D's existing per-requirement validation loop
-(`pipeline/parse_and_normalize.py`), same shape as the existing `errata_change_entry`/empty-quote
-checks — no LLM call, deterministic, cheap.
+**Zero occurrences across both documents.** Not because the model got smarter — the References/
+Glossary section chunks never reached Step C at all. `stats.json` confirms `skip_sections_applied:
+true` for both; `skip_sections` (`['GLOSSARY', 'REFERENCES', 'ACRONYMS', 'DEFINITIONS',
+'ABBREVIATIONS', 'TABLE OF CONTENTS']`) already covers this — it's WP-33.2's own shipped feature
+working exactly as designed. The riskiest part of this brainstorm's first draft — a citation-shape
+detection regex, with real false-positive risk against genuinely dated real requirements — likely
+doesn't need to be built at all. **The actual "fix" is: make sure the corpus is ingested via docling.**
+Worth validating on 1-2 more documents before fully closing this one out, but the signal from two
+documents (afpd_17-1: a dense multi-line reference list; CJCSI: no distinct references section at
+all) is a good sign, not a coincidence tied to one document's structure.
 
-**Open question — what's the actual rule?** Candidates:
-- `quote.rstrip().endswith(":")` alone — simple, but could a legitimate quote ever end in a colon
-  for a non-fragment reason? Haven't found a counterexample in the corpus, but n=173 is small.
-- `endswith(":")` AND short (under some word count) — compound condition, lower false-positive risk,
-  but need to pick a threshold with actual evidence, not a guess.
-- Something checking for a real verb/predicate after removing the colon — more robust in theory,
-  cheap NLP heuristics get unreliable fast; probably not worth the complexity for a first pass.
+### Category 4 (background/definitional prose) — narrow, low-risk config gap
 
-**Bigger idea worth at least naming and then probably deferring:** instead of just rejecting these,
-could Step D *salvage* them structurally — pull the actual list-item text from the same chunk (no LLM
-call, just string ops) and concatenate it into a complete quote? That would recover real content
-instead of just dropping it. Feels like scope creep for a first pass (more moving parts, more ways to
-get it subtly wrong) — leaning toward reject-only now, salvage as a possible follow-up once we know
-how often this pattern actually recurs in a bigger corpus.
+`afpd_17-1.pdf`'s glossary section is headed literally `"Terms"` — not in the configured
+`skip_sections` list, so it wasn't dropped, and its prose still got misextracted as a requirement.
+CJCSI has no equivalent issue (no comparably-named section). This looks like a heading-vocabulary
+gap in `skip_sections`'s matching, not a new mechanism (`_should_skip_section` in
+`pipeline/chunk_text.py` already does case-insensitive, prefix-based matching — it just doesn't know
+about `"TERMS"` as a synonym for `"DEFINITIONS"`/`"GLOSSARY"`). **Open question:** worth surveying a
+few more real documents' actual heading vocabulary before locking in a specific expanded list, rather
+than guessing synonyms from one example.
 
-### Category 1 — reference-list misextraction (recommend: fix second, needs more validation)
+### Categories 2 + 3 (boilerplate meta-statements + fragment quotes) — still real, better evidence now
 
-**Idea:** similar Step D structural rejection, but the detection rule is the hard part.
+These are the ones that still need a real Step D structural check. Found 5 concrete cross-document
+examples (not the original 2), decomposing into two distinguishable, complementary signatures:
 
-**Open question — where does the rejection rule even go?** Two options:
-- Step D (`parse_and_normalize.py`), matching category 3 and precedent (`errata_change_entry`,
-  WP-32.1's grounding check) — consistent home for "reject a structurally-bad requirement."
-- Step C's own `validate_requirement()` (`pipeline/llm_extract_requirements.py`) — closer to the
-  LLM output, means a fabricated citation-shaped record never gets a `chunk_id`-keyed row at all.
-  Less consistent with where similar checks already live, though.
-- Leaning Step D for consistency, but genuinely open on this one.
+- **Quote echoes its own `section_title_path` heading verbatim.** `afpd_17-1.pdf`'s
+  `"COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"` and `"All HAF Functionals, MAJCOMs, DRUs, and
+  FOAs will:"` both got extracted as body-content quotes, but both are *exactly* the chunk's own
+  `section_title_path[-1]` value — Step C extracted a structural heading as if it were prose. This is
+  a strong, precise, cheap signal precisely because it's grounded in docling's own structural ground
+  truth, not a fragile text-pattern guess (this generalizes Codex's `section_title_path` suggestion —
+  it applies to more than just citation detection).
+- **Quote ends in a colon with no obligation content after it.** Didn't recur in CJCSI's fragment
+  case from WP-33.3 (`"The MC4EB will:"` — that exact one didn't repeat under docling, most likely
+  LLM run-to-run variance, not a structural fix), but two *new* colon-fragments showed up in CJCSI's
+  docling re-ingest instead (`"The process will be as follows:"`, `"The KER may be sent either by...
+  or by mail to the address listed below:"`) — under `section_title_path: ['UNCLASSIFIED']`, a
+  repeated classification-marking artifact, not a real heading, so the heading-echo signal above
+  wouldn't have caught these two. The two signals are complementary, not redundant — worth combining
+  (OR'd), not picking one.
 
-**Open question — what's the actual detection rule, and how do we avoid false positives?** This is
-the one I'm least confident about. Citation lines look like `"DoDI 8500.01, Cybersecurity, March 14,
-2014"` — roughly: short document-ID-like token, comma-separated title, trailing date. A regex could
-catch that shape. But a **real requirement can legitimately contain a date** (e.g. a deadline: "...
-by January 1, 2025") — a naive "ends in a date" rule risks rejecting genuinely correct, actionable
-requirements, which would be a new regression worse than the problem (same lesson WP-32.1 already
-learned the hard way about exact-match grounding checks). This needs real design + testing against
-both the known-bad examples *and* a deliberately-checked set of real dated requirements before it
-ships, not just a regex that looks right on 7 examples.
+Recommendation unchanged from the first draft on *where* this lives: Step D
+(`pipeline/parse_and_normalize.py`), same shape as the existing `errata_change_entry`/grounding
+checks — deterministic, no LLM call, durable failure reason. This is docling-only by nature (needs
+`section_title_path`), which is a fine tradeoff given the direction in §6, not something to build a
+legacy-chunking fallback for.
 
-### Categories 2, 4, 5 — probably not this phase
+### Category 5 (form/questionnaire content) — unchanged, not re-examined this round
 
-- **Category 2 (vagueness)**: the demonstrated regression risk from touching Step C's prompt applies
-  most directly here (it's the category most naturally suited to a prompt fix, and that's exactly
-  what didn't work reliably). Leaning toward "accept as a known limitation for now," revisit only if
-  a bigger corpus shows the rate is worse than 12.5%.
-- **Category 4 (background prose)** and **category 5 (form/questionnaire content)**: too rare (1/40
-  each) to justify dedicated mechanisms on their own. Might get incidentally caught by a broader
-  "does this even look like an obligation" check someday, but not a planned line item.
+Still rare (1/40 in the original sample), still low priority. Didn't specifically re-check it against
+the docling re-ingests; not worth chasing further before there's a bigger sample.
 
-### The bigger one — description-grounding/entailment check (Tier 2, own investigation)
+## 4. Description-grounding (Tier 2) — now with a real technique to point at, not just a gap
 
-This is the highest-value fix (it's what actually catches the *fabricated description* symptom in
-both categories 1 and 3), but per Codex's PR #156 review it can't reuse WP-32.1's existing grounding
-check as-is — that check does fuzzy substring matching between a **verbatim** quote and its verbatim
-chunk, and `description` is an intentional paraphrase (Step D.5's own prompt asks for "one precise
-sentence summarizing"). A faithful summary would legitimately fail a literal substring match.
+Quick literature pass (not exhaustive) on "does a generated summary/description actually follow from
+its source" — this is the established **faithfulness hallucination** detection problem, not something
+to design from scratch:
 
-Rough candidate directions, none evaluated yet:
-- Cheap/weak: check that named entities, numbers, and control-IDs mentioned in `description` actually
-  appear somewhere in `source_quote` — automatable, no LLM call, but a weak signal (catches gross
-  fabrication, misses subtler invented claims).
-- LLM self-check: have Step D.5 also state whether its own description is fully supported by the
-  quote, as an extra field on the same call it already makes. No new LLM round-trip, but this is
-  both a **schema change** (new field on the enriched record) and arguably a **new LLM-generation
-  judgment** — both on the project's stop-and-ask list, needs explicit sign-off before any
-  implementation work starts.
-- Constrain `description` to be more extractive/verbatim-anchored by prompt design — plausible, but
-  we just demonstrated real regression risk from editing a similar prompt (Step C, not D.5 — risk
-  doesn't automatically transfer, but it's a reason for caution, not confidence).
+- **NLI (natural language inference) cross-encoder entailment scoring** — `premise=source_quote`,
+  `hypothesis=description` — is the standard lightweight technique. Same architectural slot as
+  WP-32.1's existing `rapidfuzz` grounding check, just semantic instead of literal. Purpose-built
+  compact models exist for this (Vectara's HHEM is specifically tuned for RAG-style groundedness;
+  MiniCheck/FactCG are newer lightweight options) — runs locally, no API call, no per-record LLM cost,
+  fits the self-hosted/air-gapped angle. This is a **new dependency** — per direct guidance, that's
+  fine to bring with a real reason and test results, not a heavy blocker. Worth a small spike
+  (analogous to `eval/docling_spike.py`'s "test a candidate library, look at real results" pattern)
+  before committing to shipping it.
+- **Having Step D.5 self-report whether its own description is grounded** (this doc's original Tier 2
+  option (b)) should be deprioritized, not just left as one of several roughly-equal options — the
+  literature is fairly clear that a model checking its own output is one of the weakest forms of
+  verification (a model that fabricates a claim tends to also validate that same fabrication when
+  asked to check it).
 
-**Recommendation: scope this as its own investigation, separate from Tier 1, not bundled in.** It
-needs a real design pass before implementation, not just "extend the existing check" (already wrong
-once).
+Still recommend scoping this as its own investigation (WP-34.3, spike-first, mirroring WP-33.3's own
+discipline) rather than bundling it with the Tier 1 structural checks above — it's the highest-value
+fix (directly targets the fabricated-description symptom) but the least scoped, and per Codex's
+original review, it correctly can't just reuse WP-32.1's verbatim-matching check as-is (a real
+paraphrase legitimately fails a literal substring match).
 
----
+## 5. What changed from Codex's review of the first draft, and why
 
-## 3. Cross-cutting open question: is a 173-record corpus enough to validate any of this on?
+Codex's review (full text on PR #157) made four substantive points. Revisiting each against the new
+evidence:
 
-Every number in WP-33.3's findings comes from 2 documents. Before locking in a specific regex/
-threshold for category 1 or 3, it'd help to validate against more real data than the ~7 examples we
-already know about by heart — otherwise we risk overfitting a rule to exactly the cases we've already
-seen and missing the shape of cases we haven't. Two options:
-- Re-ingest a few more documents from the original 44-doc corpus first (this also revisits the
-  explicit "rest-of-corpus re-ingest" decision WP-32.1 deliberately deferred and never actually
-  made), giving both a bigger validation set and closer-to-real corpus size.
-- Ship Tier 1 against the current small corpus, treat it as provisional, and revisit thresholds once
-  the corpus grows for other reasons.
+1. **Category 3 structural check lives in Step D, avoid a bare `endswith(":")` rule** — still agrees;
+   now have 5 real examples (not 2) to build the compound rule and test set against, per §3.
+2. **Category 1 should use `section_title_path`/chunk context, not date-shape** — correct in
+   principle, and the underlying idea (lean on docling's real structure) generalizes well — it just
+   turned out the *problem itself* mostly stops existing once you're actually on docling with
+   `skip_sections` applied, so there's no citation-detection rule left to design in the first place.
+3. **Use existing gold/seeded fixtures instead of requiring new ingest** — **retracted.**
+   `eval/gold_eval_chunks*.jsonl` (including `_curated`) is unfinished, abandoned work with an
+   estimated ~20% noise rate in `gold_requirements` (confirmed directly by the person who started it) —
+   not reliable ground truth without a fresh audit pass. Also moot for category 1 now that no
+   citation regex is being built. The Tier 1 checks in §3 can be validated against real fixtures
+   pulled directly from the two documents already re-ingested this round.
+4. **Description-grounding deserves a spike, not Tier 1** — still agrees; §4 above.
 
-Leaning toward the first (a small re-ingest batch, maybe 3-5 more documents, before or alongside
-Tier 1) since it directly de-risks the part I'm least confident about (category 1's detection rule),
-but this is a real scope/cost tradeoff worth a second opinion on, not something to just decide here.
+## 6. Open direction, not yet decided: is legacy chunking worth keeping at all?
 
----
+Raised directly during this planning session, not yet a final call, but worth stating plainly since
+it shapes how Tier 1 should be scoped: `pyproject.toml` gates docling out of the base install "purely
+for weight" (torch/torchvision) — a real past decision (`archive/PHASE25_REQUIREMENTS.md`). Given
+ReqBot's actual deployment context (IT admins standing it up on a real network, not a
+storage-constrained device), that tradeoff is being reconsidered. If pymupdf/pdfplumber chunking
+isn't earning its keep against docling, the likely direction is dropping to docling-only rather than
+maintaining dual-path support indefinitely — which would also retroactively simplify §3's fixes
+(no need to reason about a legacy-chunking fallback for the structural checks at all). Not deciding
+this here — naming it so Tier 1 doesn't get scoped around supporting a path that may not be sticking
+around.
 
-## 4. Strawman WP breakdown (for reaction, not commitment)
+## 7. Revised strawman WP breakdown (smaller than the first draft)
 
-- **WP-34.1 — Reject unrepairable fragment quotes in Step D.** Category 3 only. Smallest, safest,
-  most mechanical — ships first, same sequencing logic Phase 33 used (smallest/most mechanical
-  first).
-- **WP-34.2 — Reject citation-list-shaped quotes in Step D.** Category 1. Needs the false-positive
-  question above resolved first; may need the corpus-growth step from §3 as a prerequisite or as
-  part of this WP's own validation.
-- **WP-34.3 (maybe, own phase if it needs one) — Description-grounding/entailment investigation.**
-  Explicitly a spike first (mirrors WP-33.3's own discipline), not an implementation WP, given how
-  much is still unresolved above. Touches the stop-and-ask list if it lands on a schema/new-LLM-call
-  approach — flag for sign-off before any of those get built.
+- **WP-34.1 — Reject heading-echoed and unrepairable-fragment quotes in Step D.** Categories 2+3,
+  combined (they turned out to share a Step D home and complementary detection signals). Deterministic,
+  docling-only, 5 real cross-document fixtures already in hand.
+- **WP-34.2 — Expand `skip_sections` heading vocabulary + confirm the corpus is docling-ingested.**
+  Category 4 (config change) + closing out category 1 (process: make docling ingestion the norm,
+  survey a few more documents' heading vocabulary first). Much smaller than the citation-regex design
+  work originally scoped here.
+- **WP-34.3 (own phase if it needs one) — Description-grounding spike.** Investigation-only,
+  including a small NLI-model try-it-and-look-at-results pass per §4. Unchanged from the first draft.
 
-Categories 2/4/5 stay as `docs/TODO_future_improvements.txt` notes, not WPs, per §2 above.
+Categories 5 stays a `docs/TODO_future_improvements.txt` note, not a WP.
 
----
+## 8. What I'd like a second opinion on now
 
-## 5. What I'd like a second opinion on specifically
-
-1. Category 1's detection rule (§2) — this is the part most likely to be wrong in a non-obvious way
-   (false positives against real dated requirements). Worth having Codex or another model take a
-   pass at rule design before we write it, not just review it after.
-2. Whether the description-grounding check (§2, Tier 2) is worth investigating now as part of this
-   phase, or genuinely deferred further out — it's the highest-value fix but also the least scoped.
-3. The corpus-size question in §3 — is a small re-ingest batch worth doing now, or premature.
-4. WP sequencing in §4 — split as three WPs (or two + a deferred spike) as drafted, or combine
-   differently.
+1. Is "ensure corpus is docling-ingested + rely on existing `skip_sections`" a sufficient answer for
+   category 1, or does it still deserve a defensive Step D check for the case where docling isn't
+   available/fails and a document falls back to legacy chunking anyway?
+2. The `skip_sections` heading-vocabulary survey (§3, category 4) — worth doing against a few more
+   documents before writing WP-34.2, or expand the list now and iterate later?
+3. Is the NLI-entailment approach (§4) worth spiking now as part of Phase 34, or genuinely deferred
+   further out given it's still the least-scoped piece?
+4. §6 — is it worth explicitly deciding the legacy-chunking question before or alongside WP-34.1/34.2,
+   rather than leaving it as an open direction that could still shift scope later?

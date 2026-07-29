@@ -137,7 +137,7 @@ to design from scratch:
   verification (a model that fabricates a claim tends to also validate that same fabrication when
   asked to check it).
 
-Still recommend scoping this as its own investigation (WP-34.3, spike-first, mirroring WP-33.3's own
+Still recommend scoping this as its own investigation (WP-34.4, spike-first, mirroring WP-33.3's own
 discipline) rather than bundling it with the Tier 1 structural checks above — it's the highest-value
 fix (directly targets the fabricated-description symptom) but the least scoped, and per Codex's
 original review, it correctly can't just reuse WP-32.1's verbatim-matching check as-is (a real
@@ -171,59 +171,87 @@ evidence:
 4. **Description-grounding deserves a spike, not Tier 1** — still agrees; §4 above.
 
 Codex re-reviewed the rewritten draft (round 2) and raised five more points — folded in above (the
-Step D implementation detail and NLI model guidance) or below (§6, §7). One not yet addressed inline:
-`skip_sections_applied=False` (when `skip_sections` is configured) should probably be made "hard to
-ignore," not just visible via `reqbot docs`'s Skip-Sect column — e.g. a prominent end-of-ingest
-summary line, not just the existing mid-run log warning plus a column you have to go check
-separately. Worth folding into WP-34.2 if the legacy path stays supported at all (see §6).
+Step D implementation detail and NLI model guidance) or below (§6, §7). One point is now moot given
+§6's decision: Codex suggested making `skip_sections_applied=False` "hard to ignore" (not just visible
+via `reqbot docs`'s Skip-Sect column) *if* the legacy path stayed supported — since it didn't, there's
+no silent-no-op case left to make loud.
 
-## 6. Decision needed before this locks: is legacy chunking worth keeping at all?
+## 6. Decided: ReqBot goes docling-only
 
-Raised directly during this planning session, and Codex's round-2 review independently landed on the
-same place: **this needs an actual decision now, not another open bullet** — it's blocking, not just
-a nice-to-resolve-eventually item, because it changes what category 1 and WP-34.2 even are:
+**Decision (2026-07-29): drop pymupdf/pdfplumber legacy chunking entirely, docling becomes the only
+ingestion path.** This resolves what §3/§7 could otherwise assume — WP-34.2's Step D check can assume
+`section_title_path` always exists, category 1 needs no defensive code (§3's "already solved" finding
+now holds unconditionally, not just "as long as docling was actually used"), and WP-34.3 is purely
+the `skip_sections` vocabulary work, not also a process/visibility fix for a fallback path.
 
-- If ReqBot goes **docling-only**: category 1 needs no defensive code at all (§3) — the fix is
-  entirely "make sure ingestion uses docling," and WP-34.2 is a documentation/process change, not a
-  code change. WP-34.1's Step D check gets to assume `section_title_path` always exists.
-- If **legacy chunking stays as a supported fallback path** (e.g. `--layout-mode auto` still falling
-  back to pymupdf per-document): category 1 still needs *something* — either a real defensive check
-  (the citation-shape regex this doc originally scoped, false-positive risk and all) or, per Codex's
-  round-2 suggestion, at minimum a loud, hard-to-miss warning that skip_sections protection isn't
-  active for that ingest. WP-34.1's Step D check needs an explicit "no section_title_path available"
-  path, not just an implicit empty-list fallback.
+This isn't free, though — it's a real migration, scoped here from an actual read of the code so it's
+not hand-waved:
 
-Context for the call: `pyproject.toml` gates docling out of the base install "purely for weight"
-(torch/torchvision) — a real past decision (`archive/PHASE25_REQUIREMENTS.md`). Given ReqBot's actual
-deployment context (IT admins standing it up on a real network, not a storage-constrained device),
-that tradeoff is being reconsidered directly by the project owner. Not deciding it inside this
-document — flagging that WP-34.1 and WP-34.2 genuinely can't be locked and scoped correctly until this
-is answered one way or the other.
+- **`pipeline/run_pipeline.py`**: remove the legacy branch (`extract_pdf_to_text.run()` +
+  `chunk_text.run()` path, roughly lines 195–265) and `resolve_layout_mode()`'s silent auto-fallback
+  (`_docling_available()`/the "auto → pymupdf when docling fails" behavior, Decisions and Guardrails
+  #9). Docling failure should become a hard error, not a silent downgrade — same "fail loudly instead
+  of silently downgrading" principle `resolve_layout_mode()` already applies to an *explicit*
+  `--layout-mode docling` request, just extended to be the only behavior.
+- **`pipeline/extract_pdf_to_text.py`** (264 lines) — Step A's legacy PDF-to-text path. Removable
+  entirely once nothing calls it.
+- **`pipeline/chunk_text.py`** (797 lines) — legacy-only: `run()` (the pymupdf/pdfplumber chunker,
+  ~60 lines) plus its supporting helpers (`chunk_text()`, `load_pages`, `build_page_index`,
+  `pages_for_span`, `find_table_spans`, `table_span_at`, `validate_page_contiguity` — another ~250
+  lines combined). `run_structure_aware()` (the docling chunker) and the shared helpers
+  (`_should_skip_section`, `_normalize_heading`, `_should_skip_chunk`) stay.
+- **`--layout-mode` CLI flag**: drop the `pymupdf`/`pdfplumber`/`auto` choices, or keep them
+  rejected-with-a-clear-error for one release as a migration aid — worth a call at implementation
+  time, not here.
+- **`tests/unit/test_layout_mode_auto.py`**: this file's whole point today is testing the
+  auto-fallback behavior — most of it needs rewriting around "docling failure is a hard error," not
+  incremental patching.
+- **`pyproject.toml`**: the `docling` extra (`archive/PHASE25_REQUIREMENTS.md`'s "gated purely for
+  weight" decision) should likely move into the base install, or `ingest` should fail with a clear
+  "pip install reqbot[docling]" message rather than a confusing downstream error — worth deciding
+  which, not assuming.
+- **Keep, don't remove**: `services/docs_service.py`'s backward-compatible mode-detection fallback
+  (WP-33.2) — it correctly labels already-ingested legacy documents that predate this migration; no
+  reason to break display of historical data just because new ingestion is docling-only.
+- **Docs**: `CLAUDE.md`, `ARCHITECTURE.md`, `docs/OPERATIONS.md` all reference `--layout-mode auto`
+  and dual-path behavior (Decisions and Guardrails #9) — need updating, not just the pipeline code.
 
-## 7. Revised strawman WP breakdown (smaller than the first draft)
+This is real enough scope that it should land as **its own WP, before WP-34.1/34.2** (see §7) — the
+actionability fixes get simpler once it's done, not the other way around.
 
-- **WP-34.1 — Reject heading-echoed and unrepairable-fragment quotes in Step D.** Categories 2+3,
+## 7. Revised strawman WP breakdown
+
+- **WP-34.1 — Deprecate legacy pymupdf/pdfplumber chunking, docling-only.** New, per §6's decision.
+  Goes first because WP-34.2/34.3 both get simpler once it's done, not the other way around. Real
+  migration scope (code removal, hard-error-on-docling-failure behavior change, test rewrite,
+  dependency/docs updates) — see §6 for the concrete file-by-file list already surveyed against
+  current code.
+- **WP-34.2 — Reject heading-echoed and unrepairable-fragment quotes in Step D.** Categories 2+3,
   combined (they turned out to share a Step D home and complementary detection signals). Deterministic,
-  docling-only, 5 real cross-document fixtures already in hand.
-- **WP-34.2 — Expand `skip_sections` heading vocabulary + confirm the corpus is docling-ingested.**
-  Category 4 (config change) + closing out category 1 (process: make docling ingestion the norm,
-  survey a few more documents' heading vocabulary first). Much smaller than the citation-regex design
-  work originally scoped here. Test design per Codex round 2: both positive fixtures (`Terms`,
-  `Glossary`, `References` actually getting skipped) and negative fixtures (a heading that merely
-  *contains* one of those words in a valid, non-skippable context, e.g. something like "References to
-  External Systems" as a real content section — `_should_skip_section`'s prefix-match rule would need
-  checking against exactly this kind of near-miss before the vocabulary list grows).
-- **WP-34.3 (own phase if it needs one) — Description-grounding spike.** Investigation-only,
-  including a small NLI-model try-it-and-look-at-results pass per §4. Unchanged from the first draft.
+  can now assume `section_title_path` always exists (no legacy-fallback branch to design for). 5 real
+  cross-document fixtures already in hand. Implementation detail from Codex round 2: the hierarchy
+  lookup ordering trap in `parse_and_normalize.run()`, and reuse `_normalize_heading()` — see §3.
+- **WP-34.3 — Expand `skip_sections` heading vocabulary.** Category 4 only now (category 1 is closed
+  out entirely by WP-34.1, no separate process step needed). Small config change. Test design per
+  Codex round 2: both positive fixtures (`Terms`, `Glossary`, `References` actually getting skipped)
+  and negative fixtures (a heading that merely *contains* one of those words in a valid,
+  non-skippable context, e.g. something like "References to External Systems" as a real content
+  section — `_should_skip_section`'s prefix-match rule would need checking against exactly this kind
+  of near-miss before the vocabulary list grows).
+- **WP-34.4 (own phase if it needs one) — Description-grounding spike.** Investigation-only, including
+  a small NLI-model try-it-and-look-at-results pass per §4. Unchanged from the first draft, just
+  renumbered.
 
-Categories 5 stays a `docs/TODO_future_improvements.txt` note, not a WP.
+Category 5 stays a `docs/TODO_future_improvements.txt` note, not a WP.
 
-## 8. Open questions — §6 first, the rest follow from it
+## 8. Remaining open questions
 
-1. **§6 — decide this first:** does ReqBot go docling-only, or does legacy pymupdf/pdfplumber chunking
-   stay as a supported fallback path? This is a real stop-and-ask item (removing/preserving legacy
-   behavior), not something to default either way without an explicit call.
-2. The `skip_sections` heading-vocabulary survey (§3, category 4) — worth doing against a few more
-   documents before writing WP-34.2, or expand the list now and iterate later?
-3. Is the NLI-entailment approach (§4) worth spiking now as part of Phase 34, or genuinely deferred
-   further out given it's still the least-scoped piece?
+§6's legacy-chunking question is decided (docling-only). What's left:
+
+1. The `skip_sections` heading-vocabulary survey (§3, category 4 / WP-34.3) — worth doing against a
+   few more documents before writing that WP, or expand the list now and iterate later?
+2. Is the NLI-entailment approach (§4 / WP-34.4) worth spiking now as part of Phase 34, or genuinely
+   deferred further out given it's still the least-scoped piece?
+3. §6's migration scope (WP-34.1) is real but bounded — worth confirming the file-by-file list there
+   matches expectations before it gets locked into a full phase doc, since it's the one piece of this
+   plan that wasn't in either of the first two drafts.

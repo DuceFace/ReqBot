@@ -190,6 +190,16 @@ claim in round 3 didn't hold up: `build/bundle.sh` doesn't exist anywhere in thi
 directly) — likely a stale reference to the bundle installer `CLAUDE.md` already documents as retired
 in WP-25.4. Not folded in.
 
+**Round 4** (after the locked phase doc was drafted) found four more real gaps, all verified and
+folded in above: a *third* independent `--layout-mode` argparse definition, this time in
+`pipeline/run_pipeline.py`'s own standalone `main()` (missed by rounds 2 and 3, which only caught the
+two CLI-level parsers); `pipeline/chunk_text.py`'s own standalone CLI is dual-mode and would be left
+calling a deleted function if only the underlying `run()` were removed without restructuring the CLI
+around it; `tests/unit/test_cli_ingest.py` hardcodes a now-stale `layout_mode="pymupdf"` in a way that
+won't fail on its own (the function it tests is fully mocked); and a correctly-hedged question about
+whether `CLAUDE.md` — absent from the PR tree — was in scope on purpose. It is: confirmed gitignored,
+edited directly, not part of any PR diff.
+
 ## 6. Decided: ReqBot goes docling-only
 
 **Decision (2026-07-29): drop pymupdf/pdfplumber legacy chunking entirely, docling becomes the only
@@ -208,19 +218,6 @@ not hand-waved:
   of silently downgrading" principle `resolve_layout_mode()` already applies to an *explicit*
   `--layout-mode docling` request, just extended to be the only behavior.
 - **`pipeline/extract_pdf_to_text.py`** (264 lines) — Step A's legacy PDF-to-text path. Removable
-  entirely once nothing calls it.
-- **`pipeline/chunk_text.py`** (797 lines) — legacy-only: `run()` (the pymupdf/pdfplumber chunker,
-  ~60 lines) plus its supporting helpers (`chunk_text()`, `load_pages`, `build_page_index`,
-  `pages_for_span`, `find_table_spans`, `table_span_at`, `validate_page_contiguity` — another ~250
-  lines combined). `run_structure_aware()` (the docling chunker) and the shared helpers
-  (`_should_skip_section`, `_normalize_heading`, `_should_skip_chunk`) stay.
-- **`--layout-mode` CLI flag**: drop the `pymupdf`/`pdfplumber`/`auto` choices, or keep them
-  rejected-with-a-clear-error for one release as a migration aid — worth a call at implementation
-  time, not here. Exists in **two** places, not one: `cli/reqbot.py`'s argparse subcommands *and*
-  `cli/console.py`'s separate interactive-shell `ingest`/`batch` parsers (Codex review round 3,
-  verified — `cli/console.py` has its own `--layout-mode pymupdf|pdfplumber|auto|docling` argument,
-  independent of `cli/reqbot.py`'s).
-- **`pipeline/extract_pdf_to_text.py`** (264 lines) — Step A's legacy PDF-to-text path. Removable
   entirely once nothing calls it. `tests/unit/test_extract_pdf.py` (88 lines) exists solely to test
   this file's low-text-page detection (`_LOW_TEXT_THRESHOLD`/`warn_low_text_pages`) — verified, should
   be removed alongside it, not left testing dead code.
@@ -228,7 +225,18 @@ not hand-waved:
   ~60 lines) plus its supporting helpers (`chunk_text()`, `load_pages`, `build_page_index`,
   `pages_for_span`, `find_table_spans`, `table_span_at`, `validate_page_contiguity` — another ~250
   lines combined). `run_structure_aware()` (the docling chunker) and the shared helpers
-  (`_should_skip_section`, `_normalize_heading`, `_should_skip_chunk`) stay.
+  (`_should_skip_section`, `_normalize_heading`, `_should_skip_chunk`) stay. This file's own
+  standalone `main()`/CLI is dual-mode today (verified) — `input_path` means `pages.jsonl` in legacy
+  mode vs. a PDF with `--docling`, and legacy-only flags (`--chunk-size`/`--overlap`/`--table-aware`)
+  feed the legacy branch directly — needs restructuring to be docling-only, not left calling a
+  deleted function.
+- **`--layout-mode` CLI flag**: drop the `pymupdf`/`pdfplumber`/`auto` choices, or keep them
+  rejected-with-a-clear-error for one release as a migration aid — worth a call at implementation
+  time, not here. Exists in **three** independent places, not one: `cli/reqbot.py`'s argparse
+  subcommands, `cli/console.py`'s separate interactive-shell `ingest`/`batch` parsers, and (Codex
+  review round 4, verified) `pipeline/run_pipeline.py`'s own standalone `main()`
+  (`choices=["auto", "pymupdf", "pdfplumber", "docling"]`) — the direct-script entry point, separate
+  from both CLIs.
 - **`tests/unit/test_layout_mode_auto.py`**: this file's whole point today is testing the
   auto-fallback behavior — most of it needs rewriting around "docling failure is a hard error," not
   incremental patching.
@@ -236,6 +244,10 @@ not hand-waved:
   `pipeline.chunk_text.run` directly (verified, lines 218-219) as part of its `run_pipeline.run()`
   profile-plumbing test — needs rewriting around the docling/`section_parser` path instead of just
   deleted, since the profile-plumbing behavior it's actually testing still needs coverage.
+- **`tests/unit/test_cli_ingest.py`** (Codex review round 4, verified): its `_args()` helper
+  hardcodes `layout_mode="pymupdf"`. `run_pipeline.run()` is fully mocked in these tests, so removing
+  `pymupdf` as a valid choice elsewhere won't make this test fail on its own — it'll just keep
+  silently encoding a stale value forever unless explicitly updated.
 - **Dependency declarations — two separate files, both need attention, not just one:**
   `pyproject.toml`'s `docling` extra (`archive/PHASE25_REQUIREMENTS.md`'s "gated purely for weight"
   decision) should move into the base install. Separately, `requirements.txt` still pins
@@ -249,9 +261,11 @@ not hand-waved:
 - **Keep, don't remove**: `services/docs_service.py`'s backward-compatible mode-detection fallback
   (WP-33.2) — it correctly labels already-ingested legacy documents that predate this migration; no
   reason to break display of historical data just because new ingestion is docling-only.
-- **Docs**: `CLAUDE.md`, `ARCHITECTURE.md`, `docs/OPERATIONS.md`, `README.md` all reference
-  `--layout-mode auto` and/or dual-path behavior (Decisions and Guardrails #9) — need updating, not
-  just the pipeline code.
+- **Docs**: `ARCHITECTURE.md`, `docs/OPERATIONS.md`, `README.md` all reference `--layout-mode auto`
+  and/or dual-path behavior (Decisions and Guardrails #9) — need updating, not just the pipeline code.
+  `CLAUDE.md` covers the same ground but is gitignored (confirmed via `.gitignore:208`) — it's edited
+  directly as part of implementing this WP, not part of any PR diff. Codex's round-4 review correctly
+  flagged that it can't see this file in the PR tree and asked whether that was expected — it is.
 
 This is real enough scope that it should land as **its own WP, before WP-34.1/34.2** (see §7) — the
 actionability fixes get simpler once it's done, not the other way around.

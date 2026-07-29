@@ -94,23 +94,36 @@ by IT admins on a real network, not a storage-constrained device).
   `load_pages`, `build_page_index`, `pages_for_span`, `find_table_spans`, `table_span_at`,
   `validate_page_contiguity`). Keep `run_structure_aware()` and the shared helpers
   (`_should_skip_section`, `_normalize_heading`, `_should_skip_chunk` — WP-34.2/34.3 depend on
-  these).
-- Remove the `pymupdf`/`pdfplumber`/`auto` `--layout-mode` choices from **both** `cli/reqbot.py`'s
-  argparse subcommands and `cli/console.py`'s separate interactive-shell `ingest`/`batch` parsers —
-  these are two independent argument definitions, not one shared source.
+  these). This file's own standalone `main()`/CLI is dual-mode today (`input_path` means
+  `pages.jsonl` in legacy mode vs. a PDF with `--docling` — legacy-only flags `--chunk-size`/
+  `--overlap`/`--table-aware`) and calls the legacy `run()` directly in its non-`--docling` branch —
+  restructure it to be docling-only (drop the legacy branch and its flags, `input_path` always a
+  PDF), not just delete the function underneath it and leave the CLI referencing dead code.
+- Remove the `pymupdf`/`pdfplumber`/`auto` `--layout-mode` choices from **three** independent
+  argument definitions, not one shared source: `cli/reqbot.py`'s argparse subcommands,
+  `cli/console.py`'s separate interactive-shell `ingest`/`batch` parsers, and
+  `pipeline/run_pipeline.py`'s own standalone `main()` (`choices=["auto", "pymupdf", "pdfplumber",
+  "docling"]`) — the direct-script entry point (`python pipeline/run_pipeline.py ...`), independent
+  of both CLIs.
 - Rewrite `tests/unit/test_layout_mode_auto.py` around "docling unavailable/failure is a hard error"
-  (most of its current tests assert fallback behavior that no longer exists) and
-  `tests/unit/test_wp_20_3.py`'s `run_pipeline.run()` profile-plumbing test (currently patches
+  (most of its current tests assert fallback behavior that no longer exists); `tests/unit/
+  test_wp_20_3.py`'s `run_pipeline.run()` profile-plumbing test (currently patches
   `pipeline.extract_pdf_to_text.run`/`pipeline.chunk_text.run` directly — needs to patch the
-  docling/`section_parser` path instead, not just lose the coverage).
+  docling/`section_parser` path instead, not just lose the coverage); and `tests/unit/
+  test_cli_ingest.py`'s `_args()` helper (hardcodes `layout_mode="pymupdf"` — `run_pipeline.run()`
+  is mocked in these tests, so this won't fail on its own once `pymupdf` stops being a valid choice
+  elsewhere, it'll just keep silently encoding a stale value).
 - `pyproject.toml`: move the `docling` extra into the base install.
 - `requirements.txt`: currently has no docling entry on either path and still pins
   `pymupdf==1.27.1`/`pdfplumber==0.11.9`. Decide during implementation whether to add
   `docling==2.84.0` and drop the legacy pins, or retire the file entirely in favor of `pip install .`
   (`README.md` already documents `requirements.txt` as a legacy, pre-WP-25.2-packaging path, "not
   recommended for new setups") — don't just delete two lines and leave that install path broken.
-- Update `CLAUDE.md`, `ARCHITECTURE.md`, `docs/OPERATIONS.md`, `README.md` wherever they describe
+- Update `ARCHITECTURE.md`, `docs/OPERATIONS.md`, `README.md` wherever they describe
   `--layout-mode auto`/dual-path behavior (Decisions and Guardrails #9 is superseded by this WP).
+  `CLAUDE.md` is gitignored (not part of this or any PR) and covers the same ground — edit it
+  directly as part of implementing this WP, same as any other CLAUDE.md update, rather than treating
+  it as in-scope for the PR diff.
 
 **Non-goals:**
 - No change to `services/docs_service.py`'s backward-compatible mode-detection fallback — keeps

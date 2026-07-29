@@ -113,7 +113,6 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             extraction_model=extraction_model,
             enrichment_model=enrichment_model,
             max_chunks=args.max_chunks,
-            layout_mode=args.layout_mode,
             skip_enrichment=args.skip_enrichment,
             profile_name=args.profile,
         )
@@ -271,7 +270,6 @@ def cmd_batch(args: argparse.Namespace) -> int:
                 ollama_url=args.ollama_url,
                 extraction_model=batch_extraction_model,
                 enrichment_model=batch_enrichment_model,
-                layout_mode=args.layout_mode,
                 skip_enrichment=args.skip_enrichment,
             )
         except RuntimeError as e:
@@ -1456,15 +1454,6 @@ def main() -> None:
     # that still type --index don't suddenly fail to parse.
     p_ingest.add_argument("--index", action="store_true", help=argparse.SUPPRESS)
     p_ingest.add_argument(
-        "--layout-mode",
-        choices=["auto", "pymupdf", "pdfplumber", "docling"],
-        default="auto",
-        dest="layout_mode",
-        help="PDF extraction backend (default: auto -- uses docling when installed, "
-             "falls back to pymupdf otherwise or on failure). Pass 'docling' "
-             "explicitly to fail loudly instead of falling back.",
-    )
-    p_ingest.add_argument(
         "--skip-enrichment",
         action="store_true",
         dest="skip_enrichment",
@@ -1523,15 +1512,6 @@ def main() -> None:
     p_batch.add_argument(
         "--model", type=str, default=None,
         help="Convenience alias: sets both --extraction-model and --enrichment-model",
-    )
-    p_batch.add_argument(
-        "--layout-mode",
-        choices=["auto", "pymupdf", "pdfplumber", "docling"],
-        default="auto",
-        dest="layout_mode",
-        help="PDF extraction backend (default: auto -- uses docling when installed, "
-             "falls back to pymupdf otherwise or on failure). Pass 'docling' "
-             "explicitly to fail loudly instead of falling back.",
     )
     p_batch.add_argument(
         "--skip-enrichment",

@@ -11,6 +11,20 @@ phase for the actual description-grounding fix, depending on its findings.
 
 ---
 
+## Status
+
+This table is the live source of truth for Phase 34 WP status — update it here when a WP lands, not
+in `CLAUDE.md` or anywhere else.
+
+| WP | Status |
+|---|---|
+| WP-34.1 — Deprecate Legacy Chunking, Docling-Only | Complete — legacy pymupdf/pdfplumber chunking removed (`pipeline/extract_pdf_to_text.py` deleted, `pipeline/chunk_text.py`'s legacy `run()`/helpers removed); `--layout-mode` removed from all three independent locations (`cli/reqbot.py`, `cli/console.py`, `pipeline/run_pipeline.py`'s own `main()`); docling failure is now an unconditional hard error; docling moved into the base install (`pyproject.toml`); `requirements.txt` retired in favor of `pip install .` (CI/Dockerfile updated accordingly) |
+| WP-34.2 — Reject Heading-Echoed and Unrepairable-Fragment Quotes in Step D | Not started |
+| WP-34.3 — Expand `skip_sections` Heading Vocabulary | Not started |
+| WP-34.4 — Spike: Description-Grounding Entailment Check | Not started |
+
+---
+
 ## 1. Phase Framing
 
 Unlike Phase 33 (three independent backlog items), Phase 34 has a hard sequencing dependency: WP-34.1

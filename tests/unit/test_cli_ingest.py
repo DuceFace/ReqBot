@@ -27,7 +27,6 @@ def _args(pdf_path, output_dir, no_index=False):
         enrichment_model=None,
         max_chunks=None,
         no_index=no_index,
-        layout_mode="pymupdf",
         skip_enrichment=False,
         profile="cybersecurity",
         ollama_url="http://ollama:11434",

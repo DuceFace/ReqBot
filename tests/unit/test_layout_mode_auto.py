@@ -1,10 +1,18 @@
-"""Unit tests for layout_mode="auto" default (docling when installed,
-falling back to pymupdf otherwise or on a per-document docling failure).
+"""Unit tests for docling-only ingestion (WP-34.1).
 
-_docling_available()/resolve_layout_mode() are pure-ish and tested directly.
-The run()-level tests confirm the fallback is actually wired in and that an
-explicit --layout-mode docling request still fails loudly instead of silently
-downgrading.
+Legacy pymupdf/pdfplumber chunking and the "auto" fallback between backends
+were removed -- docling is now the only ingestion path, and any docling
+failure (missing install, per-document parse failure) is a hard error, not a
+silent downgrade. See docs/PHASE34_REQUIREMENTS.md.
+
+_docling_available() is tested directly. The run()-level tests confirm a
+docling failure always raises, unconditionally (there is no more distinction
+between an "explicit" docling request and a default one -- there's only one
+mode now). _detect_layout_mode_from_chunks() tests stay unchanged: that
+function's whole purpose is reading the real backend off of a pre-existing
+chunks.jsonl that may predate this migration (a legacy pymupdf/pdfplumber
+run from before WP-34.1 shipped), which is exactly the scenario this WP
+does NOT retroactively fix.
 """
 from pathlib import Path
 from unittest.mock import patch
@@ -14,7 +22,7 @@ import pytest
 from pipeline import run_pipeline
 
 # ---------------------------------------------------------------------------
-# _docling_available() / resolve_layout_mode()
+# _docling_available()
 # ---------------------------------------------------------------------------
 
 def test_docling_available_true_when_importable():
@@ -27,30 +35,8 @@ def test_docling_available_false_when_not_importable():
         assert run_pipeline._docling_available() is False
 
 
-def test_resolve_auto_to_docling_when_available():
-    with patch("importlib.util.find_spec", return_value=object()):
-        assert run_pipeline.resolve_layout_mode("auto") == "docling"
-
-
-def test_resolve_auto_to_pymupdf_when_unavailable():
-    with patch("importlib.util.find_spec", return_value=None):
-        assert run_pipeline.resolve_layout_mode("auto") == "pymupdf"
-
-
-@pytest.mark.parametrize("explicit", ["docling", "pymupdf", "pdfplumber"])
-def test_resolve_explicit_choices_pass_through_unchanged(explicit):
-    """An explicit choice must not be affected by whether docling is installed."""
-    with patch("importlib.util.find_spec", return_value=None):
-        assert run_pipeline.resolve_layout_mode(explicit) == explicit
-    with patch("importlib.util.find_spec", return_value=object()):
-        assert run_pipeline.resolve_layout_mode(explicit) == explicit
-
-
 # ---------------------------------------------------------------------------
-# run()-level fallback wiring
-#
-# Same mocking pattern as test_wp_20_3.py's test_run_pipeline_passes_profile_to_step_c
-# -- mock every step at its import boundary, run the real orchestrator.
+# run()-level hard-error wiring
 # ---------------------------------------------------------------------------
 
 def _run_with_mocked_steps(tmp_path, **run_kwargs):
@@ -70,13 +56,10 @@ def _run_with_mocked_steps(tmp_path, **run_kwargs):
 
     with (
         # Force docling "available" regardless of whether it's actually installed in
-        # whatever environment runs this test (CI's base install doesn't have it) --
-        # these tests are about the fallback wiring, not about detection itself
-        # (that's covered separately by test_docling_available_*).
+        # whatever environment runs this test -- these tests are about hard-error
+        # wiring, not about detection itself (covered separately above).
         patch("pipeline.run_pipeline._docling_available", return_value=True),
         patch("pipeline.section_parser.run", side_effect=RuntimeError("docling boom")) as mock_docling,
-        patch("pipeline.extract_pdf_to_text.run") as mock_legacy,
-        patch("pipeline.chunk_text.run", return_value=str(tmp_path / "doc_chunks.jsonl")),
         patch("pipeline.llm_extract_requirements.run", side_effect=fake_step_c),
         patch("pipeline.parse_and_normalize.run", side_effect=fake_step_d),
         patch("pipeline.aggregate_and_export.run"),
@@ -84,36 +67,40 @@ def _run_with_mocked_steps(tmp_path, **run_kwargs):
         kwargs = dict(skip_enrichment=True)
         kwargs.update(run_kwargs)
         result = run_pipeline.run(str(fake_pdf), str(tmp_path), **kwargs)
-        return result, mock_docling, mock_legacy
+        return result, mock_docling
 
 
-def test_auto_falls_back_to_pymupdf_when_docling_fails(tmp_path):
-    """The core auto-default behavior: layout_mode="auto" (default) + a docling failure
-    on this specific document falls back to pymupdf instead of raising."""
-    result, mock_docling, mock_legacy = _run_with_mocked_steps(tmp_path, layout_mode="auto")
-    assert mock_docling.called
-    assert mock_legacy.called
-    assert result is not None
-
-
-def test_explicit_docling_request_raises_instead_of_falling_back(tmp_path):
-    """An explicit --layout-mode docling must fail loudly, not silently downgrade --
-    the caller asked for docling specifically and deserves to know it didn't happen."""
+def test_docling_failure_raises_hard_error(tmp_path):
+    """A docling failure on this document raises, unconditionally -- there is
+    no fallback left to silently downgrade to (WP-34.1)."""
     with pytest.raises(RuntimeError, match="Docling"):
-        _run_with_mocked_steps(tmp_path, layout_mode="docling")
+        _run_with_mocked_steps(tmp_path)
 
 
-def test_auto_does_not_fall_back_mid_resume(tmp_path):
-    """skip_to != "A" means this is a resume of a prior run -- a docling failure
-    here must not silently rewrite the resume into a fresh legacy extraction."""
+def test_docling_failure_raises_hard_error_mid_resume(tmp_path):
+    """Same hard-error behavior on a resume (skip_to != "A") as on a fresh run --
+    there was never a meaningful distinction to preserve once fallback itself
+    was removed, but this confirms skip_to doesn't accidentally change it."""
     with pytest.raises(RuntimeError, match="Docling"):
-        _run_with_mocked_steps(tmp_path, layout_mode="auto", skip_to="B")
+        _run_with_mocked_steps(tmp_path, skip_to="B")
+
+
+def test_missing_docling_raises_before_any_step_runs(tmp_path):
+    """docling not being importable at all (e.g. a broken/incomplete install)
+    must produce a clear, actionable error before any pipeline step runs --
+    not a raw ImportError surfacing deep inside section_parser.py."""
+    fake_pdf = tmp_path / "doc.pdf"
+    fake_pdf.write_bytes(b"%PDF-1.4")
+    with patch("pipeline.run_pipeline._docling_available", return_value=False):
+        with pytest.raises(RuntimeError, match="docling is required"):
+            run_pipeline.run(str(fake_pdf), str(tmp_path), skip_enrichment=True)
 
 
 # ---------------------------------------------------------------------------
 # WP-33.2 fix (Codex review, PR #155): layout_mode_used recorded for Step E
-# must describe the chunks actually being aggregated, not a fresh "auto"
-# resolution that can disagree with what an earlier run actually produced.
+# must describe the chunks actually being aggregated, not an assumption about
+# what produced them. Still relevant post-WP-34.1: a --skip-to C/D/E resume
+# can target a chunks.jsonl from before this migration shipped.
 # ---------------------------------------------------------------------------
 
 def test_detect_layout_mode_from_chunks_docling_signature(tmp_path):
@@ -148,12 +135,11 @@ def test_detect_layout_mode_from_chunks_missing_file_returns_empty(tmp_path):
     assert run_pipeline._detect_layout_mode_from_chunks(tmp_path / "missing.jsonl") == ""
 
 
-def test_resume_past_step_b_records_actual_chunks_mode_not_fresh_resolution(tmp_path):
-    """Reproduces the exact bug Codex flagged: an earlier run fell back to
-    pymupdf (chunks.jsonl has no docling signature), but docling is available
-    NOW -- a --skip-to C resume must still record layout_mode_used="pymupdf",
-    matching the chunks Step E is actually aggregating, not "docling" (what
-    resolve_layout_mode("auto") would freshly resolve to today)."""
+def test_resume_past_step_b_records_actual_chunks_mode_not_fresh_assumption(tmp_path):
+    """A --skip-to C resume against a pre-WP-34.1 chunks.jsonl (no docling
+    signature -- produced by the now-removed legacy path) must still record
+    layout_mode_used="pymupdf", matching the chunks Step E is actually
+    aggregating, not "docling" (what every fresh Step A/B run produces now)."""
     chunks = tmp_path / "doc_chunks.jsonl"
     chunks.write_text('{"chunk_id": 0, "text": "plain pymupdf text"}\n')
 
@@ -178,7 +164,7 @@ def test_resume_past_step_b_records_actual_chunks_mode_not_fresh_resolution(tmp_
     ):
         run_pipeline.run(
             str(fake_pdf), str(tmp_path),
-            layout_mode="auto", skip_to="C", skip_enrichment=True,
+            skip_to="C", skip_enrichment=True,
         )
 
     assert mock_step_e.call_args.kwargs["layout_mode_used"] == "pymupdf"

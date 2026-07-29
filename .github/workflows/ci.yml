@@ -65,7 +65,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: pip install -e . -r requirements-dev.txt
       - run: pytest tests/ -v --cov=core --cov=services --cov=pipeline --cov-report=term-missing
 
   frontend-test:

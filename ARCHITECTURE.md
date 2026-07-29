@@ -60,15 +60,15 @@ api/
 
 pipeline/
   run_pipeline.py              ← Pipeline orchestrator (Steps A–E + D.5)
-  extract_pdf_to_text.py       Step A  (legacy):  PDF → pages JSONL  [pymupdf / pdfplumber]
-  section_parser.py            Step A  (docling):  PDF → *_ancestry.json + in-memory AncestryResult
-                                                   Docling DocumentConverter + iterate_items() traversal
-                                                   section_ref_path (numbered only) / section_title_path (all)
-                                                   parent_context = first ~600 chars after immediate parent heading
-  chunk_text.py                Step B  (legacy):  pages JSONL → chunks JSONL  (fixed-size sliding window)
-                               Step B  (docling):  AncestryResult → chunks JSONL  (HybridChunker + breadcrumb injection)
-                                                   Output fields: raw_text, text (breadcrumb+raw_text), breadcrumb,
-                                                   section_ref_path, section_title_path, parent_header_text, parent_context
+  section_parser.py            Step A:  PDF → *_ancestry.json + in-memory AncestryResult
+                                         Docling DocumentConverter + iterate_items() traversal
+                                         section_ref_path (numbered only) / section_title_path (all)
+                                         parent_context = first ~600 chars after immediate parent heading
+  chunk_text.py                Step B:  AncestryResult → chunks JSONL  (HybridChunker + breadcrumb injection)
+                                         Output fields: raw_text, text (breadcrumb+raw_text), breadcrumb,
+                                         section_ref_path, section_title_path, parent_header_text, parent_context
+                                         (WP-34.1: legacy pymupdf/pdfplumber fixed-size chunking removed —
+                                         docling is the only ingestion path now)
   llm_extract_requirements.py  Step C:  chunks JSONL → extracted requirements JSONL  [Ollama: extraction_model]
                                         Pass 1 (only mode): source_quote + source_ref only —
                                         description/domain_tags/requirement_type come from
@@ -211,16 +211,15 @@ api/routes/checklist.py    → core.config, services.checklist_service,
                              pipeline.checklist_export, core.profiles
 
 pipeline/run_pipeline.py
-  └── pipeline.extract_pdf_to_text  (in-process; legacy path only)
-  └── pipeline.section_parser       (in-process; docling Step A — lazy import)
-  └── pipeline.chunk_text           (in-process; both legacy and docling Step B)
+  └── pipeline.section_parser       (in-process; Step A — lazy import)
+  └── pipeline.chunk_text           (in-process; Step B)
   └── pipeline.llm_extract_requirements (in-process)
   └── pipeline.parse_and_normalize  (in-process)
   └── pipeline.enrich_requirements  (in-process; Step D.5 — skipped with --skip-enrichment)
   └── pipeline.aggregate_and_export (in-process)
 
 pipeline/chunk_text.py
-  └── pipeline.section_parser  (lazy; docling path only)
+  └── pipeline.section_parser  (lazy; standalone CLI only)
 
 core/config.py     → (no internal imports)
 core/constants.py  → (no internal imports; stdlib uuid only)
@@ -262,9 +261,7 @@ Both service URLs are configurable via `~/.config/reqbot/config.json` or environ
 
 | Package | pip name | Used By | Notes |
 |---------|----------|---------|-------|
-| `fitz` | `pymupdf` | extract_pdf_to_text | `--layout-mode` fallback backend -- always installed; used when `auto` can't find docling, or when passed explicitly |
-| `pdfplumber` | `pdfplumber` | extract_pdf_to_text | Optional; lazy import; table-aware backend |
-| `docling` | `docling` | section_parser, chunk_text | Optional; lazy import; structure-aware backend (Phase 14); `--layout-mode` default (`auto`) uses this when installed (WP, PR #147) |
+| `docling` | `docling` | section_parser, chunk_text | Base dependency (WP-34.1) — structure-aware backend (Phase 14), the only ingestion path. Lazy import within each module; a missing/broken install fails loudly with an actionable error rather than importing at module load time. |
 | `requests` | `requests` | llm_extract_requirements, reqbot | HTTP calls to Ollama REST API |
 | `ollama` | `ollama` | core/ask, embed_and_index, embed_context_index, synthesis, services/compare_service, services/evidence_service | Ollama Python client |
 | `fastembed` | `fastembed` | core/ask, embed_and_index, embed_context_index, services/compare_service, services/evidence_service | BM25 sparse embeddings (CPU-only) |
@@ -275,11 +272,11 @@ Both service URLs are configurable via `~/.config/reqbot/config.json` or environ
 | `uvicorn` | `uvicorn` | cli/reqbot.py serve | ASGI server; lazy import; only needed for `reqbot serve` |
 | `aiofiles` | `aiofiles` | Starlette dep tree | Explicit pin; pulled in by Starlette; Phase 18+ |
 
-**Install (dev/system Python):**
+**Install:**
 ```bash
-pip3 install --break-system-packages -r requirements.txt
+pip install .
 # Optional for remote synthesis:
-pip3 install --break-system-packages anthropic openai
+pip install ".[remote]"
 ```
 
 **Frontend build deps (dev machine only — end users receive pre-built dist/):**
@@ -321,21 +318,8 @@ installer-managed `~/.reqbot/` tree so it survives installer upgrades without ex
 
 ### Ingest Pipeline (PDF → Qdrant)
 
-**Legacy path (`--layout-mode pymupdf` or `pdfplumber`):**
-
-```
-PDF file
-  │
-  ▼ Step A: extract_pdf_to_text.py
-*_pages.jsonl          (one record per page: {page_num, text, source_pdf})
-  │
-  ▼ Step B: chunk_text.py  (sliding window, 3000 chars / 200 overlap; table-aware if pdfplumber)
-*_chunks.jsonl
-  │
-  (continues to Step C below)
-```
-
-**Docling path (`--layout-mode docling`):**
+Docling is the only ingestion path (WP-34.1 removed the legacy pymupdf/pdfplumber fixed-size
+chunking path that predated it):
 
 ```
 PDF file
@@ -351,7 +335,7 @@ PDF file
   (continues to Step C below)
 ```
 
-**Steps C–F (both paths):**
+**Steps C–F:**
 
 ```
 *_chunks.jsonl

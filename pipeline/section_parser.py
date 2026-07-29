@@ -365,8 +365,7 @@ def _run_docling(pdf_path: Path, max_pages: Optional[int]) -> tuple[Any, float]:
         from docling.document_converter import DocumentConverter
     except ImportError as e:
         raise RuntimeError(
-            "Docling is not installed. Install the Docling extra: "
-            "pip install reqbot[docling]"
+            "Docling is not installed or not importable. Run: pip install ."
         ) from e
 
     converter = DocumentConverter()

@@ -32,13 +32,11 @@ not here — keeping this file free of anyone's specific infrastructure details 
 ## Installing Python Dependencies (Debian/Ubuntu example)
 
 Debian/Ubuntu ship an externally-managed system Python by default — plain `pip install` refuses
-to touch it, so both the packaged install (README's primary path) and the legacy
-`requirements.txt` path need `--break-system-packages` there specifically:
+to touch it, so the packaged install (README's only supported path) needs `--break-system-packages`
+there specifically:
 
 ```bash
 pip3 install --break-system-packages .
-# or, legacy/source path:
-pip3 install --break-system-packages -r requirements.txt -r requirements-dev.txt
 ```
 
 This flag is a Debian/Ubuntu packaging-policy quirk, not general ReqBot install guidance — most
@@ -128,21 +126,15 @@ After rebuilding, **reload the browser tab** — the running server picks up new
 ```bash
 cd ~/grc-ai-system
 
-# Standard ingest (most NIST/AFI/DAF docs) — indexes into Qdrant by default
 python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
-  --ollama-url http://<ollama-host>:11434
-
-# Table-heavy docs (DODIs) — pdfplumber handles tables better
-python3 cli/reqbot.py ingest ~/path/to/dodi.pdf \
-  --layout-mode pdfplumber \
-  --ollama-url http://<ollama-host>:11434
-
-# Structure-aware — required for profile skip_sections filtering to apply; slower
-# on CPU (layout/table/OCR model inference) but exercises the full current pipeline
-python3 cli/reqbot.py ingest ~/path/to/doc.pdf \
-  --layout-mode docling \
   --ollama-url http://<ollama-host>:11434
 ```
+
+Ingestion always runs through Docling (structure-aware parsing; the earlier pymupdf/pdfplumber
+backends and `--layout-mode` flag were removed in WP-34.1) — this is what makes profile
+`skip_sections` filtering take effect on every ingest, not just some. It's slower on CPU
+(layout/table/OCR model inference) than the old fixed-size text split was, but exercises the full
+current pipeline.
 
 Output goes to `~/documents/processed/<doc_stem>_<timestamp>/`. Indexing (both
 `grc_requirements` and `grc_context`) runs automatically after extraction; add `--no-index`

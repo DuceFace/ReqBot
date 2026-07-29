@@ -215,8 +215,14 @@ def test_run_pipeline_passes_profile_to_step_c(tmp_path):
 
     with (
         patch.object(run_pipeline, "run", wraps=run_pipeline.run),
-        patch("pipeline.extract_pdf_to_text.run"),
-        patch("pipeline.chunk_text.run", return_value=str(chunks)),
+        # WP-34.1: docling is the only ingestion path now, so this test mocks it
+        # at its two entry points rather than routing around it via a legacy
+        # layout_mode -- this test is about profile passing, not docling itself.
+        # ancestry_result is never inspected since run_structure_aware is also
+        # mocked, so a bare object() placeholder is enough.
+        patch("pipeline.run_pipeline._docling_available", return_value=True),
+        patch("pipeline.section_parser.run", return_value=object()),
+        patch("pipeline.chunk_text.run_structure_aware", return_value=str(chunks)),
         patch("pipeline.llm_extract_requirements.run", side_effect=fake_step_c),
         patch("pipeline.parse_and_normalize.run", side_effect=fake_step_d),
         patch("pipeline.aggregate_and_export.run", side_effect=fake_step_e),
@@ -225,17 +231,11 @@ def test_run_pipeline_passes_profile_to_step_c(tmp_path):
         fake_pdf = tmp_path / "doc.pdf"
         fake_pdf.write_bytes(b"%PDF-1.4")
 
-        # Explicit layout_mode: this test is about profile passing, not layout-mode
-        # resolution -- leaving it at the "auto" default would make this test's
-        # behavior (and runtime) depend on whether docling happens to be installed
-        # in whatever environment runs it (WP-32.4 added a real docling attempt +
-        # fallback under "auto").
         run_pipeline.run(
             str(fake_pdf),
             str(tmp_path),
             skip_enrichment=True,
             profile_name="test-domain",
-            layout_mode="pymupdf",
         )
 
     assert captured.get("profile") is not None

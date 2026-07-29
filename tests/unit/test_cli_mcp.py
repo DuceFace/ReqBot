@@ -5,9 +5,9 @@ mcp extra isn't installed, otherwise call mcp_server.server.run() and return 0.
 mcp_server/server.py's own get_status tool has its own coverage in
 test_mcp_server.py -- these tests only cover cmd_mcp's own branch logic.
 
-mcp is an optional [mcp] extra (pyproject.toml), not in requirements.txt/
-requirements-dev.txt -- see test_mcp_server.py's module docstring for why
-these skip cleanly (pytest.importorskip) instead of failing when it's absent.
+mcp is an optional [mcp] extra (pyproject.toml), not installed by CI's `test`
+job -- see test_mcp_server.py's module docstring for why these skip cleanly
+(pytest.importorskip) instead of failing when it's absent.
 The success-path test below needs mcp_server.server importable to patch
 its .run attribute, so the whole file is gated, not just that one test.
 """

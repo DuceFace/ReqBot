@@ -4,9 +4,9 @@ Manual smoke test (real stdio subprocess + real MCP client session, calling
 get_status against a live Ollama/Qdrant) was run separately and isn't repeated
 here -- these are the fast, no-network unit checks.
 
-mcp is an optional [mcp] extra (pyproject.toml), not in requirements.txt/
-requirements-dev.txt -- CI's `test` job installs from those legacy files, not
-pyproject.toml's extras, so mcp isn't present there. Skip cleanly rather than
+mcp is an optional [mcp] extra (pyproject.toml) -- CI's `test` job installs the
+base package (`pip install -e .`) plus requirements-dev.txt, neither of which
+pulls in optional extras, so mcp isn't present there. Skip cleanly rather than
 break collection for every other test in the suite when it's absent.
 """
 import asyncio

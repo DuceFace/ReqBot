@@ -60,7 +60,7 @@ def _should_skip_section(section_title_path: list[str], skip_sections: list[str]
     skip-worthy "Abbreviations and Acronyms" matches "ABBREVIATIONS" -- both have
     the identical shape (skip-word + more free words), so there's no cheap
     syntactic rule that accepts one and rejects the other without real semantic
-    understanding. A 5-document survey found no live instance of the bad case, and
+    understanding. A 6-document survey found no live instance of the bad case, and
     a stricter rule risks breaking the confirmed-real one -- left as-is on purpose,
     not an oversight. See docs/PHASE34_REQUIREMENTS.md's WP-34.3 section.
     """

@@ -185,12 +185,13 @@ def test_all_blank_entries_never_skip():
 
 
 # ---------------------------------------------------------------------------
-# WP-34.3 — TERMS synonym, confirmed via a heading-vocabulary survey of 5 real
+# WP-34.3 — TERMS synonym, confirmed via a heading-vocabulary survey of 6 real
 # documents (afpd_17-1.pdf, afi17-101.pdf, CJCSI 6510.02G.pdf, DODI 8500.01.pdf,
-# NIST.SP.800-171r3.pdf). "Terms" appears independently in two AFI/AFPD-series
-# documents (not one document's idiosyncratic choice) as their glossary/
-# definitions heading, distinct from and not covered by "GLOSSARY" or
-# "DEFINITIONS" (see docs/PHASE34_REQUIREMENTS.md for the full survey).
+# NIST.SP.800-171r3.pdf, dafman17-1203.pdf). "Terms" appears independently in
+# three AFI/AFPD/DAFMAN-series documents (not one document's idiosyncratic
+# choice) as their glossary/definitions heading, distinct from and not covered
+# by "GLOSSARY" or "DEFINITIONS" (see docs/PHASE34_REQUIREMENTS.md for the
+# full survey).
 # ---------------------------------------------------------------------------
 
 CYBERSECURITY_SKIPS_WITH_TERMS = CYBERSECURITY_SKIPS + ["TERMS"]
@@ -223,7 +224,7 @@ def test_over_matches_references_to_external_systems():
     # Documents the known tradeoff, doesn't endorse it as correct: this heading
     # is real, substantive content (not a reference list), but prefix matching
     # can't tell it apart from a genuine "References" section. No live instance
-    # of this shape was found across the 5-document survey corpus.
+    # of this shape was found across the 6-document survey corpus.
     assert _should_skip_section(["References to External Systems"], ["REFERENCES"])
 
 

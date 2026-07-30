@@ -262,7 +262,7 @@ def main() -> None:
 
     out_dir = _ROOT / "eval" / "spike_results" / "wp_34_4"
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    (out_dir / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
 
     # False negative: a known-bad (fabricated) pair the model calls supported.
     # False positive: a known-good (faithful) pair the model calls unsupported.

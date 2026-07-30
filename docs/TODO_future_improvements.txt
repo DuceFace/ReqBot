@@ -372,8 +372,9 @@ ACTIVE BACKLOG
     documents' acronym lists, since it means those entries currently reach
     Step C unfiltered as candidate requirements.
 
-31. Production Step D.5 description-grounding entailment gate (WP-34.4 spike
-    concluded viable-with-a-fix, Phase 34)
+31. [SCOPED -- Phase 35, docs/PHASE35_REQUIREMENTS.md, 2026-07-30, not yet
+    implemented] Production Step D.5 description-grounding entailment gate
+    (WP-34.4 spike concluded viable-with-a-fix, Phase 34)
     WP-34.4's spike (`eval/entailment_spike.py`,
     `eval/spike_results/wp_34_4/report.md`) tested MiniCheck (flan-t5-large,
     github.com/Liyan06/MiniCheck) as an NLI/entailment check for whether

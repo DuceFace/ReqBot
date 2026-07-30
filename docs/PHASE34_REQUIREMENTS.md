@@ -6,9 +6,9 @@ this phase's own brainstorm (`docs/PHASE34_BRAINSTORM.md`, PR #157))
 **Date:** 2026-07-29
 **Preceded by:** Phase 33 (Profile Vocabulary Deduplication, Skip-Section Gap Visibility &
 Actionability Spike) — closed 2026-07-28, all three WPs complete.
-**Followed by:** No phase opened yet. WP-34.4's spike concluded viable-with-a-fix — a production
-Step D.5 description-grounding entailment gate is real, scoped-but-unimplemented follow-up work,
-tracked as `docs/TODO_future_improvements.txt` item 31, not yet promoted to its own WP/phase.
+**Followed by:** Phase 35 (Production Description-Grounding Entailment Gate) —
+`docs/PHASE35_REQUIREMENTS.md`, drafted 2026-07-30. WP-34.4's spike concluded viable-with-a-fix; that
+phase turns it into a real Step D.5/D.6 gate.
 
 ---
 

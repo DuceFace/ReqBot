@@ -88,7 +88,10 @@ def _run_timestamp(run_dir: Path) -> datetime | None:
     m = re.search(r"_(\d{8}_\d{6})$", run_dir.name)
     if not m:
         return None
-    return datetime.strptime(m.group(1), "%Y%m%d_%H%M%S")
+    try:
+        return datetime.strptime(m.group(1), "%Y%m%d_%H%M%S")
+    except ValueError:
+        return None
 
 
 def _is_citation_fragment_shaped(quote: str, description: str) -> bool:
@@ -147,6 +150,12 @@ def harvest(clean_sample_size: int, processed_dir: Path | None = None) -> dict:
                     # appends incrementally) -- the last line may be truncated.
                     # Skip it rather than crash; the run still counts as
                     # processed for whatever complete lines it did contribute.
+                    continue
+                if not isinstance(rec, dict):
+                    # A syntactically-valid but non-object JSON line (null,
+                    # a bare number/string, an array) -- same "don't crash on
+                    # a line that isn't real requirement data" reasoning as
+                    # the JSONDecodeError case above.
                     continue
                 quote = rec.get("source_quote") or ""
                 description = rec.get("description") or ""

@@ -256,15 +256,21 @@ PREFERRED_DESCRIPTION = {
 }
 
 
-def main() -> None:
-    harvest = json.loads(HARVEST_FILE.read_text(encoding="utf-8"))
+def build_records(
+    harvest: dict, labels: dict, spike_overlap_ids: set, preferred_description: dict
+) -> list[dict]:
+    """Merge harvester output + hand-verification labels into gold records.
 
+    Pulled out of main() so it can be unit-tested against synthetic harvest
+    data without touching the real harvest_candidates.json/gold_description_
+    grounding.jsonl files on disk.
+    """
     by_id: dict[str, dict] = {}
     for bucket in ("citation_fragment_shaped", "modality_shaped"):
         for entry in harvest[bucket]:
             rid = entry["requirement_id"]
-            if rid in PREFERRED_DESCRIPTION:
-                if entry["description"] != PREFERRED_DESCRIPTION[rid]:
+            if rid in preferred_description:
+                if entry["description"] != preferred_description[rid]:
                     continue
             elif rid in by_id and entry["description"] != by_id[rid]["description"]:
                 raise SystemExit(
@@ -274,17 +280,17 @@ def main() -> None:
                 )
             by_id[rid] = entry
 
-    missing = set(LABELS) - set(by_id)
+    missing = set(labels) - set(by_id)
     if missing:
         raise SystemExit(f"LABELS references requirement_id(s) not found in harvest output: {missing}")
-    extra = set(by_id) - set(LABELS)
+    extra = set(by_id) - set(labels)
     if extra:
         raise SystemExit(f"Flagged candidate(s) in harvest output have no hand-verified label: {extra}")
 
     records = []
     for rid, entry in by_id.items():
-        label, notes = LABELS[rid]
-        source = "wp_34_4_spike" if rid in SPIKE_OVERLAP_IDS else "wp_35_1_harvest"
+        label, notes = labels[rid]
+        source = "wp_34_4_spike" if rid in spike_overlap_ids else "wp_35_1_harvest"
         records.append({
             "source_quote": entry["source_quote"],
             "description": entry["description"],
@@ -314,6 +320,13 @@ def main() -> None:
             "run_dir": entry["run_dir"],
             "source": "wp_35_1_harvest",
         })
+
+    return records
+
+
+def main() -> None:
+    harvest = json.loads(HARVEST_FILE.read_text(encoding="utf-8"))
+    records = build_records(harvest, LABELS, SPIKE_OVERLAP_IDS, PREFERRED_DESCRIPTION)
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for r in records:

@@ -209,3 +209,27 @@ def test_harvest_dedups_identical_records_across_runs(tmp_path):
     result = harvest(clean_sample_size=5, processed_dir=tmp_path)
     assert result["totals"]["records_scanned"] == 1
     assert result["totals"]["runs_scanned"] == 2
+
+
+def test_harvest_survives_invalid_timestamp_in_dir_name(tmp_path):
+    # "doc_20260231_120000" matches the regex shape but Feb 31 isn't a real
+    # date -- _run_timestamp must return None (fix_status "unknown"), not raise.
+    rec = {
+        "requirement_id": "REQ-1", "source_quote": "q", "description": "d",
+        "source_pdf": "doc.pdf", "chunk_id": 0,
+    }
+    _write_enriched(
+        tmp_path / "doc_20260231_120000", "doc_requirements_enriched.jsonl", json.dumps(rec) + "\n"
+    )
+    result = harvest(clean_sample_size=5, processed_dir=tmp_path)
+    assert result["totals"]["records_scanned"] == 1
+
+
+def test_harvest_skips_non_dict_json_lines_without_crashing(tmp_path):
+    # Syntactically valid JSON that isn't an object (null, a bare number/
+    # string, an array) must be skipped, not crash on rec.get(...).
+    text = "null\n123\n\"a string\"\n[]\n"
+    _write_enriched(tmp_path / "doc_20260101_000000", "doc_requirements_enriched.jsonl", text)
+    result = harvest(clean_sample_size=5, processed_dir=tmp_path)
+    assert result["totals"]["records_scanned"] == 0
+    assert result["totals"]["runs_scanned"] == 0

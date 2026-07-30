@@ -185,6 +185,54 @@ def test_all_blank_entries_never_skip():
 
 
 # ---------------------------------------------------------------------------
+# WP-34.3 — TERMS synonym, confirmed via a heading-vocabulary survey of 5 real
+# documents (afpd_17-1.pdf, afi17-101.pdf, CJCSI 6510.02G.pdf, DODI 8500.01.pdf,
+# NIST.SP.800-171r3.pdf). "Terms" appears independently in two AFI/AFPD-series
+# documents (not one document's idiosyncratic choice) as their glossary/
+# definitions heading, distinct from and not covered by "GLOSSARY" or
+# "DEFINITIONS" (see docs/PHASE34_REQUIREMENTS.md for the full survey).
+# ---------------------------------------------------------------------------
+
+CYBERSECURITY_SKIPS_WITH_TERMS = CYBERSECURITY_SKIPS + ["TERMS"]
+
+
+def test_terms_exact_match():
+    assert _should_skip_section(["Terms"], CYBERSECURITY_SKIPS_WITH_TERMS)
+
+
+def test_terms_not_skipped_without_being_added():
+    # Confirms TERMS is a genuinely new addition, not already covered by an
+    # existing entry -- "Terms" doesn't start with "glossary" or "definitions".
+    assert not _should_skip_section(["Terms"], CYBERSECURITY_SKIPS)
+
+
+def test_terms_case_insensitive():
+    assert _should_skip_section(["TERMS"], CYBERSECURITY_SKIPS_WITH_TERMS)
+    assert _should_skip_section(["terms"], CYBERSECURITY_SKIPS_WITH_TERMS)
+
+
+# Known accepted over-matching tradeoff (see _should_skip_section's docstring):
+# prefix matching can't syntactically distinguish "Abbreviations and Acronyms"
+# (real, confirmed-in-corpus, must skip) from "References to External Systems"
+# (hypothetical, same shape, would ideally survive) without real semantic
+# understanding. These tests pin the CURRENT, deliberate behavior so a future
+# change to the matching algorithm has to consciously decide to alter it rather
+# than silently regress one case while fixing the other.
+
+def test_over_matches_references_to_external_systems():
+    # Documents the known tradeoff, doesn't endorse it as correct: this heading
+    # is real, substantive content (not a reference list), but prefix matching
+    # can't tell it apart from a genuine "References" section. No live instance
+    # of this shape was found across the 5-document survey corpus.
+    assert _should_skip_section(["References to External Systems"], ["REFERENCES"])
+
+
+def test_over_matches_terms_of_the_agreement():
+    # Same known tradeoff for the new TERMS entry.
+    assert _should_skip_section(["Terms of the Agreement"], ["TERMS"])
+
+
+# ---------------------------------------------------------------------------
 # P1 — _should_skip_chunk: per-item ancestry, conservative bias
 # ---------------------------------------------------------------------------
 

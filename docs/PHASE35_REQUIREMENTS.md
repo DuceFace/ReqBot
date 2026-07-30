@@ -211,7 +211,13 @@ WP-35.2's sweep meaningful — not just WP-34.4's original 15 relabeled.
   totals. Re-running the harvester once the ingest genuinely completed surfaced 2 more real
   fabrication candidates from `afi10-2402.pdf` alone (both included above) and changed the faithful
   holdout's composition. Fixed by re-harvesting, re-verifying, and rebuilding before this section was
-  finalized — not left as a known gap for WP-35.2 to discover.
+  finalized — not left as a known gap for WP-35.2 to discover. The underlying metric bug (counting
+  `runs_scanned` from directory existence rather than from whether each run's own enriched file had
+  finished writing) was independently caught by Gemini review on this WP's PR, in code this session
+  had already fixed the *data* for but not yet the *metric* itself — `runs_scanned` now only counts
+  directories that actually contributed records; `run_dirs_found` reports the raw directory count
+  separately, so a future in-progress-ingest run shows up as a visible gap between the two instead of
+  silently inflating `runs_scanned`.
 - **Circular-evidence bug, found by Codex review on this WP's own PR:** 8 of the first 17
   hand-verified records — 6 `fabricated_*` and 2 `faithful` — turned out (exact `source_quote` match)
   to already be `eval/entailment_spike.py`'s own `KNOWN_BAD`/`KNOWN_GOOD` fixtures, re-discovered

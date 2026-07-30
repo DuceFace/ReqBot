@@ -1471,6 +1471,7 @@
     }
   ],
   "totals": {
+    "run_dirs_found": 11,
     "runs_scanned": 11,
     "records_scanned": 1204,
     "citation_fragment_shaped": 6,

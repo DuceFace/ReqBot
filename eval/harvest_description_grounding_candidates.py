@@ -126,12 +126,14 @@ def harvest(clean_sample_size: int) -> dict:
     seen: set[tuple] = set()
 
     run_dirs = sorted(p for p in PROCESSED_DIR.iterdir() if p.is_dir()) if PROCESSED_DIR.exists() else []
+    runs_processed = 0
     for run_dir in run_dirs:
         ts = _run_timestamp(run_dir)
         fix_status = "unknown" if ts is None else ("post_fix" if ts >= FIX_CUTOFF else "pre_fix")
-        enriched_files = list(run_dir.glob("*_requirements_enriched.jsonl"))
+        enriched_files = sorted(run_dir.glob("*_requirements_enriched.jsonl"))
         if not enriched_files:
             continue
+        runs_processed += 1
         with open(enriched_files[0], encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
@@ -178,7 +180,8 @@ def harvest(clean_sample_size: int) -> dict:
         "modality_shaped": modality,
         "clean_sample": clean_sample,
         "totals": {
-            "runs_scanned": len(run_dirs),
+            "run_dirs_found": len(run_dirs),
+            "runs_scanned": runs_processed,
             "records_scanned": len(seen),
             "citation_fragment_shaped": len(citation_fragment),
             "modality_shaped": len(modality),

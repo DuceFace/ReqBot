@@ -23,6 +23,13 @@ from pathlib import Path
 
 from rapidfuzz import fuzz
 
+# Ensure repo root is on sys.path when run as a standalone script from pipeline/.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from pipeline.chunk_text import _normalize_heading
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -56,6 +63,71 @@ PIPELINE_VERSION = "1.0"
 # that motivated this WP scored 44). See archive/PHASE32_REQUIREMENTS.md for the
 # full investigation.
 QUOTE_GROUNDING_THRESHOLD = 60
+
+# WP-34.2: a colon-terminated source_quote longer than this (in words) is treated
+# as too substantial to be a bare list-header fragment and is left alone rather
+# than rejected. All known real fabrication triggers are well under this --
+# "The MC4EB will:" (3 words), "The process will be as follows:" (6 words), and
+# the longest, "The KER may be sent either by scanned soft copy via SIPRNET or by
+# mail to the address listed below:" (20 words) -- so 25 leaves headroom without
+# being large enough to plausibly swallow a genuinely complete, longer quote that
+# just happens to end mid-punctuation.
+UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25
+
+
+# WP-34.2: minimum fuzz.ratio (0-100, whole-string similarity) between a
+# normalized source_quote and its chunk's own heading before treating it as a
+# heading echo rather than real body content. ratio (not partial_ratio, which
+# QUOTE_GROUNDING_THRESHOLD above uses for a different comparison shape -- a
+# short quote against a much longer chunk) is the right tool here: it scores
+# the two full strings against each other, so a short generic heading (e.g.
+# "Purpose") merely appearing as a substring inside an unrelated, much longer
+# real quote scores low and passes through -- a literal substring-containment
+# check does not have this property (confirmed against a real example: "Access
+# badges shall be issued for the sole purpose of controlling entry to
+# restricted areas." contains the heading "purpose" verbatim, but is a
+# genuine, unrelated requirement). Both confirmed real fabrication fixtures are
+# exact matches after normalization (ratio 100); 90 leaves headroom for
+# incidental punctuation/whitespace differences without opening the substring
+# false-positive risk above.
+HEADING_ECHO_THRESHOLD = 90
+
+
+def _is_heading_echo(source_quote: str, section_title_path: list[str]) -> bool:
+    """True if source_quote is just its own chunk's heading, not body content.
+
+    Step C occasionally extracts a chunk's structural heading (e.g. "COMPLIANCE
+    WITH THIS PUBLICATION IS MANDATORY") as if it were a requirement in its own
+    right. Reuses chunk_text.py's _normalize_heading() for both sides so this
+    matches on the same normalized form skip_sections filtering already uses --
+    not separate matching logic (WP-34.2).
+    """
+    if not section_title_path:
+        return False
+    heading = section_title_path[-1]
+    if not heading:
+        return False
+    normalized_quote = _normalize_heading(source_quote)
+    normalized_heading = _normalize_heading(heading)
+    if not normalized_quote or not normalized_heading:
+        return False
+    return fuzz.ratio(normalized_quote, normalized_heading) >= HEADING_ECHO_THRESHOLD
+
+
+def _is_unrepairable_fragment(source_quote: str) -> bool:
+    """True if source_quote is a truncated list-header with no content of its own.
+
+    A short quote ending in a bare colon (e.g. "The process will be as
+    follows:") carries no obligation content on its own -- Step D.5 enrichment
+    was found fabricating plausible-sounding description text to "complete" it,
+    content that appears nowhere in source_quote (WP-34.2). Only fires on quotes
+    that literally end in a colon; a quote that merely contains one mid-sentence
+    (and so has real content following it) is untouched.
+    """
+    stripped = source_quote.strip()
+    if not stripped.endswith(":"):
+        return False
+    return len(stripped.split()) <= UNREPAIRABLE_FRAGMENT_MAX_WORDS
 
 
 def compute_document_identity(pdf_path: Path) -> dict:
@@ -341,6 +413,31 @@ def run(
         req_type = req.get("requirement_type", "").strip().lower()
         chunk_id = req.get("chunk_id")
 
+        # Hierarchy metadata — sourced from deterministic WP-14.2 parser output.
+        # Falls back to empty values for legacy (pre-WP-14.2) chunks. Resolved here,
+        # ahead of the validation checks below, because WP-34.2's heading-echo check
+        # needs section_title_path -- it used to be resolved after this loop's checks.
+        hierarchy = chunk_hierarchy_map.get(chunk_id) if chunk_id is not None else None
+        if hierarchy:
+            section_ref_path: list[str] = hierarchy["section_ref_path"]
+            section_title_path: list[str] = hierarchy["section_title_path"]
+            parent_context: str | None = hierarchy["parent_context"]
+            # parent_section_ref: penultimate element of the ancestry path
+            parent_section_ref: str | None = (
+                section_ref_path[-2] if len(section_ref_path) >= 2 else None
+            )
+            # child_section_refs: direct children of this section across all chunks
+            current_ref = section_ref_path[-1] if section_ref_path else None
+            child_section_refs: list[str] = (
+                section_children_map.get(current_ref, []) if current_ref else []
+            )
+        else:
+            section_ref_path = []
+            section_title_path = []
+            parent_context = None
+            parent_section_ref = None
+            child_section_refs = []
+
         if not source_quote:
             failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "empty_source_quote", "raw": req})
             continue
@@ -369,6 +466,21 @@ def run(
                 })
                 continue
 
+        # WP-34.2: reject a chunk's own structural heading extracted as if it were
+        # a body-content requirement (e.g. "COMPLIANCE WITH THIS PUBLICATION IS
+        # MANDATORY", which is exactly that chunk's section_title_path[-1]).
+        if _is_heading_echo(source_quote, section_title_path):
+            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "heading_echo_quote", "raw": req})
+            continue
+
+        # WP-34.2: reject a truncated list-header quote with no obligation content
+        # of its own (e.g. "The process will be as follows:") -- left in place,
+        # Step D.5 enrichment was found fabricating description text to "complete"
+        # these rather than the pipeline ever inventing or assembling real content.
+        if _is_unrepairable_fragment(source_quote):
+            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "unrepairable_fragment_quote", "raw": req})
+            continue
+
         if description:
             desc_lower = description.lower()
             if desc_lower.startswith("not explicitly stated"):
@@ -393,29 +505,6 @@ def run(
         page_end = None
         if chunk_id is not None and chunk_id in chunk_page_map:
             page_start, page_end = chunk_page_map[chunk_id]
-
-        # Hierarchy metadata — sourced from deterministic WP-14.2 parser output.
-        # Falls back to empty values for legacy (pre-WP-14.2) chunks.
-        hierarchy = chunk_hierarchy_map.get(chunk_id) if chunk_id is not None else None
-        if hierarchy:
-            section_ref_path: list[str] = hierarchy["section_ref_path"]
-            section_title_path: list[str] = hierarchy["section_title_path"]
-            parent_context: str | None = hierarchy["parent_context"]
-            # parent_section_ref: penultimate element of the ancestry path
-            parent_section_ref: str | None = (
-                section_ref_path[-2] if len(section_ref_path) >= 2 else None
-            )
-            # child_section_refs: direct children of this section across all chunks
-            current_ref = section_ref_path[-1] if section_ref_path else None
-            child_section_refs: list[str] = (
-                section_children_map.get(current_ref, []) if current_ref else []
-            )
-        else:
-            section_ref_path = []
-            section_title_path = []
-            parent_context = None
-            parent_section_ref = None
-            child_section_refs = []
 
         confidence = 1.0
         if not domain_tags:

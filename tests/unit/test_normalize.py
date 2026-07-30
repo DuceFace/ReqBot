@@ -1,7 +1,13 @@
 import json
 from pathlib import Path
 
-from pipeline.parse_and_normalize import build_chunk_text_map, compute_stable_id, run
+from pipeline.parse_and_normalize import (
+    _is_heading_echo,
+    _is_unrepairable_fragment,
+    build_chunk_text_map,
+    compute_stable_id,
+    run,
+)
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -246,3 +252,123 @@ def test_empty_chunk_text_still_rejects_fabricated_quote(tmp_path):
     failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
     assert len(failures) == 1
     assert failures[0]["error"] == "quote_not_grounded_in_chunk"
+
+
+# WP-34.2: heading-echo and unrepairable-fragment rejection. Fixtures are the 5
+# real examples confirmed in docs/PHASE34_REQUIREMENTS.md (afpd_17-1.pdf and
+# CJCSI 6510.02G.pdf docling re-ingests), plus the original WP-33.3 fixture.
+
+def test_is_heading_echo_exact_match():
+    assert _is_heading_echo(
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+        ["Purpose", "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"],
+    )
+
+
+def test_is_heading_echo_second_real_fixture():
+    assert _is_heading_echo(
+        "All HAF Functionals, MAJCOMs, DRUs, and FOAs will:",
+        ["All HAF Functionals, MAJCOMs, DRUs, and FOAs will:"],
+    )
+
+
+def test_is_heading_echo_trailing_punctuation_still_matches():
+    # Minor punctuation difference from the heading shouldn't let a real echo
+    # slip through -- fuzz.ratio's tolerance covers this without needing exact
+    # string equality.
+    assert _is_heading_echo(
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY.",
+        ["COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"],
+    )
+
+
+def test_is_heading_echo_false_for_unrelated_quote():
+    assert not _is_heading_echo("KERs shall be approved by the MC4EB.", ["KER Approval Process"])
+
+
+def test_is_heading_echo_false_when_heading_word_appears_incidentally():
+    # A short, generic heading (e.g. "Purpose") merely appearing as a substring
+    # inside a much longer, unrelated real requirement must NOT be flagged --
+    # this is why the check uses whole-string fuzz.ratio rather than literal
+    # substring containment.
+    assert not _is_heading_echo(
+        "Access badges shall be issued for the sole purpose of controlling entry to restricted areas.",
+        ["Purpose"],
+    )
+
+
+def test_is_heading_echo_false_with_no_hierarchy():
+    assert not _is_heading_echo("Any quote text.", [])
+
+
+def test_is_unrepairable_fragment_short_colon_lead_in():
+    assert _is_unrepairable_fragment("The process will be as follows:")
+
+
+def test_is_unrepairable_fragment_longer_colon_lead_in():
+    assert _is_unrepairable_fragment(
+        "The KER may be sent either by scanned soft copy via SIPRNET or by mail to the address listed below:"
+    )
+
+
+def test_is_unrepairable_fragment_original_wp_33_3_fixture():
+    assert _is_unrepairable_fragment("The MC4EB will:")
+
+
+def test_is_unrepairable_fragment_false_for_complete_terse_quote():
+    # Must not over-reject a genuinely terse-but-real requirement just because
+    # it's short -- the trigger is the trailing bare colon, not brevity alone.
+    assert not _is_unrepairable_fragment("KERs shall be approved by the MC4EB.")
+
+
+def test_is_unrepairable_fragment_false_for_colon_with_content_after():
+    assert not _is_unrepairable_fragment("Passwords must be at least 12 characters: no exceptions.")
+
+
+def test_heading_echo_rejected_in_full_pipeline(tmp_path):
+    chunk_text = "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote=chunk_text)
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    chunk = _chunk(1, chunk_text)
+    chunk["section_title_path"] = ["Purpose", chunk_text]
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [chunk])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert _read_jsonl(out_dir / "test_requirements_normalized.jsonl") == []
+    failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
+    assert len(failures) == 1
+    assert failures[0]["error"] == "heading_echo_quote"
+
+
+def test_unrepairable_fragment_rejected_in_full_pipeline(tmp_path):
+    chunk_text = "3.2 The process will be as follows: step one, step two, step three."
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="The process will be as follows:")
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert _read_jsonl(out_dir / "test_requirements_normalized.jsonl") == []
+    failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
+    assert len(failures) == 1
+    assert failures[0]["error"] == "unrepairable_fragment_quote"
+
+
+def test_negative_fixture_survives_full_pipeline(tmp_path):
+    # "KERs shall be approved by the MC4EB." -- terse and real, must survive
+    # both the heading-echo and unrepairable-fragment checks.
+    chunk_text = "4.1 KER Approval Process. KERs shall be approved by the MC4EB."
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="KERs shall be approved by the MC4EB.")
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    chunk = _chunk(1, chunk_text)
+    chunk["section_title_path"] = ["KER Approval Process"]
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [chunk])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert len(_read_jsonl(out_dir / "test_requirements_normalized.jsonl")) == 1
+    assert _read_jsonl(out_dir / "test_normalization_failures.jsonl") == []

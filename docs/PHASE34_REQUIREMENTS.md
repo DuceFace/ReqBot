@@ -19,7 +19,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-34.1 — Deprecate Legacy Chunking, Docling-Only | Complete — legacy pymupdf/pdfplumber chunking removed (`pipeline/extract_pdf_to_text.py` deleted, `pipeline/chunk_text.py`'s legacy `run()`/helpers removed); `--layout-mode` removed from all three independent locations (`cli/reqbot.py`, `cli/console.py`, `pipeline/run_pipeline.py`'s own `main()`); docling failure is now an unconditional hard error; docling moved into the base install (`pyproject.toml`); `requirements.txt` retired in favor of `pip install .` (CI/Dockerfile updated accordingly) |
-| WP-34.2 — Reject Heading-Echoed and Unrepairable-Fragment Quotes in Step D | Not started |
+| WP-34.2 — Reject Heading-Echoed and Unrepairable-Fragment Quotes in Step D | Complete — `_is_heading_echo`/`_is_unrepairable_fragment` added to `pipeline/parse_and_normalize.py`'s validation loop; hierarchy resolution moved earlier so `section_title_path` is available to the new checks; heading-echo uses `fuzz.ratio` (not literal substring containment — a real false-positive risk found during implementation, see §4 below) |
 | WP-34.3 — Expand `skip_sections` Heading Vocabulary | Not started |
 | WP-34.4 — Spike: Description-Grounding Entailment Check | Not started |
 
@@ -220,6 +220,27 @@ invent obligations" architecture principle.
 
 **Gate:** All 5 known positive fixtures are rejected with a durable failure reason; all negative
 fixtures pass through unaffected.
+
+**Implementation note (deviation from the Scope above):** the heading-echo check does not use literal
+substring containment ("is contained by/contains"). Tested against a realistic adversarial case before
+locking it in: a short, generic heading like `"Purpose"` appears verbatim as a substring inside plenty
+of genuine, unrelated requirements (e.g. `"Access badges shall be issued for the sole purpose of
+controlling entry to restricted areas."`) — literal containment would reject those as heading echoes,
+which they are not. Used `rapidfuzz.fuzz.ratio` (whole-string similarity, threshold 90) instead of
+`in`/`==`: both real fabrication fixtures score 100 (exact match after normalization) and pass the
+threshold comfortably, while the "Purpose" adversarial case scores low and survives. Same rapidfuzz
+dependency already in use for WP-32.1's grounding check, applied with the comparison shape (`ratio`,
+not `partial_ratio`) suited to "are these two full strings basically the same," not "does a short
+string appear somewhere in a much longer one." The unrepairable-fragment check's threshold
+(`UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25`) is a judgment call, not a calibrated sweep like WP-32.1's —
+chosen with headroom above the longest known real fixture (20 words); revisit if a future false
+positive/negative surfaces on a broader corpus.
+
+Manually verified against real data: re-ran Step D only (`--skip-to D`) against the existing docling
+extraction outputs for both `afpd_17-1.pdf` and `CJCSI 6510.02G.pdf` (from the Phase 34 brainstorm
+re-ingest). All 5 known fixtures were caught with the expected failure reason and no others; the
+pre-existing `quote_not_grounded_in_chunk` rejection counts were unchanged (3 and 16 respectively) —
+confirming zero collateral rejections among requirements the new checks weren't meant to touch.
 
 ---
 

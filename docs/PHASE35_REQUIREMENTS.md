@@ -119,9 +119,15 @@ would mean tuning to the examples used to prove the concept, not an independent 
   own Codex-caught miss was only found by checking the full record, not the quote/description text
   alone.
 - Output: a new fixture file (e.g. `eval/gold_description_grounding.jsonl`) with
-  `(source_quote, description, label, notes)` — `label` at minimum distinguishes faithful vs.
-  fabricated, and should separately flag the WP-35.3 modality-fabrication subtype found in WP-34.4,
-  not lump it in with citation/fragment-completion fabrications as one undifferentiated category.
+  `(source_quote, description, label, notes, section_title_path, parent_context, source_pdf,
+  chunk_id)` — not just the bare quote/description pair. The preceding bullet requires checking
+  `section_title_path`/`parent_context` to determine a label in the first place (this is exactly how
+  WP-34.4's own Codex-caught miss was found); a fixture that discards that context after labeling
+  can't be audited or reproduced later without re-locating the original record under
+  `~/documents/processed/`, which may not still exist by the time WP-35.2/35.3 consume this file
+  (found during PR #165 review, Codex). `label` at minimum distinguishes faithful vs. fabricated,
+  and should separately flag the WP-35.3 modality-fabrication subtype found in WP-34.4, not lump it
+  in with citation/fragment-completion fabrications as one undifferentiated category.
 - Explicitly account for `gold_eval_chunks_curated.jsonl`'s own known noise (~20% per prior
   operational findings) if any part of this dataset is built by pairing that file's quotes with
   freshly-generated descriptions — don't inherit its noise silently into a new "gold" file without
@@ -185,14 +191,39 @@ real miss WP-34.4 found (`support_prob=0.9197` on a case that should have been r
 
 **Scope:**
 - A cheap, deterministic secondary check (no LLM call, matching this project's established
-  preference for Step D checks that are fast and don't add extraction-time cost): does `description`
-  contain obligation/imperative language (e.g. "must", "shall", "required to", "implement",
-  "ensure" — reuse the cybersecurity profile's own `obligation_verbs` list from
-  `profiles/cybersecurity.json` rather than inventing a separate vocabulary) that has no
-  corresponding obligation-shaped language anywhere in `source_quote`.
+  preference for Step D checks that are fast and don't add extraction-time cost), reusing the
+  cybersecurity profile's own `obligation_verbs` list from `profiles/cybersecurity.json` rather than
+  inventing a separate vocabulary. **Not simple set-membership/presence checking** — verified during
+  PR #165 review (Codex) against this repo's own existing fixtures (`eval/entailment_spike.py`) that
+  naive vocabulary presence gets both directions wrong:
+  - **Under-catches** the actual known-bad case if checked as "quote already contains some
+    obligation word, so any obligation word in description is fine": the definition-fabrication
+    example's quote already contains "ensure" (`"...to ensure its availability..."`), but that's a
+    purpose clause ("in order to ensure X"), not an obligation modal attached to an actor — the
+    fabricated word is "Implement," a distinct verb absent from the quote entirely. A correct check
+    needs to compare specific words/senses present in `description` against `source_quote`, not
+    "does *an* obligation word exist on each side."
+  - **Over-catches** on a real faithful case if checked as strict per-word set difference (does each
+    specific obligation word in `description` appear literally in `source_quote`): the
+    `dodi_nsa_approved_crypto` fixture is a legitimate, faithful "will" → "must" modal-verb
+    substitution — a real paraphrase already confirmed faithful in WP-34.4. Obligation verbs are
+    routinely paraphrased between near-synonyms in this domain ("will"/"must"/"shall"/"is required
+    to" function interchangeably in DoD/NIST regulatory writing); a literal per-word match would
+    false-positive on exactly this kind of correct paraphrase.
+  - **What this means for implementation, left open here on purpose:** the check needs at least (a)
+    a modal-equivalence grouping so `obligation_verbs` entries that function as synonyms don't count
+    as mismatches, and (b) some way to distinguish a word's grammatical role (an actual imperative
+    modal attached to a subject/actor, vs. the same surface word used in a purpose clause, an
+    example, a definition, or a quoted title) rather than bare string containment. Whether that's a
+    small synonym-grouping table plus a lightweight dependency/POS check, or some other mechanism,
+    is WP-35.3's own design decision — not pre-solved in this phase doc, but the naive
+    "vocabulary presence" framing this section originally described is confirmed insufficient
+    against this project's own real fixtures and must not be implemented as literally first written.
 - Validate against WP-35.1's dataset specifically for this subtype — the modality-fabrication label
   from WP-35.1's fixture file is what this WP's own fixtures should be drawn from, not invented
-  fresh.
+  fresh. At minimum, both counterexamples found during this phase's own scoping review (the
+  "ensure"-as-purpose-clause case and the "will"/"must" paraphrase) must be included as fixtures,
+  not just the original miss.
 - Decide how this combines with WP-35.2's entailment threshold in WP-35.4 (either check independently
   rejects, or both feed one combined decision) — a real design decision for WP-35.4, not pre-decided
   here.
@@ -210,8 +241,9 @@ real miss WP-34.4 found (`support_prob=0.9197` on a case that should have been r
   `tests/unit/test_normalize.py` and `tests/unit/test_skip_section.py`.
 
 **Gate:** The known WP-34.4 miss (glossary definition reframed as imperative) is caught by this
-check even where the entailment score alone would pass it; real faithful descriptions that
-legitimately restate a quote's own obligation language are not falsely rejected.
+check even where the entailment score alone would pass it; the "will" → "must" and other real modal
+paraphrases already confirmed faithful in WP-34.4's own fixtures are not falsely rejected; the
+"ensure"-as-purpose-clause case specifically does not cause a false negative on the original miss.
 
 ---
 

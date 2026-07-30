@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-34.1 — Deprecate Legacy Chunking, Docling-Only | Complete — legacy pymupdf/pdfplumber chunking removed (`pipeline/extract_pdf_to_text.py` deleted, `pipeline/chunk_text.py`'s legacy `run()`/helpers removed); `--layout-mode` removed from all three independent locations (`cli/reqbot.py`, `cli/console.py`, `pipeline/run_pipeline.py`'s own `main()`); docling failure is now an unconditional hard error; docling moved into the base install (`pyproject.toml`); `requirements.txt` retired in favor of `pip install .` (CI/Dockerfile updated accordingly) |
 | WP-34.2 — Reject Heading-Echoed and Unrepairable-Fragment Quotes in Step D | Complete — `_is_heading_echo`/`_is_unrepairable_fragment` added to `pipeline/parse_and_normalize.py`'s validation loop; hierarchy resolution moved earlier so `section_title_path` is available to the new checks; heading-echo uses `fuzz.ratio` (not literal substring containment — a real false-positive risk found during implementation, see §4 below) |
-| WP-34.3 — Expand `skip_sections` Heading Vocabulary | Not started |
+| WP-34.3 — Expand `skip_sections` Heading Vocabulary | Complete — `"TERMS"` added to `profiles/cybersecurity.json`'s `skip_sections`, confirmed via a 6-document heading-vocabulary survey (see §4 below); no change to `_should_skip_section`'s matching algorithm — a real over-matching tradeoff was investigated (independently re-flagged by Codex on PR #163, confirmed still unfixable without regressions) and deliberately left as-is (documented in the function's docstring and pinned by regression tests) |
 | WP-34.4 — Spike: Description-Grounding Entailment Check | Not started |
 
 ---
@@ -285,6 +285,52 @@ does case-insensitive, prefix-based matching correctly; it just doesn't know `"T
 **Gate:** The heading-vocabulary survey is documented (which documents, which headings, what was
 added and why); `afpd_17-1.pdf`'s `"Terms"` section content is filtered on re-ingest; the negative
 fixture set confirms no over-matching.
+
+**Survey findings (implementation):** ran Steps A+B only (docling parse + chunk, no Ollama needed)
+on 6 real documents beyond the two already covered by the Phase 34 brainstorm (`afpd_17-1.pdf`,
+`CJCSI 6510.02G.pdf`) — `afi17-101.pdf`, `DODI 8500.01.pdf`, `NIST.SP.800-171r3.pdf`, and
+`dafman17-1203.pdf` — and inspected every unique `section_title_path` heading against the current
+`skip_sections` list. (`CNSSI_No1253.pdf` was also attempted but its parse was accidentally killed
+by a scratch-directory cleanup mid-run; not retried since the other 6 documents already gave
+strong, independently-replicated evidence.)
+
+- `"Terms"` is confirmed **not** a one-document idiosyncrasy: it appears independently in
+  `afpd_17-1.pdf`, `afi17-101.pdf`, **and** `dafman17-1203.pdf` (all AFI/AFPD/DAFMAN-series), a
+  real convention for that document family, not a fluke. Added as the sole new entry.
+- Every other glossary/definitions/references-equivalent heading found across all 6 documents was
+  already correctly matched by the existing list — `"PART II.  DEFINITIONS"`,
+  `"PART I.  ABBREVIATIONS AND ACRONYMS"`, `"REFERENCES"`/`"References"`, `"Appendix B. Glossary"`.
+  No other new synonym was needed.
+- `CJCSI 6510.02G.pdf` (already surveyed during brainstorming) has no glossary/definitions/
+  references-equivalent section at all — confirmed again, not a gap.
+- **A real, separate gap found and deliberately left out of scope:** `NIST.SP.800-171r3.pdf`'s
+  acronym-list entries (e.g. `CFR`, `CISA`, `CUI`) each get docling-parsed as their own standalone,
+  parentless heading (`section_title_path == ["CFR"]`, no enclosing "Acronyms" ancestor at all) —
+  not a vocabulary problem `skip_sections` can fix by adding words, since there's no parent heading
+  text to match against. This is a docling/HybridChunker structural-parsing gap, not this WP's
+  territory (which is `profiles/cybersecurity.json` vocabulary, not chunking logic). Not fixed here;
+  logged as item 30 in `docs/TODO_future_improvements.txt`.
+- **Over-matching risk investigated, not fixed:** confirmed empirically (not just hypothetically)
+  that `_should_skip_section(["References to External Systems"], ["REFERENCES"])` returns `True` —
+  a real false-positive shape. No live instance of this shape was found across the 6-document
+  survey, and a stricter matching rule (e.g. requiring nothing follow the skip word) would break the
+  confirmed-real `"Abbreviations and Acronyms"` case, which has the identical shape
+  (skip-word + more free words) but must stay skipped. Left the algorithm unchanged — the tradeoff
+  is now documented in `_should_skip_section`'s docstring and pinned by two regression tests
+  (`test_over_matches_references_to_external_systems`, `test_over_matches_terms_of_the_agreement`)
+  so a future change to the algorithm has to consciously decide to alter this rather than silently
+  regress one case while fixing the other.
+
+**Review outcome (PR #163):** Codex independently flagged the exact same `"TERMS"` over-matching
+risk (P2) and suggested treating it as an exact match or restricting to known suffixes. Tried that
+concretely rather than dismissing it: it breaks the pre-existing, already-passing
+`test_heading_starts_with_skip_phrase` test (`"Glossary of References and Supporting Information"`
+has the identical "skip-word + of + more words" shape and must keep matching) — confirming no cheap
+syntactic fix exists, consistent with the finding above. Replied on the thread with this evidence;
+no code change. Gemini's one finding (claimed `test_terms_not_skipped_without_being_added` would
+fail at runtime) was a false alarm — it assumed `CYBERSECURITY_SKIPS` might be loaded from
+`profiles/cybersecurity.json`; it's actually a hardcoded test fixture representing the pre-TERMS
+list on purpose, and the test passes (confirmed via `pytest`, 50/50 in this file).
 
 ---
 

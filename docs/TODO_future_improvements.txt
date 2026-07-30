@@ -358,6 +358,20 @@ ACTIVE BACKLOG
     different and much fuzzier thing to build, not an extension of what's
     here.
 
+30. Docling acronym/glossary list entries sometimes parse with no enclosing
+    heading (found during WP-34.3's heading-vocabulary survey, Phase 34)
+    NIST.SP.800-171r3.pdf's acronym list (e.g. "CFR", "CISA", "CUI") gets
+    docling-parsed as standalone, parentless headings -- section_title_path
+    is just ["CFR"], with no "Acronyms"/"Abbreviations" ancestor at all. This
+    isn't a skip_sections vocabulary gap (WP-34.3's territory): there's no
+    parent heading text to match against, so no amount of vocabulary tuning
+    fixes it. It's a HybridChunker/section_parser structural-parsing
+    limitation for this specific list-of-bolded-terms layout. Not fixed as
+    part of WP-34.3 (out of scope -- that WP is profile vocabulary, not
+    chunking logic). Worth a real look if it turns out to recur across other
+    documents' acronym lists, since it means those entries currently reach
+    Step C unfiltered as candidate requirements.
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS

@@ -253,8 +253,15 @@ def main() -> None:
     for bucket in ("citation_fragment_shaped", "modality_shaped"):
         for entry in harvest[bucket]:
             rid = entry["requirement_id"]
-            if rid in PREFERRED_DESCRIPTION and entry["description"] != PREFERRED_DESCRIPTION[rid]:
-                continue
+            if rid in PREFERRED_DESCRIPTION:
+                if entry["description"] != PREFERRED_DESCRIPTION[rid]:
+                    continue
+            elif rid in by_id and entry["description"] != by_id[rid]["description"]:
+                raise SystemExit(
+                    f"Duplicate requirement_id {rid} with differing descriptions found in harvest "
+                    f"candidates, and it isn't registered in PREFERRED_DESCRIPTION -- hand-pick which "
+                    f"description variant to keep (see REQ-35dfe9353e60 for the pattern) before rerunning."
+                )
             by_id[rid] = entry
 
     missing = set(LABELS) - set(by_id)

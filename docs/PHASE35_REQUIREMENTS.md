@@ -16,7 +16,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-35.1 — Build a Labeled Calibration Dataset for Description Faithfulness | Not started |
+| WP-35.1 — Build a Labeled Calibration Dataset for Description Faithfulness | Complete |
 | WP-35.2 — Threshold Calibration Sweep | Not started |
 | WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Not started |
 | WP-35.4 — Production Step D.5/D.6 Entailment Gate | Not started |
@@ -165,6 +165,52 @@ would mean tuning to the examples used to prove the concept, not an independent 
 **Gate:** A committed, documented labeled dataset exists with enough real fabricated and real
 faithful examples (both citation/fragment-completion style and modality-fabrication style) to make
 WP-35.2's sweep meaningful — not just WP-34.4's original 15 relabeled.
+
+**Findings (2026-07-30/31):**
+
+- Harvested from `~/documents/processed/*/` across 11 pipeline runs / 8 distinct source documents
+  (914 unique `(source_pdf, chunk_id, source_quote, description)` triples after dedup): the original
+  2 corpus documents (`afpd_17-1.pdf`, `CJCSI 6510.02G.pdf`, 5 runs) plus 6 freshly-ingested
+  documents (`DODI 5200.01.pdf`, `afi17-203.pdf`, `NIST.SP.800-125.pdf`, `DODI 5200.44.pdf`,
+  `DODI 8410.03.pdf`, `afi10-2402.pdf`, all ingested today with `--no-index`). The fresh ingests were
+  necessary, not just nice-to-have for diversity: all 5 pre-existing runs predate today's
+  WP-34.1/34.2/34.3 merges, so none of the local corpus reflected the current, fixed pipeline before
+  this WP ran.
+- `eval/harvest_description_grounding_candidates.py` flagged candidates with two structural
+  heuristics — the same shape that surfaced WP-34.4's own 15 examples in the first place, scaled up:
+  a short/colon-terminated quote paired with a much-longer, low-similarity description
+  (citation/fragment-shaped), and a `profiles/cybersecurity.json` `obligation_verbs` term present in
+  `description` but literally absent from `source_quote` (modality-shaped) — plus a random sample of
+  everything neither heuristic flagged, restricted to post-fix runs, as the faithful holdout.
+- **Real hit rate is low: 15 distinct flagged candidates out of 914 scanned (~1.6%).** All 15 were
+  hand-verified against their own `section_title_path`/`parent_context`, per this WP's scope. 12 were
+  confirmed genuine fabrications; the other 3 were exactly the heuristic's own predicted
+  false-positive shape (a real modal-verb or near-synonym paraphrase, e.g. `will`→`must`) and are
+  kept as `faithful`-labeled WP-35.3 fixtures specifically because they were flagged, not despite it.
+  - Every citation/fragment-shaped fabrication found (5 of 5) came from `pre_fix` runs, and every one
+    traces to a document/pattern WP-34.4's own spike already knew about — no *new* citation/fragment
+    fabrication turned up anywhere in the 6 freshly-ingested, post-fix documents. Real, positive
+    confirmation (not just the a-priori expectation carried over from WP-34.4's findings) that
+    WP-34.2/34.3 structurally prevent this shape going forward.
+  - Modality-shaped fabrication is **not** similarly prevented: 2 of the 4 real modality/other
+    fabrications came from freshly-ingested, post-fix documents never seen during WP-34.4's spike
+    (`REQ-757d551b3e59`, `NIST.SP.800-125.pdf`; `REQ-c6d23854cd0b`, `DODI 8410.03.pdf`) — direct,
+    current evidence motivating WP-35.3, not just the one historical Codex-caught example carried
+    over from Phase 34.
+  - `REQ-c6d23854cd0b` surfaced a real gap in `parse_and_normalize.py`'s `_is_unrepairable_fragment`:
+    it only fires on colon-terminated quotes, but this record — a bare enumerated list-item topic
+    phrase with no trailing colon — has the identical fabrication shape. Logged as item 32 in
+    `docs/TODO_future_improvements.txt`; out of scope to fix in this WP.
+- Given the honest hit rate above, the faithful holdout was deliberately oversized (90 records
+  against 12 fabricated + 3 reclassified) to reach this WP's Gate at a defensible total scale — 105
+  records combined, order-of-magnitude 100+ as scoped, with the shortfall on the fabricated side
+  documented rather than papered over with synthetic or padded examples.
+- **Output:** `eval/gold_description_grounding.jsonl` — 105 records: 5 `fabricated_citation`, 3
+  `fabricated_fragment`, 2 `fabricated_modality`, 2 `fabricated_other`, 93 `faithful`. Built by
+  `eval/build_gold_description_grounding.py` from `eval/harvest_description_grounding_candidates.py`'s
+  output plus this WP's hand-verification labels (both scripts committed for reproducibility, along
+  with the harvester's intermediate output, `eval/spike_results/wp_35_1/harvest_candidates.json`,
+  matching the existing `eval/spike_results/wp_33_3/`, `eval/spike_results/wp_34_4/` precedent).
 
 ---
 

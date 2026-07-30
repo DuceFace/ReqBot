@@ -415,6 +415,24 @@ ACTIVE BACKLOG
     unrelated package -- plus one NLTK data download; neither is in
     `pyproject.toml` yet since nothing ships this dependency today).
 
+32. `_is_unrepairable_fragment` only catches colon-terminated fragments, not
+    bare enumerated list-item topic phrases (found during WP-35.1's
+    calibration-dataset harvest, Phase 35)
+    `pipeline/parse_and_normalize.py`'s `_is_unrepairable_fragment` (WP-34.2)
+    only fires on a `source_quote` that ends in a colon. A real, post-fix
+    example turned up during WP-35.1's harvest that has the identical
+    fabrication shape without a trailing colon: `DODI 8410.03.pdf`'s
+    `"(3) Mean time between failures of network equipment or connectivity."`
+    -- a bare enumerated list-item topic phrase (item 3 of a list of SLA
+    areas to address, confirmed via `parent_context`), not itself an
+    obligation sentence. Step D.5 still fabricated a specific obligation for
+    it ("must be measured") that appears nowhere in the quote. Recorded as
+    `fabricated_fragment` in `eval/gold_description_grounding.jsonl`
+    (`REQ-c6d23854cd0b`). Out of scope to fix during WP-35.1 (that WP builds
+    a labeled dataset, not production code) -- worth a real look if this
+    shape recurs at meaningful scale once WP-35.2's threshold sweep runs
+    against the fuller dataset.
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS

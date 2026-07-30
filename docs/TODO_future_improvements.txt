@@ -386,10 +386,13 @@ ACTIVE BACKLOG
     pairs pulled from this repo's own enriched output, with a wide score
     margin among the caught cases (known-bad max 0.133, known-good min
     0.852). Investigation only, per the spike's own Non-Goals -- no
-    production code was changed. Follow-up work, not yet scoped as its own
-    WP: add a Step D.5 (or new Step D.6) rejection gate using this model,
-    mirroring WP-32.1's Step D grounding-check pattern (reject below a
-    threshold, log the failure reason, don't silently drop).
+    production code was changed. Now scoped as Phase 35 (see header above,
+    docs/PHASE35_REQUIREMENTS.md) -- not yet implemented: add a Step D.5 (or
+    new Step D.6) rejection gate using this model, mirroring WP-32.1's Step D
+    grounding-check pattern (reject below a threshold, log the failure
+    reason, don't silently drop -- though whether "reject" means dropping
+    the whole requirement or just the description field is itself an open
+    WP-35.4 decision, not settled here).
     **Known limitation, found by Codex review on PR #164, must be scoped
     into the fix, not just noted:** the one miss (support_prob=0.9197) was a
     dictionary-style definition reframed as an imperative obligation --

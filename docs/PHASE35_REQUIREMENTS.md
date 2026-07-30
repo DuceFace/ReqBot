@@ -111,13 +111,32 @@ would mean tuning to the examples used to prove the concept, not an independent 
   enrichment runs (Step D.5 needs Ollama; `--skip-to` isn't available for D.5 alone the way it is
   for Step D — check `pipeline/run_pipeline.py`'s actual `skip_to` handling before assuming this is
   free).
-- Hand-label a random sample from that pool — target order-of-magnitude 100+ records (more than
-  WP-34.4's 15, deliberately not claiming WP-32.1's 2,452-scale rigor since that was checked
-  mechanically via substring matching; this requires real human judgment per record, same
-  constraint WP-33.3's 40-record hand-labeling had). Each record's `section_title_path` and
-  `parent_context` must be checked, not just the bare quote/description pair in isolation — WP-34.4's
-  own Codex-caught miss was only found by checking the full record, not the quote/description text
-  alone.
+- **Not pure random sampling — stratified/targeted harvesting, with a documented reason.** Found
+  during a manual local Codex review of this doc (2026-07-30, not posted to GitHub): a random sample
+  of *fresh* Step D.5 output risks containing too few real fabrications to calibrate against, because
+  several of WP-34.4's own known-bad patterns are now prevented before they'd ever reach Step D.5 on
+  a current ingest. Checked directly — this is worse than it first sounds: 4 of WP-34.4's 6
+  known-bad examples are now structurally prevented at the source, not just 1 or 2. The citation-list
+  fabrications (`JP 3-12`, `DoDI 8500.01`) were already covered by the pre-existing `REFERENCES`
+  skip_sections entry once docling+skip_sections is properly applied — confirmed in
+  `docs/PHASE34_BRAINSTORM.md` §3 ("Category 1... likely already solved... zero occurrences across
+  both documents"). The heading-echo fragment (`"All HAF Functionals..."`) is now caught by WP-34.2.
+  The glossary-definition case (`"Cybersecurity - Prevention of..."`) is now caught by WP-34.3's
+  `TERMS` filter. Only the two subtler cases (`cjcsi_po_service_principal_fragment`,
+  `cjcsi_distribution_fabricated_attribution`) aren't yet structurally prevented. Given that, random
+  sampling of fresh output would mostly find clean, already-faithful descriptions — real evidence the
+  earlier fixes work, but useless for calibrating a *catch rate*. Instead: harvest deliberately,
+  with a minimum count per fabrication subtype (citation/fragment-completion-shaped, and
+  modality-fabrication-shaped) — reusing the same structural heuristics that surfaced WP-34.4's own
+  candidates (short/colon-terminated quotes paired with a much longer, low-similarity description)
+  scaled up, plus a separately-labeled faithful holdout sampled randomly from clean output (that part
+  can stay random, since faithful examples aren't the scarce resource). Target order-of-magnitude
+  100+ records total across both categories combined — more than WP-34.4's 15, deliberately not
+  claiming WP-32.1's 2,452-scale rigor since that was checked mechanically via substring matching;
+  this requires real human judgment per record, same constraint WP-33.3's 40-record hand-labeling
+  had. Each record's `section_title_path` and `parent_context` must be checked, not just the bare
+  quote/description pair in isolation — WP-34.4's own Codex-caught miss was only found by checking
+  the full record, not the quote/description text alone.
 - Output: a new fixture file (e.g. `eval/gold_description_grounding.jsonl`) with
   `(source_quote, description, label, notes, section_title_path, parent_context, source_pdf,
   chunk_id)` — not just the bare quote/description pair. The preceding bullet requires checking
@@ -260,11 +279,26 @@ Step D.5 enrichment output, not just exist as an eval script.
   heavy and the check is meant to run inline during every ingest, base install matches WP-34.1's
   own docling precedent; if it's expensive enough to want opt-in, a new extra is more appropriate —
   make and document the call here, don't default silently).
-- Add the calibrated rejection check, matching the existing pattern exactly: a durable failure
-  reason in `*_normalization_failures.jsonl` (e.g. `description_not_grounded`,
-  `description_fabricated_obligation` for WP-35.3's check specifically — two distinct reasons, not
-  one combined one, so failure analysis later can tell which mechanism caught what), reject-only
-  (no salvage/reconstruction, same principle WP-34.2 established).
+- **Explicitly decide what "reject" means here — this is a real open question, not
+  pre-answered by copying WP-34.2's pattern.** Found during a manual local Codex review of this doc
+  (2026-07-30, not posted to GitHub): every existing Step D check this phase's WPs have referenced as
+  precedent (`empty_source_quote`, `quote_not_grounded_in_chunk`, `heading_echo_quote`,
+  `unrepairable_fragment_quote`) rejects because `source_quote` itself — the core artifact — is
+  unreliable; there's nothing valid underneath to keep. This gate is different in kind:
+  `source_quote` already passed those checks and is confirmed grounded by the time Step D.5 runs;
+  only the *derived* `description` field can be bad. If this check reject-drops the whole requirement
+  the same way the quote-level checks do, a real, valid requirement gets silently destroyed just
+  because one non-deterministic Step D.5 LLM call produced a bad summary — confirmed this isn't
+  hypothetical: `pipeline/run_pipeline.py` already has an established, different precedent for this
+  exact situation (Step D.5 enrichment failing outright doesn't discard the requirement — "the
+  pipeline continues with the normalized JSONL for indexing"). This WP must explicitly decide and
+  document one of: (a) `description_not_grounded`/`description_fabricated_obligation` clear or blank
+  the `description` field (and whatever Step D.5 fields depend on it) but keep the underlying
+  requirement, consistent with the existing enrichment-failure precedent, or (b) the whole
+  requirement is dropped only when `source_quote` itself is independently invalid, never solely for
+  a bad `description`. Record whichever is chosen with the same rigor as every other durable failure
+  reason in `*_normalization_failures.jsonl` — but don't default to blanket reject-the-requirement
+  just because that's what the unrelated quote-level checks do.
 - Decide and document whether this runs as part of Step D.5 itself or a new Step D.6 immediately
   after it — Step D.5 already isn't fully deterministic and involves an LLM call; this check does
   not need one, so it may be cleaner as its own deterministic pass over Step D.5's output rather
@@ -288,8 +322,10 @@ Step D.5 enrichment output, not just exist as an eval script.
   fabrication patterns are now rejected end-to-end, not just in the standalone eval script.
 
 **Gate:** The calibrated gate runs as part of the real pipeline, with durable, distinguishable
-failure reasons; known fabrication patterns from WP-34.4 are rejected in a live pipeline run, not
-just the eval script.
+failure reasons; known fabrication patterns from WP-34.4 are caught in a live pipeline run, not just
+the eval script; the requirement-vs-description-field question above is explicitly decided and
+documented, not left implicit — and whichever way it's decided, a requirement with a genuinely valid
+`source_quote` is never silently lost solely because `description` failed this check.
 
 ---
 
@@ -302,8 +338,12 @@ they compose correctly against a real, full pipeline run.
 
 **Scope:**
 - Full ingest of at least one real document end-to-end with the new gate active, confirming: known
-  fabrication patterns rejected, known faithful descriptions pass, failure reasons recorded
-  correctly, no unexpected drop in overall requirement yield.
+  fabrication patterns caught, known faithful descriptions pass, failure reasons recorded correctly,
+  and — the actual yield check depends on what WP-35.4 decided — either no unexpected drop in
+  requirement *count* (if bad descriptions clear the field but keep the requirement) or no unexpected
+  drop in requirement count *beyond* records whose `source_quote` was independently invalid (if
+  WP-35.4 decided full rejection is warranted). Confirm whichever WP-35.4 actually chose is what this
+  gate observes — don't assume requirement count should stay flat if the decision was to reject.
 - Update `docs/PHASE33_REQUIREMENTS.md`'s WP-33.3 Findings categories 1 and 3 (both cite the
   description-fabrication symptom) to reference this phase's actual fix, closing the loop WP-34.4's
   spike opened.
@@ -340,9 +380,13 @@ Phase 35 is complete when:
 2. WP-35.3's secondary check stays narrow and deterministic — resist the temptation to fold it into
    a second ML model or a broader classifier. The problem found is specific (obligation language
    fabricated on top of faithful facts); the fix should be equally specific.
-3. WP-35.4's rejection checks reject only — no salvage/reconstruction of a rejected description from
-   surrounding context, same principle established in WP-34.2 and carried through every Step D check
-   since.
+3. WP-35.4's checks never salvage/reconstruct a rejected `description` from surrounding context —
+   that part of WP-34.2's principle carries over unchanged. What does *not* automatically carry over:
+   whether failing this check drops the whole requirement or just the `description` field. WP-34.2's
+   checks reject the whole requirement because the thing they check (`source_quote`) has nothing
+   valid to fall back to if it fails; WP-35.4's checks run on a field that's already downstream of an
+   independently-valid `source_quote`, so that same reasoning doesn't automatically apply — it's an
+   explicit WP-35.4 decision (see that WP's Scope), not assumed here.
 4. The MiniCheck dependency-footprint decision (§3's Non-Goals) must actually be made and documented
    during WP-35.4, not defaulted to "whatever `pip install` happened to pull in" the way WP-34.4's
    spike setup left it.

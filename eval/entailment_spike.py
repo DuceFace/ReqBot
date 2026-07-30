@@ -112,6 +112,29 @@ KNOWN_BAD = [
         "attribution ('as per Reference J-6') invented, not present in the quote. "
         "Included as a harder/borderline case, not just the obvious ones.",
     ),
+    (
+        "afpd_definition_reframed_as_imperative",
+        "Cybersecurity - Prevention of damage to, protection of, and restoration of "
+        "computers, electronic communications systems, electronic communications "
+        "services, wire communication, and electronic communication, including "
+        "information contained therein, to ensure its availability, integrity, "
+        "authentication, confidentiality, and nonrepudiation.",
+        "Implement cybersecurity measures to prevent damage, protect, and restore "
+        "computers, electronic communications systems, services, wire communication, "
+        "and electronic communication to ensure availability, integrity, "
+        "authentication, confidentiality, and nonrepudiation.",
+        "Originally miscategorized as known-good in this spike's first draft -- caught "
+        "by Codex review, PR #164. The quote's full record has "
+        "section_title_path=['Terms']: this is a glossary/definitions entry (WP-33.3 "
+        "category 4, background/definitional prose misextracted as a requirement -- "
+        "now caught pre-Step-C by WP-34.3's skip_sections fix in a fresh ingest, but "
+        "this historical record predates that fix). The description doesn't just "
+        "reword the definition -- it invents an imperative obligation ('Implement "
+        "cybersecurity measures to...') that the source text, a dictionary-style "
+        "definition of what the word 'Cybersecurity' means, never actually states. "
+        "Every individual fact carries over, but the obligation/modality itself is "
+        "fabricated, which is exactly the failure mode this check exists to catch.",
+    ),
 ]
 
 # (label, source_quote, description, note) -- real faithful paraphrases, hand-picked to
@@ -182,19 +205,6 @@ KNOWN_GOOD = [
         "Real paraphrase with a mild inferential step ('I' -> 'the system "
         "administrator', consistent with the memo's actual signatory role in this "
         "document) -- an intentionally harder edge case, not just a safe rewording.",
-    ),
-    (
-        "afpd_cybersecurity_definition",
-        "Cybersecurity - Prevention of damage to, protection of, and restoration of "
-        "computers, electronic communications systems, electronic communications "
-        "services, wire communication, and electronic communication, including "
-        "information contained therein, to ensure its availability, integrity, "
-        "authentication, confidentiality, and nonrepudiation.",
-        "Implement cybersecurity measures to prevent damage, protect, and restore "
-        "computers, electronic communications systems, services, wire communication, "
-        "and electronic communication to ensure availability, integrity, "
-        "authentication, confidentiality, and nonrepudiation.",
-        "Real paraphrase -- definition restated as an imperative, same facts.",
     ),
     (
         "afpd_iaw_expansion",

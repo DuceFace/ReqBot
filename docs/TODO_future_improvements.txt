@@ -31,7 +31,7 @@ ACTIVE BACKLOG
    Experiment gate:
    - measurable ingest-time improvement
    - no increase in malformed or partial LLM output
-   - graceful behavior on single-GPU machines
+   - graceful behavior on single-GPU  machines
 
 2. Streaming write in Step A
    For very large PDFs, write page records incrementally instead of buffering all
@@ -380,14 +380,27 @@ ACTIVE BACKLOG
     Step D.5's `description` is actually grounded in `source_quote` --
     catching the fabricated-description symptom WP-33.3 found (a citation or
     fragment quote paired with an invented, plausible-sounding description)
-    without rejecting real faithful paraphrases. Result: 0/5 false negatives,
-    0/10 false positives on real (source_quote, description) pairs pulled
-    from this repo's own enriched output, with a wide score margin (known-bad
-    max 0.133, known-good min 0.852). Investigation only, per the spike's own
-    Non-Goals -- no production code was changed. Follow-up work, not yet
-    scoped as its own WP: add a Step D.5 (or new Step D.6) rejection gate
-    using this model, mirroring WP-32.1's Step D grounding-check pattern
-    (reject below a threshold, log the failure reason, don't silently drop).
+    without rejecting real faithful paraphrases. Result: 5/6 known-fabricated
+    examples caught, 0/9 false positives, on real (source_quote, description)
+    pairs pulled from this repo's own enriched output, with a wide score
+    margin among the caught cases (known-bad max 0.133, known-good min
+    0.852). Investigation only, per the spike's own Non-Goals -- no
+    production code was changed. Follow-up work, not yet scoped as its own
+    WP: add a Step D.5 (or new Step D.6) rejection gate using this model,
+    mirroring WP-32.1's Step D grounding-check pattern (reject below a
+    threshold, log the failure reason, don't silently drop).
+    **Known limitation, found by Codex review on PR #164, must be scoped
+    into the fix, not just noted:** the one miss (support_prob=0.9197) was a
+    dictionary-style definition reframed as an imperative obligation --
+    every individual fact carried over faithfully, but the "you must
+    implement this" framing itself was invented, not present in the source.
+    A premise/hypothesis entailment check scored on factual content alone
+    doesn't reliably catch modality/obligation fabrication layered on top of
+    otherwise-faithful facts. Whatever implements this gate should account
+    for that failure mode specifically (e.g. a secondary check for whether
+    the description introduces obligation language -- "must", "shall",
+    "implement", "ensure" -- absent from the quote), not assume the
+    entailment score alone is sufficient.
     Needs before implementing: a real threshold sweep (WP-34.4's 15-pair set
     only established the technique works, not a calibrated cutoff -- compare
     WP-32.1's actual sweep against 2,452 gold examples), a decision on

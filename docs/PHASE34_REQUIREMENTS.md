@@ -22,7 +22,7 @@ in `CLAUDE.md` or anywhere else.
 | WP-34.1 — Deprecate Legacy Chunking, Docling-Only | Complete — legacy pymupdf/pdfplumber chunking removed (`pipeline/extract_pdf_to_text.py` deleted, `pipeline/chunk_text.py`'s legacy `run()`/helpers removed); `--layout-mode` removed from all three independent locations (`cli/reqbot.py`, `cli/console.py`, `pipeline/run_pipeline.py`'s own `main()`); docling failure is now an unconditional hard error; docling moved into the base install (`pyproject.toml`); `requirements.txt` retired in favor of `pip install .` (CI/Dockerfile updated accordingly) |
 | WP-34.2 — Reject Heading-Echoed and Unrepairable-Fragment Quotes in Step D | Complete — `_is_heading_echo`/`_is_unrepairable_fragment` added to `pipeline/parse_and_normalize.py`'s validation loop; hierarchy resolution moved earlier so `section_title_path` is available to the new checks; heading-echo uses `fuzz.ratio` (not literal substring containment — a real false-positive risk found during implementation, see §4 below) |
 | WP-34.3 — Expand `skip_sections` Heading Vocabulary | Complete — `"TERMS"` added to `profiles/cybersecurity.json`'s `skip_sections`, confirmed via a 6-document heading-vocabulary survey (see §4 below); no change to `_should_skip_section`'s matching algorithm — a real over-matching tradeoff was investigated (independently re-flagged by Codex on PR #163, confirmed still unfixable without regressions) and deliberately left as-is (documented in the function's docstring and pinned by regression tests) |
-| WP-34.4 — Spike: Description-Grounding Entailment Check | Spike complete, viable-with-a-fix — MiniCheck (flan-t5-large) caught all 5 known-real fabricated-description examples (0% false negative) with zero false positives on 10 real faithful paraphrases (see §4 below); production integration scoped as explicit follow-up (`docs/TODO_future_improvements.txt` item 31), not implemented in this spike per its own Non-Goals |
+| WP-34.4 — Spike: Description-Grounding Entailment Check | Spike complete, viable-with-a-fix — MiniCheck (flan-t5-large) caught 5/6 known-real fabricated-description examples (1 miss found by Codex review, a distinct modality-fabrication case) with zero false positives on 9 real faithful paraphrases (see §4 below); production integration scoped as explicit follow-up (`docs/TODO_future_improvements.txt` item 31), not implemented in this spike per its own Non-Goals |
 
 ---
 
@@ -398,29 +398,48 @@ this phase.
   (`--break-system-packages` matches how this environment's other ML dependencies — docling,
   torch, transformers — are already installed; confirmed via `pip show docling`'s install path).
   Also needs one NLTK resource: `python3 -c "import nltk; nltk.download('punkt_tab')"`.
-- **Test set: 15 real (source_quote, description) pairs, zero synthetic data** — 5 known-fabricated
+- **Test set: 15 real (source_quote, description) pairs, zero synthetic data** — 6 known-fabricated
   (pulled by flagging short/colon-terminated quotes paired with a much longer, low-similarity
   description across every enriched JSONL under `~/documents/processed/`, then hand-verified each
-  against its source document) and 10 known-faithful (hand-picked to span a real range of
+  against its source document) and 9 known-faithful (hand-picked to span a real range of
   quote/description similarity, not just near-verbatim echoes — most of this corpus's Step D.5
   output turned out to be close-to-verbatim copies rather than true paraphrases, itself a minor
   observation worth noting, so genuinely-paraphrased examples had to be deliberately sought out to
   actually stress-test the model rather than trivially pass on lookalike text).
-- **Result: 0/5 false negatives, 0/10 false positives**, with a wide margin — every known-bad pair
-  scored `support_prob` between 0.026 and 0.133; every known-good pair scored between 0.852 and
-  0.978. No pair from either set came within 0.7 of the other set's range. This held even against
-  two deliberately-hard cases included specifically to stress the model: a faithful paraphrase with
-  a mild inferential step (`"I declare..."` → `"The system administrator declares..."`) and a subtle
-  fabrication (`"Distribution: A, B, C"` → adds an invented `"as per Reference J-6"` attribution).
+- **Result: 1/6 false negatives (17%), 0/9 false positives.** The 5 caught known-bad pairs and all 9
+  known-good pairs separate with a wide margin — caught known-bad scores 0.026–0.133, known-good
+  0.852–0.978, no pair from either set within 0.7 of the other's range. This held even against two
+  deliberately-hard cases: a faithful paraphrase with a mild inferential step (`"I declare..."` →
+  `"The system administrator declares..."`) and a subtle fabrication (`"Distribution: A, B, C"` →
+  adds an invented `"as per Reference J-6"` attribution).
+- **The one miss (`support_prob=0.9197`, scored as supported when it should not have been) — found
+  by Codex review on PR #164, not by this WP's own initial pass.** This pair was originally
+  (mis-)classified as known-good: `"Cybersecurity - Prevention of damage to..."` → `"Implement
+  cybersecurity measures to prevent damage..."`. Codex correctly flagged that reframing a
+  dictionary-style definition as an imperative obligation isn't a faithful paraphrase — the source
+  never states anyone must *implement* anything, only what the word means. Checking the full
+  record confirmed it's worse than even that: `section_title_path=["Terms"]` — this is a
+  glossary/definitions entry (WP-33.3 category 4, background/definitional prose misextracted as a
+  requirement), a chunk WP-34.3's `skip_sections` fix now filters before Step C in a fresh ingest,
+  though this historical record predates that fix. Reclassified as known-bad; the corrected numbers
+  above reflect that. **This is a real, distinct limitation, not noise:** an entailment check scoped
+  to factual content (do the named facts appear in the quote) does not by itself catch obligation/
+  modality invented on top of otherwise-faithful facts — every individual fact in that description
+  does appear in the quote, only the "you must implement this" framing is fabricated.
 - **Caveats, honestly stated:** small test set (15 pairs, per the WP's own "small, real" framing —
   not a quantified precision/recall eval), drawn from only 2 documents (`afpd_17-1.pdf`,
   `CJCSI 6510.02G.pdf` — this phase's whole corpus), and CPU inference on `flan-t5-large` (770M
   params) took ~230ms/pair batched, fast enough to plausibly gate every Step D.5 output but not
   load-tested at real corpus scale.
 
-**Conclusion, per Success Criteria and Reject-If above:** viable-with-a-fix. The signal is clear and
-evidence-backed, not "seems promising" — per this WP's own Non-Goals, no production Step D.5 change
-is made in this spike. Scoped as explicit follow-up: `docs/TODO_future_improvements.txt` item 31.
+**Conclusion, per Success Criteria and Reject-If above:** viable-with-a-fix, with a named limitation.
+The signal is clear and evidence-backed on the factual-fabrication failure mode this WP targets (5/5
+of the citation/fragment-completion cases caught cleanly, 0 false positives on real faithful
+paraphrases) — not "seems promising." The one miss is a distinct failure mode (modality/obligation
+fabrication on top of otherwise-faithful facts) worth flagging explicitly to whoever implements the
+follow-up, not evidence the overall approach doesn't work. Per this WP's own Non-Goals, no production
+Step D.5 change is made in this spike. Scoped as explicit follow-up:
+`docs/TODO_future_improvements.txt` item 31, updated to carry this caveat forward.
 
 ---
 

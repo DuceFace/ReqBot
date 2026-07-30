@@ -211,6 +211,16 @@ LABELS = {
         "REQ-a485fe91aa5f; description invents 'Implement Insider Threat "
         "Program', an imperative the quote never states.",
     ),
+    "REQ-668a74c21bd2": (
+        "faithful",
+        "New, post-fix (dafman17-1305.pdf), found during the second corpus "
+        "expansion (5 more documents, prompted by Codex's PR #166 finding that "
+        "the independent fabricated partition was too thin). Another real "
+        "modal-verb substitution (will -> must), same facts, same "
+        "over-catch shape as REQ-679a055fb375/REQ-efc38d9d853d -- a third "
+        "independent WP-35.3 near-synonym/paraphrase fixture, not a duplicate "
+        "of either (different document, different verb pair context).",
+    ),
 }
 
 # requirement_id -> True if this record is a duplicate of one of

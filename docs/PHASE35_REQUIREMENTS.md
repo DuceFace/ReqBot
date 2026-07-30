@@ -168,25 +168,28 @@ WP-35.2's sweep meaningful — not just WP-34.4's original 15 relabeled.
 
 **Findings (2026-07-30/31):**
 
-- Harvested from `~/documents/processed/*/` across 11 pipeline runs / 8 distinct source documents
-  (1,204 unique `(source_pdf, chunk_id, source_quote, description)` triples after dedup): the
-  original 2 corpus documents (`afpd_17-1.pdf`, `CJCSI 6510.02G.pdf`, 5 runs) plus 6 freshly-ingested
-  documents (`DODI 5200.01.pdf`, `afi17-203.pdf`, `NIST.SP.800-125.pdf`, `DODI 5200.44.pdf`,
-  `DODI 8410.03.pdf`, `afi10-2402.pdf`, all ingested today with `--no-index`). The fresh ingests were
-  necessary, not just nice-to-have for diversity: all 5 pre-existing runs predate today's
-  WP-34.1/34.2/34.3 merges, so none of the local corpus reflected the current, fixed pipeline before
-  this WP ran.
+- Harvested from `~/documents/processed/*/` across 16 pipeline runs / 13 distinct source documents
+  (2,064 unique `(source_pdf, chunk_id, source_quote, description)` triples after dedup): the
+  original 2 corpus documents (`afpd_17-1.pdf`, `CJCSI 6510.02G.pdf`, 5 runs) plus 11 freshly-ingested
+  documents across two expansion rounds (`DODI 5200.01.pdf`, `afi17-203.pdf`, `NIST.SP.800-125.pdf`,
+  `DODI 5200.44.pdf`, `DODI 8410.03.pdf`, `afi10-2402.pdf`, then `DODI 5200.48.pdf`,
+  `DODI 8551.01.pdf`, `afi13-550.pdf`, `afman17-2101.pdf`, `dafman17-1305.pdf`, all ingested today
+  with `--no-index`). The first round's fresh ingests were necessary, not just nice-to-have for
+  diversity: all 5 pre-existing runs predate today's WP-34.1/34.2/34.3 merges, so none of the local
+  corpus reflected the current, fixed pipeline before this WP ran. The second round was a direct
+  response to a Codex review finding on this WP's own PR (see below).
 - `eval/harvest_description_grounding_candidates.py` flagged candidates with two structural
   heuristics — the same shape that surfaced WP-34.4's own 15 examples in the first place, scaled up:
   a short/colon-terminated quote paired with a much-longer, low-similarity description
   (citation/fragment-shaped), and a `profiles/cybersecurity.json` `obligation_verbs` term present in
   `description` but literally absent from `source_quote` (modality-shaped) — plus a random sample of
   everything neither heuristic flagged, restricted to post-fix runs, as the faithful holdout.
-- **Real hit rate is low: 17 distinct flagged candidates out of 1,204 scanned (~1.4%).** All 17 were
-  hand-verified against their own `section_title_path`/`parent_context`, per this WP's scope. 14 were
-  confirmed genuine fabrications; the other 3 were exactly the heuristic's own predicted
-  false-positive shape (a real modal-verb or near-synonym paraphrase, e.g. `will`→`must`) and are
-  kept as `faithful`-labeled WP-35.3 fixtures specifically because they were flagged, not despite it.
+- **Real hit rate is low and stayed low after doubling the corpus: 18 distinct flagged candidates out
+  of 2,064 scanned (~0.9%).** All 18 were hand-verified against their own
+  `section_title_path`/`parent_context`, per this WP's scope. 14 were confirmed genuine fabrications;
+  the other 4 were exactly the heuristic's own predicted false-positive shape (a real modal-verb or
+  near-synonym paraphrase, e.g. `will`→`must`) and are kept as `faithful`-labeled WP-35.3 fixtures
+  specifically because they were flagged, not despite it.
   - Every citation/fragment-shaped fabrication found (5 of 5) came from `pre_fix` runs, and every one
     traces to a document/pattern WP-34.4's own spike already knew about — no *new* citation/fragment
     fabrication turned up anywhere in the 6 freshly-ingested, post-fix documents. Real, positive
@@ -229,13 +232,31 @@ WP-35.2's sweep meaningful — not just WP-34.4's original 15 relabeled.
   `SPIKE_OVERLAP_IDS`. The 8 stay in the file as a regression check (does WP-35.2's chosen threshold
   still classify the original spike cases correctly), but WP-35.2 must filter to
   `source == "wp_35_1_harvest"` for its actual catch-rate/false-positive statistics.
+- **Independent fabricated partition is thin, and a second corpus expansion confirmed this is a real
+  finding, not just insufficient search — found by Codex review on this WP's own PR.** After
+  excluding the 8 `wp_34_4_spike` records, the `wp_35_1_harvest` partition has only 8 fabricated
+  examples against 92 faithful (3 `fabricated_citation`, 1 `fabricated_fragment`, 2
+  `fabricated_modality`, 2 `fabricated_other`) — thin enough that a single record flipping catch/miss
+  moves the apparent catch rate by 12.5 points, and citation/fragment subtype evidence is especially
+  sparse. Response: ingested 5 more documents (`DODI 5200.48.pdf`, `DODI 8551.01.pdf`,
+  `afi13-550.pdf`, `afman17-2101.pdf`, `dafman17-1305.pdf`), nearly doubling `records_scanned` (1,204
+  → 2,064). Result: **zero new fabricated candidates of either subtype** — the only new flagged
+  candidate was one more real `will`→`must` faithful paraphrase. This is itself informative, not a
+  null result to shrug off: it's now been confirmed twice (once at ~1,200 records, again at ~2,000)
+  that citation/fragment/modality-shaped fabrication is genuinely rare in fresh, post-fix pipeline
+  output, not an artifact of an insufficiently broad first search. Growing the independent fabricated
+  count meaningfully further would likely need an order-of-magnitude larger harvest (dozens more
+  documents), disproportionate to this WP's scope — so rather than keep chasing a number, this
+  limitation is carried forward explicitly into WP-35.2's Scope below (filter, minimum-count
+  awareness, and a documented exploratory/provisional stance) instead of being masked by further
+  padding.
 - Given the honest hit rate above, the faithful holdout was deliberately oversized (90 records
-  against 14 fabricated + 3 reclassified, 8 of those 17 marked `wp_34_4_spike`) to reach this WP's
-  Gate at a defensible total scale — 107 records combined (99 genuinely new to this WP), order-of-
+  against 14 fabricated + 4 reclassified, 8 of those 18 marked `wp_34_4_spike`) to reach this WP's
+  Gate at a defensible total scale — 108 records combined (100 genuinely new to this WP), order-of-
   magnitude 100+ as scoped, with the shortfall on the fabricated side documented rather than papered
   over with synthetic or padded examples.
-- **Output:** `eval/gold_description_grounding.jsonl` — 107 records: 5 `fabricated_citation`, 3
-  `fabricated_fragment`, 3 `fabricated_modality`, 3 `fabricated_other`, 93 `faithful` (99 `source:
+- **Output:** `eval/gold_description_grounding.jsonl` — 108 records: 5 `fabricated_citation`, 3
+  `fabricated_fragment`, 3 `fabricated_modality`, 3 `fabricated_other`, 94 `faithful` (100 `source:
   wp_35_1_harvest`, 8 `source: wp_34_4_spike`). Built by `eval/build_gold_description_grounding.py`
   from `eval/harvest_description_grounding_candidates.py`'s output plus this WP's hand-verification
   labels (both scripts committed for reproducibility, along with the harvester's intermediate output,
@@ -270,16 +291,34 @@ independently-built data the way WP-32.1 did before picking `QUOTE_GROUNDING_THR
 - If the sweep reveals the technique doesn't hold up as well against a larger, less-curated dataset
   as WP-34.4's small set suggested, that's a valid, documented outcome — not a reason to force a
   threshold that doesn't actually separate the two classes well.
+- **Treat this sweep as exploratory/provisional, not a confident calibration — found by Codex review
+  on WP-35.1's own PR (#166), confirmed by a second corpus-expansion attempt that found zero new
+  fabricated examples (see WP-35.1's Findings).** The `wp_35_1_harvest` partition has only 8
+  independent fabricated examples (3 citation, 1 fragment, 2 modality, 2 other) against 92 faithful —
+  thin enough that a single record flipping catch/miss moves the apparent catch rate by 12.5 points,
+  and per-subtype evidence (especially `fabricated_fragment`, at 1 example) is too sparse to calibrate
+  a subtype-specific threshold with any confidence. Report per-subtype breakdowns alongside the
+  aggregate sweep, not just an aggregate number that hides this. If the chosen threshold's
+  classification of any individual fabricated example is sensitive to minor `support_prob` shifts (not
+  a wide, comfortable margin the way WP-34.4's original 15-pair spike showed), that must be reported
+  as an underpowered/inconclusive result — a real option is to pick a conservative threshold band
+  rather than a single precise cutoff, or to explicitly recommend a further targeted harvest (not
+  necessarily more random documents, since that already proved to have a very low yield — WP-33.3/
+  WP-34.4's spike-example provenance suggests hand-constructed or targeted-search candidates may be
+  more productive) before WP-35.4 treats any number here as production-ready.
 
 **Non-goals:**
 - No production code change — this WP picks and documents a number for WP-35.4 to use.
 
 **Tests/verification:**
 - The sweep itself, committed as a report (mirroring `eval/entailment_spike.py`'s own
-  `eval/spike_results/` pattern).
+  `eval/spike_results/` pattern), including the per-subtype breakdown and an explicit statement of
+  whether the result should be treated as confident or provisional given the data-scale caveat above.
 
 **Gate:** A specific threshold is chosen and documented with real false-positive/catch-rate evidence
-at WP-35.1's dataset scale, not asserted from WP-34.4's 15-pair result alone.
+at WP-35.1's dataset scale, not asserted from WP-34.4's 15-pair result alone — and the sweep report
+honestly states whether that evidence is strong enough to be confident, or whether it's provisional
+given the thin independent fabricated partition.
 
 ---
 

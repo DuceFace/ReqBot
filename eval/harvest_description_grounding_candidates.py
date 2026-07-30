@@ -72,6 +72,17 @@ _OBLIGATION_VERBS = json.loads(
 )["obligation_verbs"]
 
 
+def _non_negative_int(value: str) -> int:
+    """Argparse type: integer that must be >= 0."""
+    try:
+        iv = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {value!r}")
+    if iv < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    return iv
+
+
 def _run_timestamp(run_dir: Path) -> datetime | None:
     """Parse the YYYYMMDD_HHMMSS suffix off a processed/<doc>_<ts> dir name."""
     m = re.search(r"_(\d{8}_\d{6})$", run_dir.name)
@@ -180,7 +191,7 @@ def harvest(clean_sample_size: int) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="WP-35.1 candidate harvester")
-    parser.add_argument("--clean-sample", type=int, default=90, dest="clean_sample")
+    parser.add_argument("--clean-sample", type=_non_negative_int, default=90, dest="clean_sample")
     args = parser.parse_args()
 
     result = harvest(args.clean_sample)

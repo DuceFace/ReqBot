@@ -169,8 +169,8 @@ WP-35.2's sweep meaningful — not just WP-34.4's original 15 relabeled.
 **Findings (2026-07-30/31):**
 
 - Harvested from `~/documents/processed/*/` across 11 pipeline runs / 8 distinct source documents
-  (914 unique `(source_pdf, chunk_id, source_quote, description)` triples after dedup): the original
-  2 corpus documents (`afpd_17-1.pdf`, `CJCSI 6510.02G.pdf`, 5 runs) plus 6 freshly-ingested
+  (1,204 unique `(source_pdf, chunk_id, source_quote, description)` triples after dedup): the
+  original 2 corpus documents (`afpd_17-1.pdf`, `CJCSI 6510.02G.pdf`, 5 runs) plus 6 freshly-ingested
   documents (`DODI 5200.01.pdf`, `afi17-203.pdf`, `NIST.SP.800-125.pdf`, `DODI 5200.44.pdf`,
   `DODI 8410.03.pdf`, `afi10-2402.pdf`, all ingested today with `--no-index`). The fresh ingests were
   necessary, not just nice-to-have for diversity: all 5 pre-existing runs predate today's
@@ -182,8 +182,8 @@ WP-35.2's sweep meaningful — not just WP-34.4's original 15 relabeled.
   (citation/fragment-shaped), and a `profiles/cybersecurity.json` `obligation_verbs` term present in
   `description` but literally absent from `source_quote` (modality-shaped) — plus a random sample of
   everything neither heuristic flagged, restricted to post-fix runs, as the faithful holdout.
-- **Real hit rate is low: 15 distinct flagged candidates out of 914 scanned (~1.6%).** All 15 were
-  hand-verified against their own `section_title_path`/`parent_context`, per this WP's scope. 12 were
+- **Real hit rate is low: 17 distinct flagged candidates out of 1,204 scanned (~1.4%).** All 17 were
+  hand-verified against their own `section_title_path`/`parent_context`, per this WP's scope. 14 were
   confirmed genuine fabrications; the other 3 were exactly the heuristic's own predicted
   false-positive shape (a real modal-verb or near-synonym paraphrase, e.g. `will`→`must`) and are
   kept as `faithful`-labeled WP-35.3 fixtures specifically because they were flagged, not despite it.
@@ -192,25 +192,49 @@ WP-35.2's sweep meaningful — not just WP-34.4's original 15 relabeled.
     fabrication turned up anywhere in the 6 freshly-ingested, post-fix documents. Real, positive
     confirmation (not just the a-priori expectation carried over from WP-34.4's findings) that
     WP-34.2/34.3 structurally prevent this shape going forward.
-  - Modality-shaped fabrication is **not** similarly prevented: 2 of the 4 real modality/other
-    fabrications came from freshly-ingested, post-fix documents never seen during WP-34.4's spike
-    (`REQ-757d551b3e59`, `NIST.SP.800-125.pdf`; `REQ-c6d23854cd0b`, `DODI 8410.03.pdf`) — direct,
-    current evidence motivating WP-35.3, not just the one historical Codex-caught example carried
-    over from Phase 34.
+  - Modality/attribution-shaped fabrication is **not** similarly prevented: 4 of the 6 real
+    modality/other fabrications came from freshly-ingested, post-fix documents never seen during
+    WP-34.4's spike (`REQ-757d551b3e59`/`NIST.SP.800-125.pdf`, `REQ-c6d23854cd0b`/`DODI 8410.03.pdf`,
+    `REQ-f7a98a6a365d`/`afi10-2402.pdf`, `REQ-cbc6374a655f`/`afi10-2402.pdf`) — direct, current
+    evidence motivating WP-35.3, not just the one historical Codex-caught example carried over from
+    Phase 34.
   - `REQ-c6d23854cd0b` surfaced a real gap in `parse_and_normalize.py`'s `_is_unrepairable_fragment`:
     it only fires on colon-terminated quotes, but this record — a bare enumerated list-item topic
     phrase with no trailing colon — has the identical fabrication shape. Logged as item 32 in
     `docs/TODO_future_improvements.txt`; out of scope to fix in this WP.
+- **Self-caught data-completeness bug:** the first commit on this WP's PR was built from a harvest run
+  where `afi10-2402.pdf`'s ingest (started in the background, ~135 chunks, much larger/slower than
+  the other 5 fresh documents) hadn't actually finished — its completion notification arrived only
+  *after* the dataset was already committed and the PR opened. `eval/harvest_description_grounding_
+  candidates.py` counts `runs_scanned` from directory existence, not from whether each run's
+  `*_requirements_enriched.jsonl` had finished writing, so the miss wasn't visible in its own output
+  totals. Re-running the harvester once the ingest genuinely completed surfaced 2 more real
+  fabrication candidates from `afi10-2402.pdf` alone (both included above) and changed the faithful
+  holdout's composition. Fixed by re-harvesting, re-verifying, and rebuilding before this section was
+  finalized — not left as a known gap for WP-35.2 to discover.
+- **Circular-evidence bug, found by Codex review on this WP's own PR:** 8 of the first 17
+  hand-verified records — 6 `fabricated_*` and 2 `faithful` — turned out (exact `source_quote` match)
+  to already be `eval/entailment_spike.py`'s own `KNOWN_BAD`/`KNOWN_GOOD` fixtures, re-discovered
+  independently by this WP's heuristics without being recognized as duplicates. Counting them as new
+  calibration evidence would be exactly the circularity this WP exists to avoid (Phase Framing, Gap
+  1: "using [the spike's 15 pairs] as [a calibration threshold] would be circular"). Fixed, not just
+  noted: every record now carries a `source` field (`wp_34_4_spike` for the 8 duplicates,
+  `wp_35_1_harvest` for everything genuinely new) — see `eval/build_gold_description_grounding.py`'s
+  `SPIKE_OVERLAP_IDS`. The 8 stay in the file as a regression check (does WP-35.2's chosen threshold
+  still classify the original spike cases correctly), but WP-35.2 must filter to
+  `source == "wp_35_1_harvest"` for its actual catch-rate/false-positive statistics.
 - Given the honest hit rate above, the faithful holdout was deliberately oversized (90 records
-  against 12 fabricated + 3 reclassified) to reach this WP's Gate at a defensible total scale — 105
-  records combined, order-of-magnitude 100+ as scoped, with the shortfall on the fabricated side
-  documented rather than papered over with synthetic or padded examples.
-- **Output:** `eval/gold_description_grounding.jsonl` — 105 records: 5 `fabricated_citation`, 3
-  `fabricated_fragment`, 2 `fabricated_modality`, 2 `fabricated_other`, 93 `faithful`. Built by
-  `eval/build_gold_description_grounding.py` from `eval/harvest_description_grounding_candidates.py`'s
-  output plus this WP's hand-verification labels (both scripts committed for reproducibility, along
-  with the harvester's intermediate output, `eval/spike_results/wp_35_1/harvest_candidates.json`,
-  matching the existing `eval/spike_results/wp_33_3/`, `eval/spike_results/wp_34_4/` precedent).
+  against 14 fabricated + 3 reclassified, 8 of those 17 marked `wp_34_4_spike`) to reach this WP's
+  Gate at a defensible total scale — 107 records combined (99 genuinely new to this WP), order-of-
+  magnitude 100+ as scoped, with the shortfall on the fabricated side documented rather than papered
+  over with synthetic or padded examples.
+- **Output:** `eval/gold_description_grounding.jsonl` — 107 records: 5 `fabricated_citation`, 3
+  `fabricated_fragment`, 3 `fabricated_modality`, 3 `fabricated_other`, 93 `faithful` (99 `source:
+  wp_35_1_harvest`, 8 `source: wp_34_4_spike`). Built by `eval/build_gold_description_grounding.py`
+  from `eval/harvest_description_grounding_candidates.py`'s output plus this WP's hand-verification
+  labels (both scripts committed for reproducibility, along with the harvester's intermediate output,
+  `eval/spike_results/wp_35_1/harvest_candidates.json`, matching the existing
+  `eval/spike_results/wp_33_3/`, `eval/spike_results/wp_34_4/` precedent).
 
 ---
 
@@ -227,6 +251,14 @@ independently-built data the way WP-32.1 did before picking `QUOTE_GROUNDING_THR
   false-positive rate (faithful descriptions wrongly rejected) vs. catch rate (fabricated
   descriptions correctly rejected) per threshold — same shape as `QUOTE_GROUNDING_THRESHOLD`'s own
   documented sweep in `pipeline/parse_and_normalize.py`.
+- **Filter to `source == "wp_35_1_harvest"` for these statistics.** WP-35.1's dataset also carries 8
+  records tagged `source == "wp_34_4_spike"` — exact duplicates of `eval/entailment_spike.py`'s own
+  proof-of-concept fixtures, kept in the file for a regression check but excluded from the primary
+  sweep specifically to avoid the circularity WP-35.1's own Findings section found and fixed (Codex
+  review, PR #166): counting the spike's own examples toward this WP's "independent" catch-rate would
+  inflate it artificially. After picking a threshold from the `wp_35_1_harvest` partition, separately
+  confirm it still classifies all 8 `wp_34_4_spike` records correctly — a real, if smaller, check that
+  nothing regressed, just not part of the primary statistics.
 - Pick a threshold with the same kind of explicit reasoning already established in this codebase
   (diminishing-returns framing, not just "the number that gave 100% on our small set").
 - If the sweep reveals the technique doesn't hold up as well against a larger, less-curated dataset

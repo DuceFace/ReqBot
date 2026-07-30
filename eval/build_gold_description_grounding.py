@@ -15,6 +15,19 @@ holdout to stay randomly sampled without the same per-record deliberation the
 scarce fabricated examples needed, though all 90 were still skimmed by hand
 for anything that looked wrong before being accepted (none did).
 
+Every output record carries a `source` field: `"wp_34_4_spike"` for the 8
+records confirmed (via exact source_quote match, see SPIKE_OVERLAP_IDS) to
+already exist in eval/entailment_spike.py's own KNOWN_BAD/KNOWN_GOOD proof-
+of-concept set, `"wp_35_1_harvest"` for everything genuinely new to this WP.
+Found by Codex review on this WP's own PR: half of the first hand-verified
+fabricated batch turned out to be WP-34.4 fixtures reused unknowingly, which
+would make WP-35.2's sweep circular against the exact set that motivated
+building an independent dataset in the first place. WP-35.2 must filter to
+`source == "wp_35_1_harvest"` for its real calibration statistics; the
+`wp_34_4_spike` records stay in the file as a regression check only (does
+the chosen threshold still classify the original cases correctly), not
+counted toward catch-rate/false-positive-rate.
+
 Usage:
   python3 eval/build_gold_description_grounding.py
 """
@@ -176,6 +189,51 @@ LABELS = {
         "real over-catch case for the same reason as REQ-679a055fb375 -- kept as "
         "a second WP-35.3 near-synonym/paraphrase fixture.",
     ),
+    "REQ-f7a98a6a365d": (
+        "fabricated_other",
+        "New, post-fix (afi10-2402.pdf) -- found on a re-harvest after this WP's "
+        "first commit, once afi10-2402's ingest (still running in the background "
+        "at that point) actually finished. source_quote is a complete, real "
+        "sentence about BSAs recommending remediation measures; description is "
+        "about an entirely different topic (findings-report distribution lists) "
+        "found nowhere in the quote or parent_context -- not a citation, not a "
+        "truncated fragment, just wholesale topical drift. Distinct from the "
+        "other fabricated_other example (REQ-409e58971a57's invented attribution) "
+        "but grouped the same way: a specific invented claim with no fragment or "
+        "citation shape driving it.",
+    ),
+    "REQ-cbc6374a655f": (
+        "fabricated_modality",
+        "New, post-fix (afi10-2402.pdf), same late re-harvest as REQ-f7a98a6a365d. "
+        "source_quote names a term via cross-reference to its defining "
+        "instructions ('Insider Threat, as defined in DoDD 5205.16... and AFI "
+        "16-1402...'), the same definitional-cross-reference shape as "
+        "REQ-a485fe91aa5f; description invents 'Implement Insider Threat "
+        "Program', an imperative the quote never states.",
+    ),
+}
+
+# requirement_id -> True if this record is a duplicate of one of
+# eval/entailment_spike.py's own KNOWN_BAD/KNOWN_GOOD fixtures (confirmed by
+# exact source_quote match, not just topical similarity). Found by Codex
+# review on this WP's own PR (#166): 8 of the first 15 hand-verified records
+# turned out to already exist in WP-34.4's proof-of-concept set -- reusing
+# them here as "new" calibration evidence would be circular (WP-35.1 exists
+# specifically because that set was never meant to calibrate a threshold, see
+# docs/PHASE35_REQUIREMENTS.md's Phase Framing). Kept in the file rather than
+# deleted -- real regression value in confirming WP-35.2's chosen threshold
+# still classifies the original spike cases correctly -- but marked with
+# source="wp_34_4_spike" so WP-35.2's actual calibration sweep can exclude
+# them from its catch-rate/false-positive statistics.
+SPIKE_OVERLAP_IDS = {
+    "REQ-da2d52df8841",  # cjcsi_po_service_principal_fragment
+    "REQ-466a23120b21",  # afpd_dodi_8500_citation
+    "REQ-04dd14fe4baf",  # afpd_jp3_12_citation
+    "REQ-917e508c8a6d",  # afpd_haf_functionals_fragment
+    "REQ-409e58971a57",  # cjcsi_distribution_fabricated_attribution
+    "REQ-a485fe91aa5f",  # afpd_definition_reframed_as_imperative
+    "REQ-679a055fb375",  # dodi_nsa_approved_crypto
+    "REQ-35dfe9353e60",  # afpd_ea_inventory
 }
 
 # requirement_id -> which description variant to keep, for the one record with
@@ -209,6 +267,7 @@ def main() -> None:
     records = []
     for rid, entry in by_id.items():
         label, notes = LABELS[rid]
+        source = "wp_34_4_spike" if rid in SPIKE_OVERLAP_IDS else "wp_35_1_harvest"
         records.append({
             "source_quote": entry["source_quote"],
             "description": entry["description"],
@@ -220,6 +279,7 @@ def main() -> None:
             "chunk_id": entry["chunk_id"],
             "requirement_id": rid,
             "run_dir": entry["run_dir"],
+            "source": source,
         })
 
     for entry in harvest["clean_sample"]:
@@ -235,6 +295,7 @@ def main() -> None:
             "chunk_id": entry["chunk_id"],
             "requirement_id": entry["requirement_id"],
             "run_dir": entry["run_dir"],
+            "source": "wp_35_1_harvest",
         })
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:

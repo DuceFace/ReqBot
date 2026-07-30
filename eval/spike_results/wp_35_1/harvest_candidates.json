@@ -13,6 +13,21 @@
       "flag_type": "citation_fragment_shaped"
     },
     {
+      "requirement_id": "REQ-f7a98a6a365d",
+      "source_quote": "BSAs also recommend measures to remediate or mitigate the identified vulnerabilities.",
+      "description": "BSA findings reports are distributed only to the assessed organization, the JS, the relevant CCMD(s) and service(s), the assessment requesting organization, and any organization mandated by DoD or service guidance.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 82,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix",
+      "flag_type": "citation_fragment_shaped"
+    },
+    {
       "requirement_id": "REQ-466a23120b21",
       "source_quote": "DoDI 8500.01, Cybersecurity, March 14, 2014",
       "description": "Establishes policies and procedures for implementing cybersecurity measures in accordance with NIST SP 800-53 Rev. 4.",
@@ -146,6 +161,21 @@
       "flag_type": "modality_shaped"
     },
     {
+      "requirement_id": "REQ-cbc6374a655f",
+      "source_quote": "Insider Threat, as defined in DoDD 5205.16, The DoD Insider Threat Program, and AFI 16-1402, Insider Threat Program Management.",
+      "description": "Implement Insider Threat Program as defined in DoDD 5205.16 and AFI 16-1402.",
+      "section_title_path": [
+        "PROGRAM OVERVIEW",
+        "1.4. CARM and MA Integration Strategy"
+      ],
+      "parent_context": "1.4.1.  DoDD 3020.40 provides guidance for the integration and synchronization of DoD risk management programs, to  include  CARM.    CARM  programs  will  implement  and  execute CARM guidance and requirements within the overall DoD MA Strategy and Framework by establishing  complementary  partnerships  and  information  cross-flows  between  the  CARM program and AF MA efforts as needed.  Designated MA programs/activities, as defined in DoDD 3020.40, are: 1.4.1.1.  Continuity of Operations (COOP), as defined in DoDD  3020.26, DoD Continuity  Programs, and  AFI  10-208, Air  Force  Continuity",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 20,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix",
+      "flag_type": "modality_shaped"
+    },
+    {
       "requirement_id": "REQ-5968a12bc1d6",
       "source_quote": "DoDI 8330.01, Interoperability of Information Technology (IT), including National Security Systems (NSS), May 21, 2014",
       "description": "Establishes requirements for IT systems, including National Security Systems (NSS), to ensure interoperability across the DoD.",
@@ -214,6 +244,34 @@
   ],
   "clean_sample": [
     {
+      "requirement_id": "REQ-55d95de4ba81",
+      "source_quote": "Document major remediation projects, timelines, and changes in status of Tier 1 and Tier 2 TCAs in the AF CARM system of record.",
+      "description": "Document major remediation projects, timelines, and changes in status of Tier 1 and Tier 2 TCAs in the AF CARM system of record.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.21. Air Force Critical Asset Owning Centers and Wings."
+      ],
+      "parent_context": "2.21.1.  Execute  CARM activities,  to  include  the  identification  and  management  of  risk  to TCAs. ( T-1 ) 2.21.1.1.  Centers/Wings will be exempt if capable of demonstrating an absence of TCAs. 2.21.2.  Appoint in writing primary and alternate CARM POCs to execute CARM activities to include the identification and management of risk to AF TCAs. ( T-2 ) A copy of the POC appointment letter will be provided to the applicable MAJCOM/DRU. ( T-2 ) 2.21.2.1.  The  appointment  of  CARM  POCs  should  be  assigned  to  the  position  for  a minimum of one year to ensure the stability and conti",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 71,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-c7000de68332",
+      "source_quote": "Work with the COCOM to identify the impact resulting from the loss, damage, or destruction of internal and external infrastructure critical to the CCMD's mission.",
+      "description": "Work with the COCOM to identify the impact resulting from the loss, damage, or destruction of internal and external infrastructure critical to the CCMD's mission.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.19. Air Force Components to the Combatant Commands."
+      ],
+      "parent_context": "2.19.1.  Participate in the CARM WG as required. 2.19.2.  Assist in identifying and prioritizing AF assets critical to the capabilities required by the Combatant Commander. 2.19.3.  Coordinate with the MAJCOM/DRUs, FOAs, and AF functional area leads on the identification, assessment, and remediation of AF TCAs and non-AF owned and/or managed infrastructure. 2.19.4.  Document major remediation projects, timelines, and changes in status of Tier 1 and Tier 2 TCAs in the AF CARM system of record. ( T-1 ) 2.19.5.  Provide  notification  of  unfunded  remediation  requirements  to  the  relevant  HH",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 60,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-db893e04f281",
       "source_quote": "Therefore, organizations should minimize the creation, storage, and use of unnecessary images.",
       "description": "Therefore, organizations should minimize the creation, storage, and use of unnecessary images.",
@@ -240,6 +298,19 @@
       "source_pdf": "NIST.SP.800-125.pdf",
       "chunk_id": 36,
       "run_dir": "NIST.SP.800-125_20260730_215611",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-759c51583ceb",
+      "source_quote": "it will be reported in this category",
+      "description": "it will be reported in this category",
+      "section_title_path": [
+        "INTRODUCTION"
+      ],
+      "parent_context": "1.1. Introduction. The AF relies on networked electronic systems to plan and execute its full range  of  missions  around  the  world.  While  these  systems  help  us  to  maintain  our  military dominance, they also provide our adversaries a means by which to gain an asymmetric advantage via network attack and/or the exploitation of networked systems. AF networks are probed and scanned by domestic and foreign sources thousands of times each day. To counter, negate and mitigate unauthorized activity on its networks, the AF and DoD conduct a wide range of actions collectively known as DCO. 1.1",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 10,
+      "run_dir": "afi17-203_20260730_215609",
       "fix_status": "post_fix"
     },
     {
@@ -271,6 +342,19 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-e2e921ec155f",
+      "source_quote": "The IS is compromised with malicious code that provides remote interactive control, it will be reported in this category.",
+      "description": "The IS is compromised with malicious code that provides remote interactive control, it will be reported in this category.",
+      "section_title_path": [
+        "INTRODUCTION"
+      ],
+      "parent_context": "1.1. Introduction. The AF relies on networked electronic systems to plan and execute its full range  of  missions  around  the  world.  While  these  systems  help  us  to  maintain  our  military dominance, they also provide our adversaries a means by which to gain an asymmetric advantage via network attack and/or the exploitation of networked systems. AF networks are probed and scanned by domestic and foreign sources thousands of times each day. To counter, negate and mitigate unauthorized activity on its networks, the AF and DoD conduct a wide range of actions collectively known as DCO. 1.1",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 9,
+      "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-a4921bb013d1",
       "source_quote": "Organizations should secure all of these elements and maintain their security based on sound security practices, such as keeping software up-to-date with security patches, using secure configuration baselines, and using host-based firewalls, antivirus software, or other appropriate mechanisms to detect and stop attacks.",
       "description": "Secure all elements and maintain their security based on sound security practices, such as keeping software up-to-date with security patches, using secure configuration baselines, and using host-based firewalls, antivirus software, or other appropriate mechanisms to detect and stop attacks.",
@@ -284,17 +368,31 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-dfd90d5b5170",
-      "source_quote": "Counters cyber threats by enabling criminal prosecution or conducting counterintelligence activities.",
-      "description": "Counters cyber threats by enabling criminal prosecution or conducting counterintelligence activities.",
+      "requirement_id": "REQ-fa5362d1c2cb",
+      "source_quote": "Work with those organizations within their installation who own TCAs to ensure proper support and awareness of assets.",
+      "description": "Work with those organizations within their installation who own TCAs to ensure proper support and awareness of assets.",
       "section_title_path": [
         "ROLES AND RESPONSIBILITIES",
-        "2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."
+        "2.22. Air Force Host Centers and Wings."
       ],
-      "parent_context": "2.2.1.  In coordination with AF/A3, SAF/A6 and SAF/AQ, recommends security protection of  new  projects/capabilities  in  accordance  with  established  classification  guidance  and Department of Defense Instruction (DoDI) O-3600.02, Information Operation (IO) Security Classification Guidance. 2.2.2.  Is  designated  Computer  Network  Defense  Service  Provider  (CNDSP)  Certification Authority  (CA)  for  Special  Access  Program  (SAP)  networks  and  is  responsible  for coordinating and directing SAP enclave-wide CNDSP activities. 2.3. The  AF  Inspector  General  (SAF/IG). SAF/IG  provi",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 19,
-      "run_dir": "afi17-203_20260730_215609",
+      "parent_context": "2.22.1.  Execute the responsibilities found in section 2.22. if responsible for any TCAs. ( T-1 ) Host Centers/Wings will be exempt if capable of demonstrating an absence of TCAs.  If an exemption is awarded, Host Centers/Wings are only responsible for those activities identified in this section. 2.22.2.  Work  with  those  organizations  within  their  installation  who  own  TCAs  to  ensure proper support and awareness of assets. ( T-2 ) 2.22.2.1.  Where applicable, maintain a host-tenant agreement with asset-owning organizations within their installation that spells out the responsibilitie",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 75,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-955ab005b394",
+      "source_quote": "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+      "description": "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+      "section_title_path": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+        "1.1. Executive Summary"
+      ],
+      "parent_context": "1.1.1.  The CARM Program was established to increase the reliability of assets/capabilities essential  to  the  execution  of  DoD  missions  worldwide.    The  CARM  program  enables continuity in two ways: 1) by identifying those systems and assets on which AF missions rely for functionality, and 2) then implementing a risk management strategy designed to reduce or offset  the  risk  of  loss  to  these  TCA/  systems/capabilities.    The  CARM  risk  management approach includes four macro processes (identify, assess, analyze, and manage mission risk) which  seek  to  introduce  mitigation ",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 11,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -339,16 +437,30 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-3eb3e58787e7",
-      "source_quote": "Notifies MCCCs and NOSs of cyber incidents occurring in their respective AORs to facilitate mission impact analysis. NOSs will coordinate through the 624 OC with 24 AF, if necessary, to determine if additional protections are required to prevent future similar incidents.",
-      "description": "Notifies MCCCs and NOSs of cyber incidents occurring in their respective AORs to facilitate mission impact analysis. NOSs will coordinate through the 624 OC with 24 AF, if necessary, to determine if additional protections are required to prevent future similar incidents.",
+      "requirement_id": "REQ-e0471aa64a63",
+      "source_quote": "Force Health Protection, as defined in DoDD 6200.04, Force Health Protection , and DoDI 6200.03, Public Health Emergency Management Within the DoD.",
+      "description": "Force Health Protection, as defined in DoDD 6200.04, Force Health Protection , and DoDI 6200.03, Public Health Emergency Management Within the DoD.",
       "section_title_path": [
-        "ROLES AND RESPONSIBILITIES",
-        "2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."
+        "PROGRAM OVERVIEW",
+        "1.4. CARM and MA Integration Strategy"
       ],
-      "parent_context": "2.2.1.  In coordination with AF/A3, SAF/A6 and SAF/AQ, recommends security protection of  new  projects/capabilities  in  accordance  with  established  classification  guidance  and Department of Defense Instruction (DoDI) O-3600.02, Information Operation (IO) Security Classification Guidance. 2.2.2.  Is  designated  Computer  Network  Defense  Service  Provider  (CNDSP)  Certification Authority  (CA)  for  Special  Access  Program  (SAP)  networks  and  is  responsible  for coordinating and directing SAP enclave-wide CNDSP activities. 2.3. The  AF  Inspector  General  (SAF/IG). SAF/IG  provi",
+      "parent_context": "1.4.1.  DoDD 3020.40 provides guidance for the integration and synchronization of DoD risk management programs, to  include  CARM.    CARM  programs  will  implement  and  execute CARM guidance and requirements within the overall DoD MA Strategy and Framework by establishing  complementary  partnerships  and  information  cross-flows  between  the  CARM program and AF MA efforts as needed.  Designated MA programs/activities, as defined in DoDD 3020.40, are: 1.4.1.1.  Continuity of Operations (COOP), as defined in DoDD  3020.26, DoD Continuity  Programs, and  AFI  10-208, Air  Force  Continuity",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 20,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-e41d286c83f4",
+      "source_quote": "Examples of strategies include modifying network access controls (e.g., firewall), installing new antivirus or intrusion detection/prevention sensor signatures, or making physical changes to the infrastructure.",
+      "description": "Examples of strategies include modifying network access controls (e.g., firewall), installing new antivirus or intrusion detection/prevention sensor signatures, or making physical changes to the infrastructure.",
+      "section_title_path": [
+        "Actions",
+        "3.7.2. Methodology."
+      ],
+      "parent_context": "3.7.2.1.  If  applicable, implement additional containment actions to regain control of or isolate the system and prevent further malicious activity. 3.7.2.2.  Containment strategies vary based on the type of incident. Common strategies include  restoring  the  compromised  system  to  a  pristine  condition  and/or  formally decommissioning the system if it cannot be restored. 3.7.2.3.  Examples of strategies include modifying network access controls (e.g., firewall), installing new antivirus or intrusion detection/prevention sensor signatures, or making  physical  changes  to  the  infrastru",
       "source_pdf": "afi17-203.pdf",
-      "chunk_id": 24,
+      "chunk_id": 49,
       "run_dir": "afi17-203_20260730_215609",
       "fix_status": "post_fix"
     },
@@ -379,6 +491,20 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-4cc2145998a9",
+      "source_quote": "In accordance with AFI 17-201, Command and Control for Cyberspace Operations, the Commander, AF Space Command (AFSPC/CC) is responsible for the overall command and control, security and defense of the AF Information Network (AFIN), and for the command, control, implementation, security, operation, maintenance, sustainment, configuration, and defense of the AF Network (AFNET)/AF Network-Secure (AFNET-S).",
+      "description": "In accordance with AFI 17-201, Command and Control for Cyberspace Operations, the Commander, AF Space Command (AFSPC/CC) is responsible for the overall command and control, security and defense of the AF Information Network (AFIN), and for the command, control, implementation, security, operation, maintenance, sustainment, configuration, and defense of the AF Network (AFNET)/AF Network-Secure (AFNET-S).",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."
+      ],
+      "parent_context": "2.2.1.  In coordination with AF/A3, SAF/A6 and SAF/AQ, recommends security protection of  new  projects/capabilities  in  accordance  with  established  classification  guidance  and Department of Defense Instruction (DoDI) O-3600.02, Information Operation (IO) Security Classification Guidance. 2.2.2.  Is  designated  Computer  Network  Defense  Service  Provider  (CNDSP)  Certification Authority  (CA)  for  Special  Access  Program  (SAP)  networks  and  is  responsible  for coordinating and directing SAP enclave-wide CNDSP activities. 2.3. The  AF  Inspector  General  (SAF/IG). SAF/IG  provi",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 21,
+      "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-3097aa5d306c",
       "source_quote": "(4) Detailed explanations of the expected levels and quality of NM services that will be provided.",
       "description": "Detailed explanations of the expected levels and quality of NM services that will be provided.",
@@ -392,6 +518,61 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-0e2e2d9ff2b9",
+      "source_quote": "The annual schedule of AFMAAs are developed by AFSFC in coordination with AF/A3OA with primary consideration of the assessment requirements dictated by AF Mission Assurance and Antiterrorism programs.",
+      "description": "The annual schedule of AFMAAs are developed by AFSFC in coordination with AF/A3OA with primary consideration of the assessment requirements dictated by AF Mission Assurance and Antiterrorism programs.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 94,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-aed81e615a4b",
+      "source_quote": "MAJCOM/DRUs and FOAs (as appropriate) are responsible for entering all of their TCAs into the AF CARM system of record and validating TCAs.",
+      "description": "MAJCOM/DRUs and FOAs (as appropriate) are responsible for entering all of their TCAs into the AF CARM system of record and validating TCAs.",
+      "section_title_path": [
+        "CARM PROCESSES"
+      ],
+      "parent_context": "3.2.5.1.1.  Defense Critical Asset (DCA) - TCAs of such extraordinary importance to operations in peace, crisis, and war, that its incapacitation or destruction would have a very  serious,  debilitating  effect  on  the  ability  of  the  DOD  to  fulfill  its  missions. DCAs are not an independent tier of assets, but are a high-priority subset of Tier 1 TCAs. 3.2.5.2.  Tier 2 TCA - A system or asset of which the loss, incapacitation, or disruption could result in severe mission (or function) degradation at the DoD, Military Department, CCMD, Sub-Unified Command, Defense Agency, or DISLA level",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 80,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-c4e8070165c4",
+      "source_quote": "The local CFP, with the assistance of the mission owner, the servicing MCCC/ACCC and applicable CSCS units, will develop a Plan of Action and Milestones (POA&M) detailing the required actions and responsible offices/individuals to guide system restoration and prevention of similar incidents in the future.",
+      "description": "The local CFP, with the assistance of the mission owner, the servicing MCCC/ACCC and applicable CSCS units, will develop a Plan of Action and Milestones (POA&M) detailing the required actions and responsible offices/individuals to guide system restoration and prevention of similar incidents in the future.",
+      "section_title_path": [
+        "Actions",
+        "3.6.2. Methodology."
+      ],
+      "parent_context": "3.6.2.1.  Gather  information.  All  involved  personnel  should  identify  and  collect  all relevant information about the incident for use in incident analysis. Information gathered may include data previously acquired and preserved, external logs, personal accounts, allsource intelligence, technical information, or the current operational situation. 3.6.2.2.  Validate  the  incident.  Personnel  should  continuously  review,  corroborate,  and update (if applicable) the reported incident to ensure the accuracy of all information. 3.6.2.3.  Determine  the  operational  impact.  Operational ",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 47,
+      "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-dfd90d5b5170",
+      "source_quote": "Counters cyber threats by enabling criminal prosecution or conducting counterintelligence activities.",
+      "description": "Counters cyber threats by enabling criminal prosecution or conducting counterintelligence activities.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."
+      ],
+      "parent_context": "2.2.1.  In coordination with AF/A3, SAF/A6 and SAF/AQ, recommends security protection of  new  projects/capabilities  in  accordance  with  established  classification  guidance  and Department of Defense Instruction (DoDI) O-3600.02, Information Operation (IO) Security Classification Guidance. 2.2.2.  Is  designated  Computer  Network  Defense  Service  Provider  (CNDSP)  Certification Authority  (CA)  for  Special  Access  Program  (SAP)  networks  and  is  responsible  for coordinating and directing SAP enclave-wide CNDSP activities. 2.3. The  AF  Inspector  General  (SAF/IG). SAF/IG  provi",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 19,
+      "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-b892fd30193d",
       "source_quote": "(2) Read-only and read-write SNMP community strings for a managed device shall be different.",
       "description": "(2) Read-only and read-write SNMP community strings for a managed device shall be different.",
@@ -402,6 +583,47 @@
       "source_pdf": "DODI 8410.03.pdf",
       "chunk_id": 29,
       "run_dir": "DODI 8410.03_20260730_220814",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-e7418b1a04f6",
+      "source_quote": "If the originator / recipient of the incident report (IR) is, 3 = and Informational Recipients will be.",
+      "description": "If the originator / recipient of the incident report (IR) is, 3 = and Informational Recipients will be.",
+      "section_title_path": [
+        "INCIDENT HANDLING",
+        "3.3.1. Objectives."
+      ],
+      "parent_context": "3.3.2.1.  Ensure all suspicious activity is detected and reported so that further analysis can take place to determine if it is a reportable event or incident. 3.3.2.2.  Ensure  suspicious  activity  is  reported  in  a  timely  manner  consistent  with required  reporting  timelines.  Reporting  accurate  incident  information  as  close  to  nearreal-time as possible is crucial to an effective response. If the incident meets OPREP-3 criteria,  report  the  operational  impact  in  accordance  with  AFI  10-206,  Operational Reporting, Chapter 3 . 3.3.2.3.  Coordinate with command channels, D",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 35,
+      "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-b05f35b52feb",
+      "source_quote": "The AF detects activity through a variety of means and capabilities.",
+      "description": "The AF detects activity through a variety of means and capabilities.",
+      "section_title_path": [
+        "INCIDENT HANDLING"
+      ],
+      "parent_context": "3.1. General. Units  operating  the  ACD  and  AFINC  weapon  systems  monitor  and  record suspicious  and  unauthorized  network  and  information  systems  access  and  activity  on  AF networks.  Suspicious activity may include network scanning, multiple connection attempts to a network  device  from  an  unknown  entity,  or  other  reportable  activity  detected  at  any  level. Intrusion activity may include the presence of unusual or excessive activity on the network, or unauthorized  individuals  gaining  full  (root)  or  limited  (user)  access  to  a  network  device  or informatio",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 31,
+      "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-da7cdd6f071a",
+      "source_quote": "Systematically capture the methods used in the attack and identify security controls that could prevent future occurrences.",
+      "description": "Systematically capture the methods used in the attack and identify security controls that could prevent future occurrences.",
+      "section_title_path": [
+        "Actions",
+        "3.6.1. Objectives."
+      ],
+      "parent_context": "3.6.1.1.  Ensure the accuracy and completeness of incident reports. 3.6.1.2.  Characterize and communicate the potential impact of the incident. This includes identifying and sanitizing any compromised AF data. 3.6.1.3.  Systematically  capture  the  methods  used  in  the  attack  and  identify  security controls that could prevent future occurrences. 3.6.1.4.  Research  actions  that  can  be  taken  to  respond  to  and  eradicate  the  risk  and/or threat. 3.6.1.5.  Understand  patterns  of  activity  to  characterize  the  threat  and  direct  protective and defensive strategies.",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 45,
+      "run_dir": "afi17-203_20260730_215609",
       "fix_status": "post_fix"
     },
     {
@@ -419,17 +641,31 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-22dfb57c640f",
-      "source_quote": "Ensure all suspicious activity is detected and reported so that further analysis can take place to determine if it is a reportable event or incident.",
-      "description": "Ensure all suspicious activity is detected and reported so that further analysis can take place to determine if it is a reportable event or incident.",
+      "requirement_id": "REQ-a6935fee37c4",
+      "source_quote": "Conduct an annual review of BEIs for identified TCAs to maintain data fidelity and asset awareness.",
+      "description": "Conduct an annual review of BEIs for identified TCAs to maintain data fidelity and asset awareness.",
       "section_title_path": [
-        "INCIDENT HANDLING",
-        "3.3.1. Objectives."
+        "ROLES AND RESPONSIBILITIES",
+        "2.17. MAJCOM/DRUs."
       ],
-      "parent_context": "3.3.2.1.  Ensure all suspicious activity is detected and reported so that further analysis can take place to determine if it is a reportable event or incident. 3.3.2.2.  Ensure  suspicious  activity  is  reported  in  a  timely  manner  consistent  with required  reporting  timelines.  Reporting  accurate  incident  information  as  close  to  nearreal-time as possible is crucial to an effective response. If the incident meets OPREP-3 criteria,  report  the  operational  impact  in  accordance  with  AFI  10-206,  Operational Reporting, Chapter 3 . 3.3.2.3.  Coordinate with command channels, D",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 32,
-      "run_dir": "afi17-203_20260730_215609",
+      "parent_context": "2.17.1.  Establish  a  CARM  program  office  within  the  Headquarters  organization  for  the purpose of identifying, assessing, analyzing, and managing mission risk to AF TCAs. 2.17.1.1.  Any organization which can demonstrate a lack of TCAs will be exempt from CARM programmatic responsibilities. 2.17.2.  Appoint  a  primary  and  alternate  CARM  POC  on  an  annual  basis,  in  writing,  to manage their overall CARM program.  A copy of the appointment letter will be provided to the HAF CARM Program office. ( T-1 )  In addition: 2.17.2.1.  MAJCOM/DRU CARM program appointed personnel must p",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 53,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-56b2bcb38f4a",
+      "source_quote": "Assign servicing AFOSI unit-specific roles and responsibilities for the identification, tracking, and dissemination of threat information to all AF commands owning or operating Tier 1 TCAs.",
+      "description": "Assign servicing AFOSI unit-specific roles and responsibilities for the identification, tracking, and dissemination of threat information to all AF commands owning or operating Tier 1 TCAs.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.7. Secretary of the Air Force, Inspector General (SAF/IG)."
+      ],
+      "parent_context": "2.7.1.  Provide inspection policy IAW HAF functional requirements. 2.7.2.  Ensure the Air Force Office of Special Investigations (AFOSI), in coordination with the HAF CARM Program office, provides policy and oversight regarding intelligence, threat and counterintelligence (CI) support provided by AFOSI to the CARM Program, and more specifically will: 2.7.2.1.  Identify  tailored  CI  collection  requirements  based  on  foreign  intelligence  and international  terrorist  threats  that  could  affect  the  protection  and  assurance  of  Tier  1 TCAs.  TCA tier definitions can be found in sect",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 27,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -447,17 +683,17 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-267079d9297a",
-      "source_quote": "The individual responsible for developing the incident report will review either DoDI O-3600.02 or the AF Cyberspace Operation Security Classification Guide (SCG) to determine if the report should be classified.",
-      "description": "The individual responsible for developing the incident report will review either DoDI O-3600.02 or the AF Cyberspace Operation Security Classification Guide (SCG) to determine if the report should be classified.",
+      "requirement_id": "REQ-d40f19c7f4d5",
+      "source_quote": "Implement and direct the AF CAIP, as outlined in Chapter 3 and Attachment 2 of this AFI.",
+      "description": "Implement and direct the AF CAIP, as outlined in Chapter 3 and Attachment 2 of this AFI.",
       "section_title_path": [
-        "Actions",
-        "3.4.4. Methodology."
+        "ROLES AND RESPONSIBILITIES",
+        "2.12. Air Force Deputy Chief of Staff, Operations (AF/A3)."
       ],
-      "parent_context": "3.4.4.1.  Assess and Categorize. Assess the event against the incident criteria to determine if it is a reportable event or incident (See Table 1.1, Incident Categories). In cases where more than one category applies, use the category of highest precedence as outlined in the Table 1.1. 3.4.4.2.  Classification  of  Incident  Reports.  Incident  reports  may  be  either  classified  or unclassified.  The  individual  responsible  for  developing  the  incident  report  will  review either  DoDI  O-3600.02  or  the  AF  Cyberspace  Operation  Security  Classification  Guide (SCG) to determine if",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 40,
-      "run_dir": "afi17-203_20260730_215609",
+      "parent_context": "2.12.1.  Serve as the AF functional area lead for Space. 2.12.2.  Provide  a  Space  or  appropriate  functional  area  representative  to  the  CARM  WG when requested. 2.12.3.  Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs. 2.12.4.  Focus the CARM Program on DoD mission requirements. 2.12.5.  Serve as the approving authority for finalized AF Risk Response Plans (RRP).",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 36,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -501,6 +737,20 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-17736f2f8734",
+      "source_quote": "The CARM WG can be incorporated into an equivalent, existing MAJCOM/DRU, FOA, Center/Wing, or Installation WG (e.g. Threat, COOP, or EM WG).",
+      "description": "The CARM WG can be incorporated into an equivalent, existing MAJCOM/DRU, FOA, Center/Wing, or Installation WG (e.g. Threat, COOP, or EM WG).",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.6. CARM WG."
+      ],
+      "parent_context": "3.6.1.  The  CARM  WG  serves  at  the  primary  working  level  advisory  forum  for  the development, vetting, and coordination of CARM-related policies, procedures, and actions. This may include: 3.6.1.1.  Identification, prioritization, and assessment of TCAs. 3.6.1.2.  Coordinating,  resourcing,  and  tracking  of  risk  management  decisions  and actions. 3.6.1.3.  Providing situational awareness of TCA availability and reliability. 3.6.1.4.  Facilitating cross-functional and cross-organizational dialogue.",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 104,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-f6f10463fb75",
       "source_quote": "The DOT&E shall: Provide the NM and SM data necessary to fulfill the commander's critical information requirements in support of established DoD cyberspace operational hierarchies.",
       "description": "The DOT&E shall: Provide the NM and SM data necessary to fulfill the commander's critical information requirements in support of established DoD cyberspace operational hierarchies.",
@@ -528,16 +778,31 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-856decab90ac",
-      "source_quote": "Submit an updated IR every 7 days until all actions required to resolve the incident are complete.",
-      "description": "Submit an updated IR every 7 days until all actions required to resolve the incident are complete.",
+      "requirement_id": "REQ-2fe094fa2ecd",
+      "source_quote": "Appointed personnel (program positions must be coded) will be coordinated with SAF/AAR, and possess a TS / SCI security clearance.",
+      "description": "Appointed personnel (program positions must be coded) will be coordinated with SAF/AAR, and possess a TS / SCI security clearance.",
       "section_title_path": [
-        "Actions"
+        "ROLES AND RESPONSIBILITIES",
+        "2.12. Air Force Deputy Chief of Staff, Operations (AF/A3)."
       ],
-      "parent_context": "1 Upon detection of an incident, end users will immediately notify their assigned CST/CSL and provide information as requested. (T-2) 2 Upon detection or notification of an incident, the CST/CSL will notify their servicing CFP. After notifying the CFP, the CST/CSL will prepare and transmit an IR to the servicing CFP. If there is no servicing CFP, send the IR directly to the supporting INOSC. Support the ACD unit as directed during investigation of incident. (T-2) 3 Upon detection or notification of an incident, contact the 624 OC for assessment of the incident and assignment of an Incident Rep",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 37,
-      "run_dir": "afi17-203_20260730_215609",
+      "parent_context": "2.12.1.  Serve as the AF functional area lead for Space. 2.12.2.  Provide  a  Space  or  appropriate  functional  area  representative  to  the  CARM  WG when requested. 2.12.3.  Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs. 2.12.4.  Focus the CARM Program on DoD mission requirements. 2.12.5.  Serve as the approving authority for finalized AF Risk Response Plans (RRP).",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 34,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-69c4c628c142",
+      "source_quote": "Ensure the reporting of changes in the operational status of their Tier 1 and Tier 2 TCAs as outlined and required in AFI 10-206.",
+      "description": "Ensure the reporting of changes in the operational status of their Tier 1 and Tier 2 TCAs as outlined and required in AFI 10-206.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.21. Air Force Critical Asset Owning Centers and Wings."
+      ],
+      "parent_context": "2.21.1.  Execute  CARM activities,  to  include  the  identification  and  management  of  risk  to TCAs. ( T-1 ) 2.21.1.1.  Centers/Wings will be exempt if capable of demonstrating an absence of TCAs. 2.21.2.  Appoint in writing primary and alternate CARM POCs to execute CARM activities to include the identification and management of risk to AF TCAs. ( T-2 ) A copy of the POC appointment letter will be provided to the applicable MAJCOM/DRU. ( T-2 ) 2.21.2.1.  The  appointment  of  CARM  POCs  should  be  assigned  to  the  position  for  a minimum of one year to ensure the stability and conti",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 72,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -595,16 +860,16 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-d4401d7fc16e",
-      "source_quote": "The decision to restore a system without identifying the root cause(s) of an incident must be weighed carefully as it may leave the system vulnerable.",
-      "description": "The decision to restore a system without identifying the root cause(s) of an incident must be weighed carefully as it may leave the system vulnerable.",
+      "requirement_id": "REQ-e6c2bb920c35",
+      "source_quote": "Characterize and communicate the potential impact of the incident.",
+      "description": "Characterize and communicate the potential impact of the incident.",
       "section_title_path": [
         "Actions",
-        "3.7.2. Methodology."
+        "3.6.1. Objectives."
       ],
-      "parent_context": "3.7.2.1.  If  applicable, implement additional containment actions to regain control of or isolate the system and prevent further malicious activity. 3.7.2.2.  Containment strategies vary based on the type of incident. Common strategies include  restoring  the  compromised  system  to  a  pristine  condition  and/or  formally decommissioning the system if it cannot be restored. 3.7.2.3.  Examples of strategies include modifying network access controls (e.g., firewall), installing new antivirus or intrusion detection/prevention sensor signatures, or making  physical  changes  to  the  infrastru",
+      "parent_context": "3.6.1.1.  Ensure the accuracy and completeness of incident reports. 3.6.1.2.  Characterize and communicate the potential impact of the incident. This includes identifying and sanitizing any compromised AF data. 3.6.1.3.  Systematically  capture  the  methods  used  in  the  attack  and  identify  security controls that could prevent future occurrences. 3.6.1.4.  Research  actions  that  can  be  taken  to  respond  to  and  eradicate  the  risk  and/or threat. 3.6.1.5.  Understand  patterns  of  activity  to  characterize  the  threat  and  direct  protective and defensive strategies.",
       "source_pdf": "afi17-203.pdf",
-      "chunk_id": 50,
+      "chunk_id": 45,
       "run_dir": "afi17-203_20260730_215609",
       "fix_status": "post_fix"
     },
@@ -623,6 +888,20 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-c9cbe8436b92",
+      "source_quote": "The AF/A3 is responsible for final approval of RRPs.",
+      "description": "The AF/A3 is responsible for final approval of RRPs.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.4. Mission Risk Analysis."
+      ],
+      "parent_context": "3.4.1.  Per  paragraphs  2.17.27  and  2.20.17,  RRPs  will  be  developed  to  document  the criticality data, threats, hazards, and vulnerabilities to TCAs identified during an assessment; as  well  as  provide  possible  risk  reduction  COAs  developed  by  assessment  team  SMEs, installation POCs, MAJCOM/DRUs, or FOAs.  The purpose of the COAs are to reduce risk to capability and increase mission resilience.  The MAJCOM/DRU Commander, or designee, will  select  a  COA  or  determine  the  level  of  asset  risk  to  be  acceptable  prior  to  RRP finalization. 3.4.1.1.  RRPs will be deve",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 97,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-70525aff10af",
       "source_quote": "As needed and with DISA support, develop standard NM information and data models to include NM MIB standards for tactical edge NEs.",
       "description": "As needed and with DISA support, develop standard NM information and data models to include NM MIB standards for tactical edge NEs.",
@@ -633,6 +912,20 @@
       "source_pdf": "DODI 8410.03.pdf",
       "chunk_id": 18,
       "run_dir": "DODI 8410.03_20260730_220814",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-b7aaad63c97a",
+      "source_quote": "Maintain a current list of TCAs for the installation in accordance with proper security procedures.",
+      "description": "Maintain a current list of TCAs for the installation in accordance with proper security procedures.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.22. Air Force Host Centers and Wings."
+      ],
+      "parent_context": "2.22.1.  Execute the responsibilities found in section 2.22. if responsible for any TCAs. ( T-1 ) Host Centers/Wings will be exempt if capable of demonstrating an absence of TCAs.  If an exemption is awarded, Host Centers/Wings are only responsible for those activities identified in this section. 2.22.2.  Work  with  those  organizations  within  their  installation  who  own  TCAs  to  ensure proper support and awareness of assets. ( T-2 ) 2.22.2.1.  Where applicable, maintain a host-tenant agreement with asset-owning organizations within their installation that spells out the responsibilitie",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 75,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -650,16 +943,45 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-eeb283685157",
-      "source_quote": "The sponsoring MAJCOM Staff element will establish the ROEs and SOPs for the exercise participants and will ensure the ROEs and SOPs address the issue of managing real world and exercise events and incidents.",
-      "description": "The sponsoring MAJCOM Staff element will establish the ROEs and SOPs for the exercise participants and will ensure the ROEs and SOPs address the issue of managing real world and exercise events and incidents.",
+      "requirement_id": "REQ-01d5bf560dbf",
+      "source_quote": "Coordination = Coordination of response actions between C/S/As and field activities, CNDSPs, mission owners, Installations and DCO Service subscribers, DoDIN Operations, and with LE/CI and IC, and others as required.",
+      "description": "Coordination = Coordination of response actions between C/S/As and field activities, CNDSPs, mission owners, Installations and DCO Service subscribers, DoDIN Operations, and with LE/CI and IC, and others as required.",
       "section_title_path": [
-        "EXERCISES"
+        "Actions",
+        "3.7.3. Post-Incident Analysis."
       ],
-      "parent_context": "4.1. Exercises on Operational Networks. Organizations that conduct exercises on operational networks run the risk of confusing exercise incidents with real world incidents. Any organization that  participates  in  exercises  conducted  on  operational  networks  will  ensure  procedures  are  in place to manage real world and exercise incidents. 4.2. Joint Exercises. The sponsoring command should provide the rules of engagement (ROEs) and standard operating procedures (SOPs) for the exercise. The senior Air Force representative from  each  participating  organization  will  ensure  the  ROEs  ",
+      "parent_context": "3.7.3.1.  Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.  Data captured in the postmortem includes  lessons  learned,  initial  root  cause,  problems  with  executing  COAs,  missing policies  and  procedures,  and  inadequate  infrastructure  defenses.  Post-incident  analysis reporting will be provided to the affected MAJCOM/unit so that corrective actions can be taken (T-2) . 3.7.3.2.  The ACD unit drafts a Cyber Incident Report (CIR), which provides a detailed analysis  to  include  the  affected  sys",
       "source_pdf": "afi17-203.pdf",
-      "chunk_id": 57,
+      "chunk_id": 56,
       "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-727bf54a4a92",
+      "source_quote": "The HAF CARM Program office will distribute the approved RRP and risk response decision(s) across the HAF A-Staff, relevant MAJCOM/DRU or FOA, and respective CCMDs.",
+      "description": "The HAF CARM Program office will distribute the approved RRP and risk response decision(s) across the HAF A-Staff, relevant MAJCOM/DRU or FOA, and respective CCMDs.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.4. Mission Risk Analysis."
+      ],
+      "parent_context": "3.4.1.  Per  paragraphs  2.17.27  and  2.20.17,  RRPs  will  be  developed  to  document  the criticality data, threats, hazards, and vulnerabilities to TCAs identified during an assessment; as  well  as  provide  possible  risk  reduction  COAs  developed  by  assessment  team  SMEs, installation POCs, MAJCOM/DRUs, or FOAs.  The purpose of the COAs are to reduce risk to capability and increase mission resilience.  The MAJCOM/DRU Commander, or designee, will  select  a  COA  or  determine  the  level  of  asset  risk  to  be  acceptable  prior  to  RRP finalization. 3.4.1.1.  RRPs will be deve",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 97,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-9a1f01a2d295",
+      "source_quote": "Assist in identifying and prioritizing AF assets critical to the capabilities required by the Combatant Commander.",
+      "description": "Assist in identifying and prioritizing AF assets critical to the capabilities required by the Combatant Commander.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.19. Air Force Components to the Combatant Commands."
+      ],
+      "parent_context": "2.19.1.  Participate in the CARM WG as required. 2.19.2.  Assist in identifying and prioritizing AF assets critical to the capabilities required by the Combatant Commander. 2.19.3.  Coordinate with the MAJCOM/DRUs, FOAs, and AF functional area leads on the identification, assessment, and remediation of AF TCAs and non-AF owned and/or managed infrastructure. 2.19.4.  Document major remediation projects, timelines, and changes in status of Tier 1 and Tier 2 TCAs in the AF CARM system of record. ( T-1 ) 2.19.5.  Provide  notification  of  unfunded  remediation  requirements  to  the  relevant  HH",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 60,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -690,17 +1012,17 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-b3bb541f144f",
-      "source_quote": "Ensure all appropriate DoD organizations, to include assigned Authorizing Officials (AO) and their staffs, are notified through technical and operational reporting channels.",
-      "description": "Ensure all appropriate DoD organizations, to include assigned Authorizing Officials (AO) and their staffs, are notified through technical and operational reporting channels.",
+      "requirement_id": "REQ-ab014971d73f",
+      "source_quote": "Utilize the Planning, Programming, Budgeting and Execution (PPBE), Program Budget Review (PBR) and other sources to plan, program, and advocate for sufficient manpower resources to execute the CARM program.",
+      "description": "Utilize the Planning, Programming, Budgeting and Execution (PPBE), Program Budget Review (PBR) and other sources to plan, program, and advocate for sufficient manpower resources to execute the CARM program.",
       "section_title_path": [
-        "Actions",
-        "3.4.3. Objectives."
+        "ROLES AND RESPONSIBILITIES",
+        "2.12. Air Force Deputy Chief of Staff, Operations (AF/A3)."
       ],
-      "parent_context": "3.4.3.1.  Determine whether a detected event is a reportable event or incident. 3.4.3.2.  Ensure  all  appropriate  DoD  organizations,  to  include  assigned  Authorizing Officials (AO) and their staffs, are notified through technical and operational reporting channels. 3.4.3.3.  Ensure the timely submission, by the organization that first discovers and reports the  incident,  of  an  initial  incident  report  that  contains  as  much  complete  and  useful information as is available (or possible). This includes timely submissions into the DoD's Joint Incident Management System (JIMS).",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 39,
-      "run_dir": "afi17-203_20260730_215609",
+      "parent_context": "2.12.1.  Serve as the AF functional area lead for Space. 2.12.2.  Provide  a  Space  or  appropriate  functional  area  representative  to  the  CARM  WG when requested. 2.12.3.  Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs. 2.12.4.  Focus the CARM Program on DoD mission requirements. 2.12.5.  Serve as the approving authority for finalized AF Risk Response Plans (RRP).",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 36,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -743,6 +1065,34 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-4eec1125fd70",
+      "source_quote": "Establish and provide corporate process priorities and products for Tier 1 and Tier 2 TCA information on an as-requested basis for the AFSEEB (AFPD 16-14, Security Enterprise Governance) and AF Budget Corporate Processes (AFI 65-601, V3, The Air Force Budget Corporate Process), as well as sanctioned AF WGs.",
+      "description": "Establish and provide corporate process priorities and products for Tier 1 and Tier 2 TCA information on an as-requested basis for the AFSEEB (AFPD 16-14, Security Enterprise Governance) and AF Budget Corporate Processes (AFI 65-601, V3, The Air Force Budget Corporate Process), as well as sanctioned AF WGs.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.17. MAJCOM/DRUs."
+      ],
+      "parent_context": "2.17.1.  Establish  a  CARM  program  office  within  the  Headquarters  organization  for  the purpose of identifying, assessing, analyzing, and managing mission risk to AF TCAs. 2.17.1.1.  Any organization which can demonstrate a lack of TCAs will be exempt from CARM programmatic responsibilities. 2.17.2.  Appoint  a  primary  and  alternate  CARM  POC  on  an  annual  basis,  in  writing,  to manage their overall CARM program.  A copy of the appointment letter will be provided to the HAF CARM Program office. ( T-1 )  In addition: 2.17.2.1.  MAJCOM/DRU CARM program appointed personnel must p",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 50,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-48b04625daea",
+      "source_quote": "Participate in CARM WGs as requested by Centers/Wings on their installation.",
+      "description": "Participate in CARM WGs as requested by Centers/Wings on their installation.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.22. Air Force Host Centers and Wings."
+      ],
+      "parent_context": "2.22.1.  Execute the responsibilities found in section 2.22. if responsible for any TCAs. ( T-1 ) Host Centers/Wings will be exempt if capable of demonstrating an absence of TCAs.  If an exemption is awarded, Host Centers/Wings are only responsible for those activities identified in this section. 2.22.2.  Work  with  those  organizations  within  their  installation  who  own  TCAs  to  ensure proper support and awareness of assets. ( T-2 ) 2.22.2.1.  Where applicable, maintain a host-tenant agreement with asset-owning organizations within their installation that spells out the responsibilitie",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 75,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-055f1f2635b8",
       "source_quote": "(1)  In coordination with the Director, National Security Agency, may independently conduct operational and technical observations and assessments in support of the use of the authority in Section 3252 of Title 10, U.S.C..",
       "description": "(1) In coordination with the Director, National Security Agency, may independently conduct operational and technical observations and assessments in support of the use of the authority in Section 3252 of Title 10, U.S.C..",
@@ -754,6 +1104,20 @@
       "source_pdf": "DODI 5200.44.pdf",
       "chunk_id": 33,
       "run_dir": "DODI 5200.44_20260730_220819",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-a29bf5a2acdf",
+      "source_quote": "Additionally, it is also reviewed during the vulnerability assessment by the ATO and EM SMEs with the applicable on-site POCs to ensure a comprehensive product.",
+      "description": "Additionally, it is also reviewed during the vulnerability assessment by the ATO and EM SMEs with the applicable on-site POCs to ensure a comprehensive product.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 86,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -798,6 +1162,34 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-d393c1bab421",
+      "source_quote": "Provide notification of unfunded remediation requirements to the HAF CARM Program office.",
+      "description": "Provide notification of unfunded remediation requirements to the HAF CARM Program office.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.17. MAJCOM/DRUs."
+      ],
+      "parent_context": "2.17.1.  Establish  a  CARM  program  office  within  the  Headquarters  organization  for  the purpose of identifying, assessing, analyzing, and managing mission risk to AF TCAs. 2.17.1.1.  Any organization which can demonstrate a lack of TCAs will be exempt from CARM programmatic responsibilities. 2.17.2.  Appoint  a  primary  and  alternate  CARM  POC  on  an  annual  basis,  in  writing,  to manage their overall CARM program.  A copy of the appointment letter will be provided to the HAF CARM Program office. ( T-1 )  In addition: 2.17.2.1.  MAJCOM/DRU CARM program appointed personnel must p",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 53,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-e9d569fc3745",
+      "source_quote": "Maintain access to a facility capable of developing, communicating, and maintaining up to and including TS / SCI TCA-related data.",
+      "description": "Maintain access to a facility capable of developing, communicating, and maintaining up to and including TS / SCI TCA-related data.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.17. MAJCOM/DRUs."
+      ],
+      "parent_context": "2.17.1.  Establish  a  CARM  program  office  within  the  Headquarters  organization  for  the purpose of identifying, assessing, analyzing, and managing mission risk to AF TCAs. 2.17.1.1.  Any organization which can demonstrate a lack of TCAs will be exempt from CARM programmatic responsibilities. 2.17.2.  Appoint  a  primary  and  alternate  CARM  POC  on  an  annual  basis,  in  writing,  to manage their overall CARM program.  A copy of the appointment letter will be provided to the HAF CARM Program office. ( T-1 )  In addition: 2.17.2.1.  MAJCOM/DRU CARM program appointed personnel must p",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 49,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-e056997cbb35",
       "source_quote": "Standard formats and identifications shall be maintained in a DoD-published MIB data format and dictionary established and maintained by DISA.",
       "description": "Standard formats and identifications shall be maintained in a DoD-published MIB data format and dictionary established and maintained by DISA.",
@@ -811,30 +1203,31 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-cd3a2497aa50",
-      "source_quote": "Upon detection of an incident, end users will immediately notify their assigned CST/CSL and provide information as requested.",
-      "description": "Upon detection of an incident, end users will immediately notify their assigned CST/CSL and provide information as requested.",
+      "requirement_id": "REQ-2166731e6ccd",
+      "source_quote": "Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs.",
+      "description": "Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs.",
       "section_title_path": [
-        "Actions"
+        "ROLES AND RESPONSIBILITIES",
+        "2.12. Air Force Deputy Chief of Staff, Operations (AF/A3)."
       ],
-      "parent_context": "1 Upon detection of an incident, end users will immediately notify their assigned CST/CSL and provide information as requested. (T-2) 2 Upon detection or notification of an incident, the CST/CSL will notify their servicing CFP. After notifying the CFP, the CST/CSL will prepare and transmit an IR to the servicing CFP. If there is no servicing CFP, send the IR directly to the supporting INOSC. Support the ACD unit as directed during investigation of incident. (T-2) 3 Upon detection or notification of an incident, contact the 624 OC for assessment of the incident and assignment of an Incident Rep",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 37,
-      "run_dir": "afi17-203_20260730_215609",
+      "parent_context": "2.12.1.  Serve as the AF functional area lead for Space. 2.12.2.  Provide  a  Space  or  appropriate  functional  area  representative  to  the  CARM  WG when requested. 2.12.3.  Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs. 2.12.4.  Focus the CARM Program on DoD mission requirements. 2.12.5.  Serve as the approving authority for finalized AF Risk Response Plans (RRP).",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 34,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-64deb4e3c39f",
-      "source_quote": "Supports USCYBERCOM in Mission Analysis development.",
-      "description": "Supports USCYBERCOM in Mission Analysis development.",
+      "requirement_id": "REQ-06fd414a5fee",
+      "source_quote": "All MAJCOM/DRUs and FOAs that are responsible for TCAs (as appropriate) will establish CARM programs charged with performing risk management to TCAs and direct subordinate organizations to execute CARM responsibilities as necessary.",
+      "description": "All MAJCOM/DRUs and FOAs that are responsible for TCAs (as appropriate) will establish CARM programs charged with performing risk management to TCAs and direct subordinate organizations to execute CARM responsibilities as necessary.",
       "section_title_path": [
-        "ROLES AND RESPONSIBILITIES",
-        "2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."
+        "PROGRAM OVERVIEW",
+        "1.3. Scope"
       ],
-      "parent_context": "2.2.1.  In coordination with AF/A3, SAF/A6 and SAF/AQ, recommends security protection of  new  projects/capabilities  in  accordance  with  established  classification  guidance  and Department of Defense Instruction (DoDI) O-3600.02, Information Operation (IO) Security Classification Guidance. 2.2.2.  Is  designated  Computer  Network  Defense  Service  Provider  (CNDSP)  Certification Authority  (CA)  for  Special  Access  Program  (SAP)  networks  and  is  responsible  for coordinating and directing SAP enclave-wide CNDSP activities. 2.3. The  AF  Inspector  General  (SAF/IG). SAF/IG  provi",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 24,
-      "run_dir": "afi17-203_20260730_215609",
+      "parent_context": "1.3.1.  CARM  program  responsibilities  extend  to  any AF  organization  with  assigned missions and required capabilities.  All MAJCOM/DRUs and FOAs that are responsible for TCAs  (as  appropriate)  will  establish  CARM  programs  charged  with  performing  risk management to TCAs and direct subordinate organizations to execute CARM responsibilities as  necessary.   Exemptions may be granted to installations with a demonstrated absence of DCI.",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 16,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -851,16 +1244,30 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-10f00faf0eda",
-      "source_quote": "The senior Air Force representative from each participating organization will ensure the ROEs and SOPs address the issue of managing real world and exercise events and incidents.",
-      "description": "The senior Air Force representative from each participating organization will ensure the ROEs and SOPs address the issue of managing real world and exercise events and incidents.",
+      "requirement_id": "REQ-5c349cdc3656",
+      "source_quote": "Documentation of analysis results.",
+      "description": "Documentation of analysis results.",
       "section_title_path": [
-        "EXERCISES"
+        "Actions",
+        "3.7.3. Post-Incident Analysis."
       ],
-      "parent_context": "4.1. Exercises on Operational Networks. Organizations that conduct exercises on operational networks run the risk of confusing exercise incidents with real world incidents. Any organization that  participates  in  exercises  conducted  on  operational  networks  will  ensure  procedures  are  in place to manage real world and exercise incidents. 4.2. Joint Exercises. The sponsoring command should provide the rules of engagement (ROEs) and standard operating procedures (SOPs) for the exercise. The senior Air Force representative from  each  participating  organization  will  ensure  the  ROEs  ",
+      "parent_context": "3.7.3.1.  Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.  Data captured in the postmortem includes  lessons  learned,  initial  root  cause,  problems  with  executing  COAs,  missing policies  and  procedures,  and  inadequate  infrastructure  defenses.  Post-incident  analysis reporting will be provided to the affected MAJCOM/unit so that corrective actions can be taken (T-2) . 3.7.3.2.  The ACD unit drafts a Cyber Incident Report (CIR), which provides a detailed analysis  to  include  the  affected  sys",
       "source_pdf": "afi17-203.pdf",
-      "chunk_id": 57,
+      "chunk_id": 55,
       "run_dir": "afi17-203_20260730_215609",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-2ee1e33c0130",
+      "source_quote": "Critical Assets, formerly known as SICAs, are infrastructures directly used to support the functioning or operation of a TCA such that the supporting infrastructure TCA's loss, degradation, or denial will result in the inability of TCAs to function or operate as intended in the execution of their associated METs/MEFs.",
+      "description": "Critical Assets, formerly known as SICAs, are infrastructures directly used to support the functioning or operation of a TCA such that the supporting infrastructure TCA's loss, degradation, or denial will result in the inability of TCAs to function or operate as intended in the execution of their associated METs/MEFs.",
+      "section_title_path": [
+        "CARM PROCESSES"
+      ],
+      "parent_context": "3.2.5.1.1.  Defense Critical Asset (DCA) - TCAs of such extraordinary importance to operations in peace, crisis, and war, that its incapacitation or destruction would have a very  serious,  debilitating  effect  on  the  ability  of  the  DOD  to  fulfill  its  missions. DCAs are not an independent tier of assets, but are a high-priority subset of Tier 1 TCAs. 3.2.5.2.  Tier 2 TCA - A system or asset of which the loss, incapacitation, or disruption could result in severe mission (or function) degradation at the DoD, Military Department, CCMD, Sub-Unified Command, Defense Agency, or DISLA level",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 79,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -902,6 +1309,33 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-65d9633de3bb",
+      "source_quote": "The nominated TCAs will be reviewed and validated by the respective MAJCOM/DRU and FOA (as appropriate).",
+      "description": "The nominated TCAs will be reviewed and validated by the respective MAJCOM/DRU and FOA (as appropriate).",
+      "section_title_path": [
+        "QUICK REFERENCE CHART AND PROCESS OVERVIEW"
+      ],
+      "parent_context": "A2.1. During the initial step of the CAIP process , DoD mission owners (CCMDs, Defense Agencies, Military Departments) will decompose their assigned missions and core functions to identify  the  specific  METs/MEFs  each  requires  to  be  implemented  by  the  resource  providers. This  information  allows  resource  providers  such  as  Services  or  Field  Activities  to  select  the individual  METs/MEFs  their  organizations  execute  in  support  of  assigned  missions.    This process  is  then  replicated  at  each  subordinate  organizational  level  until  a  list  of  METs/MEFs requ",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 118,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-6700c94950ea",
+      "source_quote": "Appoint in writing primary and alternate CARM POCs to execute CARM activities to include the identification and management of risk to AF TCAs.",
+      "description": "Appoint in writing primary and alternate CARM POCs to execute CARM activities to include the identification and management of risk to AF TCAs.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.21. Air Force Critical Asset Owning Centers and Wings."
+      ],
+      "parent_context": "2.21.1.  Execute  CARM activities,  to  include  the  identification  and  management  of  risk  to TCAs. ( T-1 ) 2.21.1.1.  Centers/Wings will be exempt if capable of demonstrating an absence of TCAs. 2.21.2.  Appoint in writing primary and alternate CARM POCs to execute CARM activities to include the identification and management of risk to AF TCAs. ( T-2 ) A copy of the POC appointment letter will be provided to the applicable MAJCOM/DRU. ( T-2 ) 2.21.2.1.  The  appointment  of  CARM  POCs  should  be  assigned  to  the  position  for  a minimum of one year to ensure the stability and conti",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 69,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-f3d8806b240f",
       "source_quote": "(1) Identification of the organizations between which the agreement is established, to include technical and organizational points of contact.",
       "description": "(1) Identification of the organizations between which the agreement is established, to include technical and organizational points of contact.",
@@ -929,6 +1363,20 @@
       "fix_status": "post_fix"
     },
     {
+      "requirement_id": "REQ-1cb479031246",
+      "source_quote": "Maintain an Information Technology (IT) contingency plan for the AF CARM system of record to provide documented procedures to ensure the successful recovery in the event of a short-term system outage.",
+      "description": "Maintain an Information Technology (IT) contingency plan for the AF CARM system of record to provide documented procedures to ensure the successful recovery in the event of a short-term system outage.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.12. Air Force Deputy Chief of Staff, Operations (AF/A3)."
+      ],
+      "parent_context": "2.12.1.  Serve as the AF functional area lead for Space. 2.12.2.  Provide  a  Space  or  appropriate  functional  area  representative  to  the  CARM  WG when requested. 2.12.3.  Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs. 2.12.4.  Focus the CARM Program on DoD mission requirements. 2.12.5.  Serve as the approving authority for finalized AF Risk Response Plans (RRP).",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 42,
+      "run_dir": "afi10-2402_20260730_220821",
+      "fix_status": "post_fix"
+    },
+    {
       "requirement_id": "REQ-dcf01c5e6996",
       "source_quote": "The latest version of SNMP shall be implemented with a security model appropriate to the security of the network rather than the default model.",
       "description": "The latest version of SNMP shall be implemented with a security model appropriate to the security of the network rather than the default model.",
@@ -939,6 +1387,19 @@
       "source_pdf": "DODI 8410.03.pdf",
       "chunk_id": 28,
       "run_dir": "DODI 8410.03_20260730_220814",
+      "fix_status": "post_fix"
+    },
+    {
+      "requirement_id": "REQ-8a9662ea5d56",
+      "source_quote": "Mission owners decompose assigned missions to identify capabilities required to implement each mission.",
+      "description": "Mission owners decompose assigned missions to identify capabilities required to implement each mission.",
+      "section_title_path": [
+        "QUICK REFERENCE CHART AND PROCESS OVERVIEW"
+      ],
+      "parent_context": "A2.1. During the initial step of the CAIP process , DoD mission owners (CCMDs, Defense Agencies, Military Departments) will decompose their assigned missions and core functions to identify  the  specific  METs/MEFs  each  requires  to  be  implemented  by  the  resource  providers. This  information  allows  resource  providers  such  as  Services  or  Field  Activities  to  select  the individual  METs/MEFs  their  organizations  execute  in  support  of  assigned  missions.    This process  is  then  replicated  at  each  subordinate  organizational  level  until  a  list  of  METs/MEFs requ",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 111,
+      "run_dir": "afi10-2402_20260730_220821",
       "fix_status": "post_fix"
     },
     {
@@ -955,490 +1416,67 @@
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-4da8a110068b",
-      "source_quote": "If a system hosts guest OSs with different impact levels, the system should be secured in accordance with the highest of those levels.",
-      "description": "If a system hosts guest OSs with different impact levels, the system should be secured in accordance with the highest of those levels.",
+      "requirement_id": "REQ-17290369ef3b",
+      "source_quote": "If the originator / recipient of the incident report (IR) is, 2 = and the Primary Recipient will be.",
+      "description": "If the originator / recipient of the incident report (IR) is, 2 = and the Primary Recipient will be.",
       "section_title_path": [
-        "5. Secure Virtualization Planning and Deployment",
-        "5.1 Initiation"
+        "INCIDENT HANDLING",
+        "3.3.1. Objectives."
       ],
-      "parent_context": "The initiation phase involves many preparatory actions, such as identifying current and future needs, and specifying requirements for performance, functionality, and security. A critical part of the initiation phase is the development of a virtualization security policy. The section lists elements that a virtualization security policy should contain and, where relevant, describes some of the factors that should be considered when making the decisions behind each element. A virtualization security policy should define which forms of virtualization the organization permits and which types of app",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 93,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-48f549669bb2",
-      "source_quote": "Required NM data update rates.",
-      "description": "Required NM data update rates.",
-      "section_title_path": [
-        "4.  SLAs"
-      ],
-      "parent_context": "NM systems shall be located within the network topology in a manner that ensures they can monitor and report on SLA compliance. NM SLAs shall at a minimum address the following areas identified in International Telecommunications Union - Telecommunications Recommendation M.3342 (Reference (z)) and TM Forum GB917 Release 3.0 (Reference (aa)): Identification of the organizations between which the agreement is established, to include technical and organizational points of contact. A description of the NM services that will be provided along with scope, limitations, and other terms of reference th",
-      "source_pdf": "DODI 8410.03.pdf",
-      "chunk_id": 33,
-      "run_dir": "DODI 8410.03_20260730_220814",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-815fb52a698d",
-      "source_quote": "25AF provides intelligence support to the ACD unit CIR incident reporting process through the production of a Network Intelligence Report (NIR), an all-source report which focuses on an incident, group of incidents, or network activity or on a foreign individual, group, or organization identified as a threat or potential threat to DOD networks.",
-      "description": "25AF provides intelligence support to the ACD unit CIR incident reporting process through the production of a Network Intelligence Report (NIR), an all-source report which focuses on an incident, group of incidents, or network activity or on a foreign individual, group, or organization identified as a threat or potential threat to DOD networks.",
-      "section_title_path": [
-        "Actions",
-        "3.7.3. Post-Incident Analysis."
-      ],
-      "parent_context": "3.7.3.1.  Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.  Data captured in the postmortem includes  lessons  learned,  initial  root  cause,  problems  with  executing  COAs,  missing policies  and  procedures,  and  inadequate  infrastructure  defenses.  Post-incident  analysis reporting will be provided to the affected MAJCOM/unit so that corrective actions can be taken (T-2) . 3.7.3.2.  The ACD unit drafts a Cyber Incident Report (CIR), which provides a detailed analysis  to  include  the  affected  sys",
+      "parent_context": "3.3.2.1.  Ensure all suspicious activity is detected and reported so that further analysis can take place to determine if it is a reportable event or incident. 3.3.2.2.  Ensure  suspicious  activity  is  reported  in  a  timely  manner  consistent  with required  reporting  timelines.  Reporting  accurate  incident  information  as  close  to  nearreal-time as possible is crucial to an effective response. If the incident meets OPREP-3 criteria,  report  the  operational  impact  in  accordance  with  AFI  10-206,  Operational Reporting, Chapter 3 . 3.3.2.3.  Coordinate with command channels, D",
       "source_pdf": "afi17-203.pdf",
-      "chunk_id": 52,
+      "chunk_id": 35,
       "run_dir": "afi17-203_20260730_215609",
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-a368bb45724e",
-      "source_quote": "Identify ICT supply chain risks and indicate whether the risk applies to an individual procurement transaction only or to a class of procurements and direct or recommend specific mitigation actions.",
-      "description": "Identify ICT supply chain risks and indicate whether the risk applies to an individual procurement transaction only or to a class of procurements and direct or recommend specific mitigation actions.",
+      "requirement_id": "REQ-a043bc9401b1",
+      "source_quote": "The same is true for applications running on guest OSs: if the organization has a security policy for an application, it should apply the same regardless of whether the application is running on an OS within a hypervisor or on an OS running on hardware.",
+      "description": "Apply the same security policy to applications regardless of whether they are running on an OS within a hypervisor or on an OS running on hardware.",
       "section_title_path": [
-        "The DoD CIO:",
-        "2.10.  SECRETARIES OF THE MILITARY DEPARTMENTS."
+        "Secure all elements of a full virtualization solution and maintain their security."
       ],
-      "parent_context": "In addition to the responsibilities in Paragraph 2.9., the Secretaries of the Military Departments: In coordination with the USD(R&E); the DoD CIO; the USD(A&S); the USD(I&S); and the Commander, USCYBERCOM, review intelligence and counterintelligence assessments of known ICT supplier threats and determine associated risks affecting DoD information systems, networks, weapon systems, and defense critical infrastructure.  Identify ICT supply chain risks and indicate whether the risk applies to an individual procurement transaction only or to a class of procurements and direct or recommend specifi",
-      "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 31,
-      "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-45c98fad7998",
-      "source_quote": "(4) Establishes, if demand for threat assessments exceeds resources, threat assessment prioritization and IC support prioritization.",
-      "description": "Establishes, if demand for threat assessments exceeds resources, threat assessment prioritization and IC support prioritization.",
-      "section_title_path": [
-        "SECTION 2:  RESPONSIBILITIES",
-        "2.1.  UNDER SECRETARY OF DEFENSE FOR RESEARCH AND ENGINEERING (USD(R&E))."
-      ],
-      "parent_context": "The USD(R&E): In coordination with the DoD Chief Information Officer (DoD CIO), oversees and provides guidance on implementing this issuance. In coordination with the DoD CIO, the Under Secretary of Defense for Acquisition and Sustainment (USD(A&S)), the Under Secretary of Defense for Intelligence and Security (USD(I&S)), and the DoD Component heads: Establishes policy and provides guidance, mitigations, education, and training for the science and technology manager and engineering workforce on the protection of mission critical functions and critical components and the application of software",
-      "source_pdf": "DODI 5200.44.pdf",
+      "parent_context": "The security of a full virtualization solution is heavily dependent on the individual security of each of its components, from the hypervisor and host OS (if applicable) to guest OSs, applications, and storage. Organizations should secure all of these elements and maintain their security based on sound security practices, such as keeping software up-to-date with security patches, using secure configuration baselines, and using host-based firewalls, antivirus software, or other appropriate mechanisms to detect and stop attacks. In general, organizations should have the same security controls in",
+      "source_pdf": "NIST.SP.800-125.pdf",
       "chunk_id": 9,
-      "run_dir": "DODI 5200.44_20260730_220819",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-908dbfb11d8a",
-      "source_quote": "the Director, NGA develops implementing guidance, as necessary, for the protection of imagery, imagery intelligence, and geospatial information.",
-      "description": "the Director, NGA develops implementing guidance, as necessary, for the protection of imagery, imagery intelligence, and geospatial information.",
+      "requirement_id": "REQ-d1f214096f98",
+      "source_quote": "The DoD CIO, shall: Create, manage, and maintain a common repository based upon security classifications within the MDR for all data-exchange schemas and SNMP MIBs used by NM systems, including supporting documentation and interface characteristics and specifications.",
+      "description": "Create, manage, and maintain a common repository based upon security classifications within the MDR for all data-exchange schemas and SNMP MIBs used by NM systems, including supporting documentation and interface characteristics and specifications",
       "section_title_path": [
-        "1.  UNDER SECRETARY OF DEFENSE FOR INTELLIGENCE AND SECURITY (USD(I&S))."
+        "1.  DoD CHIEF INFORMATION OFFICER (DoD CIO).  The DoD CIO, shall:"
       ],
-      "parent_context": "As the senior security official and the senior agency official responsible for the DoD Information Security Program in accordance with References (a) and (c), the USD(I&S): Develops, coordinates, and oversees the implementation of a DoD Information Security Program that encompasses CUI, SCI, special access programs, and collateral information and activities. Develops information security policy and guidance and oversees DoD implementation of References (c) and (g), Executive Order 13549 (Reference (u)), and the DoD Information Security Program. Consults, as necessary, with other Principal Staf",
-      "source_pdf": "DODI 5200.01.pdf",
-      "chunk_id": 13,
-      "run_dir": "DODI 5200.01_20260730_215412",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-0c2c0182d57d",
-      "source_quote": "For purposes of this Instruction, the term MCCC also includes organizational structures established at the discretion of a MAJCOM which perform the same functions as an MCCC.",
-      "description": "Includes organizational structures established at the discretion of a MAJCOM which perform the same functions as an MCCC.",
-      "section_title_path": [
-        "INTRODUCTION"
-      ],
-      "parent_context": "1.1. Introduction. The AF relies on networked electronic systems to plan and execute its full range  of  missions  around  the  world.  While  these  systems  help  us  to  maintain  our  military dominance, they also provide our adversaries a means by which to gain an asymmetric advantage via network attack and/or the exploitation of networked systems. AF networks are probed and scanned by domestic and foreign sources thousands of times each day. To counter, negate and mitigate unauthorized activity on its networks, the AF and DoD conduct a wide range of actions collectively known as DCO. 1.1",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 15,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-c7922e1bba50",
-      "source_quote": "makes determinations pursuant to DFARS Part 239.7304(b) for the DoD Components on behalf of the Secretary of Defense, when necessary, to protect national security by reducing ICT supply chain risk.",
-      "description": "makes determinations pursuant to DFARS Part 239.7304(b) for the DoD Components on behalf of the Secretary of Defense, when necessary, to protect national security by reducing ICT supply chain risk.",
-      "section_title_path": [
-        "The DoD CIO:",
-        "2.3.  USD(A&S)."
-      ],
-      "parent_context": "The USD(A&S): In coordination with the USD(R&E) and the DoD CIO, evaluates the supply chain risk and integrates ICT SCRM into the acquisition process. Establishes policy and develops implementing guidance for acquisition and materiel management, including source selection guidance in support of TSN capabilities, to include ICT SCRM. In coordination with the USD(R&E), the DoD CIO, the USD(I&S), and the DoD Component heads, establishes TSN and ICT SCRM policy, guidance, education, and training for the program managers and the acquisition and sustainment workforce to include cybersecurity for acq",
-      "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 18,
-      "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-5716f97c2bc7",
-      "source_quote": "Maintain control of the affected system(s) and surrounding environment.",
-      "description": "Maintain control of the affected system(s) and surrounding environment.",
-      "section_title_path": [
-        "Actions",
-        "3.5.1. Objectives."
-      ],
-      "parent_context": "3.5.1.1.  Isolate  and  contain  the  reportable  event  from  causing  further  damage  to  AF networks. 3.5.1.2.  Maintain control of the affected system(s) and surrounding environment. 3.5.1.3.  As directed by AFOSI and the 624 OC, begin chain of custody documentation and ensure forensically sound acquisition of required data as determined by preliminary analysis and identification; reference paragraphs 3.4.2 and 3.5.2.5. 3.5.1.4.  Maintain and update the incident report and communicate updates through the appropriate technical and operational command channels. 3.5.1.5.  AFOSI will notify A",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 42,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-97b8b3232c12",
-      "source_quote": "Mechanisms for enforcement, auditing, and assurance.",
-      "description": "Mechanisms for enforcement, auditing, and assurance.",
-      "section_title_path": [
-        "4.  SLAs"
-      ],
-      "parent_context": "NM systems shall be located within the network topology in a manner that ensures they can monitor and report on SLA compliance. NM SLAs shall at a minimum address the following areas identified in International Telecommunications Union - Telecommunications Recommendation M.3342 (Reference (z)) and TM Forum GB917 Release 3.0 (Reference (aa)): Identification of the organizations between which the agreement is established, to include technical and organizational points of contact. A description of the NM services that will be provided along with scope, limitations, and other terms of reference th",
+      "parent_context": "Provide strategy, policy, oversight, and guidance for NM capability, planning, definition, and implementation across the DoD Information Enterprise and GIG IAW Reference (b). In coordination with Under Secretary of Defense for Acquisition, Technology, and Logistics (USD(AT&L)) and the Heads of the DoD Components, develop: End-to-end NM architectures and strategies that support efficient, effective, and secure NM operations in tactical and non-tactical networks and improve interoperability across NM systems. Mission-driven NM metrics for tactical and non-tactical networks and NM systems that en",
       "source_pdf": "DODI 8410.03.pdf",
-      "chunk_id": 33,
+      "chunk_id": 11,
       "run_dir": "DODI 8410.03_20260730_220814",
       "fix_status": "post_fix"
     },
     {
-      "requirement_id": "REQ-b73da299e723",
-      "source_quote": "(4) SNMP community strings shall be safeguarded and protected against compromise at the level of the operational network.",
-      "description": "(4) SNMP community strings shall be safeguarded and protected against compromise at the level of the operational network.",
+      "requirement_id": "REQ-0dbea77d8ac0",
+      "source_quote": "Any DoD system with a high impact level for any of the three security objectives-confidentiality, integrity, and availability-in accordance with the system categorization procedures in DoD Instruction (DoDI) 8510.01.",
+      "description": "Any DoD system with a high impact level for any of the three security objectives-confidentiality, integrity, and availability-in accordance with the system categorization procedures in DoD Instruction (DoDI) 8510.01.",
       "section_title_path": [
-        "3.  NM USE OF SNMP"
+        "SECTION 1:  GENERAL ISSUANCE INFORMATION",
+        "1.1.  APPLICABILITY."
       ],
-      "parent_context": "All SNMP MIBs used in the DoD shall comply with technical standards in the DISR and DISA Security Technical Implementation Guides (STIGs). All MIBs along with full descriptions of their use and format shall be stored in an MIB registry managed and published by DISA. Where possible, elements in multiple MIBs that refer to the same parameter shall be formatted and identified the same way.  Standard formats and identifications shall be maintained in a DoD-published MIB data format and dictionary established and maintained by DISA. New SNMP managed resources and management applications shall use t",
-      "source_pdf": "DODI 8410.03.pdf",
-      "chunk_id": 29,
-      "run_dir": "DODI 8410.03_20260730_220814",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-d25b1a526785",
-      "source_quote": "This helps ensure that the virtual environment is as secure as possible and in compliance with all relevant organizational policies.",
-      "description": "This helps ensure that the virtual environment is as secure as possible and in compliance with all relevant organizational policies.",
-      "section_title_path": [
-        "5. Secure Virtualization Planning and Deployment"
-      ],
-      "parent_context": "A critical aspect of deploying a secure virtualization solution is careful planning prior to installation, configuration, and deployment. This helps ensure that the virtual environment is as secure as possible and in compliance with all relevant organizational policies. Many virtualization security and performance problems can be traced to a lack of planning or management controls. Security should be considered from the initial planning stage at the beginning of the systems development life cycle to maximize security and minimize costs. It is much more difficult and expensive to address securi",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 88,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-72f640bb1a96",
-      "source_quote": "In addition to the responsibilities in Paragraph 2.9., the DIRNSA/CHCSS: ... establishes prioritization for support to achieve TSN.",
-      "description": "In addition to the responsibilities in Paragraph 2.9., the DIRNSA/CHCSS: ... establishes prioritization for support to achieve TSN.",
-      "section_title_path": [
-        "The DoD CIO:",
-        "2.5.  DIRECTOR, NATIONAL SECURITY AGENCY/CHIEF, CENTRAL SECURITY SERVICE (DIRNSA/CHCSS)."
-      ],
-      "parent_context": "Under the authority, direction, and control of the USD(I&S), and in addition to the responsibilities in Paragraph 2.9., the DIRNSA/CHCSS: In coordination with the DoD CIO, the USD(I&S), and the DoD Component heads, supports the development and application of TSN requirements, best practices, and processes.  If demand for support exceeds resources, establishes prioritization for support to achieve TSN. Advises and guides the DoD Component heads in applying processes, tools, techniques, and methods to minimize vulnerabilities and risk of malicious intent in procured and developed software and ha",
+      "parent_context": "This issuance applies to: OSD, the Military Departments, the Office of the Chairman of the Joint Chiefs of Staff and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense, the Defense Agencies, the DoD Field Activities, and all other organizational entities within the DoD (referred to collectively in this issuance as the 'DoD Components'). The United States Coast Guard.  The United States Coast Guard will adhere to DoD cybersecurity requirements, standards, and policies in this issuance in accordance with the direction in Paragraphs 4.(a) through",
       "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 23,
+      "chunk_id": 3,
       "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-800ee9df1ec3",
-      "source_quote": "Physical partitioning sets hard limits on resources for each guest OS because unused capacity from one resource may not be accessed by any other guest OS.",
-      "description": "Physical partitioning sets hard limits on resources for each guest OS because unused capacity from one resource may not be accessed by any other guest OS.",
-      "section_title_path": [
-        "3. Virtualization Security Overview",
-        "3.1 Guest OS Isolation"
-      ],
-      "parent_context": "The hypervisor is responsible for managing guest OS access to hardware (e.g., CPU, memory, storage). The hypervisor partitions these resources so that each guest OS can access its own resources but cannot encroach on the other guest OSs' resources or any resources not allocated for virtualization use. This prevents unauthorized access to resources and also helps prevent one guest OS from injecting malware into another, such as infecting a guest OS's files or placing malware code into another guest OS's memory. Separately, partitioning can also reduce the threat of denial of service conditions ",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 50,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-01d5bf560dbf",
-      "source_quote": "Coordination = Coordination of response actions between C/S/As and field activities, CNDSPs, mission owners, Installations and DCO Service subscribers, DoDIN Operations, and with LE/CI and IC, and others as required.",
-      "description": "Coordination = Coordination of response actions between C/S/As and field activities, CNDSPs, mission owners, Installations and DCO Service subscribers, DoDIN Operations, and with LE/CI and IC, and others as required.",
-      "section_title_path": [
-        "Actions",
-        "3.7.3. Post-Incident Analysis."
-      ],
-      "parent_context": "3.7.3.1.  Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.  Data captured in the postmortem includes  lessons  learned,  initial  root  cause,  problems  with  executing  COAs,  missing policies  and  procedures,  and  inadequate  infrastructure  defenses.  Post-incident  analysis reporting will be provided to the affected MAJCOM/unit so that corrective actions can be taken (T-2) . 3.7.3.2.  The ACD unit drafts a Cyber Incident Report (CIR), which provides a detailed analysis  to  include  the  affected  sys",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 56,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-08c38b5f2255",
-      "source_quote": "Some hypervisors provide APIs that allow a privileged VM to have full visibility to the network traffic.",
-      "description": "Some hypervisors provide APIs that allow a privileged VM to have full visibility to the network traffic.",
-      "section_title_path": [
-        "2. Introduction to Full Virtualization",
-        "2.3 Virtualizing Hardware",
-        "2.3.1 Virtualized Networking"
-      ],
-      "parent_context": "Full virtualization hypervisors can provide networking capabilities, allowing the individual guest OSs to communicate with one another while simultaneously limiting access to the external physical network. The network interfaces that the guest OSs see may be virtual, physical, or both. Typical hypervisors offer three primary forms of network access: \uf06e Network Bridging. The guest OS is given direct access to the host's network interface cards (NIC) independent of the host OS. \uf06e Network Address Translation (NAT). The guest OS is given a virtual NIC that is connected to a simulated NAT inside the",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 31,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-4379dbcc717a",
-      "source_quote": "an organization might have a network security policy that says that all network switches connecting multiple servers must be managed and that traffic between the servers be monitored for suspicious activity.",
-      "description": "an organization might have a network security policy that says that all network switches connecting multiple servers must be managed and that traffic between the servers be monitored for suspicious activity.",
-      "section_title_path": [
-        "4. Security Recommendations for Virtualization Components",
-        "4.3 Virtualized Infrastructure Security"
-      ],
-      "parent_context": "Virtualization provides simulation of hardware such as storage and network interfaces. This infrastructure is as important to the security of a virtualized guest OS as real hardware infrastructure is to an operating system running on a physical computer. Many virtualization systems have features to provide access control to the virtual hardware, particularly storage and networking. Access to virtual hardware should be strictly limited to the guest OSs that will use it. For example, if a virtual hard drive will be shared between two guest OSs, only those two OSs should have access to the virtua",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 81,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-279ca533421c",
-      "source_quote": "As agency heads and designated senior agency officials as defined by and in accordance with Reference (c), in cooperation with the USD(I&S), participate in the development and coordination of applicable Executive orders, security policy directives, and related issuances.",
-      "description": "Participate in the development and coordination of applicable Executive orders, security policy directives, and related issuances as agency heads and designated senior agency officials.",
-      "section_title_path": [
-        "11. DOD COMPONENT HEADS.  The DoD Component heads:"
-      ],
-      "parent_context": "Protect classified information and CUI from unauthorized disclosure consistent with References (c) and (i). Designate a senior agency official to be responsible for the direction, administration, and oversight of the DoD Component's information security program, to include: Classification, declassification, and safeguarding classified information. Security education and training programs. Implementation of References (c) and (i).",
-      "source_pdf": "DODI 5200.01.pdf",
-      "chunk_id": 24,
-      "run_dir": "DODI 5200.01_20260730_215412",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-4cc2145998a9",
-      "source_quote": "In accordance with AFI 17-201, Command and Control for Cyberspace Operations, the Commander, AF Space Command (AFSPC/CC) is responsible for the overall command and control, security and defense of the AF Information Network (AFIN), and for the command, control, implementation, security, operation, maintenance, sustainment, configuration, and defense of the AF Network (AFNET)/AF Network-Secure (AFNET-S).",
-      "description": "In accordance with AFI 17-201, Command and Control for Cyberspace Operations, the Commander, AF Space Command (AFSPC/CC) is responsible for the overall command and control, security and defense of the AF Information Network (AFIN), and for the command, control, implementation, security, operation, maintenance, sustainment, configuration, and defense of the AF Network (AFNET)/AF Network-Secure (AFNET-S).",
-      "section_title_path": [
-        "ROLES AND RESPONSIBILITIES",
-        "2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."
-      ],
-      "parent_context": "2.2.1.  In coordination with AF/A3, SAF/A6 and SAF/AQ, recommends security protection of  new  projects/capabilities  in  accordance  with  established  classification  guidance  and Department of Defense Instruction (DoDI) O-3600.02, Information Operation (IO) Security Classification Guidance. 2.2.2.  Is  designated  Computer  Network  Defense  Service  Provider  (CNDSP)  Certification Authority  (CA)  for  Special  Access  Program  (SAP)  networks  and  is  responsible  for coordinating and directing SAP enclave-wide CNDSP activities. 2.3. The  AF  Inspector  General  (SAF/IG). SAF/IG  provi",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 21,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-d5836b668c81",
-      "source_quote": "Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.",
-      "description": "Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.",
-      "section_title_path": [
-        "Actions",
-        "3.7.3. Post-Incident Analysis."
-      ],
-      "parent_context": "3.7.3.1.  Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.  Data captured in the postmortem includes  lessons  learned,  initial  root  cause,  problems  with  executing  COAs,  missing policies  and  procedures,  and  inadequate  infrastructure  defenses.  Post-incident  analysis reporting will be provided to the affected MAJCOM/unit so that corrective actions can be taken (T-2) . 3.7.3.2.  The ACD unit drafts a Cyber Incident Report (CIR), which provides a detailed analysis  to  include  the  affected  sys",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 51,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-05f9d4b7460f",
-      "source_quote": "Provide software and hardware assurance capabilities and resources and support the JFAC in accordance with Section 937 of Public Law 113-66, also known as NDAA for FY 2014, and DoD Policy Memorandum 15-001.",
-      "description": "Provide software and hardware assurance capabilities and resources and support the JFAC in accordance with Section 937 of Public Law 113-66, also known as NDAA for FY 2014, and DoD Policy Memorandum 15-001.",
-      "section_title_path": [
-        "The DoD CIO:",
-        "2.9.  DOD COMPONENT HEADS."
-      ],
-      "parent_context": "The DoD Component heads: Establish and maintain an operational TSN program to enable risk owners to identify, assess, and manage engineering risks. Establish and maintain an operational ICT SCRM program to enable acquisition risk owners to identify, assess, and manage ICT supply chain risks. Integrate engineering, acquisition, intelligence, counterintelligence, security, and risk management into DoD Component-level TSN and ICT SCRM activities and incorporate enterprise resources as appropriate. Designate a focal point and resources to represent the acquisition executive; risk management execut",
-      "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 30,
-      "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-2859699f7644",
-      "source_quote": "Establishes policy and develops implementing guidance for acquisition and materiel management, including source selection guidance in support of TSN capabilities, to include ICT SCRM.",
-      "description": "Establishes policy and develops implementing guidance for acquisition and materiel management, including source selection guidance in support of TSN capabilities, to include ICT SCRM.",
-      "section_title_path": [
-        "The DoD CIO:",
-        "2.3.  USD(A&S)."
-      ],
-      "parent_context": "The USD(A&S): In coordination with the USD(R&E) and the DoD CIO, evaluates the supply chain risk and integrates ICT SCRM into the acquisition process. Establishes policy and develops implementing guidance for acquisition and materiel management, including source selection guidance in support of TSN capabilities, to include ICT SCRM. In coordination with the USD(R&E), the DoD CIO, the USD(I&S), and the DoD Component heads, establishes TSN and ICT SCRM policy, guidance, education, and training for the program managers and the acquisition and sustainment workforce to include cybersecurity for acq",
-      "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 16,
-      "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-6c26e9e5a36f",
-      "source_quote": "Ensure processes, procedures, and infrastructure are available to operationally test and evaluate NM capabilities that are developed and acquired.",
-      "description": "Ensure processes, procedures, and infrastructure are available to operationally test and evaluate NM capabilities that are developed and acquired.",
-      "section_title_path": [
-        "4.  DIRECTOR, OPERATIONAL TEST AND EVALUATION (DOT&E).  The DOT&E shall:"
-      ],
-      "parent_context": "Ensure processes, procedures, and infrastructure are available to operationally test and evaluate NM capabilities that are developed and acquired. Conduct periodic assessments of NM processes, procedures, and capabilities as requested by the DoD CIO. UNDER SECRETARY OF DEFENSE FOR INTELLIGENCE (USD(I)).  The USD(I) shall serve as the DoD focal point to the Intelligence Community (IC) for NM policy and oversight matters relating to intelligence information sharing and interoperability of Defense intelligence systems and processes IAW DoDD 5143.01 (Reference (o)). DIRECTOR, DEFENSE INTELLIGENCE ",
-      "source_pdf": "DODI 8410.03.pdf",
-      "chunk_id": 14,
-      "run_dir": "DODI 8410.03_20260730_220814",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-47784f76adea",
-      "source_quote": "Only those two OSs should have access to the virtual hard drive.",
-      "description": "Only those two OSs should have access to the virtual hard drive.",
-      "section_title_path": [
-        "4. Security Recommendations for Virtualization Components",
-        "4.3 Virtualized Infrastructure Security"
-      ],
-      "parent_context": "Virtualization provides simulation of hardware such as storage and network interfaces. This infrastructure is as important to the security of a virtualized guest OS as real hardware infrastructure is to an operating system running on a physical computer. Many virtualization systems have features to provide access control to the virtual hardware, particularly storage and networking. Access to virtual hardware should be strictly limited to the guest OSs that will use it. For example, if a virtual hard drive will be shared between two guest OSs, only those two OSs should have access to the virtua",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 80,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-50656d90908a",
-      "source_quote": "Report data spillages and classified message incidents as a security incident in accordance with AFI 16-1404, Air Force Information Security Program.",
-      "description": "Report data spillages and classified message incidents as a security incident in accordance with AFI 16-1404, Air Force Information Security Program.",
-      "section_title_path": [
-        "INCIDENT HANDLING"
-      ],
-      "parent_context": "3.1. General. Units  operating  the  ACD  and  AFINC  weapon  systems  monitor  and  record suspicious  and  unauthorized  network  and  information  systems  access  and  activity  on  AF networks.  Suspicious activity may include network scanning, multiple connection attempts to a network  device  from  an  unknown  entity,  or  other  reportable  activity  detected  at  any  level. Intrusion activity may include the presence of unusual or excessive activity on the network, or unauthorized  individuals  gaining  full  (root)  or  limited  (user)  access  to  a  network  device  or informatio",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 30,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-513d1d794e15",
-      "source_quote": "Existing systems that use SNMP v1 or v2c shall implement the following security precautions in the period prior to transition to the latest approved version of SNMP:",
-      "description": "Existing systems that use SNMP v1 or v2c shall implement the following security precautions in the period prior to transition to the latest approved version of SNMP:",
-      "section_title_path": [
-        "3.  NM USE OF SNMP"
-      ],
-      "parent_context": "All SNMP MIBs used in the DoD shall comply with technical standards in the DISR and DISA Security Technical Implementation Guides (STIGs). All MIBs along with full descriptions of their use and format shall be stored in an MIB registry managed and published by DISA. Where possible, elements in multiple MIBs that refer to the same parameter shall be formatted and identified the same way.  Standard formats and identifications shall be maintained in a DoD-published MIB data format and dictionary established and maintained by DISA. New SNMP managed resources and management applications shall use t",
-      "source_pdf": "DODI 8410.03.pdf",
-      "chunk_id": 28,
-      "run_dir": "DODI 8410.03_20260730_220814",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-a4ff3163f268",
-      "source_quote": "Coordinate with the victim system's owning CFP, NOS, and MCCC (as appropriate) to determine the Mission Assurance Category level of the system.",
-      "description": "Coordinate with the victim system's owning CFP, NOS, and MCCC (as appropriate) to determine the Mission Assurance Category level of the system.",
-      "section_title_path": [
-        "Actions",
-        "3.6.2. Methodology."
-      ],
-      "parent_context": "3.6.2.1.  Gather  information.  All  involved  personnel  should  identify  and  collect  all relevant information about the incident for use in incident analysis. Information gathered may include data previously acquired and preserved, external logs, personal accounts, allsource intelligence, technical information, or the current operational situation. 3.6.2.2.  Validate  the  incident.  Personnel  should  continuously  review,  corroborate,  and update (if applicable) the reported incident to ensure the accuracy of all information. 3.6.2.3.  Determine  the  operational  impact.  Operational ",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 47,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-9c7e09003f88",
-      "source_quote": "In coordination with the USD(R&E), the DoD CIO, the USD(A&S), the USD(I&S), and the Secretaries of the Military Departments, reviews intelligence and counterintelligence assessments of known ICT supplier threats and determines associated risks affecting DoD information systems, networks, weapon systems, and defense critical infrastructure.",
-      "description": "In coordination with the USD(R&E), the DoD CIO, the USD(A&S), the USD(I&S), and the Secretaries of the Military Departments, reviews intelligence and counterintelligence assessments of known ICT supplier threats and determines associated risks affecting DoD information systems, networks, weapon systems, and defense critical infrastructure.",
-      "section_title_path": [
-        "The DoD CIO:",
-        "2.11.  COMMANDER, USCYBERCOM."
-      ],
-      "parent_context": "In addition to the responsibilities in Paragraph 2.9., the Commander, USCYBERCOM: In coordination with the USD(R&E), the DoD CIO, the USD(A&S), the USD(I&S), and the Secretaries of the Military Departments, reviews intelligence and counterintelligence assessments of known ICT supplier threats and determines associated risks affecting DoD information systems, networks, weapon systems, and defense critical infrastructure.  Identifies ICT supply chain risks in accordance with Section 3252 of Title 10, U.S.C. and directs or recommends specific mitigation actions. Takes all necessary and appropriat",
-      "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 33,
-      "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-9a0e037190c2",
-      "source_quote": "Information will not be classified, continue to be maintained as classified, or fail to be declassified, or be designated CUI under any circumstances in order to:",
-      "description": "Information will not be classified, continue to be maintained as classified, or fail to be declassified, or be designated CUI under any circumstances in order to:",
-      "section_title_path": [
-        "3.  POLICY.  It is DoD policy that:"
-      ],
-      "parent_context": "National security information will be classified, safeguarded, and declassified in accordance with References (c), (d), and DoD Manual 5200.01 (Reference (i)).  CUI will be identified and safeguarded consistent with the requirements of References (g) and (i). Declassification of information will receive equal attention as the classification of information so that information remains classified only as long as required by national security considerations. Information will not be classified, continue to be maintained as classified, or fail to be declassified, or be designated CUI under any circu",
-      "source_pdf": "DODI 5200.01.pdf",
-      "chunk_id": 2,
-      "run_dir": "DODI 5200.01_20260730_215412",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-c088178ca281",
-      "source_quote": "Direct and administer a program for systematic declassification reviews as required by subsection 3.4 of Reference (c), to declassify records as soon as possible, but not prematurely, and for review of information subject to the automatic declassification provisions of subsection 3.3 of Reference (c).",
-      "description": "Direct and administer a program for systematic declassification reviews as required by subsection 3.4 of Reference (c), to declassify records as soon as possible, but not prematurely, and for review of information subject to the automatic declassification provisions of subsection 3.3 of Reference (c).",
-      "section_title_path": [
-        "11. DOD COMPONENT HEADS.  The DoD Component heads:"
-      ],
-      "parent_context": "Protect classified information and CUI from unauthorized disclosure consistent with References (c) and (i). Designate a senior agency official to be responsible for the direction, administration, and oversight of the DoD Component's information security program, to include: Classification, declassification, and safeguarding classified information. Security education and training programs. Implementation of References (c) and (i).",
-      "source_pdf": "DODI 5200.01.pdf",
-      "chunk_id": 21,
-      "run_dir": "DODI 5200.01_20260730_215412",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-5c349cdc3656",
-      "source_quote": "Documentation of analysis results.",
-      "description": "Documentation of analysis results.",
-      "section_title_path": [
-        "Actions",
-        "3.7.3. Post-Incident Analysis."
-      ],
-      "parent_context": "3.7.3.1.  Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.  Data captured in the postmortem includes  lessons  learned,  initial  root  cause,  problems  with  executing  COAs,  missing policies  and  procedures,  and  inadequate  infrastructure  defenses.  Post-incident  analysis reporting will be provided to the affected MAJCOM/unit so that corrective actions can be taken (T-2) . 3.7.3.2.  The ACD unit drafts a Cyber Incident Report (CIR), which provides a detailed analysis  to  include  the  affected  sys",
-      "source_pdf": "afi17-203.pdf",
-      "chunk_id": 55,
-      "run_dir": "afi17-203_20260730_215609",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-4141f1ee4905",
-      "source_quote": "Issues guidance on the DoD operational usage of suppliers and components on DoD systems that are excluded from procurement or otherwise restricted from use due to a significant ICT supply chain risk.",
-      "description": "Issues guidance on the DoD operational usage of suppliers and components on DoD systems that are excluded from procurement or otherwise restricted from use due to a significant ICT supply chain risk.",
-      "section_title_path": [
-        "The DoD CIO:"
-      ],
-      "parent_context": "a.  Coordinates with the USD(R&E), the USD(A&S), and the DoD Component heads as a subject matter expert on ICT SCRM activities in assured systems and networks, implementation of supply chain assurance practices across the DoD, and development of ICT SCRM training, requirements, best practices, and mitigations. In coordination with the USD(R&E), the USD(A&S), the USD(I&S), and the DoD Component heads, integrates multilayered ICT SCRM concepts into security controls and other policies and processes. In coordination with the USD(R&E), the USD(I&S), and the USD(A&S), issues information systems sec",
-      "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 14,
-      "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-2811319187f9",
-      "source_quote": "This control can be asserted by creating a high-assurance platform that constantly updates the guest OS to have the exact versions of the programs that it is authorized to have, and no other programs.",
-      "description": "This control can be asserted by creating a high-assurance platform that constantly updates the guest OS to have the exact versions of the programs that it is authorized to have, and no other programs.",
-      "section_title_path": [
-        "2. Introduction to Full Virtualization",
-        "2.1 Motivations for Full Virtualization"
-      ],
-      "parent_context": "The recent increase in the use of full virtualization products and services has been driven by many benefits. One of the most common reasons for adopting full virtualization is operational efficiency: organizations can use their existing hardware (and new hardware purchases) more efficiently by putting more load on each computer. In general, servers using full virtualization can use more of the computer's processing and memory resources than servers running a single OS instance and a single set of services. Recent advances in CPU architectures have made full virtualization faster than it was j",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 21,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-73af6efe94be",
-      "source_quote": "Under the authority, direction, and control of the USD(I&S), and in addition to the responsibilities in Paragraph 2.9., the Director, DIA: ...",
-      "description": "Under the authority, direction, and control of the USD(I&S), and in addition to the responsibilities in Paragraph 2.9., the Director, DIA: ...",
-      "section_title_path": [
-        "The DoD CIO:",
-        "2.6.  DIRECTOR, DEFENSE INTELLIGENCE AGENCY (DIA)."
-      ],
-      "parent_context": "Under the authority, direction, and control of the USD(I&S), and in addition to the responsibilities in Paragraph 2.9., the Director, DIA: Produces intelligence and counterintelligence threat assessments to support the DoD's mission and provides them to requesting parties in a timely manner relative to acquisition life cycles. In coordination with the USD(R&E), the DoD CIO, the USD(A&S), the USD(I&S), and the DoD Component heads, operates and prioritizes support to conduct threat analysis of suppliers of critical ICT components when demand for support exceeds resources. Notifies the DoD CIO; t",
-      "source_pdf": "DODI 5200.44.pdf",
-      "chunk_id": 24,
-      "run_dir": "DODI 5200.44_20260730_220819",
-      "fix_status": "post_fix"
-    },
-    {
-      "requirement_id": "REQ-3b9d32c59633",
-      "source_quote": "equipment is configured to meet operational and security requirements",
-      "description": "Equipment is configured to meet operational and security requirements.",
-      "section_title_path": [
-        "5. Secure Virtualization Planning and Deployment"
-      ],
-      "parent_context": "A critical aspect of deploying a secure virtualization solution is careful planning prior to installation, configuration, and deployment. This helps ensure that the virtual environment is as secure as possible and in compliance with all relevant organizational policies. Many virtualization security and performance problems can be traced to a lack of planning or management controls. Security should be considered from the initial planning stage at the beginning of the systems development life cycle to maximize security and minimize costs. It is much more difficult and expensive to address securi",
-      "source_pdf": "NIST.SP.800-125.pdf",
-      "chunk_id": 90,
-      "run_dir": "NIST.SP.800-125_20260730_215611",
       "fix_status": "post_fix"
     }
   ],
   "totals": {
     "runs_scanned": 11,
-    "records_scanned": 914,
-    "citation_fragment_shaped": 5,
-    "modality_shaped": 11,
-    "clean_pool": 898,
-    "clean_pool_post_fix": 566,
+    "records_scanned": 1204,
+    "citation_fragment_shaped": 6,
+    "modality_shaped": 12,
+    "clean_pool": 1186,
+    "clean_pool_post_fix": 854,
     "clean_sample": 90
   }
 }

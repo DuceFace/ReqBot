@@ -125,7 +125,7 @@ def harvest(clean_sample_size: int) -> dict:
     clean_pool: list[dict] = []
     seen: set[tuple] = set()
 
-    run_dirs = sorted(p for p in PROCESSED_DIR.iterdir() if p.is_dir())
+    run_dirs = sorted(p for p in PROCESSED_DIR.iterdir() if p.is_dir()) if PROCESSED_DIR.exists() else []
     for run_dir in run_dirs:
         ts = _run_timestamp(run_dir)
         fix_status = "unknown" if ts is None else ("post_fix" if ts >= FIX_CUTOFF else "pre_fix")

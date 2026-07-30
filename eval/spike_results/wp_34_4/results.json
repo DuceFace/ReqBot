@@ -1,0 +1,137 @@
+[
+  {
+    "group": "known_bad",
+    "label": "afpd_jp3_12_citation",
+    "source_quote": "JP 3-12, Cyberspace Operations, February 5, 2013",
+    "description": "Provides guidance on cyberspace operations, including requirements for planning, executing, and assessing the effectiveness of these operations.",
+    "note": "WP-33.3 category 1 (reference-list citation misextraction) -- a bare bibliography entry, description invents specific content ('requirements for planning, executing, and assessing') that appears nowhere in the citation.",
+    "pred_supported": false,
+    "support_prob": 0.1326
+  },
+  {
+    "group": "known_bad",
+    "label": "afpd_dodi_8500_citation",
+    "source_quote": "DoDI 8500.01, Cybersecurity, March 14, 2014",
+    "description": "Establishes policies and procedures for implementing cybersecurity measures in accordance with NIST SP 800-53 Rev. 4.",
+    "note": "Same pattern as above, same document -- description invents a specific framework reference ('NIST SP 800-53 Rev. 4') not present in the citation.",
+    "pred_supported": false,
+    "support_prob": 0.026
+  },
+  {
+    "group": "known_bad",
+    "label": "afpd_haf_functionals_fragment",
+    "source_quote": "All HAF Functionals, MAJCOMs, DRUs, and FOAs will:",
+    "description": "Identify the Protection Level of their cyber and computer/communications assets and apply integrated defense measures IAW AFI 31-101, Integrated Defense.",
+    "note": "WP-33.3 category 3 (truncated colon-terminated fragment) -- description completes the sentence with specific obligations and a citation invented wholesale; also a WP-34.2 heading-echo fixture (this exact quote is its own chunk's section_title_path[-1]), now rejected before Step D.5 in a fresh ingest, but the historical enriched record is real and demonstrates the fabrication symptom independent of that fix.",
+    "pred_supported": false,
+    "support_prob": 0.0459
+  },
+  {
+    "group": "known_bad",
+    "label": "cjcsi_po_service_principal_fragment",
+    "source_quote": "The PO, in conjunction with Service Principal/CIO and AO will:",
+    "description": "The PO, in conjunction with Service Principal/CIO and AO will: Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+    "note": "Same fragment-completion pattern as WP-33.3's original 'The MC4EB will:' example (that exact historical record's fabricated text wasn't reproducible from currently-available artifacts -- Step D.5 enrichment isn't fully deterministic -- but this is the same document, same root cause, real data).",
+    "pred_supported": false,
+    "support_prob": 0.0723
+  },
+  {
+    "group": "known_bad",
+    "label": "cjcsi_distribution_fabricated_attribution",
+    "source_quote": "Distribution: A, B, C",
+    "description": "Distribution must be made to A, B, and C as per Reference J-6.",
+    "note": "Subtler than the others -- a short administrative line gets a fabricated attribution ('as per Reference J-6') invented, not present in the quote. Included as a harder/borderline case, not just the obvious ones.",
+    "pred_supported": false,
+    "support_prob": 0.0778
+  },
+  {
+    "group": "known_good",
+    "label": "cjcsi_ker_reordered",
+    "source_quote": "In the event a decertified product would be required to be used beyond the published cease key dates, then a key extension request (KER) for decertified product must be submitted.",
+    "description": "A key extension request (KER) for decertified product must be submitted if a decertified product is required to be used beyond the published cease key dates.",
+    "note": "Real paraphrase -- clause order reversed, same facts.",
+    "pred_supported": true,
+    "support_prob": 0.9784
+  },
+  {
+    "group": "known_good",
+    "label": "cjcsi_services_responsibility",
+    "source_quote": "Although the responsibility for acquiring, installing, and maintaining secure communications lies primarily with the Services,",
+    "description": "The Services are primarily responsible for acquiring, installing, and maintaining secure communications.",
+    "note": "Real paraphrase -- subordinate clause restated as a main clause.",
+    "pred_supported": true,
+    "support_prob": 0.9764
+  },
+  {
+    "group": "known_good",
+    "label": "afpd_ea_strategy",
+    "source_quote": "The EA must also provide a strategy that will enable the agency to support its current state and also act as the roadmap for transition to its target environment.",
+    "description": "The EA must provide a strategy for supporting current state and transitioning to target environment.",
+    "note": "Real paraphrase -- condensed, same two facts (support current state, roadmap to target environment).",
+    "pred_supported": true,
+    "support_prob": 0.9685
+  },
+  {
+    "group": "known_good",
+    "label": "afpd_ea_inventory",
+    "source_quote": "The agency must support the EA with a complete inventory of agency information resources, including personnel, equipment, and funds devoted to information resources management and information technology, at an appropriate level of detail.",
+    "description": "Agency must maintain a complete inventory of information resources, including personnel, equipment, and funds, at an appropriate level of detail.",
+    "note": "Real paraphrase -- condensed, drops a redundant qualifier without changing meaning.",
+    "pred_supported": true,
+    "support_prob": 0.9553
+  },
+  {
+    "group": "known_good",
+    "label": "cjcsi_nsa_coordination",
+    "source_quote": "In coordination with the NSA, ensure adjudication of cryptographic issues that impact joint, allied, or combined interoperability.",
+    "description": "Ensure adjudication of cryptographic issues that impact joint, allied, or combined interoperability in coordination with the NSA.",
+    "note": "Real paraphrase -- clause reordered, same facts.",
+    "pred_supported": true,
+    "support_prob": 0.9667
+  },
+  {
+    "group": "known_good",
+    "label": "afpd_transition_processes",
+    "source_quote": "These transition processes will include an agency's capital planning and investment control processes, agency EA planning processes, and agency systems life cycle methodologies.",
+    "description": "Transition processes include capital planning, investment control, EA planning, and systems life cycle methodologies.",
+    "note": "Real paraphrase -- condensed list, same four items.",
+    "pred_supported": true,
+    "support_prob": 0.9336
+  },
+  {
+    "group": "known_good",
+    "label": "cjcsi_key_support_declaration",
+    "source_quote": "Per this memorandum, I declare key support for (system) is no longer required.",
+    "description": "The system administrator declares that key support for (system) is no longer required.",
+    "note": "Real paraphrase with a mild inferential step ('I' -> 'the system administrator', consistent with the memo's actual signatory role in this document) -- an intentionally harder edge case, not just a safe rewording.",
+    "pred_supported": true,
+    "support_prob": 0.852
+  },
+  {
+    "group": "known_good",
+    "label": "afpd_cybersecurity_definition",
+    "source_quote": "Cybersecurity - Prevention of damage to, protection of, and restoration of computers, electronic communications systems, electronic communications services, wire communication, and electronic communication, including information contained therein, to ensure its availability, integrity, authentication, confidentiality, and nonrepudiation.",
+    "description": "Implement cybersecurity measures to prevent damage, protect, and restore computers, electronic communications systems, services, wire communication, and electronic communication to ensure availability, integrity, authentication, confidentiality, and nonrepudiation.",
+    "note": "Real paraphrase -- definition restated as an imperative, same facts.",
+    "pred_supported": true,
+    "support_prob": 0.9197
+  },
+  {
+    "group": "known_good",
+    "label": "afpd_iaw_expansion",
+    "source_quote": "The organizations to which this instruction applies must act IAW its policy objectives and in compliance with reference (b).",
+    "description": "The organizations to which this instruction applies must act in accordance with its policy objectives and in compliance with reference (b).",
+    "note": "Near-verbatim -- only abbreviation expansion (IAW -> in accordance with).",
+    "pred_supported": true,
+    "support_prob": 0.9282
+  },
+  {
+    "group": "known_good",
+    "label": "dodi_nsa_approved_crypto",
+    "source_quote": "DoD Components will use only NSA-approved cryptographic products to protect classified and/or sensitive national security information processed and transmitted over National Security Systems (NSS).",
+    "description": "DoD Components must use only NSA-approved cryptographic products to protect classified and/or sensitive national security information processed and transmitted over National Security Systems (NSS).",
+    "note": "Near-verbatim -- only a modal-verb substitution (will -> must).",
+    "pred_supported": true,
+    "support_prob": 0.9378
+  }
+]

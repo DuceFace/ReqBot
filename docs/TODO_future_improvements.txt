@@ -372,6 +372,32 @@ ACTIVE BACKLOG
     documents' acronym lists, since it means those entries currently reach
     Step C unfiltered as candidate requirements.
 
+31. Production Step D.5 description-grounding entailment gate (WP-34.4 spike
+    concluded viable-with-a-fix, Phase 34)
+    WP-34.4's spike (`eval/entailment_spike.py`,
+    `eval/spike_results/wp_34_4/report.md`) tested MiniCheck (flan-t5-large,
+    github.com/Liyan06/MiniCheck) as an NLI/entailment check for whether
+    Step D.5's `description` is actually grounded in `source_quote` --
+    catching the fabricated-description symptom WP-33.3 found (a citation or
+    fragment quote paired with an invented, plausible-sounding description)
+    without rejecting real faithful paraphrases. Result: 0/5 false negatives,
+    0/10 false positives on real (source_quote, description) pairs pulled
+    from this repo's own enriched output, with a wide score margin (known-bad
+    max 0.133, known-good min 0.852). Investigation only, per the spike's own
+    Non-Goals -- no production code was changed. Follow-up work, not yet
+    scoped as its own WP: add a Step D.5 (or new Step D.6) rejection gate
+    using this model, mirroring WP-32.1's Step D grounding-check pattern
+    (reject below a threshold, log the failure reason, don't silently drop).
+    Needs before implementing: a real threshold sweep (WP-34.4's 15-pair set
+    only established the technique works, not a calibrated cutoff -- compare
+    WP-32.1's actual sweep against 2,452 gold examples), a decision on
+    whether it runs inline during Step D.5 or as a separate pass, and the new
+    dependency questions the spike deferred (MiniCheck needs
+    `pip install --user --break-system-packages` from its GitHub source, not
+    plain `pip install minicheck` -- that PyPI name is squatted by an
+    unrelated package -- plus one NLTK data download; neither is in
+    `pyproject.toml` yet since nothing ships this dependency today).
+
 
 ================================================================
 RETRIEVAL EXPERIMENTS

@@ -1,0 +1,2403 @@
+{
+  "model": "flan-t5-large",
+  "thresholds_swept": [
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95
+  ],
+  "sweep_table": [
+    {
+      "threshold": 0.05,
+      "false_positive_rate": 0.0,
+      "false_positive_count": 0,
+      "faithful_n": 92,
+      "catch_rate": 0.25,
+      "catch_count": 2,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 1
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 1
+        }
+      }
+    },
+    {
+      "threshold": 0.1,
+      "false_positive_rate": 0.0,
+      "false_positive_count": 0,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.15,
+      "false_positive_rate": 0.0,
+      "false_positive_count": 0,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.2,
+      "false_positive_rate": 0.0,
+      "false_positive_count": 0,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.25,
+      "false_positive_rate": 0.0,
+      "false_positive_count": 0,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.3,
+      "false_positive_rate": 0.03260869565217391,
+      "false_positive_count": 3,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.35,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.45,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.5,
+      "catch_count": 4,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 0
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.5,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.625,
+      "catch_count": 5,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.55,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.625,
+      "catch_count": 5,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.625,
+      "catch_count": 5,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.65,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.625,
+      "catch_count": 5,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.7,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.625,
+      "catch_count": 5,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.75,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.625,
+      "catch_count": 5,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.8,
+      "false_positive_rate": 0.043478260869565216,
+      "false_positive_count": 4,
+      "faithful_n": 92,
+      "catch_rate": 0.625,
+      "catch_count": 5,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 2
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 0
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.85,
+      "false_positive_rate": 0.05434782608695652,
+      "false_positive_count": 5,
+      "faithful_n": 92,
+      "catch_rate": 0.875,
+      "catch_count": 7,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 3
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 1
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.9,
+      "false_positive_rate": 0.13043478260869565,
+      "false_positive_count": 12,
+      "faithful_n": 92,
+      "catch_rate": 0.875,
+      "catch_count": 7,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 3
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 1
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 1
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.95,
+      "false_positive_rate": 0.5869565217391305,
+      "false_positive_count": 54,
+      "faithful_n": 92,
+      "catch_rate": 1.0,
+      "catch_count": 8,
+      "fabricated_n": 8,
+      "by_subtype": {
+        "fabricated_citation": {
+          "n": 3,
+          "caught": 3
+        },
+        "fabricated_fragment": {
+          "n": 1,
+          "caught": 1
+        },
+        "fabricated_modality": {
+          "n": 2,
+          "caught": 2
+        },
+        "fabricated_other": {
+          "n": 2,
+          "caught": 2
+        }
+      }
+    }
+  ],
+  "chosen_threshold": 0.85,
+  "regression_check": {
+    "threshold": 0.85,
+    "all_correct": false,
+    "records": [
+      {
+        "requirement_id": "REQ-da2d52df8841",
+        "label": "fabricated_fragment",
+        "support_prob": 0.0723,
+        "predicted_reject": true,
+        "should_reject": true,
+        "correct": true
+      },
+      {
+        "requirement_id": "REQ-466a23120b21",
+        "label": "fabricated_citation",
+        "support_prob": 0.026,
+        "predicted_reject": true,
+        "should_reject": true,
+        "correct": true
+      },
+      {
+        "requirement_id": "REQ-04dd14fe4baf",
+        "label": "fabricated_citation",
+        "support_prob": 0.1326,
+        "predicted_reject": true,
+        "should_reject": true,
+        "correct": true
+      },
+      {
+        "requirement_id": "REQ-917e508c8a6d",
+        "label": "fabricated_fragment",
+        "support_prob": 0.0459,
+        "predicted_reject": true,
+        "should_reject": true,
+        "correct": true
+      },
+      {
+        "requirement_id": "REQ-409e58971a57",
+        "label": "fabricated_other",
+        "support_prob": 0.0778,
+        "predicted_reject": true,
+        "should_reject": true,
+        "correct": true
+      },
+      {
+        "requirement_id": "REQ-679a055fb375",
+        "label": "faithful",
+        "support_prob": 0.9378,
+        "predicted_reject": false,
+        "should_reject": false,
+        "correct": true
+      },
+      {
+        "requirement_id": "REQ-a485fe91aa5f",
+        "label": "fabricated_modality",
+        "support_prob": 0.9197,
+        "predicted_reject": false,
+        "should_reject": true,
+        "correct": false
+      },
+      {
+        "requirement_id": "REQ-35dfe9353e60",
+        "label": "faithful",
+        "support_prob": 0.9553,
+        "predicted_reject": false,
+        "should_reject": false,
+        "correct": true
+      }
+    ]
+  },
+  "scored_records": [
+    {
+      "source_quote": "The PO, in conjunction with Service Principal/CIO and AO will:",
+      "description": "The PO, in conjunction with Service Principal/CIO and AO will: Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "label": "fabricated_fragment",
+      "notes": "WP-34.4 known-bad (cjcsi_po_service_principal_fragment). Colon-terminated list header; description invents the full list of duties. Same document, chunk 3 -- section_title_path/parent_context weren't captured for this chunk (an early-document hierarchy gap, not a labeling gap).",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "CJCSI 6510.02G.pdf",
+      "chunk_id": 3,
+      "requirement_id": "REQ-da2d52df8841",
+      "run_dir": "CJCSI 6510.02G_20260727_202900",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.0723
+    },
+    {
+      "source_quote": "BSAs also recommend measures to remediate or mitigate the identified vulnerabilities.",
+      "description": "BSA findings reports are distributed only to the assessed organization, the JS, the relevant CCMD(s) and service(s), the assessment requesting organization, and any organization mandated by DoD or service guidance.",
+      "label": "fabricated_other",
+      "notes": "New, post-fix (afi10-2402.pdf) -- found on a re-harvest after this WP's first commit, once afi10-2402's ingest (still running in the background at that point) actually finished. source_quote is a complete, real sentence about BSAs recommending remediation measures; description is about an entirely different topic (findings-report distribution lists) found nowhere in the quote or parent_context -- not a citation, not a truncated fragment, just wholesale topical drift. Distinct from the other fabricated_other example (REQ-409e58971a57's invented attribution) but grouped the same way: a specific invented claim with no fragment or citation shape driving it.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 82,
+      "requirement_id": "REQ-f7a98a6a365d",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.0283
+    },
+    {
+      "source_quote": "DoDI 8500.01, Cybersecurity, March 14, 2014",
+      "description": "Establishes policies and procedures for implementing cybersecurity measures in accordance with NIST SP 800-53 Rev. 4.",
+      "label": "fabricated_citation",
+      "notes": "WP-34.4 known-bad (afpd_dodi_8500_citation). Bare bibliography entry; description invents a specific framework reference (NIST SP 800-53 Rev. 4) absent from the citation. From afpd_17-1.pdf chunk 8 -- a References-list chunk (see REQ-ddc1112cabc9, REQ-04dd14fe4baf, REQ-5968a12bc1d6, REQ-44408bbfebbe below, all the same chunk).",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-466a23120b21",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.026
+    },
+    {
+      "source_quote": "DoDI 8115.02, Information Technology Portfolio Management Implementation, October 30, 2006",
+      "description": "Requires the development of an IT portfolio management plan that includes a comprehensive inventory of all DoD IT systems and applications.",
+      "label": "fabricated_citation",
+      "notes": "New citation-shaped fabrication (not in WP-34.4's original set), same References-list chunk (afpd_17-1.pdf chunk 8) as REQ-466a23120b21. Description invents a specific plan requirement ('comprehensive inventory of all DoD IT systems') the bare citation never states.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-ddc1112cabc9",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.0515
+    },
+    {
+      "source_quote": "JP 3-12, Cyberspace Operations, February 5, 2013",
+      "description": "Provides guidance on cyberspace operations, including requirements for planning, executing, and assessing the effectiveness of these operations.",
+      "label": "fabricated_citation",
+      "notes": "WP-34.4 known-bad (afpd_jp3_12_citation). Same References-list chunk as REQ-466a23120b21.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-04dd14fe4baf",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.1326
+    },
+    {
+      "source_quote": "All HAF Functionals, MAJCOMs, DRUs, and FOAs will:",
+      "description": "Identify the Protection Level of their cyber and computer/communications assets and apply integrated defense measures IAW AFI 31-101, Integrated Defense.",
+      "label": "fabricated_fragment",
+      "notes": "WP-34.4 known-bad (afpd_haf_functionals_fragment). Also a WP-34.2 heading-echo case -- section_title_path confirms this exact quote is its own chunk's heading ('3.14. All HAF Functionals...'), so a fresh ingest now rejects it before Step D.5 ever runs. Kept here as real historical evidence of the pattern, same as WP-34.4 treated it.",
+      "section_title_path": [
+        "2. Policy. The AF will:",
+        "3.14. All HAF Functionals, MAJCOMs, DRUs, and FOAs will:"
+      ],
+      "parent_context": "3.14.1.  Participate  in  the  cyberspace  governance  forums,  as  required.  Identify  new cyberspace requirements to responsible CFL. 3.14.2.  Ensure all cyberspace investments are identified and registered in the SAF/CIO A6-directed management control system. 3.14.3.  Maintain  enterprise  architectures  for  their  areas  of    responsibility,  to  include mission-unique IS solution architectures, and be able to integrate their  architectural data using AF-directed repositories. 3.14.4.  Develop  and  exercise  contingency  plans  for  mission  assurance  when  operating under conditions ",
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 24,
+      "requirement_id": "REQ-917e508c8a6d",
+      "run_dir": "afpd_17-1_20260729_163823",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.0459
+    },
+    {
+      "source_quote": "a. Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "description": "The PO, in conjunction with Service Principal/CIO and AO will: Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "label": "fabricated_other",
+      "notes": "Subtler than a bare citation: this record's own source_quote is just 'a. Address the operational readiness...' (the sub-bullet body, no actor named) -- but the description prepends 'The PO, in conjunction with Service Principal/CIO and AO will:', an attribution that is real text elsewhere in the same document (it's REQ-da2d52df8841's own source_quote) but is absent from *this* record's source_quote. Grounding is evaluated per-record against that record's own source_quote, so this counts as invented content by this project's existing standard -- an attribution-hallucination flavor distinct from both the citation and fragment shapes.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "CJCSI 6510.02G.pdf",
+      "chunk_id": 3,
+      "requirement_id": "REQ-d700d6df28b0",
+      "run_dir": "CJCSI 6510.02G_20260727_202900",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.0528
+    },
+    {
+      "source_quote": "Distribution: A, B, C",
+      "description": "Distribution must be made to A, B, and C as per Reference J-6.",
+      "label": "fabricated_other",
+      "notes": "WP-34.4 known-bad (cjcsi_distribution_fabricated_attribution). A short administrative line gets a fabricated attribution ('as per Reference J-6') invented, not present in the quote.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "CJCSI 6510.02G.pdf",
+      "chunk_id": 0,
+      "requirement_id": "REQ-409e58971a57",
+      "run_dir": "CJCSI 6510.02G_20260729_020101",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.0778
+    },
+    {
+      "source_quote": "DoD Components will use only NSA-approved cryptographic products to protect classified and/or sensitive national security information processed and transmitted over National Security Systems (NSS).",
+      "description": "DoD Components must use only NSA-approved cryptographic products to protect classified and/or sensitive national security information processed and transmitted over National Security Systems (NSS).",
+      "label": "faithful",
+      "notes": "WP-34.4 known-good (dodi_nsa_approved_crypto). Real modal-verb substitution (will -> must), same facts. Caught by this WP's harvester's broad modality heuristic (must appears in description, not in quote) -- exactly the over-catch case docs/PHASE35_REQUIREMENTS.md's WP-35.3 section warns a naive per-word check would false-positive on. Kept explicitly as a WP-35.3 fixture per that section's own instruction.",
+      "section_title_path": [
+        "UNCLASSIFIED"
+      ],
+      "parent_context": "CJCSI 6510.02G 20 March 2025 command and control responsibilities of the joint military command structure dictate that the CJCS (supported by the Joint Staff) and the Combatant Commanders (CCDRs) exercise continuing oversight of assigned forces' cybersecurity solutions and cryptographic programs, as well as their implementations.  Therefore: DoD Components will use only NSA-approved cryptographic products to protect classified and/or sensitive national security information processed and transmitted over National Security Systems (NSS). The NSA, as the national manager for cryptographic product",
+      "source_pdf": "CJCSI 6510.02G.pdf",
+      "chunk_id": 5,
+      "requirement_id": "REQ-679a055fb375",
+      "run_dir": "CJCSI 6510.02G_20260729_020101",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.9378
+    },
+    {
+      "source_quote": "(3) Mean time between failures of network equipment or connectivity.",
+      "description": "Mean time between failures of network equipment or connectivity must be measured.",
+      "label": "fabricated_fragment",
+      "notes": "New, post-fix (DODI 8410.03.pdf). source_quote is a bare enumerated list-item topic phrase ('(3) Mean time between failures of network equipment or connectivity.') with no obligation verb of its own -- parent_context confirms it's item 3 of a list of SLA topics to address, not an instruction. Description invents a specific obligation ('must be measured') the quote never states. Notably this one does *not* end in a colon, so parse_and_normalize.py's _is_unrepairable_fragment (which only fires on colon-terminated quotes) would not catch it -- a real gap worth a future look, out of scope for this WP to fix.",
+      "section_title_path": [
+        "4.  SLAs"
+      ],
+      "parent_context": "NM systems shall be located within the network topology in a manner that ensures they can monitor and report on SLA compliance. NM SLAs shall at a minimum address the following areas identified in International Telecommunications Union - Telecommunications Recommendation M.3342 (Reference (z)) and TM Forum GB917 Release 3.0 (Reference (aa)): Identification of the organizations between which the agreement is established, to include technical and organizational points of contact. A description of the NM services that will be provided along with scope, limitations, and other terms of reference th",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 34,
+      "requirement_id": "REQ-c6d23854cd0b",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8421
+    },
+    {
+      "source_quote": "meet all required background checks, training, and certification requirements prior to assuming their duties",
+      "description": "All required background checks, training, and certification requirements must be met prior to assuming duties.",
+      "label": "faithful",
+      "notes": "New, post-fix (DODI 8410.03.pdf). Active-to-passive rephrasing ('meet all required...' -> '...must be met'); the quote's own wording already labels the checks as 'required', so asserting they 'must be met' doesn't invent new content, just makes the existing modality explicit. Another real over-catch case for the same reason as REQ-679a055fb375 -- kept as a second WP-35.3 near-synonym/paraphrase fixture.",
+      "section_title_path": [
+        "5.  NM SECURITY"
+      ],
+      "parent_context": "Data exchanges between NM systems shall be encrypted per DISA Security Technical Implementation Guides Network Infrastructure (Reference (ab)) and shall be processed and protected at the appropriate classification level. Management information obtained from NEs shall be classified, stored, processed, and shared IAW the USSTRATCOM GIG NetOps Security Classification Guide (Reference (ac)) and other applicable classification guides.  NM data that provides sensitive operational status of the network or the status of the network's ability to support real-world operations shall be protected as sensi",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 37,
+      "requirement_id": "REQ-efc38d9d853d",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9214
+    },
+    {
+      "source_quote": "better control of OSs to ensure that they meet the organization's security requirements",
+      "description": "Implement better control of OSs to ensure they meet the organization's security requirements.",
+      "label": "fabricated_modality",
+      "notes": "New, post-fix (NIST.SP.800-125.pdf, ingested fresh during this WP -- not one of WP-34.4's original documents). source_quote is a noun-phrase fragment ('better control of OSs to ensure that they meet the organization's security requirements') with no obligation verb of its own; description prepends 'Implement', inventing an imperative the quote never states. Real, current evidence that modality-fabrication is not yet structurally prevented the way citation/fragment fabrications are.",
+      "section_title_path": [
+        "Executive Summary"
+      ],
+      "parent_context": "Virtualization is the simulation of the software and/or hardware upon which other software runs. This simulated environment is called a virtual machine (VM) . There are many forms of virtualization, distinguished primarily by computing architecture layer. This publication focuses on the form of virtualization known as full virtualization. In full virtualization , one or more OSs and the applications they contain are run on top of virtual hardware. Each instance of an OS and its applications runs in a separate VM called a guest operating system . The guest OSs on a host are managed by the hyper",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 7,
+      "requirement_id": "REQ-757d551b3e59",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9367
+    },
+    {
+      "source_quote": "Insider Threat, as defined in DoDD 5205.16, The DoD Insider Threat Program, and AFI 16-1402, Insider Threat Program Management.",
+      "description": "Implement Insider Threat Program as defined in DoDD 5205.16 and AFI 16-1402.",
+      "label": "fabricated_modality",
+      "notes": "New, post-fix (afi10-2402.pdf), same late re-harvest as REQ-f7a98a6a365d. source_quote names a term via cross-reference to its defining instructions ('Insider Threat, as defined in DoDD 5205.16... and AFI 16-1402...'), the same definitional-cross-reference shape as REQ-a485fe91aa5f; description invents 'Implement Insider Threat Program', an imperative the quote never states.",
+      "section_title_path": [
+        "PROGRAM OVERVIEW",
+        "1.4. CARM and MA Integration Strategy"
+      ],
+      "parent_context": "1.4.1.  DoDD 3020.40 provides guidance for the integration and synchronization of DoD risk management programs, to  include  CARM.    CARM  programs  will  implement  and  execute CARM guidance and requirements within the overall DoD MA Strategy and Framework by establishing  complementary  partnerships  and  information  cross-flows  between  the  CARM program and AF MA efforts as needed.  Designated MA programs/activities, as defined in DoDD 3020.40, are: 1.4.1.1.  Continuity of Operations (COOP), as defined in DoDD  3020.26, DoD Continuity  Programs, and  AFI  10-208, Air  Force  Continuity",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 20,
+      "requirement_id": "REQ-cbc6374a655f",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.4524
+    },
+    {
+      "source_quote": "DoDI 8330.01, Interoperability of Information Technology (IT), including National Security Systems (NSS), May 21, 2014",
+      "description": "Establishes requirements for IT systems, including National Security Systems (NSS), to ensure interoperability across the DoD.",
+      "label": "fabricated_citation",
+      "notes": "Same References-list chunk as REQ-466a23120b21 (afpd_17-1.pdf chunk 8). Description invents a specific interoperability-requirements claim the bare citation never states. Flagged by the modality heuristic rather than the fragment heuristic only because 'ensure' happens to appear in the description and not the quote -- same citation-fabrication shape as the others from this chunk, not a distinct pattern.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-5968a12bc1d6",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.827
+    },
+    {
+      "source_quote": "CJCSI 5123.01G Charter of the Joint Requirements Oversight Council, February 12, 2015",
+      "description": "Charter of the Joint Requirements Oversight Council, which is responsible for reviewing and approving requirements for DoD IT systems and applications.",
+      "label": "fabricated_citation",
+      "notes": "Same References-list chunk as REQ-466a23120b21. Description invents specific charter authority ('responsible for reviewing and approving requirements') beyond what a bare citation title states.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-44408bbfebbe",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.0416
+    },
+    {
+      "source_quote": "Cybersecurity - Prevention of damage to, protection of, and restoration of computers, electronic communications systems, electronic communications services, wire communication, and electronic communication, including information contained therein, to ensure its availability, integrity, authentication, confidentiality, and nonrepudiation.",
+      "description": "Implement cybersecurity measures to prevent damage, protect, and restore computers, electronic communications systems, services, wire communication, and electronic communication to ensure availability, integrity, authentication, confidentiality, and nonrepudiation.",
+      "label": "fabricated_modality",
+      "notes": "WP-34.4 known-bad, originally miscategorized as known-good until Codex's PR #164 review (afpd_definition_reframed_as_imperative). section_title_path=['Terms'] confirms this is a genuine glossary definition; description reframes it as an imperative obligation. This specific historical record predates WP-34.3's TERMS skip_sections fix.",
+      "section_title_path": [
+        "Terms"
+      ],
+      "parent_context": "AF  Information  Network  (AFIN) -  The  globally  interconnected,  end-to-end  set  of  AF information capabilities, and associated processes for collecting, processing, storing, disseminating,  and  managing  information  on-demand  to  AF  warfighters,  policy  makers,  and support  personnel,  including  owned  and  leased  communications  and  computing  systems  and services, software (including applications), data, security  services, other associated services, and national security systems.' (Derived from the JP 3-12 definition of DoDIN). Business  Mission  Area  (BMA) -The BMA ensures",
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 26,
+      "requirement_id": "REQ-a485fe91aa5f",
+      "run_dir": "afpd_17-1_20260729_163823",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.9197
+    },
+    {
+      "source_quote": "The agency must support the EA with a complete inventory of agency information resources, including personnel, equipment, and funds devoted to information resources management and information technology, at an appropriate level of detail.",
+      "description": "Agency must maintain a complete inventory of information resources, including personnel, equipment, and funds, at an appropriate level of detail.",
+      "label": "faithful",
+      "notes": "Real paraphrase (support -> maintain, condensed) -- same two facts (complete inventory, includes personnel/equipment/funds). Lives under section_title_path=['Terms'] in afpd_17-1.pdf, the same glossary/definitions heading as REQ-a485fe91aa5f below, but this particular quote already reads as an operational obligation sentence in its own right ('The agency must support...'), not dictionary-style prose -- the Terms heading here looks like a docling hierarchy misplacement, not evidence this is a definition. Two near-duplicate variants existed across two separate pipeline runs (Step D.5 enrichment isn't fully deterministic); the more complete variant (retains 'at an appropriate level of detail') was kept, the other discarded as a duplicate.",
+      "section_title_path": [
+        "Terms"
+      ],
+      "parent_context": "AF  Information  Network  (AFIN) -  The  globally  interconnected,  end-to-end  set  of  AF information capabilities, and associated processes for collecting, processing, storing, disseminating,  and  managing  information  on-demand  to  AF  warfighters,  policy  makers,  and support  personnel,  including  owned  and  leased  communications  and  computing  systems  and services, software (including applications), data, security  services, other associated services, and national security systems.' (Derived from the JP 3-12 definition of DoDIN). Business  Mission  Area  (BMA) -The BMA ensures",
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 28,
+      "requirement_id": "REQ-35dfe9353e60",
+      "run_dir": "afpd_17-1_20260729_163823",
+      "source": "wp_34_4_spike",
+      "support_prob": 0.9553
+    },
+    {
+      "source_quote": "Once assigned to cyberspace-coded position, Cyber Operations (17XX) officers will meet DCWF foundational requirements within nine (9) months of duty assignment (T-0).",
+      "description": "Cyber Operations (17XX) officers must meet DCWF foundational requirements within nine months of duty assignment.",
+      "label": "faithful",
+      "notes": "New, post-fix (dafman17-1305.pdf), found during the second corpus expansion (5 more documents, prompted by Codex's PR #166 finding that the independent fabricated partition was too thin). Another real modal-verb substitution (will -> must), same facts, same over-catch shape as REQ-679a055fb375/REQ-efc38d9d853d -- a third independent WP-35.3 near-synonym/paraphrase fixture, not a duplicate of either (different document, different verb pair context).",
+      "section_title_path": [
+        "PROCEDURES, EXCEPTIONS, AND WAIVERS",
+        "4.1. Normal and Amplified Procedures"
+      ],
+      "parent_context": "4.1.1.  DAF  civilian  and  military  personnel  are  qualified  after  meeting  foundational  and residential  requirements  within  12  months  of  assignment  to  their  cyberspace  duties;  (2) publication  of  this  manual;  and  (3)  the  position  has  been  fully  transitioned  to  DCWF. Completion of foundational requirements must be accomplished within the first nine months. Completion of residential requirements may be accomplished concurrently or after completion of foundational requirements. 4.1.2.  Maintenance of qualification requires meeting a continuing education requirement o",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 80,
+      "requirement_id": "REQ-668a74c21bd2",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9512
+    },
+    {
+      "source_quote": "After making initial contact with the 624 OC, follow-up by submitting an initial IR.",
+      "description": "After making initial contact with the 624 OC, follow-up by submitting an initial IR.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "Actions"
+      ],
+      "parent_context": "1 Upon detection of an incident, end users will immediately notify their assigned CST/CSL and provide information as requested. (T-2) 2 Upon detection or notification of an incident, the CST/CSL will notify their servicing CFP. After notifying the CFP, the CST/CSL will prepare and transmit an IR to the servicing CFP. If there is no servicing CFP, send the IR directly to the supporting INOSC. Support the ACD unit as directed during investigation of incident. (T-2) 3 Upon detection or notification of an incident, contact the 624 OC for assessment of the incident and assignment of an Incident Rep",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 37,
+      "requirement_id": "REQ-89f1bc139b9b",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9529
+    },
+    {
+      "source_quote": "Maintain situational awareness of AF participation and review metrics generated by formal DoD NC3 assessment and exercise programs, such as: USSTRATCOM Continuing Evaluation Program (CEP) (US Strategic Command Instruction 513-3, Continuing Evaluation Program ) and the Joint Staff POLO HAT and PAUL REVERE programs (CJCSI 3264.01F, Nuclear Command, Control, and Communications (NC3) Operational Assessment Programs ).",
+      "description": "Maintain situational awareness of AF participation and review metrics generated by formal DoD NC3 assessment and exercise programs, such as: USSTRATCOM Continuing Evaluation Program (CEP) (US Strategic Command Instruction 513-3, Continuing Evaluation Program ) and the Joint Staff POLO HAT and PAUL REVERE programs (CJCSI 3264.01F, Nuclear Command, Control, and Communications (NC3) Operational Assessment Programs ).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ASSESSMENTS",
+        "7.3. Responsibilities.",
+        "7.3.1. AF/A10 will:"
+      ],
+      "parent_context": "7.3.1.1.  Act as the primary AF interface on AF NC3 assessment matters to OSD, JS, other services, and external agencies at the headquarters level. (T-0) 7.3.1.2.  Coordinate AF participation in joint NC3 assessment forums. 7.3.1.3.  Conduct periodic comprehensive NC3 assessments and provide such assessments to the SecAF, CSAF, and other organizations as directed by law. (T-0) 7.3.1.4.  Monitor consolidated assessments, exercises, and reporting regarding the health and status of the AF NC3 mission area, with support from MAJCOMs, HAF functionals, and others as required. 7.3.1.5.  Maintain situ",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 67,
+      "requirement_id": "REQ-c5cafaa7919c",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9476
+    },
+    {
+      "source_quote": "organizations should periodically reassess their policies for virtualization.",
+      "description": "Organizations should periodically reassess their policies for virtualization.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "5. Secure Virtualization Planning and Deployment",
+        "5.1 Initiation"
+      ],
+      "parent_context": "The initiation phase involves many preparatory actions, such as identifying current and future needs, and specifying requirements for performance, functionality, and security. A critical part of the initiation phase is the development of a virtualization security policy. The section lists elements that a virtualization security policy should contain and, where relevant, describes some of the factors that should be considered when making the decisions behind each element. A virtualization security policy should define which forms of virtualization the organization permits and which types of app",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 94,
+      "requirement_id": "REQ-22336c31702a",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9655
+    },
+    {
+      "source_quote": "Install all updates to the hypervisor as they are released by the vendor.",
+      "description": "Install all updates to the hypervisor as they are released by the vendor.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4. Security Recommendations for Virtualization Components",
+        "4.1 Hypervisor Security"
+      ],
+      "parent_context": "The programs that control the hypervisor should be secured using methods similar to those used to protect other software running on desktops and servers. The security of the entire virtual infrastructure relies on the security of the virtualization management system that controls the hypervisor and allows the operator to start guest OSs, create new guest OS images, and perform other actions. Because of the security implications of these actions, access to the virtualization management system should be restricted to authorized administrators only. Some virtualization management systems allow di",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 71,
+      "requirement_id": "REQ-c5cf5b772438",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.911
+    },
+    {
+      "source_quote": "Coordinate with SAF/CN to develop policy and direct implementation of DAF requirements and processes.",
+      "description": "Coordinate with SAF/CN to develop policy and direct implementation of DAF requirements and processes.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.3. Deputy Chief of Staff for Intelligence, Surveillance, Reconnaissance and Cyber Effects Operations (AF/A2/6) shall:"
+      ],
+      "parent_context": "2.3.1.  Coordinate  with  SAF/CN  to  develop  policy  and  direct  implementation  of  DAF requirements and processes. 2.3.2.  Oversee updates to the Enlisted and Officer Classification Directories to reflect  SEI requirements for the cyberspace workforce. 2.3.3.  As Program Element Monitor (PEM), work with SAF/CN to provide programming, sustainment,  and  budget  guidance  to  MAJCOMs,  FLDCOMs  and  PMOs  for  cyberspace workforce  management  and  improvement  programs  to  include  certification  exam  and maintenance fee costs, and computer-based training. 2.3.4.  Ensure  reasonable acco",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 23,
+      "requirement_id": "REQ-05729583dc25",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9345
+    },
+    {
+      "source_quote": "the CJCS develops, coordinates, and distributes PPSM policies, doctrine, and procedures for joint and combined operations in accordance with this issuance.",
+      "description": "the CJCS develops, coordinates, and distributes PPSM policies, doctrine, and procedures for joint and combined operations in accordance with this issuance.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 2:  RESPONSIBILITIES",
+        "2.5.  CJCS."
+      ],
+      "parent_context": "In addition to the responsibilities in Paragraph 2.4., the CJCS develops, coordinates, and distributes PPSM policies, doctrine, and procedures for joint and combined operations in accordance with this issuance.",
+      "source_pdf": "DODI 8551.01.pdf",
+      "chunk_id": 14,
+      "requirement_id": "REQ-6d50a0ee51e5",
+      "run_dir": "DODI 8551.01_20260730_224254",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9696
+    },
+    {
+      "source_quote": "limiting access to the hypervisor is critical to the security of the entire system",
+      "description": "limiting access to the hypervisor is critical to the security of the entire system",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4. Security Recommendations for Virtualization Components",
+        "4.1 Hypervisor Security"
+      ],
+      "parent_context": "The programs that control the hypervisor should be secured using methods similar to those used to protect other software running on desktops and servers. The security of the entire virtual infrastructure relies on the security of the virtualization management system that controls the hypervisor and allows the operator to start guest OSs, create new guest OS images, and perform other actions. Because of the security implications of these actions, access to the virtualization management system should be restricted to authorized administrators only. Some virtualization management systems allow di",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 69,
+      "requirement_id": "REQ-4c6f526a202d",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9519
+    },
+    {
+      "source_quote": "The DAF Chief Information Officer (SAF/CN) shall: Coordinate with AF/A2/6, SF/COO/S6, Deputy Chief of Staff for Manpower, Personnel and Services (AF/A1), Deputy Chief of Space Operations for Human Capital (SF/S1), and the Assistant Secretary of the AF, Acquisition, Technology, & Logistics (SAF/AQ) to acquire a capability for MAJCOMs, FLDCOMs, PMOs, CCMDs (Combatant Commands), and/or units to track and manage qualifications for the DAF cyberspace workforce. Such capability shall be compatible with DoD CIO systems where required and supports automated reporting of the DAF cyberspace workforce as necessary.",
+      "description": "The DAF Chief Information Officer (SAF/CN) shall: Coordinate with AF/A2/6, SF/COO/S6, Deputy Chief of Staff for Manpower, Personnel and Services (AF/A1), Deputy Chief of Space Operations for Human Capital (SF/S1), and the Assistant Secretary of the AF, Acquisition, Technology, & Logistics (SAF/AQ) to acquire a capability for MAJCOMs, FLDCOMs, PMOs, CCMDs (Combatant Commands), and/or units to track and manage qualifications for the DAF cyberspace workforce. Such capability shall be compatible with DoD CIO systems where required and supports automated reporting of the DAF cyberspace workforce as necessary.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.2. The DAF Chief Information Officer (SAF/CN) shall:"
+      ],
+      "parent_context": "2.2.1.  Coordinate with the Deputy Chief of Staff for Intelligence, Surveillance, Reconnaissance and Cyber Effects Operations (AF/A2/6), Deputy Chief of Space Operations for Operations, Cyber and Nuclear ( SF/COO), Offices of the Undersecretary of Defense, the SAP community (not including  those  for  Sensitive  Compartmented  Information  and  other intel-funded capabilities regardless of classification level),  and  DoD  CIO  on  policy development and implementation of DAF cyberspace workforce requirements and processes. 2.2.2.  Interpret  DoD  policy,  guidance,  and  directives  and  prom",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 21,
+      "requirement_id": "REQ-fadadb54ecc8",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9458
+    },
+    {
+      "source_quote": "the hypervisor itself can perform this monitoring that meets the organization's security policies",
+      "description": "the hypervisor itself can perform this monitoring that meets the organization's security policies",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "2. Introduction to Full Virtualization",
+        "2.3 Virtualizing Hardware",
+        "2.3.1 Virtualized Networking"
+      ],
+      "parent_context": "Full virtualization hypervisors can provide networking capabilities, allowing the individual guest OSs to communicate with one another while simultaneously limiting access to the external physical network. The network interfaces that the guest OSs see may be virtual, physical, or both. Typical hypervisors offer three primary forms of network access: \uf06e Network Bridging. The guest OS is given direct access to the host's network interface cards (NIC) independent of the host OS. \uf06e Network Address Translation (NAT). The guest OS is given a virtual NIC that is connected to a simulated NAT inside the",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 32,
+      "requirement_id": "REQ-ed3c56de4287",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9638
+    },
+    {
+      "source_quote": "Ensure the accuracy and completeness of incident reports.",
+      "description": "Ensure the accuracy and completeness of incident reports.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "Actions",
+        "3.6.1. Objectives."
+      ],
+      "parent_context": "3.6.1.1.  Ensure the accuracy and completeness of incident reports. 3.6.1.2.  Characterize and communicate the potential impact of the incident. This includes identifying and sanitizing any compromised AF data. 3.6.1.3.  Systematically  capture  the  methods  used  in  the  attack  and  identify  security controls that could prevent future occurrences. 3.6.1.4.  Research  actions  that  can  be  taken  to  respond  to  and  eradicate  the  risk  and/or threat. 3.6.1.5.  Understand  patterns  of  activity  to  characterize  the  threat  and  direct  protective and defensive strategies.",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 45,
+      "requirement_id": "REQ-b4ff74119cf4",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9155
+    },
+    {
+      "source_quote": "JMAAs integrate the findings of three distinct assessments: 1) criticality assessment, 2) all hazards/threats assessments (AHTA), and 3) vulnerability assessment.",
+      "description": "JMAAs integrate the findings of three distinct assessments: 1) criticality assessment, 2) all hazards/threats assessments (AHTA), and 3) vulnerability assessment.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 83,
+      "requirement_id": "REQ-21acb2c480ca",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.924
+    },
+    {
+      "source_quote": "Utilize the Planning, Programming, Budgeting and Execution (PPBE), Program Budget Review (PBR) and other sources to plan, program, and advocate for sufficient manpower resources to execute the CARM program.",
+      "description": "Utilize the Planning, Programming, Budgeting and Execution (PPBE), Program Budget Review (PBR) and other sources to plan, program, and advocate for sufficient manpower resources to execute the CARM program.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.12. Air Force Deputy Chief of Staff, Operations (AF/A3)."
+      ],
+      "parent_context": "2.12.1.  Serve as the AF functional area lead for Space. 2.12.2.  Provide  a  Space  or  appropriate  functional  area  representative  to  the  CARM  WG when requested. 2.12.3.  Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs. 2.12.4.  Focus the CARM Program on DoD mission requirements. 2.12.5.  Serve as the approving authority for finalized AF Risk Response Plans (RRP).",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 36,
+      "requirement_id": "REQ-ab014971d73f",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9518
+    },
+    {
+      "source_quote": "Develop, publish, and enforce standard processes for the sharing of NM data about readiness and operating status of all DoD networks.",
+      "description": "Develop, publish, and enforce standard processes for sharing NM data about readiness and operating status of all DoD networks.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4.  DIRECTOR, OPERATIONAL TEST AND EVALUATION (DOT&E).  The DOT&E shall:"
+      ],
+      "parent_context": "Ensure processes, procedures, and infrastructure are available to operationally test and evaluate NM capabilities that are developed and acquired. Conduct periodic assessments of NM processes, procedures, and capabilities as requested by the DoD CIO. UNDER SECRETARY OF DEFENSE FOR INTELLIGENCE (USD(I)).  The USD(I) shall serve as the DoD focal point to the Intelligence Community (IC) for NM policy and oversight matters relating to intelligence information sharing and interoperability of Defense intelligence systems and processes IAW DoDD 5143.01 (Reference (o)). DIRECTOR, DEFENSE INTELLIGENCE ",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 21,
+      "requirement_id": "REQ-8f35524b5937",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9384
+    },
+    {
+      "source_quote": "Ensure CARM Program requirements are coordinated with HAF CE and IMSC engineering leads and considered in the installation planning process for the MA survivability, resiliency, and redundancy of all TCAs during facility construction and installation capitalization efforts that affect, house, or support these identified TCAs as outlined in DoDI 3020.45.",
+      "description": "Ensure CARM Program requirements are coordinated with HAF CE and IMSC engineering leads and considered in the installation planning process for the MA survivability, resiliency, and redundancy of all TCAs during facility construction and installation capitalization efforts that affect, house, or support these identified TCAs as outlined in DoDI 3020.45.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.13. Deputy Chief of Staff for Logistics, Civil Engineering, and Force Protection (AF/A4)."
+      ],
+      "parent_context": "2.13.1.  Serve  as  the  AF  functional  area  lead  for  Logistics,  CE,  and  Force  Protection  (FP) functional areas as identified in DoDI 3020.45. 2.13.2.  Provide Logistics, CE, and FP representatives to the CARM WG when requested. 2.13.3.  Ensure  CARM  Program  requirements  are  coordinated  with  HAF  CE  and  IMSC engineering leads and considered in the installation planning process for the  MA survivability,  resiliency,  and  redundancy  of  all  TCAs  during  facility  construction  and installation  capitalization  efforts  that  affect,  house,  or  support  these  identified  ",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 43,
+      "requirement_id": "REQ-2c4284cca346",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9597
+    },
+    {
+      "source_quote": "The AFMAA team structure and assessment format parallel that of the JMAA.",
+      "description": "The AFMAA team structure and assessment format parallel that of the JMAA.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 93,
+      "requirement_id": "REQ-9de207b16791",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9344
+    },
+    {
+      "source_quote": "Once DCWF qualifications are obtained, 17X officers will maintain their qualifications in good standing even while serving in a joint assignment, special duty assignment, or deployment (T-1).",
+      "description": "17X officers will maintain their DCWF qualifications in good standing while serving in a joint assignment, special duty assignment, or deployment (T-1).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "PROCEDURES, EXCEPTIONS, AND WAIVERS",
+        "4.1. Normal and Amplified Procedures"
+      ],
+      "parent_context": "4.1.1.  DAF  civilian  and  military  personnel  are  qualified  after  meeting  foundational  and residential  requirements  within  12  months  of  assignment  to  their  cyberspace  duties;  (2) publication  of  this  manual;  and  (3)  the  position  has  been  fully  transitioned  to  DCWF. Completion of foundational requirements must be accomplished within the first nine months. Completion of residential requirements may be accomplished concurrently or after completion of foundational requirements. 4.1.2.  Maintenance of qualification requires meeting a continuing education requirement o",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 80,
+      "requirement_id": "REQ-50aba6da17ef",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9571
+    },
+    {
+      "source_quote": "All SNMP MIBs used in the DoD shall comply with technical standards in the DISR and DISA Security Technical Implementation Guides (STIGs).",
+      "description": "All SNMP MIBs used in the DoD shall comply with technical standards in the DISR and DISA Security Technical Implementation Guides (STIGs).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "3.  NM USE OF SNMP"
+      ],
+      "parent_context": "All SNMP MIBs used in the DoD shall comply with technical standards in the DISR and DISA Security Technical Implementation Guides (STIGs). All MIBs along with full descriptions of their use and format shall be stored in an MIB registry managed and published by DISA. Where possible, elements in multiple MIBs that refer to the same parameter shall be formatted and identified the same way.  Standard formats and identifications shall be maintained in a DoD-published MIB data format and dictionary established and maintained by DISA. New SNMP managed resources and management applications shall use t",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 28,
+      "requirement_id": "REQ-2cf067dcef15",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9538
+    },
+    {
+      "source_quote": "Blocks all externally visible PPS not correctly implemented or enabled in accordance with this issuance and disconnects connections to, on, or through the DODIN transport.",
+      "description": "Blocks all externally visible PPS not correctly implemented or enabled in accordance with this issuance and disconnects connections to, on, or through the DODIN transport.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 2:  RESPONSIBILITIES",
+        "2.6.  COMMANDER, UNITED STATES CYBER COMMAND."
+      ],
+      "parent_context": "In addition to the responsibilities in Paragraph 2.4., the Commander, United States Cyber Command: Develops, coordinates, and distributes PPSM operational policies, doctrine, and procedures to implement this issuance. Directs the PPSM PMO to coordinate PPS use for the DODIN monitoring and management capabilities to support DoD information network operations and defensive cyberspace operations as part of the responsibility for DODIN operations and defense. In cooperation with the Director, DISA, implements PPSM operational policies and standards in accordance with this issuance. Directs and mai",
+      "source_pdf": "DODI 8551.01.pdf",
+      "chunk_id": 16,
+      "requirement_id": "REQ-9ca01fef57cc",
+      "run_dir": "DODI 8551.01_20260730_224254",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9351
+    },
+    {
+      "source_quote": "Provide oversight over the cyberspace workforce within their respective commands, agencies, and units, ensuring the cyberspace workforce is identified, trained, qualified, tracked and managed in accordance with DoD and DAF Cyberspace Workforce Management Program directives and policies (e.g., DoDD 8140.01, DoDI 8140.02, DoDM 8140.03 and this manual).",
+      "description": "Provide oversight over the cyberspace workforce within their respective commands, agencies, and units, ensuring the cyberspace workforce is identified, trained, qualified, tracked and managed in accordance with DoD and DAF Cyberspace Workforce Management Program directives and policies (e.g., DoDD 8140.01, DoDI 8140.02, DoDM 8140.03 and this manual).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.9. Major Commands, Field Commands, Field Operating Agency, Direct Reporting Units shall:"
+      ],
+      "parent_context": "2.9.1.  Provide oversight over the cyberspace workforce within their respective commands, agencies, and units, ensuring the cyberspace workforce is identified, trained, qualified, tracked and managed in accordance with DoD and DAF Cyberspace Workforce Management Program directives and policies (e.g., DoDD 8140.01, DoDI 8140.02, DoDM 8140.03 and this manual). 2.9.2.  Ensure  the  cyberspace  workforce  positions  are  reviewed  periodically  and  validated annually in accordance with SAF/CN guidance (T-1) . 2.9.3.  Act as the command focal point on cyberspace workforce issues. 2.9.4.  Consolida",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 30,
+      "requirement_id": "REQ-fd47387141d1",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9354
+    },
+    {
+      "source_quote": "Supports the Director, DISA in developing PPSM standards.",
+      "description": "Supports the Director, DISA in developing PPSM standards.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 2:  RESPONSIBILITIES",
+        "2.3.  DIRECTOR, NATIONAL SECURITY AGENCY/CHIEF, CENTRAL SECURITY SERVICE."
+      ],
+      "parent_context": "Under the authority, direction, and control of the Under Secretary of Defense for Intelligence and Security; the authority, direction, and control exercised by the DoD CIO over the activities of the Cybersecurity Directorate, or any successor organization, of the National Security Agency, funded through the Information System Security Program; and in addition to the responsibilities in Paragraph 2.4., the Director, National Security Agency/Chief, Central Security Service: Develops and publishes security configuration guides as required in coordination with the DoD CISO. Supports the Director, ",
+      "source_pdf": "DODI 8551.01.pdf",
+      "chunk_id": 10,
+      "requirement_id": "REQ-95db05aa2461",
+      "run_dir": "DODI 8551.01_20260730_224254",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8781
+    },
+    {
+      "source_quote": "Appoint a Long Haul Comm point of Contact (POC) for circuit management and LHC related issues and forward appointment letter to AF Long Haul Communication Flight, 38 Cyberspace Readiness Squadron/SCC.",
+      "description": "Appoint a Long Haul Comm point of Contact (POC) for circuit management and LHC related issues and forward appointment letter to AF Long Haul Communication Flight, 38 Cyberspace Readiness Squadron/SCC.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.4. Major Commands, Management Headquarters (MHQ), AF level Organizations will:"
+      ],
+      "parent_context": "2.4.1.  Execute LAFO duties as detailed in Chapter 2, paragraph 2.11 of this AFMAN. 2.4.2.  Appoint a Long Haul Comm point of Contact (POC) for circuit management and LHC related  issues  and  forward  appointment  letter  to  AF  Long  Haul  Communication  Flight,  38 Cyberspace Readiness Squadron/SCC. (T-3) 2.4.3.  Appoint a LAFO and alternate and forward appointment letter to 38 CYRS/SCC. If the LAFO and alternate are identified as the LHC POC state that in the LAFO appointment letter. Note: AF-level FOAs and DRUs that do not have LHC requirements (circuits and services) do NOT need to appo",
+      "source_pdf": "afman17-2101.pdf",
+      "chunk_id": 27,
+      "requirement_id": "REQ-27a4e0532757",
+      "run_dir": "afman17-2101_20260730_224258",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9235
+    },
+    {
+      "source_quote": "Any organization that participates in exercises conducted on operational networks will ensure procedures are in place to manage real world and exercise incidents.",
+      "description": "Any organization that participates in exercises conducted on operational networks will ensure procedures are in place to manage real world and exercise incidents.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "EXERCISES"
+      ],
+      "parent_context": "4.1. Exercises on Operational Networks. Organizations that conduct exercises on operational networks run the risk of confusing exercise incidents with real world incidents. Any organization that  participates  in  exercises  conducted  on  operational  networks  will  ensure  procedures  are  in place to manage real world and exercise incidents. 4.2. Joint Exercises. The sponsoring command should provide the rules of engagement (ROEs) and standard operating procedures (SOPs) for the exercise. The senior Air Force representative from  each  participating  organization  will  ensure  the  ROEs  ",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 57,
+      "requirement_id": "REQ-4ebe8e4af7d3",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9647
+    },
+    {
+      "source_quote": "Vouchers are only issued for initial and annual payment of vendor certification fees for civilian and military personnel.",
+      "description": "Vouchers are only issued for initial and annual payment of vendor certification fees for civilian and military personnel.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "PROCEDURES, EXCEPTIONS, AND WAIVERS",
+        "4.1. Normal and Amplified Procedures"
+      ],
+      "parent_context": "4.1.1.  DAF  civilian  and  military  personnel  are  qualified  after  meeting  foundational  and residential  requirements  within  12  months  of  assignment  to  their  cyberspace  duties;  (2) publication  of  this  manual;  and  (3)  the  position  has  been  fully  transitioned  to  DCWF. Completion of foundational requirements must be accomplished within the first nine months. Completion of residential requirements may be accomplished concurrently or after completion of foundational requirements. 4.1.2.  Maintenance of qualification requires meeting a continuing education requirement o",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 76,
+      "requirement_id": "REQ-3fdf10a2cab9",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9588
+    },
+    {
+      "source_quote": "Ensure updates are made to civilian cyber work role and proficiency level codes for tracking cyberspace workforce requirements that align with the AFSCs, SFSCs, and occupational series under the purview of the career field manager.",
+      "description": "Ensure updates are made to civilian cyber work role and proficiency level codes for tracking cyberspace workforce requirements that align with the AFSCs, SFSCs, and occupational series under the purview of the career field manager.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.8. DAF Cyber Career Field Managers shall:"
+      ],
+      "parent_context": "2.8.1.  Maintain updated AFSCs, SFSCs, or occupational series and DCWF for inclusion or removal to the cyberspace workforce program. 2.8.2.  Provide  guidance  to  ensure  SEIs  are  updated  on  UMDs,  enlisted  and  officer classification directories and/or appropriate civilian personnel databases and systems. 2.8.3.  Provide guidance to ensure that the personnel section and supervisor over civilians will ensure the SCPD, CPD, or PRD and appropriate civilian personnel databases or systems reflect accurately the cyberspace workforce requirements . (T-2) . 2.8.4.  Ensure the servicing personne",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 28,
+      "requirement_id": "REQ-c602939f3402",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.947
+    },
+    {
+      "source_quote": "shall be designated IA Technical Category Level 2 and IA Management Category Level 2 positions and as critical sensitive positions as defined by DoD 5200.2-R",
+      "description": "IA Technical Category Level 2 and IA Management Category Level 2 positions shall be designated as critical sensitive positions.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "5.  NM SECURITY"
+      ],
+      "parent_context": "Data exchanges between NM systems shall be encrypted per DISA Security Technical Implementation Guides Network Infrastructure (Reference (ab)) and shall be processed and protected at the appropriate classification level. Management information obtained from NEs shall be classified, stored, processed, and shared IAW the USSTRATCOM GIG NetOps Security Classification Guide (Reference (ac)) and other applicable classification guides.  NM data that provides sensitive operational status of the network or the status of the network's ability to support real-world operations shall be protected as sensi",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 37,
+      "requirement_id": "REQ-117f5d31be02",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8711
+    },
+    {
+      "source_quote": "Track Privileged User Agreements for each Systems as assigned and provide updates at the close of each fiscal year to the AO or WCO/DCO or as directed (T-1).",
+      "description": "Track Privileged User Agreements for each Systems as assigned and provide updates at the close of each fiscal year to the AO or WCO/DCO or as directed (T-1).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.17. Information System Security Managers (ISSMs) shall:"
+      ],
+      "parent_context": "2.17.1.  Validate that all personnel are properly coded and qualified and provide updates at the close of each fiscal year to the Authorizing Official on the status of personnel within their area of responsibility or as directed. 2.17.2.  Validate  an  individual  has  signed  a  Privileged  User  Agreement,  completed  the appropriate  clearance  or  national  security  investigation  appropriate  for  access,  and  meets required DoD approved cyberspace foundational requirements before a privileged account to any Systems is granted (T-1) . 2.17.3.  Track Privileged User Agreements for each S",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 51,
+      "requirement_id": "REQ-ee61146e9f05",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9331
+    },
+    {
+      "source_quote": "Identify, track, and manage all cyberspace workforce positions according to guidance as issued by the appropriate career field manager and this manual.",
+      "description": "Identify, track, and manage all cyberspace workforce positions according to guidance as issued by the appropriate career field manager and this manual.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.15. Program  or  Project  Managers  (PMs),  System  Managers,  Program  Management Offices (PMOs), Developmental or Operational Test Agencies and all Units shall:"
+      ],
+      "parent_context": "2.15.1.  Identify, track, and manage all cyberspace workforce positions according to guidance as issued by the appropriate career field manager and this manual. 2.15.2.  Identify  all  civilian  and  military  cyberspace  positions  in  manpower  and  personnel databases or systems. 2.15.3.  Ensure  every  civilian  and  military  with  privileged  accounts  are  assigned  to  a cyberspace coded position on the UMD. 2.15.4.  Ensure all cyberspace workforce personnel are qualified in accordance with DoDD 8140.01 and this manual. 2.15.5.  Verify  that  the  Program  Office  maintains  a  copy  o",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 42,
+      "requirement_id": "REQ-7d4fa73955e6",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.938
+    },
+    {
+      "source_quote": "All training that meets the requirements of the DoD Cyberspace Operations Forces is accepted as meeting the qualification standards and requirements (T-0).",
+      "description": "All training that meets the requirements of the DoD Cyberspace Operations Forces is accepted as meeting the qualification standards and requirements (T-0).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "GUIDANCE AND PROCEDURES",
+        "3.4. Cyberspace Workforce Qualification and Management Program"
+      ],
+      "parent_context": "3.4.1.  As per DoDM 8140.03, the DoD Cyberspace Workforce Qualification and Management Program establishes enterprise baseline requirements by work role according to proficiency level to enhance cyberspace mission readiness across the DoD. 3.4.2.  The standards are intended to be used in conjunction with OPM Qualification standards rather  than  as  a  replacement  for  those  standards.  The  program  is  designed  to  develop  a cyberspace  workforce  with  a  common  understanding  of  the  concepts,  principles,  and applications  of  cyberspace  functions  to  enhance  interoperability  a",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 70,
+      "requirement_id": "REQ-e068fc30067f",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9525
+    },
+    {
+      "source_quote": "organizations implementing full virtualization solutions should also follow the recommendations from NIST SP 800-53",
+      "description": "Organizations implementing full virtualization solutions should also follow the recommendations from NIST SP 800-53.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "5. Secure Virtualization Planning and Deployment"
+      ],
+      "parent_context": "A critical aspect of deploying a secure virtualization solution is careful planning prior to installation, configuration, and deployment. This helps ensure that the virtual environment is as secure as possible and in compliance with all relevant organizational policies. Many virtualization security and performance problems can be traced to a lack of planning or management controls. Security should be considered from the initial planning stage at the beginning of the systems development life cycle to maximize security and minimize costs. It is much more difficult and expensive to address securi",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 91,
+      "requirement_id": "REQ-7530137bf942",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9755
+    },
+    {
+      "source_quote": "In coordination with AFNWC, engage with PEOs, Services, CCMDs, and agencies with NC3 related programs not aligned to the AFPEO NC3, but who act as architects for their NC3 related systems.",
+      "description": "In coordination with AFNWC, engage with PEOs, Services, CCMDs, and agencies with NC3 related programs not aligned to the AFPEO NC3, but who act as architects for their NC3 related systems.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ARCHITECTURE AND CONFIGURATION MANAGEMENT",
+        "5.3. Responsibilities.",
+        "5.3.3. AFGSC will:"
+      ],
+      "parent_context": "5.3.3.1.  Appoint a Chief Architect for NDO (to include AF NC3) Service Core Function architecture  oversight  as  specified  in,  but  not  limited  to,  AFI  17-140, Architecting . Establish the AF NC3 Enterprise Architecture. 5.3.3.2.  In  coordination  with  AFNWC,  engage  with  PEOs,  Services,  CCMDs,  and agencies  with  NC3  related  programs  not  aligned  to  the  AFPEO  NC3,  but  who  act  as architects  for  their  NC3  related  systems.    Coordinate  with  SAF/CIO  A6  to  negotiate compatible interfaces to enable a federated approach to architecture IAW AFI 17-140.",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 51,
+      "requirement_id": "REQ-6a4fbe7f236c",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9248
+    },
+    {
+      "source_quote": "The HAF CARM Program office will conduct CARM Reviews with the MAJCOM/DRU, FOA, and Component to the Combatant Command CARM programs as requested.",
+      "description": "The HAF CARM Program office will conduct CARM Reviews with the MAJCOM/DRU, FOA, and Component to the Combatant Command CARM programs as requested.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "CARM PROGRAM TRAINING AND OUTREACH"
+      ],
+      "parent_context": "4.1. The CARM  training and outreach program will provide recipients with an understanding of program methodologies and processes, address any programmatic updates or changes that may impact the field, increase cross-program and cross-function coordination, and enable  personnel  to  execute  the  four  stages  of  the  CARM  cycle.    Training  will  be  provided through outreach and the leveraging of existing technologies for remote delivery. 4.2. Several  methods  of  remote  delivery  will be  utilized  to  instruct  personnel  on  the  basic tenets  of  the  CARM  program  and  in  the  n",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 108,
+      "requirement_id": "REQ-bf16bec2df09",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9625
+    },
+    {
+      "source_quote": "Consolidates DoD Component input on the oversight of CUI protection requirements in DoD classified contracts for NISP contractors under DCSA security oversight, as required by Information Security Oversight Office (ISOO) Notice 2016-01.",
+      "description": "Consolidates DoD Component input on the oversight of CUI protection requirements in DoD classified contracts for NISP contractors under DCSA security oversight, as required by Information Security Oversight Office (ISOO) Notice 2016-01.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 2:  RESPONSIBILITIES",
+        "2.3.  DIRECTOR, DEFENSE COUNTERINTELLIGENCE AND SECURITY AGENCY (DSCA)."
+      ],
+      "parent_context": "Under the authority, direction, and control of the USD(I&S) and in addition to the responsibilities in Paragraph 2.10., the Director, DCSA: Administers the DoD CUI Program for contractually established CUI requirements for contractors in classified contracts in accordance with the May 17, 2018 Under Secretary of Defense for Intelligence Memorandum. Assesses contractor compliance with contractually established CUI system requirements in DoD classified contracts associated with the National Industrial Security Program (NISP) in accordance with Part 2003 of Title 32, CFR and National Institute of",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 10,
+      "requirement_id": "REQ-311c7ca4531e",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9551
+    },
+    {
+      "source_quote": "Act as the primary interface to the OSD, the JS, and serve as the HAF accountable officer responsible to the Secretary of the Air Force (SecAF) and the CSAF for the AF NLCC/NC3 mission area IAW HAF MD 1-60, Deputy Chief of Staff of the Air Force Strategic Deterrence and Nuclear Integration.",
+      "description": "Act as the primary interface to the OSD, the JS, and serve as the HAF accountable officer responsible to the Secretary of the Air Force (SecAF) and the CSAF for the AF NLCC/NC3 mission area IAW HAF MD 1-60, Deputy Chief of Staff of the Air Force Strategic Deterrence and Nuclear Integration.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "GENERAL ROLES AND RESPONSIBILITIES",
+        "2.2. Responsibilities."
+      ],
+      "parent_context": "2.2.1. Deputy Chief of Staff for Strategic Deterrence and Nuclear Integration ( AF/A10 ) will: 2.2.1.1.  In accordance with AFPD 13-5, Air Force Nuclear Mission , provide guidance for implementing AF NLCC/NC3 policy, strategy, and planning IAW national-level, DoD, CJCS, and AF directives. (T-0) 2.2.1.2.  Act as the primary interface to the OSD, the JS, and serve as the HAF accountable officer responsible to the Secretary of the Air Force (SecAF) and the CSAF for the AF NLCC/NC3 mission area IAW HAF MD 1-60, Deputy Chief of Staff  of  the  Air  Force Strategic Deterrence and Nuclear Integration",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 17,
+      "requirement_id": "REQ-41d55f55b047",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9197
+    },
+    {
+      "source_quote": "In addition to the responsibilities in section 11 of this enclosure, the Chairman of the Joint Chiefs of Staff provides oversight of the Combatant Commands' information security programs.",
+      "description": "Provide oversight of the Combatant Commands' information security programs, in addition to section 11 responsibilities.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "11. DOD COMPONENT HEADS.  The DoD Component heads:"
+      ],
+      "parent_context": "Protect classified information and CUI from unauthorized disclosure consistent with References (c) and (i). Designate a senior agency official to be responsible for the direction, administration, and oversight of the DoD Component's information security program, to include: Classification, declassification, and safeguarding classified information. Security education and training programs. Implementation of References (c) and (i).",
+      "source_pdf": "DODI 5200.01.pdf",
+      "chunk_id": 24,
+      "requirement_id": "REQ-11fd1b774113",
+      "run_dir": "DODI 5200.01_20260730_215412",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9337
+    },
+    {
+      "source_quote": "e. Ensures the transfer of information to foreign mission partners is approved and undertaken in accordance with DoDI 2040.02.",
+      "description": "Ensures the transfer of information to foreign mission partners is approved and undertaken in accordance with DoDI 2040.02.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 2:  RESPONSIBILITIES",
+        "2.2.  DIRECTOR, DISA."
+      ],
+      "parent_context": "Under the authority, direction, and control of the DoD Chief Information Officer, and in addition to the responsibilities in Paragraph 2.4., the Director, DISA: Maintains all DoD information technology, cloud computing, and managed data services and ensures that they are: Assessed for vulnerabilities and documented in a vulnerability assessment report with recommendations to support the implementation of security measures to address vulnerabilities. Assigned an assurance category and documented in the category assurance list (CAL). Develops, coordinates, reviews, and approves the PPSM CCB Char",
+      "source_pdf": "DODI 8551.01.pdf",
+      "chunk_id": 9,
+      "requirement_id": "REQ-4b5291213258",
+      "run_dir": "DODI 8551.01_20260730_224254",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9302
+    },
+    {
+      "source_quote": "Ensure the development of RRPs for select Tier 1 TCAs, as outlined in paragraph 3.4., and as required and applicable.",
+      "description": "Ensure the development of RRPs for select Tier 1 TCAs, as outlined in paragraph 3.4., and as required and applicable.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.20. FOAs."
+      ],
+      "parent_context": "2.20.1.  Establish  a  CARM  program  office  within  the  organization  for  the  purpose  of assigning, identifying, assessing, analyzing, and managing mission risk to AF TCAs. ( T-1 ) 2.20.1.1.  Any organization which can demonstrate a lack of TCAs will be exempt from CARM programmatic responsibilities through their HHQ's organization. 2.20.2.  Appoint  a  primary  and  alternate  CARM  POC  on  an  annual  basis,  in  writing,  to manage  their  overall  CARM  program.  ( T-2 )    A  copy  of  the  appointment  letter  will  be provided to the HAF CARM Program office and the FOA's HHQ's fu",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 67,
+      "requirement_id": "REQ-854f6849cfbd",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9591
+    },
+    {
+      "source_quote": "Submit concurrence or non-concurrence to the base Communications Focal Point for SBU I DATA, SECRET IP DATA, and 24 AF designated mission critical circuits.",
+      "description": "Submit concurrence or non-concurrence to the base Communications Focal Point for SBU I DATA, SECRET IP DATA, and 24 AF designated mission critical circuits.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.8. Functional LHC Circuit Management Office (CMO) Responsibilities."
+      ],
+      "parent_context": "2.8.1.  MAJCOM level CMO workload responsibilities were consolidated under the AF LHC Flight at 38 CYRS/SCC. 2.8.2.  All  CMO  not  part  of  the  MAJCOM  CMO's  consolidation  effort  retain  their  CMO responsibilities to: 2.8.2.1.  Provision,  track,  and  manage  LHC  circuits  and  service  throughout  their  life cycle. 2.8.2.2.  Register and obtain appropriate role assignments in DISA StoreFront provisioning tool and AF TCOSS for their respective organizations.  All CMO's will: 2.8.2.2.1.  Prepare, review, validate, approve, and/or reject Service Requests in DISA StoreFront for long-hau",
+      "source_pdf": "afman17-2101.pdf",
+      "chunk_id": 39,
+      "requirement_id": "REQ-1f0653e54723",
+      "run_dir": "afman17-2101_20260730_224258",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9176
+    },
+    {
+      "source_quote": "Support CDRUSSTRATCOM in establishing NetOps hierarchies that fully consider NM along with network defense and content management.",
+      "description": "Support CDRUSSTRATCOM in establishing NetOps hierarchies that fully consider NM along with network defense and content management.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4.  DIRECTOR, OPERATIONAL TEST AND EVALUATION (DOT&E).  The DOT&E shall:"
+      ],
+      "parent_context": "Ensure processes, procedures, and infrastructure are available to operationally test and evaluate NM capabilities that are developed and acquired. Conduct periodic assessments of NM processes, procedures, and capabilities as requested by the DoD CIO. UNDER SECRETARY OF DEFENSE FOR INTELLIGENCE (USD(I)).  The USD(I) shall serve as the DoD focal point to the Intelligence Community (IC) for NM policy and oversight matters relating to intelligence information sharing and interoperability of Defense intelligence systems and processes IAW DoDD 5143.01 (Reference (o)). DIRECTOR, DEFENSE INTELLIGENCE ",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 18,
+      "requirement_id": "REQ-27477742c3f0",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9115
+    },
+    {
+      "source_quote": "All classified documents, including legacy documents will be reviewed for CUI and properly marked upon changes in the document's classification level, particularly if the documents are to be completely declassified.",
+      "description": "All classified documents, including legacy documents will be reviewed for CUI and properly marked upon changes in the document's classification level, particularly if the documents are to be completely declassified.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 3:  PROGRAMMATICS",
+        "3.4.  MARKING REQUIREMENTS."
+      ],
+      "parent_context": "This paragraph covers the essential marking requirements for initial phased implementation of the DoD CUI Program. At minimum, CUI markings for unclassified DoD documents will  include the acronym 'CUI' in the banner and footer of the document. If portion markings are selected, then all document subjects and titles, as well as individual sections, parts, paragraphs, or similar portions of a CUI document known to contain CUI, will be portion marked with '(CUI).'  Use of the unclassified marking '(U)' as a portion marking for unclassified information within CUI documents or materials is required",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 40,
+      "requirement_id": "REQ-198bb4f72074",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9637
+    },
+    {
+      "source_quote": "Ensure all records created as a result of processes prescribed in this publication are maintained in accordance with Air Force Manual 33-363, Management of Records, and disposed of in accordance with the Air Force Records Disposition Schedule located in the Air Force Records Information Management System.",
+      "description": "Ensure all records created as a result of processes prescribed in this publication are maintained in accordance with Air Force Manual 33-363, Management of Records, and disposed of in accordance with the Air Force Records Disposition Schedule located in the Air Force Records Information Management System.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"
+      ],
+      "parent_context": "ACCESSIBILITY: Publications and forms are available on the e-Publishing website at www.e-publishing.af.mil for downloading or ordering. RELEASABILITY: There are no releasability restrictions on this publication. OPR:  AF/A10N",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 2,
+      "requirement_id": "REQ-10a9f264c37e",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9605
+    },
+    {
+      "source_quote": "Preliminary response actions should not result in a self-imposed denial of service;",
+      "description": "Preliminary response actions should not result in a self-imposed denial of service;",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "Actions",
+        "3.4.4. Methodology."
+      ],
+      "parent_context": "3.4.4.1.  Assess and Categorize. Assess the event against the incident criteria to determine if it is a reportable event or incident (See Table 1.1, Incident Categories). In cases where more than one category applies, use the category of highest precedence as outlined in the Table 1.1. 3.4.4.2.  Classification  of  Incident  Reports.  Incident  reports  may  be  either  classified  or unclassified.  The  individual  responsible  for  developing  the  incident  report  will  review either  DoDI  O-3600.02  or  the  AF  Cyberspace  Operation  Security  Classification  Guide (SCG) to determine if",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 41,
+      "requirement_id": "REQ-938435202cf9",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8473
+    },
+    {
+      "source_quote": "(7) Communicate PPS securely across the DODIN.",
+      "description": "(7) Communicate PPS securely across the DODIN.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 2:  RESPONSIBILITIES",
+        "2.4.  DOD COMPONENT HEADS."
+      ],
+      "parent_context": "The DoD Component heads: Designate in writing to the PPSM CCB chairperson, a primary and one or more alternative voting members to support PPSM CCB meetings. The representative must be a DoD military officer in the grade of O-6 or a DoD civilian employee in the grade of General Schedule (GS)-15 and have at least a Secret security clearance. If necessary, the representative can delegate to a DoD military officer in the grade of O-5 or a DoD civilian employee in the grade of GS-14 with at least a Secret security clearance. A representative from OIG DoD may attend in a non-voting role only.",
+      "source_pdf": "DODI 8551.01.pdf",
+      "chunk_id": 13,
+      "requirement_id": "REQ-cf527f39c8d7",
+      "run_dir": "DODI 8551.01_20260730_224254",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.916
+    },
+    {
+      "source_quote": "(1) CTI is to be marked with one of the Distribution Statements B through F, in accordance with DoDI 5230.24.",
+      "description": "CTI is to be marked with one of the Distribution Statements B through F, in accordance with DoDI 5230.24.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 3:  PROGRAMMATICS",
+        "3.7.  GENERAL DOD CUI REQUIREMENTS."
+      ],
+      "parent_context": "This section specifies initial requirements for implementing, marking, and managing the CUI program.  Table 1 contains a sample list of the categories found in the DoD CUI Registry and Defense Index.  A complete list of CUI Indexes and Categories can be found on Intelink at https://intelshare.intelink.gov/sites/ousdi/hcis/sec/icdirect/information/CUI/Forms/AllItems.aspx. Some significant points about DoD CUI include: CUI does not include information lawfully and publicly available without restrictions. b.  CUI requires safeguarding measures identified by the CUI EA in Part 2002.14 of Title 32,",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 53,
+      "requirement_id": "REQ-baa9afcc4db4",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9416
+    },
+    {
+      "source_quote": "During working hours, steps will be taken to minimize the risk of access by unauthorized personnel, such as not reading, discussing, or leaving CUI information unattended where unauthorized personnel are present.",
+      "description": "During working hours, steps will be taken to minimize the risk of access by unauthorized personnel, such as not reading, discussing, or leaving CUI information unattended where unauthorized personnel are present.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 4:  DISSEMINATION, DECONTROLLING, AND DESTRUCTION OF CUI",
+        "4.1.  GENERAL."
+      ],
+      "parent_context": "Part 2002 of Title 32, CFR requires dissemination statements to be placed on classified and unclassified documents or other materials when CUI necessitates access restrictions, including those required by law, regulation, or government-wide policy.  These statements facilitate control, secondary sharing, decontrol, and release without the need to repeatedly obtain approval or authorization from the controlling DoD office. Dissemination controls identify the audience  deemed to have a lawful government purpose to use the CUI and specify the rationale  for applying the controls by specific codes",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 73,
+      "requirement_id": "REQ-2727eff94edb",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9555
+    },
+    {
+      "source_quote": "when policy requires, that the information is encrypted and signed.",
+      "description": "when policy requires, that the information is encrypted and signed.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4. Security Recommendations for Virtualization Components",
+        "4.4 Desktop Virtualization Security"
+      ],
+      "parent_context": "A major difference in security between server and desktop virtualization is the ability to control the images. In a server environment, the ability to create and manage images is usually limited to administrators. But in desktop environments, end users often have the ability to create, modify, duplicate, and delete images. The virtualization software itself may also be fully controlled by the user. It may not be possible for the organization to ensure that the guest OS images meet the organization's security policy requirements, such as being patched regularly. Organizations considering the us",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 87,
+      "requirement_id": "REQ-ceca6f11ee37",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9077
+    },
+    {
+      "source_quote": "(a) Export-controlled CUI transfers to foreign persons must be in accordance with the Arms Export Control Act, International Traffic in Arms Regulations, Export Control Reform Act, Export Administration Regulations, and DoDI 2040.02.",
+      "description": "(a) Export-controlled CUI transfers to foreign persons must be in accordance with the Arms Export Control Act, International Traffic in Arms Regulations, Export Control Reform Act, Export Administration Regulations, and DoDI 2040.02.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 3:  PROGRAMMATICS",
+        "3.4.  MARKING REQUIREMENTS."
+      ],
+      "parent_context": "This paragraph covers the essential marking requirements for initial phased implementation of the DoD CUI Program. At minimum, CUI markings for unclassified DoD documents will  include the acronym 'CUI' in the banner and footer of the document. If portion markings are selected, then all document subjects and titles, as well as individual sections, parts, paragraphs, or similar portions of a CUI document known to contain CUI, will be portion marked with '(CUI).'  Use of the unclassified marking '(U)' as a portion marking for unclassified information within CUI documents or materials is required",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 40,
+      "requirement_id": "REQ-3882379e5c0d",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9363
+    },
+    {
+      "source_quote": "Submit requests to terminate unused AF funded SBU IP DATA and SECRET IP DATA connections when no longer required.",
+      "description": "Submit requests to terminate unused AF funded SBU IP DATA and SECRET IP DATA connections when no longer required.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.7. All Air Force Centers, Agencies, and Other Key Stakeholder will:"
+      ],
+      "parent_context": "2.7.1.  Validate  centrally  funded  SBU  IP  DATA  and  SECRET  IP  DATA  transport connections,  and  Internet  Protocol  addressing,  on-site  assistance  requests  and  systems configuration. This responsibility includes conducting Review & Revalidation on connections every 2 years. 2.7.1.1.  Submit requests to terminate unused AF funded SBU IP DATA and SECRET IP DATA connections when no longer required. 2.7.2.  Program Management Offices: 2.7.2.1.  Ensure  networked systems that use  LHC transport are bandwidth-efficient and include implementation of software and/or hardware compression/a",
+      "source_pdf": "afman17-2101.pdf",
+      "chunk_id": 33,
+      "requirement_id": "REQ-04af9fc7dca2",
+      "run_dir": "afman17-2101_20260730_224258",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9279
+    },
+    {
+      "source_quote": "The Heads of the Defense Intelligence Components shall execute their NM responsibilities consistent with Intelligence Community Directive 502 (Reference (r)).",
+      "description": "The Heads of the Defense Intelligence Components shall execute their NM responsibilities consistent with Intelligence Community Directive 502 (Reference (r)).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4.  DIRECTOR, OPERATIONAL TEST AND EVALUATION (DOT&E).  The DOT&E shall:"
+      ],
+      "parent_context": "Ensure processes, procedures, and infrastructure are available to operationally test and evaluate NM capabilities that are developed and acquired. Conduct periodic assessments of NM processes, procedures, and capabilities as requested by the DoD CIO. UNDER SECRETARY OF DEFENSE FOR INTELLIGENCE (USD(I)).  The USD(I) shall serve as the DoD focal point to the Intelligence Community (IC) for NM policy and oversight matters relating to intelligence information sharing and interoperability of Defense intelligence systems and processes IAW DoDD 5143.01 (Reference (o)). DIRECTOR, DEFENSE INTELLIGENCE ",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 15,
+      "requirement_id": "REQ-92b084c08584",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9638
+    },
+    {
+      "source_quote": "Identify the likely root cause(s) of the incident through technical analysis.",
+      "description": "Identify the likely root cause(s) of the incident through technical analysis.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "Actions",
+        "3.6.1. Objectives."
+      ],
+      "parent_context": "3.6.1.1.  Ensure the accuracy and completeness of incident reports. 3.6.1.2.  Characterize and communicate the potential impact of the incident. This includes identifying and sanitizing any compromised AF data. 3.6.1.3.  Systematically  capture  the  methods  used  in  the  attack  and  identify  security controls that could prevent future occurrences. 3.6.1.4.  Research  actions  that  can  be  taken  to  respond  to  and  eradicate  the  risk  and/or threat. 3.6.1.5.  Understand  patterns  of  activity  to  characterize  the  threat  and  direct  protective and defensive strategies.",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 45,
+      "requirement_id": "REQ-97c1cb9072f8",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9064
+    },
+    {
+      "source_quote": "Sign a formal statement of assigned cybersecurity responsibilities and submit to the appropriate program management office.",
+      "description": "Sign a formal statement of assigned cybersecurity responsibilities and submit to the appropriate program management office.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.20. Individuals (Civilian and Military) shall:"
+      ],
+      "parent_context": "2.20.1.  Obtain  or  meet  appropriate  DAF  approved  cyberspace  foundational  requirements applicable  for  cyberspace  tasks  required  for  any  position  held,  within  nine  months  of assignment in accordance with DoDI 8140.02 and obtain residential qualifications within 12 months of assignment (T-0) . 2.20.2.  Maintain  valid  (i.e.,  in  good  standing)  DAF  approved  cybersecurity  foundational certification(s) in accordance with DODI 8140.02 if used to satisfy foundational requirements for the role (T-0) . 2.20.3.  Become  and  remain  qualified  in  their  assigned  cyberspace  p",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 58,
+      "requirement_id": "REQ-3dbc18b10d93",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9445
+    },
+    {
+      "source_quote": "Provide CE, physical security, and AT subject matter expertise in support to MAJCOM/DRU, FOA, Center/Wing CARM program as requested.",
+      "description": "Provide CE, physical security, and AT subject matter expertise in support to MAJCOM/DRU, FOA, Center/Wing CARM program as requested.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.18. AF Installation and Mission Support Center (IMSC)."
+      ],
+      "parent_context": "2.18.1.  Provide  CE,  physical  security,  and  AT  subject  matter  expertise  in  support  to MAJCOM/DRU, FOA, Center/Wing CARM program as requested. 2.18.2.  IMSC PSUs, the Air Force Civil Engineer Center (AFCEC), will provide program management  for  infrastructure-related  engineering  efforts  associated  with  TCAs  on  AF installations. ( T-1 ) 2.18.3.  IMSC PSU, the Air Force Security Forces Center (AFSFC), will conduct Air Force Mission Assurance Assessments (AFMAA) for AF installations as requested.",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 59,
+      "requirement_id": "REQ-843da0ab070f",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9216
+    },
+    {
+      "source_quote": "Ensure networked systems that use LHC transport are bandwidth-efficient and include implementation of software and/or hardware compression/acceleration technologies where possible.",
+      "description": "Ensure networked systems that use LHC transport are bandwidth-efficient and include implementation of software and/or hardware compression/acceleration technologies where possible.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.7. All Air Force Centers, Agencies, and Other Key Stakeholder will:"
+      ],
+      "parent_context": "2.7.1.  Validate  centrally  funded  SBU  IP  DATA  and  SECRET  IP  DATA  transport connections,  and  Internet  Protocol  addressing,  on-site  assistance  requests  and  systems configuration. This responsibility includes conducting Review & Revalidation on connections every 2 years. 2.7.1.1.  Submit requests to terminate unused AF funded SBU IP DATA and SECRET IP DATA connections when no longer required. 2.7.2.  Program Management Offices: 2.7.2.1.  Ensure  networked systems that use  LHC transport are bandwidth-efficient and include implementation of software and/or hardware compression/a",
+      "source_pdf": "afman17-2101.pdf",
+      "chunk_id": 33,
+      "requirement_id": "REQ-d998b6bae50b",
+      "run_dir": "afman17-2101_20260730_224258",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9538
+    },
+    {
+      "source_quote": "AFSPC will: Identify NC3 cybersecurity risks against associated systems and facilities.",
+      "description": "AFSPC will: Identify NC3 cybersecurity risks against associated systems and facilities.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "RESILIENCE",
+        "6.3. Responsibilities.",
+        "6.3.8. AFSPC will:"
+      ],
+      "parent_context": "6.3.8.1.  Execute authorizing official duties for a subset of AF NC3 systems IAW DoDI 8510.01,  AFI  17-130,  and  applicable  CDRUSSTRATCOM  Memoranda  delegating authorizing official responsibilities for specified systems. (T-0) 6.3.8.2.  Coordinate resourcing for EMP protection shortfalls at AFSPC NC3 nodes and facilities with AFIMSC. 6.3.8.3.  Coordinate with AFGSC on any modifications to identified AN/USQ-225 external dependencies (e.g. communications satellites, ground entry points, non-collocated communications terminals, and DoD Information Network links). 6.3.8.4.  Identify NC3  cyber",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 64,
+      "requirement_id": "REQ-31ab01a942b8",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9577
+    },
+    {
+      "source_quote": "Establishes policy and assigns responsibility for planning, implementing, executing, and maintaining NM for the Global Information Grid (GIG) as an integral part of GIG Enterprise Management (GEM).",
+      "description": "Establishes policy and assigns responsibility for planning, implementing, executing, and maintaining NM for the Global Information Grid (GIG) as an integral part of GIG Enterprise Management (GEM).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 0,
+      "requirement_id": "REQ-d0612afe0b15",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9573
+    },
+    {
+      "source_quote": "To ensure AF capabilities, functions, and missions can be executed globally via identifying those systems, assets, and infrastructure dependencies whose loss or degradation would negatively impact mission execution.",
+      "description": "To ensure AF capabilities, functions, and missions can be executed globally via identifying those systems, assets, and infrastructure dependencies whose loss or degradation would negatively impact mission execution.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+        "1.2. Program Objectives"
+      ],
+      "parent_context": "1.2.1.  To  ensure  AF  capabilities,  functions,  and  missions  can  be  executed  globally  via identifying those systems, assets, and infrastructure dependencies whose loss or degradation would negatively impact mission execution. 1.2.2.  To establish and implement a risk management program for systems and assets critical to the execution of AF missions. 1.2.3.  To  define  responsibilities,  procedures,  and  standards  so  commanders  can  identify, validate, and prioritize TCAs and assess and manage risk to these TCAs in all threats/hazards environment. 1.2.4.  Create a comprehensive an",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 14,
+      "requirement_id": "REQ-0127cafaa6e7",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9558
+    },
+    {
+      "source_quote": "Establish and maintain an assessment program to measure performance, identify shortfalls, and correct deficiencies.",
+      "description": "Establish and maintain an assessment program to measure performance, identify shortfalls, and correct deficiencies.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "GENERAL INFORMATION",
+        "1.4. Objectives."
+      ],
+      "parent_context": "1.4.1.  Establish a formal governance structure to oversee and manage the AF NC3 mission area. 1.4.2.  Provide guidance and direction to resource the AF NC3 mission area in order to ensure AF NC3 capabilities that fulfill warfighter requirements. 1.4.3.  Provide guidance and direction to manage the AF NC3 architecture and manage the AN/USQ-225 configuration baseline. 1.4.4.  Provide guidance and direction to ensure AF NC3 system resilience IAW governing Department  of  Defense  (DoD)  and  Chairman,  Joint  Chiefs  of  Staff  (CJCS)  directives  and Military Standard documents. 1.4.5.  Establi",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-dc824f32a2ac",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9561
+    },
+    {
+      "source_quote": "CUI transmission via facsimile machine is permitted; however, the sender is responsible for determining whether appropriate protection will be available at the receiving location before transmission (e.g., facsimile machine attended by a person authorized to receive CUI; facsimile machine located in a controlled government environment).",
+      "description": "CUI transmission via facsimile machine is permitted; however, the sender is responsible for determining whether appropriate protection will be available at the receiving location before transmission (e.g., facsimile machine attended by a person authorized to receive CUI; facsimile machine located in a controlled government environment).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 4:  DISSEMINATION, DECONTROLLING, AND DESTRUCTION OF CUI",
+        "4.1.  GENERAL."
+      ],
+      "parent_context": "Part 2002 of Title 32, CFR requires dissemination statements to be placed on classified and unclassified documents or other materials when CUI necessitates access restrictions, including those required by law, regulation, or government-wide policy.  These statements facilitate control, secondary sharing, decontrol, and release without the need to repeatedly obtain approval or authorization from the controlling DoD office. Dissemination controls identify the audience  deemed to have a lawful government purpose to use the CUI and specify the rationale  for applying the controls by specific codes",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 74,
+      "requirement_id": "REQ-2e08051f79c4",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9501
+    },
+    {
+      "source_quote": "As required or directed by the DNI or the USD(I&S), gathers data and prepares and submits reports to the DNI through the USD(I&S), regarding the status of implementation of SCI security policies and procedures within the DoD.",
+      "description": "As required or directed by the DNI or the USD(I&S), gathers data and prepares and submits reports to the DNI through the USD(I&S), regarding the status of implementation of SCI security policies and procedures within the DoD.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "1.  UNDER SECRETARY OF DEFENSE FOR INTELLIGENCE AND SECURITY (USD(I&S))."
+      ],
+      "parent_context": "As the senior security official and the senior agency official responsible for the DoD Information Security Program in accordance with References (a) and (c), the USD(I&S): Develops, coordinates, and oversees the implementation of a DoD Information Security Program that encompasses CUI, SCI, special access programs, and collateral information and activities. Develops information security policy and guidance and oversees DoD implementation of References (c) and (g), Executive Order 13549 (Reference (u)), and the DoD Information Security Program. Consults, as necessary, with other Principal Staf",
+      "source_pdf": "DODI 5200.01.pdf",
+      "chunk_id": 10,
+      "requirement_id": "REQ-0790edf59bff",
+      "run_dir": "DODI 5200.01_20260730_215412",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.941
+    },
+    {
+      "source_quote": "The DoD CIO, shall: Participate in applicable standards bodies and organizations to advocate for and aid in developing standards, protocols, and mechanisms for translating NM information from current formats (e.g., SNMP) to ones that facilitate net-centric information sharing (e.g., extensible markup language).",
+      "description": "The DoD CIO shall participate in applicable standards bodies and organizations to advocate for and aid in developing standards, protocols, and mechanisms for translating NM information from current formats (e.g., SNMP) to ones that facilitate net-centric information sharing (e.g., extensible markup language).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "1.  DoD CHIEF INFORMATION OFFICER (DoD CIO).  The DoD CIO, shall:"
+      ],
+      "parent_context": "Provide strategy, policy, oversight, and guidance for NM capability, planning, definition, and implementation across the DoD Information Enterprise and GIG IAW Reference (b). In coordination with Under Secretary of Defense for Acquisition, Technology, and Logistics (USD(AT&L)) and the Heads of the DoD Components, develop: End-to-end NM architectures and strategies that support efficient, effective, and secure NM operations in tactical and non-tactical networks and improve interoperability across NM systems. Mission-driven NM metrics for tactical and non-tactical networks and NM systems that en",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 11,
+      "requirement_id": "REQ-bb423f659746",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9704
+    },
+    {
+      "source_quote": "Identify NC3-related resource shortfalls and elevate them through the AF NLCC/NC3 governance and AF Corporate Structure processes.",
+      "description": "Identify NC3-related resource shortfalls and elevate them through the AF NLCC/NC3 governance and AF Corporate Structure processes.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "RESOURCING",
+        "4.3. Responsibilities.",
+        "4.3.8. Air Force Reserve Command (AFRC) will:"
+      ],
+      "parent_context": "4.3.8.1.  Identify  NC3-related  resource  shortfalls  and  elevate  them  through  the  AF NLCC/NC3 governance and AF Corporate Structure processes. 4.3.8.2.  Identify AF NC3-related facility requirements at AFRC installations (e.g. wing command posts), to include EMP protection, sustainment, and maintenance, and coordinate mitigation resourcing with AFIMSC.",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 42,
+      "requirement_id": "REQ-3478e2c8adca",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.95
+    },
+    {
+      "source_quote": "All involved personnel should identify and collect all relevant information about the incident for use in incident analysis.",
+      "description": "All involved personnel should identify and collect all relevant information about the incident for use in incident analysis.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "Actions",
+        "3.6.2. Methodology."
+      ],
+      "parent_context": "3.6.2.1.  Gather  information.  All  involved  personnel  should  identify  and  collect  all relevant information about the incident for use in incident analysis. Information gathered may include data previously acquired and preserved, external logs, personal accounts, allsource intelligence, technical information, or the current operational situation. 3.6.2.2.  Validate  the  incident.  Personnel  should  continuously  review,  corroborate,  and update (if applicable) the reported incident to ensure the accuracy of all information. 3.6.2.3.  Determine  the  operational  impact.  Operational ",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 46,
+      "requirement_id": "REQ-8d80e105612d",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9636
+    },
+    {
+      "source_quote": "The USD(I&S) must coordinate and collaborate with the DoD CIO to ensure the agency requesting the waiver has plans to appropriately safeguard and control CUI.",
+      "description": "The USD(I&S) must coordinate and collaborate with the DoD CIO to ensure the agency requesting the waiver has plans to appropriately safeguard and control CUI.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 3:  PROGRAMMATICS",
+        "3.10.  GENERAL SYSTEM AND NETWORK CUI REQUIREMENTS."
+      ],
+      "parent_context": "In accordance with DoDIs 8500.01 and 8510.01, security controls for systems and networks are set to the level required by the safeguarding requirements for the data or information being processed, as identified in Federal Information Processing Standards 199 and 200.  For DoD CUI, the minimum security level will be moderate confidentiality in accordance with Part 2002 of Title 32, CFR and NIST SP 800-171. The USD(I&S) will notify and coordinate with the CUI EA regarding waiver requests involving CUI requirements prior to granting any such requests, including waiver requests related to IS.  The",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 66,
+      "requirement_id": "REQ-9f12eac0a73a",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9644
+    },
+    {
+      "source_quote": "Program, budget, fund, and provide support for the DISN, and the DODIN as required.",
+      "description": "Program, budget, fund, and provide support for the DISN, and the DODIN as required.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES"
+      ],
+      "parent_context": "2.1. Air Force. The Department of the Air Force in accordance with DOD Directive 5100.01 shall  organize,  train,  equip,  and  provide  air,  space,  and  cyberspace  forces  for  the  conduct  of prompt  and  sustained  combat  operations,  military  engagement,  and  security  cooperation  in defense of the Nation, and to support the other  Military Services and joint forces.  Long Haul Communication is an enabler for air, space and cyberspace forces, the Air Force responsibilities for DISN LHC are: 2.1.1.  Program,  budget,  fund,  and  provide  support  for  the  DISN,  and  the  DODIN  a",
+      "source_pdf": "afman17-2101.pdf",
+      "chunk_id": 14,
+      "requirement_id": "REQ-e27b1598ba13",
+      "run_dir": "afman17-2101_20260730_224258",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8961
+    },
+    {
+      "source_quote": "The DoD Components' CSAOs and CPMs will establish procedures to ensure prompt and appropriate management action is taken in cases of CUI misuse, including UD of CUI, improper CUI designation and marking, violation of this issuance, and incidents potentially placing CUI at risk of UD.",
+      "description": "The DoD Components' CSAOs and CPMs will establish procedures to ensure prompt and appropriate management action is taken in cases of CUI misuse, including UD of CUI, improper CUI designation and marking, violation of this issuance, and incidents potentially placing CUI at risk of UD.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 3:  PROGRAMMATICS",
+        "3.9.  GENERAL RELEASE AND DISCLOSURE REQUIREMENTS."
+      ],
+      "parent_context": "The release or disclosure to foreign governments, international organizations, coalitions, or allied personnel of CUI not controlled as NOFORN will be in accordance with a law, regulation, or government-wide policy.  Access to such CUI during official foreign national visits and assignments to DoD Components and cleared contractor facilities, when applied by contract, will be in accordance with DoDD 5230.20. CUI not controlled as NOFORN may be released or disclosed to non-U.S. citizens employed by the DoD if: Access to such information is within the scope of their assigned duties. Access to su",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 65,
+      "requirement_id": "REQ-7c1e2bc987f5",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9618
+    },
+    {
+      "source_quote": "in addition to the responsibilities in Paragraph 2.9.",
+      "description": "in addition to the responsibilities in Paragraph 2.9.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "The DoD CIO:",
+        "2.7.  DIRECTOR, DEFENSE COUNTERINTELLIGENCE AND SECURITY AGENCY."
+      ],
+      "parent_context": "Under the authority, direction, and control of the USD(I&S), in addition to the responsibilities in Paragraph 2.9., and in accordance with Paragraphs 2.2, 4.1, and 11.2 of Volume 1 of DoD Manual 5220.32, the Director, Defense Counterintelligence and Security Agency: Grants facility and personnel security clearances for contractors who require access to classified information to perform classified contracts and as requested by DMEA for the accreditation of trusted suppliers. Provides counterintelligence reporting and provides counterintelligence awareness and reporting advice and assistance to ",
+      "source_pdf": "DODI 5200.44.pdf",
+      "chunk_id": 25,
+      "requirement_id": "REQ-8105d9acb410",
+      "run_dir": "DODI 5200.44_20260730_220819",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.2766
+    },
+    {
+      "source_quote": "Establishes the official DoD CUI Registry.",
+      "description": "Establishes the official DoD CUI Registry.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "CONTROLLED UNCLASSIFIED INFORMATION (CUI)"
+      ],
+      "parent_context": "Originating Component: Office of the Under Secretary of Defense for Intelligence and Security Effective: March 6, 2020 Releasability:",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 0,
+      "requirement_id": "REQ-1149c956d114",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9403
+    },
+    {
+      "source_quote": "Perform periodic verification audits, each consisting of pre-audit preparation, audit conduct, and post-audit reporting and follow-up for the AN/USQ-225.",
+      "description": "Perform periodic verification audits, each consisting of pre-audit preparation, audit conduct, and post-audit reporting and follow-up for the AN/USQ-225.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ARCHITECTURE AND CONFIGURATION MANAGEMENT",
+        "5.3. Responsibilities.",
+        "5.3.4. AFNC3C will:"
+      ],
+      "parent_context": "5.3.4.1.  Be  a  voting  member  of  the  AFNWC/NC-chaired  AN/USQ-225  Configuration Control Board (CCB). (T-1) 5.3.4.2.  Establish policy to assure fleet-wide interoperability of the NC3 mission area. (T1) 5.3.4.3.  Establish  policy  to  assure  fleet-wide  commonality  and  configuration  control through the preservation of baselined characteristics to AN/USQ-225 constituents. (T-1) 5.3.4.4.  Ensure  all  operational  changes  or  degradation  of  baselined  characteristics  to  a system or end-item are coordinated with and assessed by AFNWC/NC. (T-1) 5.3.4.5.  Perform  periodic  verificat",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 53,
+      "requirement_id": "REQ-8d329e1c7d2f",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9594
+    },
+    {
+      "source_quote": "Identify shortfalls in AF NC3-related requirements within their Lead Command/Lead Agent or installation portfolios and elevate through the AF NLCC/NC3 governance and AF Corporate Structure processes.",
+      "description": "Identify shortfalls in AF NC3-related requirements within their Lead Command/Lead Agent or installation portfolios and elevate through the AF NLCC/NC3 governance and AF Corporate Structure processes.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "RESOURCING",
+        "4.3. Responsibilities.",
+        "4.3.5. Air Combat Command (ACC) will:"
+      ],
+      "parent_context": "4.3.5.1.  Identify AF NC3-related funding requirements within ACC and coordinate their inclusion in the AF NC3 funding requirements list with AFGSC and the appropriate Lead Command/Lead Agent. 4.3.5.2.  Identify AF NC3-related facility requirements at ACC installations (e.g. command centers, wing command posts), to include EMP protection, sustainment, and maintenance, and coordinate mitigation resourcing with AFIMSC. 4.3.5.3.  Identify shortfalls in AF NC3-related requirements within their Lead Command/Lead Agent or installation portfolios and elevate through the AF NLCC/NC3 governance and AF ",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 39,
+      "requirement_id": "REQ-d028a0c3b47a",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.934
+    },
+    {
+      "source_quote": "Required local event storage requirements (if any).",
+      "description": "Required local event storage requirements (if any).",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4.  SLAs"
+      ],
+      "parent_context": "NM systems shall be located within the network topology in a manner that ensures they can monitor and report on SLA compliance. NM SLAs shall at a minimum address the following areas identified in International Telecommunications Union - Telecommunications Recommendation M.3342 (Reference (z)) and TM Forum GB917 Release 3.0 (Reference (aa)): Identification of the organizations between which the agreement is established, to include technical and organizational points of contact. A description of the NM services that will be provided along with scope, limitations, and other terms of reference th",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 33,
+      "requirement_id": "REQ-5a3bc398d988",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8596
+    },
+    {
+      "source_quote": "All TCA nominations will be approved by each Center/Wing Commander prior to the initiation of the validation process.",
+      "description": "All TCA nominations will be approved by each Center/Wing Commander prior to the initiation of the validation process.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "QUICK REFERENCE CHART AND PROCESS OVERVIEW"
+      ],
+      "parent_context": "A2.1. During the initial step of the CAIP process , DoD mission owners (CCMDs, Defense Agencies, Military Departments) will decompose their assigned missions and core functions to identify  the  specific  METs/MEFs  each  requires  to  be  implemented  by  the  resource  providers. This  information  allows  resource  providers  such  as  Services  or  Field  Activities  to  select  the individual  METs/MEFs  their  organizations  execute  in  support  of  assigned  missions.    This process  is  then  replicated  at  each  subordinate  organizational  level  until  a  list  of  METs/MEFs requ",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 118,
+      "requirement_id": "REQ-fcd3be0c33e7",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9498
+    },
+    {
+      "source_quote": "Waivers can be granted a maximum of two (2) years for any specific JMAA.",
+      "description": "Waivers can be granted a maximum of two (2) years for any specific JMAA.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 92,
+      "requirement_id": "REQ-a42f303b1e90",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9166
+    },
+    {
+      "source_quote": "In the event of any conflict between this issuance and the OIG DoD's statutory independence and authority, the Inspector General Act takes precedence.",
+      "description": "In the event of any conflict between this issuance and the OIG DoD's statutory independence and authority, the Inspector General Act takes precedence.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 1:  GENERAL ISSUANCE INFORMATION",
+        "1.1.  APPLICABILITY."
+      ],
+      "parent_context": "This issuance: Applies to OSD, the Military Departments (including the Coast Guard at all times, including when it is a Service in the Department of Homeland Security by agreement with that Department), the Office of the Chairman of the Joint Chiefs of Staff (CJCS) and the Joint Staff, the Combatant Commands, the Office of Inspector General of the Department of Defense (OIG DoD), the Defense Agencies, the DoD Field Activities, and all other organizational entities within the DoD (referred to collectively in this issuance as the 'DoD Components.') Does not alter or override existing Director of",
+      "source_pdf": "DODI 8551.01.pdf",
+      "chunk_id": 3,
+      "requirement_id": "REQ-0e8cf523e91e",
+      "run_dir": "DODI 8551.01_20260730_224254",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9533
+    },
+    {
+      "source_quote": "DAF mandated training must be completed within 120 days of assignment (T-1) .",
+      "description": "DAF mandated training must be completed within 120 days of assignment (T-1) .",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "CYBERSPACE WORKFORCE TRAINING",
+        "5.1. Skills Training and Learning Resources"
+      ],
+      "parent_context": "5.1.1.  Initial Skills Training (IST) for various AFSC or SFSCs include cybersecurity concepts and  practices  as  well  as  an  organic,  schoolhouse  provided  test  preparation  course  for  a cyberspace certification exam. Distributive or online learning is available, or units can elect to fund training for those civilian and military personnel who cannot attend one of these IST programs. 5.1.2.  Distributive learning resources are available at no cost to civilian and military users. Examples include e-Learning on the AF Portal, Digital University, and the Federal Virtual Training Environm",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 93,
+      "requirement_id": "REQ-820c56e31c06",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.94
+    },
+    {
+      "source_quote": "Documentation of analysis results.",
+      "description": "Documentation of analysis results.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "Actions",
+        "3.7.3. Post-Incident Analysis."
+      ],
+      "parent_context": "3.7.3.1.  Post-incident analysis involves the postmortem analysis of an incident to review the effectiveness and efficiency of incident handling.  Data captured in the postmortem includes  lessons  learned,  initial  root  cause,  problems  with  executing  COAs,  missing policies  and  procedures,  and  inadequate  infrastructure  defenses.  Post-incident  analysis reporting will be provided to the affected MAJCOM/unit so that corrective actions can be taken (T-2) . 3.7.3.2.  The ACD unit drafts a Cyber Incident Report (CIR), which provides a detailed analysis  to  include  the  affected  sys",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 55,
+      "requirement_id": "REQ-5c349cdc3656",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8998
+    },
+    {
+      "source_quote": "Issues guidance on the DoD operational usage of suppliers and components on DoD systems that are excluded from procurement or otherwise restricted from use due to a significant ICT supply chain risk.",
+      "description": "Issues guidance on the DoD operational usage of suppliers and components on DoD systems that are excluded from procurement or otherwise restricted from use due to a significant ICT supply chain risk.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "The DoD CIO:"
+      ],
+      "parent_context": "a.  Coordinates with the USD(R&E), the USD(A&S), and the DoD Component heads as a subject matter expert on ICT SCRM activities in assured systems and networks, implementation of supply chain assurance practices across the DoD, and development of ICT SCRM training, requirements, best practices, and mitigations. In coordination with the USD(R&E), the USD(A&S), the USD(I&S), and the DoD Component heads, integrates multilayered ICT SCRM concepts into security controls and other policies and processes. In coordination with the USD(R&E), the USD(I&S), and the USD(A&S), issues information systems sec",
+      "source_pdf": "DODI 5200.44.pdf",
+      "chunk_id": 14,
+      "requirement_id": "REQ-4141f1ee4905",
+      "run_dir": "DODI 5200.44_20260730_220819",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.92
+    },
+    {
+      "source_quote": "DoD information systems processing, storing, or transmitting CUI will be categorized at the moderate impact level, and follow the guidance in DoDIs 8500.01 and 8510.01.",
+      "description": "DoD information systems processing, storing, or transmitting CUI will be categorized at the moderate impact level, and follow the guidance in DoDIs 8500.01 and 8510.01.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 3:  PROGRAMMATICS",
+        "3.10.  GENERAL SYSTEM AND NETWORK CUI REQUIREMENTS."
+      ],
+      "parent_context": "In accordance with DoDIs 8500.01 and 8510.01, security controls for systems and networks are set to the level required by the safeguarding requirements for the data or information being processed, as identified in Federal Information Processing Standards 199 and 200.  For DoD CUI, the minimum security level will be moderate confidentiality in accordance with Part 2002 of Title 32, CFR and NIST SP 800-171. The USD(I&S) will notify and coordinate with the CUI EA regarding waiver requests involving CUI requirements prior to granting any such requests, including waiver requests related to IS.  The",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 67,
+      "requirement_id": "REQ-1967b8659c71",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9396
+    },
+    {
+      "source_quote": "Establish a comprehensive set of performance measurements (metrics) to determine the overall effectiveness and compliance of MAJCOM CARM programs with standards and benchmarks to identify, assess, analyze, and manage risk to SECDEF reportable TCAs.",
+      "description": "Establish a comprehensive set of performance measurements (metrics) to determine the overall effectiveness and compliance of MAJCOM CARM programs with standards and benchmarks to identify, assess, analyze, and manage risk to SECDEF reportable TCAs.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.12. Air Force Deputy Chief of Staff, Operations (AF/A3)."
+      ],
+      "parent_context": "2.12.1.  Serve as the AF functional area lead for Space. 2.12.2.  Provide  a  Space  or  appropriate  functional  area  representative  to  the  CARM  WG when requested. 2.12.3.  Oversee and maintain overall responsibility for implementing a CARM program for the purpose of managing risk to AF TCAs. 2.12.4.  Focus the CARM Program on DoD mission requirements. 2.12.5.  Serve as the approving authority for finalized AF Risk Response Plans (RRP).",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 40,
+      "requirement_id": "REQ-611bb564a245",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9692
+    },
+    {
+      "source_quote": "Support development of standards for digital forensics personnel training and qualifications.",
+      "description": "Support development of standards for digital forensics personnel training and qualifications.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.1. The Secretary of the Air Force shall:"
+      ],
+      "parent_context": "2.1.1.  Act as the DoD Executive Agent for the Department of Defense Cyber Crime Center (DC3) and for digital/multimedia forensics within the DoD Forensic Enterprise, in accordance with DoDDs 5505.13E, DoD Executive Agent (EA) for the DoD Cyber Crime Center (DC3) , and 5205.15E, DoD Forensic Enterprise . 2.1.2.  Support development  of  standards for digital forensics personnel training  and qualifications. 2.1.3.  Coordinate  with  the  DoD  Chief  Information  Officer  (CIO),  the  Under  Secretary  of Defense  (USD  I&S),  and  the  Secretaries  of  the  other  Military  Departments  to  in",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 16,
+      "requirement_id": "REQ-3a169d753313",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9455
+    },
+    {
+      "source_quote": "Ensure suspicious activity is reported in a timely manner consistent with required reporting timelines.",
+      "description": "Ensure suspicious activity is reported in a timely manner consistent with required reporting timelines.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "INCIDENT HANDLING",
+        "3.3.1. Objectives."
+      ],
+      "parent_context": "3.3.2.1.  Ensure all suspicious activity is detected and reported so that further analysis can take place to determine if it is a reportable event or incident. 3.3.2.2.  Ensure  suspicious  activity  is  reported  in  a  timely  manner  consistent  with required  reporting  timelines.  Reporting  accurate  incident  information  as  close  to  nearreal-time as possible is crucial to an effective response. If the incident meets OPREP-3 criteria,  report  the  operational  impact  in  accordance  with  AFI  10-206,  Operational Reporting, Chapter 3 . 3.3.2.3.  Coordinate with command channels, D",
+      "source_pdf": "afi17-203.pdf",
+      "chunk_id": 32,
+      "requirement_id": "REQ-5c87ff79b709",
+      "run_dir": "afi17-203_20260730_215609",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9396
+    },
+    {
+      "source_quote": "(5) Directs the PPSM Program Management Office (PMO) to conduct vulnerability assessments of declared PPS and document them in a vulnerability assessment report.",
+      "description": "Directs the PPSM Program Management Office (PMO) to conduct vulnerability assessments of declared PPS and document them in a vulnerability assessment report.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "SECTION 2:  RESPONSIBILITIES",
+        "2.2.  DIRECTOR, DISA."
+      ],
+      "parent_context": "Under the authority, direction, and control of the DoD Chief Information Officer, and in addition to the responsibilities in Paragraph 2.4., the Director, DISA: Maintains all DoD information technology, cloud computing, and managed data services and ensures that they are: Assessed for vulnerabilities and documented in a vulnerability assessment report with recommendations to support the implementation of security measures to address vulnerabilities. Assigned an assurance category and documented in the category assurance list (CAL). Develops, coordinates, reviews, and approves the PPSM CCB Char",
+      "source_pdf": "DODI 8551.01.pdf",
+      "chunk_id": 9,
+      "requirement_id": "REQ-83e0959ff094",
+      "run_dir": "DODI 8551.01_20260730_224254",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9507
+    },
+    {
+      "source_quote": "Members  shall submit  this  form  to  the  appropriate  servicing  personnel  function  (e.g.,  Force Support Squadron, Military Personnel Flight, or equivalent) to update their personnel record, after the supervisor and commander signs the form.",
+      "description": "Members shall submit this form to update their personnel record after supervisor and commander signatures.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "PROCEDURES, EXCEPTIONS, AND WAIVERS",
+        "4.1. Normal and Amplified Procedures"
+      ],
+      "parent_context": "4.1.1.  DAF  civilian  and  military  personnel  are  qualified  after  meeting  foundational  and residential  requirements  within  12  months  of  assignment  to  their  cyberspace  duties;  (2) publication  of  this  manual;  and  (3)  the  position  has  been  fully  transitioned  to  DCWF. Completion of foundational requirements must be accomplished within the first nine months. Completion of residential requirements may be accomplished concurrently or after completion of foundational requirements. 4.1.2.  Maintenance of qualification requires meeting a continuing education requirement o",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 79,
+      "requirement_id": "REQ-fd9e0b303990",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9707
+    },
+    {
+      "source_quote": "This prevents unauthorized access to resources and also helps prevent one guest OS from injecting malware into another, such as infecting a guest OS's files or placing malware code into another guest OS's memory.",
+      "description": "This prevents unauthorized access to resources and also helps prevent one guest OS from injecting malware into another, such as infecting a guest OS's files or placing malware code into another guest OS's memory.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "3. Virtualization Security Overview",
+        "3.1 Guest OS Isolation"
+      ],
+      "parent_context": "The hypervisor is responsible for managing guest OS access to hardware (e.g., CPU, memory, storage). The hypervisor partitions these resources so that each guest OS can access its own resources but cannot encroach on the other guest OSs' resources or any resources not allocated for virtualization use. This prevents unauthorized access to resources and also helps prevent one guest OS from injecting malware into another, such as infecting a guest OS's files or placing malware code into another guest OS's memory. Separately, partitioning can also reduce the threat of denial of service conditions ",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 49,
+      "requirement_id": "REQ-9e3c4a1edae3",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.916
+    },
+    {
+      "source_quote": "will establish memorandums of agreement with user agencies to ensure accurate assignment of responsibility, accountability, and resources.",
+      "description": "will establish memorandums of agreement with user agencies to ensure accurate assignment of responsibility, accountability, and resources",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "GENERAL ROLES AND RESPONSIBILITIES",
+        "2.2. Responsibilities.",
+        "2.2.4. Deputy Chief of Staff for Operations ( AF/A3 ) will:"
+      ],
+      "parent_context": "2.2.4.1.  As lead for the AF continuity of operations policy and programs, coordinate with AF/A10 and Chief, Information Dominance and Chief Information Officer ( SAF/CIO A6 ) for AF continuity of operations communications requirements. 2.2.4.2.  As HAF lead for AF operational reporting, provide guidance to and coordinate with  AFGSC for  AN/USQ-225 weapon system  operational  reporting  requirements  and processes. 2.2.4.3.  As HAF lead for conventional command and control (C2) and operations, assist in  the  integration  of  nuclear  and  conventional  forces  into  NC3  operational  strateg",
+      "source_pdf": "afi13-550.pdf",
+      "chunk_id": 29,
+      "requirement_id": "REQ-7fcb21ba016f",
+      "run_dir": "afi13-550_20260730_224256",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9458
+    },
+    {
+      "source_quote": "Implementation of SLAs for tactical edge and non-tactical edge networks shall not impact network or mission effectiveness.",
+      "description": "Implementation of SLAs for tactical edge and non-tactical edge networks shall not impact network or mission effectiveness.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "4.  SLAs"
+      ],
+      "parent_context": "NM systems shall be located within the network topology in a manner that ensures they can monitor and report on SLA compliance. NM SLAs shall at a minimum address the following areas identified in International Telecommunications Union - Telecommunications Recommendation M.3342 (Reference (z)) and TM Forum GB917 Release 3.0 (Reference (aa)): Identification of the organizations between which the agreement is established, to include technical and organizational points of contact. A description of the NM services that will be provided along with scope, limitations, and other terms of reference th",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 34,
+      "requirement_id": "REQ-fd23f59eb131",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.2507
+    },
+    {
+      "source_quote": "These systems shall not be connected to the base network/NIPRNET with the privileges of '.mil' registered users.",
+      "description": "These systems shall not be connected to the base network/NIPRNET with the privileges of '.mil' registered users.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "COMMERCIAL INTERNET SERVICE PROVIDER (ISP)",
+        "3.1. Commercial Internet Service Provider (CISP) Connection"
+      ],
+      "parent_context": "3.1.1.  Types. CISP connections do not connect to the AF Information Network infrastructure and  require  authorization  through  the  DoD  and  AF  DISN  waiver  process.  Information Services  (ISs)  that  process,  store  and  transmit  DoD  data  using  a  CISP  connection  must perform categorization in accordance with DoDI 8510.01 tailored appropriately to determine the  set  of  security  controls  to  be  implemented  with  the  approval  of  the  IS's  Authorizing Official (AO).  Tailoring of security controls must take into account the sensitivity of the data being  processed,  store",
+      "source_pdf": "afman17-2101.pdf",
+      "chunk_id": 48,
+      "requirement_id": "REQ-57cc2bff546c",
+      "run_dir": "afman17-2101_20260730_224258",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8718
+    },
+    {
+      "source_quote": "Execute the AF CAIP process by identifying, nominating, and validating Tier 1 and Tier 2 TCAs supporting assigned missions and documenting approved TCAs in the AF CARM system of record as required.",
+      "description": "Execute the AF CAIP process by identifying, nominating, and validating Tier 1 and Tier 2 TCAs supporting assigned missions and documenting approved TCAs in the AF CARM system of record as required.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "ROLES AND RESPONSIBILITIES",
+        "2.17. MAJCOM/DRUs."
+      ],
+      "parent_context": "2.17.1.  Establish  a  CARM  program  office  within  the  Headquarters  organization  for  the purpose of identifying, assessing, analyzing, and managing mission risk to AF TCAs. 2.17.1.1.  Any organization which can demonstrate a lack of TCAs will be exempt from CARM programmatic responsibilities. 2.17.2.  Appoint  a  primary  and  alternate  CARM  POC  on  an  annual  basis,  in  writing,  to manage their overall CARM program.  A copy of the appointment letter will be provided to the HAF CARM Program office. ( T-1 )  In addition: 2.17.2.1.  MAJCOM/DRU CARM program appointed personnel must p",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 52,
+      "requirement_id": "REQ-d3ddd4c12a9d",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.96
+    },
+    {
+      "source_quote": "I will not share the administrative or root account(s), passwords, and other authenticator(s) entrusted for my use.",
+      "description": "Do not share administrative or root account(s), passwords, and other authenticator(s) entrusted for your use.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "Figure A2.3.  Privileged User Agreement Addendum"
+      ],
+      "parent_context": "I understand, acknowledge and consent to the following: I am accessing a U.S. Government Information System (which includes any device attached to this Information System) that is provided for U.S. Government authorized used only. The U.S. Government routinely intercepts and monitors communications on this Information System for purposes including, but not limited to, penetration testing, Information Systems Security Monitoring, network operations and defense, personnel misconduct, law enforcement and counterintelligence investigations. The U.S. Government may inspect and seize data stored on ",
+      "source_pdf": "dafman17-1305.pdf",
+      "chunk_id": 105,
+      "requirement_id": "REQ-7b7cbb7ef5b7",
+      "run_dir": "dafman17-1305_20260730_224300",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.2893
+    },
+    {
+      "source_quote": "Access to the various types of storage that a guest OS has access to should be controlled as it would be if the storage",
+      "description": "Access to the various types of storage that a guest OS has access to should be controlled as it would be if the storage",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "2. Introduction to Full Virtualization",
+        "2.3 Virtualizing Hardware",
+        "2.3.2 Virtualized Storage"
+      ],
+      "parent_context": "Hypervisor systems have many ways of simulating disk storage for guest OSs. All hypervisors, at a minimum, have virtual hard drives, while some of them also have more advanced virtual storage options. In addition, some hypervisors can use advanced storage interfaces on the host system, such as networkattached storage (NAS) and storage area networks (SAN) to present different storage options to the guest OSs. This section describes those options. All hypervisors in common use present the guest OSs with virtual hard drives though the use of disk images. A disk image is a file on the host that lo",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 35,
+      "requirement_id": "REQ-e026f6b5506a",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.8728
+    },
+    {
+      "source_quote": "DoD is not using this structure in its initial implementation phase.",
+      "description": "DoD is not using this structure in its initial implementation phase.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "TERM DEFINITION"
+      ],
+      "parent_context": "contract Defined in Section 252.204- 2008 and 7012 of the FARS/DFARS. controlled environment Defined in Section 2002.4 of Title 32 CFR controls Defined in Section 2002.4 of Title 32 CFR CNSI Defined in E.O. 13526. CPM Defined in Section 2002.4 of Title 32 CFR",
+      "source_pdf": "DODI 5200.48.pdf",
+      "chunk_id": 90,
+      "requirement_id": "REQ-69fe659699bb",
+      "run_dir": "DODI 5200.48_20260730_224252",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.3312
+    },
+    {
+      "source_quote": "Develop and implement DoD Component-specific TSN and ICT SCRM training.",
+      "description": "Develop and implement DoD Component-specific TSN and ICT SCRM training.",
+      "label": "faithful",
+      "notes": "Random sample from post-fix clean-pool output (not flagged by either fabrication heuristic); skimmed by hand, not individually annotated.",
+      "section_title_path": [
+        "The DoD CIO:",
+        "2.9.  DOD COMPONENT HEADS."
+      ],
+      "parent_context": "The DoD Component heads: Establish and maintain an operational TSN program to enable risk owners to identify, assess, and manage engineering risks. Establish and maintain an operational ICT SCRM program to enable acquisition risk owners to identify, assess, and manage ICT supply chain risks. Integrate engineering, acquisition, intelligence, counterintelligence, security, and risk management into DoD Component-level TSN and ICT SCRM activities and incorporate enterprise resources as appropriate. Designate a focal point and resources to represent the acquisition executive; risk management execut",
+      "source_pdf": "DODI 5200.44.pdf",
+      "chunk_id": 29,
+      "requirement_id": "REQ-b3dfe230a02b",
+      "run_dir": "DODI 5200.44_20260730_220819",
+      "source": "wp_35_1_harvest",
+      "support_prob": 0.9269
+    }
+  ]
+}

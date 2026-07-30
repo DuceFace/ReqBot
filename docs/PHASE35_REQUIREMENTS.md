@@ -17,7 +17,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-35.1 — Build a Labeled Calibration Dataset for Description Faithfulness | Complete |
-| WP-35.2 — Threshold Calibration Sweep | Not started |
+| WP-35.2 — Threshold Calibration Sweep | Complete |
 | WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Not started |
 | WP-35.4 — Production Step D.5/D.6 Entailment Gate | Not started |
 | WP-35.5 — Integration Gate | Not started |
@@ -319,6 +319,48 @@ independently-built data the way WP-32.1 did before picking `QUOTE_GROUNDING_THR
 at WP-35.1's dataset scale, not asserted from WP-34.4's 15-pair result alone — and the sweep report
 honestly states whether that evidence is strong enough to be confident, or whether it's provisional
 given the thin independent fabricated partition.
+
+**Findings (2026-07-30/31):**
+
+- `eval/threshold_sweep.py` scores all 108 `eval/gold_description_grounding.jsonl` records with
+  MiniCheck (`flan-t5-large`, same checkpoint as WP-34.4's spike) and sweeps `support_prob`
+  thresholds from 0.05 to 0.95 in 0.05 steps, filtered to `source == "wp_35_1_harvest"` (8
+  fabricated, 92 faithful) for the primary statistics, with the 8 `wp_34_4_spike` records checked
+  separately as a regression test — matching the Scope above exactly.
+- **The naive "maximize catch rate" selection would have picked a bad threshold, and the sweep
+  caught it.** The first version of this script picked whichever threshold first reached 100% catch
+  rate on the independent partition — 0.95 — without weighing the cost. That threshold does catch
+  all 8 fabricated examples, but at a 58.7% false-positive rate (54 of 92 faithful descriptions
+  wrongly rejected), a number that would make the check unusable in production. Fixed before this
+  section was written up: selection now picks the highest catch rate among thresholds with a
+  false-positive rate ≤ 10% (a documented judgment call, not derived from the data), mirroring
+  `QUOTE_GROUNDING_THRESHOLD`'s own diminishing-returns reasoning.
+- **Chosen threshold: `support_prob < 0.85` → reject.** 87.5% catch rate (7/8), 5.4% false-positive
+  rate (5/92). One step up (`0.9`) gives the *same* catch rate (7/8) at more than double the
+  false-positive rate (13.0%) — a clean, real diminishing-returns cliff, not an arbitrary cutoff.
+- **The one miss at 0.85 is the exact case WP-35.3 exists to catch.** Per-subtype catch rate:
+  `fabricated_citation` 3/3, `fabricated_fragment` 1/1, `fabricated_other` 2/2,
+  `fabricated_modality` **1/2**. The missed modality example scores high because its factual content
+  genuinely is grounded — only the invented obligation isn't — precisely the entailment-score
+  blind spot Gap 2 (§1) and WP-35.3 describe. This is real, current evidence (not just the one
+  historical Codex-caught spike example) that the two-layer design (entailment threshold + separate
+  modality check) is necessary, not redundant.
+- **Regression check against the 8 `wp_34_4_spike` records: 7/8 correct at 0.85.** The one incorrect
+  classification is `REQ-a485fe91aa5f` (`afpd_definition_reframed_as_imperative`,
+  `support_prob=0.9197`) — the same known miss WP-34.4's own spike and Codex's PR #164 review
+  already found and named. Its continued miss here isn't a new problem; it's confirmation that
+  WP-35.3's secondary check is catching a gap the entailment score was never going to close on its
+  own, at any threshold (0.9197 is close enough to the faithful-side cluster that no reasonable
+  false-positive-rate cap would push the threshold that high).
+- **Confidence call: provisional, not a confident production calibration** — carried forward
+  explicitly per the Scope above, given the 8-example independent fabricated partition (documented
+  in WP-35.1's own Findings as a real, twice-confirmed data-scarcity result, not insufficient
+  search). WP-35.4 must not treat `0.85` as beyond-question final without acknowledging this.
+- Output: `eval/spike_results/wp_35_2/report.md` and `results.json` (full sweep table, per-subtype
+  breakdown, regression check, all 108 scored records). `eval/threshold_sweep.py` and
+  `tests/unit/test_threshold_sweep.py` (pure-logic tests for `sweep()`/`regression_check()`, added
+  proactively given how much scrutiny WP-35.1's harvester/builder scripts got for missing test
+  coverage) committed alongside.
 
 ---
 

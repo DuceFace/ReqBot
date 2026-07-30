@@ -119,13 +119,14 @@ def _is_modality_shaped(quote: str, description: str) -> bool:
     return bool(desc_only)
 
 
-def harvest(clean_sample_size: int) -> dict:
+def harvest(clean_sample_size: int, processed_dir: Path | None = None) -> dict:
+    target_dir = processed_dir or PROCESSED_DIR
     citation_fragment: list[dict] = []
     modality: list[dict] = []
     clean_pool: list[dict] = []
     seen: set[tuple] = set()
 
-    run_dirs = sorted(p for p in PROCESSED_DIR.iterdir() if p.is_dir()) if PROCESSED_DIR.exists() else []
+    run_dirs = sorted(p for p in target_dir.iterdir() if p.is_dir()) if target_dir.exists() else []
     runs_processed = 0
     for run_dir in run_dirs:
         ts = _run_timestamp(run_dir)
@@ -133,17 +134,25 @@ def harvest(clean_sample_size: int) -> dict:
         enriched_files = sorted(run_dir.glob("*_requirements_enriched.jsonl"))
         if not enriched_files:
             continue
-        runs_processed += 1
+        run_contributed = False
         with open(enriched_files[0], encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
-                rec = json.loads(line)
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    # A run's enriched file can still be mid-write (Step D.5
+                    # appends incrementally) -- the last line may be truncated.
+                    # Skip it rather than crash; the run still counts as
+                    # processed for whatever complete lines it did contribute.
+                    continue
                 quote = rec.get("source_quote") or ""
                 description = rec.get("description") or ""
                 if not quote or not description:
                     continue
+                run_contributed = True
                 dedup_key = (rec.get("source_pdf"), rec.get("chunk_id"), quote, description)
                 if dedup_key in seen:
                     continue
@@ -169,6 +178,8 @@ def harvest(clean_sample_size: int) -> dict:
                     modality.append(entry)
                 else:
                     clean_pool.append(entry)
+        if run_contributed:
+            runs_processed += 1
 
     post_fix_clean = [e for e in clean_pool if e["fix_status"] == "post_fix"]
     rng = random.Random(35_1)

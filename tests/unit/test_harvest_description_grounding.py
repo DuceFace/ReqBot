@@ -1,5 +1,6 @@
 """Unit tests for WP-35.1's candidate-harvesting heuristics."""
 import argparse
+import json
 
 import pytest
 
@@ -8,7 +9,13 @@ from eval.harvest_description_grounding_candidates import (
     _is_modality_shaped,
     _non_negative_int,
     _obligation_words_in,
+    harvest,
 )
+
+
+def _write_enriched(run_dir, filename, records_text):
+    run_dir.mkdir()
+    (run_dir / filename).write_text(records_text)
 
 # ---------------------------------------------------------------------------
 # _is_citation_fragment_shaped
@@ -154,3 +161,51 @@ def test_non_negative_int_rejects_negative():
 def test_non_negative_int_rejects_non_numeric():
     with pytest.raises(argparse.ArgumentTypeError):
         _non_negative_int("abc")
+
+
+# ---------------------------------------------------------------------------
+# harvest() -- run scanning, dedup, and robustness against in-progress runs
+# ---------------------------------------------------------------------------
+
+def test_harvest_against_missing_processed_dir(tmp_path):
+    result = harvest(clean_sample_size=5, processed_dir=tmp_path / "does-not-exist")
+    assert result["totals"]["run_dirs_found"] == 0
+    assert result["totals"]["runs_scanned"] == 0
+    assert result["totals"]["records_scanned"] == 0
+
+
+def test_harvest_excludes_empty_enriched_file_from_runs_scanned(tmp_path):
+    # A run directory whose enriched file exists but has zero records (e.g. a
+    # Step D.5 run that just created the file and hasn't written anything yet)
+    # must not count toward runs_scanned -- it contributed nothing.
+    _write_enriched(tmp_path / "doc1_20260101_000000", "doc1_requirements_enriched.jsonl", "")
+    result = harvest(clean_sample_size=5, processed_dir=tmp_path)
+    assert result["totals"]["run_dirs_found"] == 1
+    assert result["totals"]["runs_scanned"] == 0
+
+
+def test_harvest_skips_truncated_trailing_line_without_crashing(tmp_path):
+    # Step D.5 appends incrementally -- reading mid-write can catch a
+    # partially-written last line. Must skip it, not raise.
+    rec = {
+        "requirement_id": "REQ-1", "source_quote": "q", "description": "d",
+        "source_pdf": "doc2.pdf", "chunk_id": 0,
+    }
+    text = json.dumps(rec) + "\n" + '{"incomplete json'
+    _write_enriched(tmp_path / "doc2_20260730_150000", "doc2_requirements_enriched.jsonl", text)
+    result = harvest(clean_sample_size=5, processed_dir=tmp_path)
+    assert result["totals"]["runs_scanned"] == 1
+    assert result["totals"]["records_scanned"] == 1
+
+
+def test_harvest_dedups_identical_records_across_runs(tmp_path):
+    rec = {
+        "requirement_id": "REQ-1", "source_quote": "same quote", "description": "same description",
+        "source_pdf": "doc.pdf", "chunk_id": 0,
+    }
+    text = json.dumps(rec) + "\n"
+    _write_enriched(tmp_path / "doc_20260101_000000", "doc_requirements_enriched.jsonl", text)
+    _write_enriched(tmp_path / "doc_20260102_000000", "doc_requirements_enriched.jsonl", text)
+    result = harvest(clean_sample_size=5, processed_dir=tmp_path)
+    assert result["totals"]["records_scanned"] == 1
+    assert result["totals"]["runs_scanned"] == 2

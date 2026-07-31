@@ -21,7 +21,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-39.1 — Parent-Stem Context Loss Audit | Not started |
+| WP-39.1 — Parent-Stem Context Loss Audit | Complete |
 
 ---
 
@@ -218,15 +218,116 @@ known fragment shapes, backed by the traced examples and their evidence, with a 
 recommendation for what WP-39.2 (or later) should build — including whether one schema covers both
 shapes.
 
-**Findings:** _(pending — filled in once WP-39.1 runs)_
+**Findings (2026-07-31):**
+
+*Method.* Joined `eval/audit_wp38_1/labeled_failures.jsonl` (category/subtype labels) with
+`unbiased_sample.jsonl` (`chunk_id`, `source_pdf`, `document_id`, `document_hash_full`) by
+`requirement_id`, per this WP's revised Scope. Re-verified the local corpus against
+`source_manifest.json` first — still 0/13 documents drifted. Traced all 18 real FRAGMENT examples
+(12 `orphaned_list_item`, 6 `dangling_clause`) against their actual on-disk pipeline artifacts —
+`*_chunks.jsonl` (Step B raw text + ancestry), `*_extracted_requirements.jsonl` (Step C raw output)
+— and hand-classified each into a loss category, same discipline as WP-38.1's own hand-audit.
+Script and full classification (with per-example notes) committed at
+`eval/audit_wp39_1/trace_examples.py` and `eval/audit_wp39_1/classify_examples.py`.
+
+*Headline result: chunking is almost never the problem, and Step C's flat extraction schema is where
+context actually gets lost — but through three genuinely different mechanisms, not one.*
+
+| Category | Count | What it means |
+|---|---:|---|
+| `SAME_CHUNK_STEM_EXTRACTED` | 7 | The stem/main clause is already a *separate* Step C record in the same chunk — just not linked to the fragment. Cheapest possible fix: pure proximity reconstruction against data already extracted, no LLM or chunking change needed. |
+| `STEM_NEVER_EXTRACTED` | 3 | The needed text is verbatim in the chunk's raw text, but Step C never extracted it as *any* record — truncated mid-sentence or skipped entirely. Needs either a Step C prompt/schema fix, or reconstruction straight from raw chunk text (bypassing Step C's output). |
+| `CROSS_CHUNK_SPLIT` | 2 | The stem is in a *different*, earlier chunk — confirmed directly for `REQ-cf527f39c8d7` (stem in `chunk_id=12`, item in `chunk_id=13`, `DODI 8551.01`). Exactly the failure mode Codex's PR #182 review warned the original "stop at first stage" methodology would miss. |
+| `CITATION_ONLY_NOT_A_TARGET` | 2 | A `"<term>, as defined in <citation>"` pointer — WP-38.2's `_is_definitional_citation_only()` already correctly rejects these. Not fragments needing reconstruction at all. |
+| `GARBLED_TABLE` | 2 | Chunk text is mangled, flattened tabular content (a table's rows/columns collapsed into run-on prose by Docling/chunking) — no clean stem sentence exists to recover. A genuinely harder problem needing table-structure-aware handling, not a `parent_stem` field. |
+| `HEADING_IS_SUBJECT` | 1 | The missing "stem" is really the section heading itself (`REQ-1b1071c8d317`: `parent_header_text` = `"2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."`) — the source document never states a separate subject sentence at all; the office name *is* the subject for every item under it. Already computed, already flows through every chunk record today — zero new engineering to *access* it, just needs to be recognized as a `parent_stem` candidate. |
+| `AMBIGUOUS_MAY_NOT_BE_REQ` | 1 | `REQ-364e0be72ebb`, `"Overview of programmatic and policy updates or changes."` — a bare noun-phrase item in a training-program topic list. Unclear a `parent_stem` even makes this an actionable requirement; closer to descriptive/topic content than a requirement missing context. Flagging rather than force-classifying. |
+
+*What this rules out, concretely:*
+- **Chunking is not the primary bottleneck.** 15 of 18 examples have their needed context in the
+  *same* chunk as the fragment (`SAME_CHUNK_STEM_EXTRACTED` + `STEM_NEVER_EXTRACTED` +
+  `HEADING_IS_SUBJECT`) — confirmed by reading `HybridChunker`'s actual output, not assumed from the
+  Phase Framing's architectural note above. Only 2/18 are genuine cross-chunk splits.
+- **Step C's own LLM input already contains the answer in the large majority of cases** — the model
+  had the full stem sentence in front of it (it's in the same chunk `raw_text` that gets sent as its
+  prompt input) and either extracted it as a separate, unlinked candidate (7 cases) or dropped it
+  outright (3 cases). Either way, **no chunking change is needed for 10 of these 18 examples** — the
+  fix is entirely about what Step C's *output schema* keeps, not what it *sees*.
+- **`_is_definitional_citation_only()` and the `_is_orphaned_list_item()`/`_is_dangling_clause()`
+  removal from WP-38.2 are both already doing the right thing** — the 2 `CITATION_ONLY_NOT_A_TARGET`
+  examples confirm those aren't reconstruction candidates, and the 3 examples WP-38.2 explicitly chose
+  *not* to reject (per Tyler's product call) are exactly the ones this audit shows have recoverable
+  context sitting one hop away.
+
+*Step D and embedding, confirmed directly from code, not assumed:*
+- Step D (`pipeline/parse_and_normalize.py`) doesn't touch any of this — it operates only on
+  `source_quote` and the fields already in the record; a hypothetical `parent_stem` field would pass
+  through untouched today (there's nothing in `run()` that would drop an extra field).
+- Embedding (`pipeline/embed_and_index.py`'s `build_embedding_text()`) confirmed by reading the code
+  directly: embeds `source_quote` plus an optional `\nRef: {source_ref}` suffix — **nothing else,
+  today.** Matches Codex's own independent verification during PR #182's review.
+
+*Retrieval check — real embeddings, not simulated (`nomic-embed-text` via the project's configured
+Ollama host), for one example per major category:*
+
+| Example | Category | Bare-quote similarity | With parent-stem | Delta |
+|---|---|---:|---:|---:|
+| `REQ-9700722b04cd` (`"shall be coordinated with the customer"`) | `SAME_CHUNK_STEM_EXTRACTED` | 0.5051 | 0.7690 | **+0.264** |
+| `REQ-c6aeb8df528b` (`"(3) Restrain competition."`) | `SAME_CHUNK_STEM_EXTRACTED` | 0.6727 | 0.7100 | +0.037 |
+| `REQ-1b1071c8d317` (CNDSP CA item) | `HEADING_IS_SUBJECT` | 0.7033 | 0.7061 | +0.003 |
+
+Each tested against a realistic query about that specific requirement (see
+`eval/audit_wp39_1/classify_examples.py` for exact text). The gain scales with how semantically empty
+the bare quote is on its own — largest where the fragment alone carries almost no domain content
+(`"shall be coordinated with the customer"` could be about anything), smallest where the bare quote
+already contains enough identifying detail that the missing subject barely matters for retrieval.
+This is a different intervention than WP-37.2's reverted contextual-embedding attempt — that
+prepended a heading chain to *every* record regardless of need and measurably regressed retrieval;
+this is a targeted, per-record addition only for records that are already known to be
+context-starved, and it doesn't touch the embedding text for the other 95%+ of the corpus that isn't
+fragmentary. No evidence found that WP-37.2's regression applies here — different mechanism, opposite
+scope (universal vs. targeted).
+
+*Recommendation for WP-39.2 (not built here, per this WP's Non-Goals):*
+1. **Don't touch Step C's LLM prompt.** Consistent with this project's standing preference for
+   deterministic fixes over LLM-reliability risk — 10 of the 15 real reconstruction candidates (all
+   of `SAME_CHUNK_STEM_EXTRACTED` + `HEADING_IS_SUBJECT`, plus both `CROSS_CHUNK_SPLIT` cases) are
+   solvable with **purely deterministic reconstruction against data already on disk today**: no model
+   call, no prompt engineering.
+2. Add a new deterministic reconstruction step (Step D or a new step between C and D) that, only for
+   records already flagged by the existing `_is_orphaned_list_item()`/`_is_dangling_clause()`
+   detectors, attempts — in order, falling through to "leave empty" rather than guessing:
+   a. the nearest preceding same-chunk Step C record that looks like a stem (ends in `:`, or
+      similar structural signal already established in `_is_unrepairable_fragment()`);
+   b. if not found, the same check against the *immediately preceding chunk* (same `document_id`,
+      sequential `chunk_id`) — covers the confirmed `CROSS_CHUNK_SPLIT` cases;
+   c. if still not found, fall back to `parent_header_text` directly — covers `HEADING_IS_SUBJECT`
+      at zero additional engineering cost, since that field already exists on every chunk record.
+3. Add `parent_stem` and `embedding_text` fields (Tyler's original schema, Phase Framing above);
+   update `build_embedding_text()` to prefer `embedding_text` when present, falling back to
+   `source_quote` — backward compatible, no reindex forced.
+4. **Leave `STEM_NEVER_EXTRACTED` (3 examples) and `GARBLED_TABLE` (2 examples) out of WP-39.2's
+   scope.** The former needs either a Step C fix (out of step with recommendation #1) or raw-chunk-text
+   stitching (a meaningfully different, riskier mechanism than steps 2a-2c); the latter needs
+   table-structure-aware handling, a different problem entirely. Both are real, but scoping them into
+   the same WP as the 10 cheap wins risks the whole WP stalling on the hard 30% instead of shipping
+   the easy, well-evidenced 70%. Worth their own future WP if the rate justifies it after WP-39.2
+   ships and the corpus is re-measured.
+5. `AMBIGUOUS_MAY_NOT_BE_REQ` (1 example): don't force a `parent_stem` guess onto it. If it stays
+   unrejected and unreconstructed after WP-39.2, that's the same "honest gap over false confidence"
+   discipline already established for `_is_orphaned_list_item()`'s bare-noun-phrase case in WP-38.2.
+
+*Not done, by design (per this WP's own Non-Goals):* no `parent_stem` reconstruction was
+implemented, no schema changed, no reindex run. This is audit output only.
 
 ---
 
 ## 5. Backlog (deferred, not WP-39.1)
 
-- **The reconstruction fix itself** (WP-39.2 or later, scoped from WP-39.1's actual findings) —
-  whatever shape the audit recommends: a schema addition threaded through Step C/D, a chunking-boundary
-  fix, or (only if warranted) embedding-layer work.
+- **The reconstruction fix itself** (WP-39.2 or later) — per WP-39.1's Findings above: a deterministic
+  `parent_stem`/`embedding_text` reconstruction step (same-chunk lookup → preceding-chunk lookup →
+  `parent_header_text` fallback), no Step C prompt change, scoped to the 10/18 traced examples with a
+  cheap, confident fix; the harder `STEM_NEVER_EXTRACTED` and `GARBLED_TABLE` shapes deferred further.
 - **Over-Grab Precision** — still open from Phase 38, unrelated to this phase's problem; see
   `docs/PHASE38_REQUIREMENTS.md`'s Backlog.
 
@@ -234,13 +335,16 @@ shapes.
 
 ## 6. Success Gate
 
-- [ ] WP-39.1's audit is complete: real per-stage evidence for both fragment shapes across at least
+- [x] WP-39.1's audit is complete: real per-stage evidence for both fragment shapes across at least
       the known WP-38.1-fixture examples, with a grounded recommendation — not assumed from Tyler's
-      framing alone.
+      framing alone. (All 18 examples traced against real on-disk pipeline artifacts, hand-classified
+      into 7 loss categories, committed at `eval/audit_wp39_1/`. Real retrieval-similarity check via
+      `nomic-embed-text`, not simulated.)
 - [ ] The recommendation is either acted on as a properly-scoped follow-up WP, or, if the audit finds
       the context is already unrecoverable or the fix doesn't move retrieval, a documented conclusion
       to that effect — an equally valid, equally evidenced outcome, not a failure to close the phase.
-- [ ] Full `pytest` suite and `ruff check .` clean throughout.
+- [x] Full `pytest` suite and `ruff check .` clean throughout. (792 tests passed; `ruff check .`
+      clean.)
 
 ---
 

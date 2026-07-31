@@ -27,7 +27,6 @@ Categories (see docs/PHASE39_REQUIREMENTS.md's WP-39.1 Findings for the full wri
                                  non-actionable already (WP-38.2's own rule), not a
                                  reconstruction candidate at all.
 """
-import json
 import math
 import sys
 from pathlib import Path
@@ -47,7 +46,7 @@ LABELS = {
     "REQ-c6aeb8df528b": ("SAME_CHUNK_STEM_EXTRACTED", "Same stem as REQ-626b98fef9aa (R-2-3), same chunk. Retrieval check: +0.037 similarity with a realistic query."),
     "REQ-3097aa5d306c": ("SAME_CHUNK_STEM_EXTRACTED", "Stem ('NM SLAs shall at a minimum address the following areas...') is R-31-1, same chunk."),
     "REQ-c6d23854cd0b": ("SAME_CHUNK_STEM_EXTRACTED", "Stem ('NM SLAs and other agreements shall establish baseline...') is R-34-3, same chunk."),
-    "REQ-48f549669bb2": ("CROSS_CHUNK_SPLIT", "Chunk 33's raw_text starts mid-list at marker '(b)' with no visible top-level stem -- the governing list opener is outside this chunk (deeper nesting than the other DODI 8410.03 examples)."),
+    "REQ-48f549669bb2": ("CROSS_CHUNK_SPLIT", "Confirmed directly (Codex review, PR #183: the original note only established the stem was absent from chunk 33, not that it was present one hop back -- checked chunk 32 explicitly): stem is '(5) How NM service levels will be monitored and reported...This section will define for all parties:' followed by '(a) The characteristics of the NM information to be exchanged...', in chunk_id=32; this item, '(b) Required NM data update rates.', continues the same (a)/(b)/(c)... sub-enumeration in chunk_id=33 -- confirmed one hop back, same as REQ-cf527f39c8d7."),
     "REQ-7464da5820b8": ("SAME_CHUNK_STEM_EXTRACTED", "Same stem as REQ-c6d23854cd0b (R-34-3), same chunk."),
     "REQ-cf527f39c8d7": ("CROSS_CHUNK_SPLIT", "Confirmed directly: stem ('b. Oversee their respective Component's PPSM program to:') is in chunk_id=12; this item ('(7) Communicate PPS securely...') is in chunk_id=13 -- a different chunk entirely."),
     "REQ-4523443092b8": ("CITATION_ONLY_NOT_A_TARGET", "'<term>, as defined in <citation>' pointer -- WP-38.2's _is_definitional_citation_only() already correctly rejects this; not a fragment needing reconstruction."),
@@ -73,14 +72,22 @@ def summarize():
 
 def retrieval_check():
     """Real embedding-similarity check via Ollama nomic-embed-text -- not simulated.
-    Requires network access to the Ollama host configured in CLAUDE.md.
+
+    Uses the project's own config loader (core.config.load(), the same
+    ~/.config/reqbot/config.json + REQBOT_OLLAMA_URL/REQBOT_EMBEDDING_MODEL resolution
+    every other reqbot command uses) instead of a hardcoded host -- a hardcoded
+    192.168.90.100 IP only works on this specific environment and breaks portability
+    (Gemini review, PR #183).
     """
     import ollama
 
-    client = ollama.Client(host="http://192.168.90.100:11434")
+    from core import config as reqbot_config
+
+    cfg = reqbot_config.load()
+    client = ollama.Client(host=cfg.ollama_url)
 
     def embed(text: str) -> list[float]:
-        return client.embed(model="nomic-embed-text", input=text).embeddings[0]
+        return client.embed(model=cfg.embedding_model, input=text).embeddings[0]
 
     def cos(a: list[float], b: list[float]) -> float:
         dot = sum(x * y for x, y in zip(a, b))

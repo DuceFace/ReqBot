@@ -19,6 +19,7 @@ matching WP-38.1's own hand-audit discipline. Output is read and classified by h
 not scored mechanically, because "is the parent stem present" requires judgment the
 same way WP-38.1's category labels did.
 """
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -27,8 +28,43 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from core.artifact_resolver import resolve_requirement_file
+
 PROCESSED_DIR = Path.home() / "documents" / "processed"
 FIXTURE_DIR = _ROOT / "eval" / "audit_wp38_1"
+
+
+def verify_corpus_against_manifest() -> None:
+    """Fail loudly if the local corpus has drifted from what
+    eval/audit_wp38_1/source_manifest.json was built from -- a re-ingest since then
+    can reassign chunk_id values, silently invalidating every downstream trace
+    (Codex review, PR #183: this check was described in docs/PHASE39_REQUIREMENTS.md's
+    Scope but never actually implemented in this script -- fixed here)."""
+    with open(FIXTURE_DIR / "source_manifest.json", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    drifted = []
+    for doc_key, info in manifest["documents"].items():
+        try:
+            req_path = resolve_requirement_file(PROCESSED_DIR, doc_key)
+        except ValueError:
+            drifted.append(f"{doc_key}: no longer resolvable under {PROCESSED_DIR}")
+            continue
+        if req_path.name != info["source_file"]:
+            drifted.append(f"{doc_key}: latest file is now {req_path.name!r}, manifest has {info['source_file']!r}")
+            continue
+        actual_hash = hashlib.sha256(req_path.read_bytes()).hexdigest()
+        if actual_hash != info["sha256"]:
+            drifted.append(f"{doc_key}: sha256 changed since the fixture was built (re-ingested?) -- {req_path}")
+
+    if drifted:
+        raise SystemExit(
+            "Local corpus has drifted from eval/audit_wp38_1/source_manifest.json -- "
+            "chunk_id values in unbiased_sample.jsonl are no longer guaranteed to match "
+            "the current on-disk chunks for the affected document(s). Re-match affected "
+            "records by document_hash_full + exact source_quote text before trusting any "
+            "chunk_id lookup, per this WP's Scope. Drifted:\n  " + "\n  ".join(drifted)
+        )
 
 
 def load_targets() -> dict:
@@ -59,10 +95,11 @@ def load_targets() -> dict:
 
 
 def resolve_doc_dir(doc_key: str) -> Path:
-    candidates = sorted(PROCESSED_DIR.glob(f"{doc_key}_*"))
-    if not candidates:
-        raise SystemExit(f"No processed directory found for doc_key={doc_key!r}")
-    return candidates[-1]
+    """Use the same 'latest run, best tier' resolver reindex/generate_samples.py use --
+    not a lexicographic-last glob (Codex review, PR #183: a plain directory-name sort
+    doesn't agree with 'latest' in every case and never cross-checked source_manifest.json
+    at all; verify_corpus_against_manifest() now does that check before this is called)."""
+    return resolve_requirement_file(PROCESSED_DIR, doc_key).parent
 
 
 def load_chunk(doc_dir: Path, doc_key: str, chunk_id: int) -> dict | None:
@@ -89,13 +126,27 @@ def load_step_c_records(doc_dir: Path, doc_key: str, chunk_id: int) -> list[dict
 
 
 def main():
+    verify_corpus_against_manifest()
     targets = load_targets()
     print(f"Tracing {len(targets)} known FRAGMENT examples\n{'=' * 100}\n")
 
-    for rid, rec in sorted(targets.items(), key=lambda kv: (kv[1]["subtype"], kv[1]["_doc_key"])):
+    # _doc_key/source_quote are unconditionally set by generate_samples.py for every
+    # record in unbiased_sample.jsonl (confirmed directly: 0/1872 missing either field
+    # today) -- but this script is a committed, reusable artifact, not a one-off, so
+    # fail loudly with a clear message rather than a bare KeyError/AttributeError if
+    # the fixture is ever regenerated without them (Gemini review, PR #183).
+    def sort_key(kv):
+        rid, rec = kv
+        doc_key = rec.get("_doc_key")
+        if not doc_key:
+            raise SystemExit(f"{rid}: missing _doc_key in unbiased_sample.jsonl record")
+        return (rec["subtype"], doc_key)
+
+    for rid, rec in sorted(targets.items(), key=sort_key):
         doc_key = rec["_doc_key"]
         chunk_id = rec["chunk_id"]
         doc_dir = resolve_doc_dir(doc_key)
+        target_quote = (rec.get("source_quote") or "").strip()
 
         print(f"### {rid}  [{rec['subtype']}]  doc={doc_key}  chunk_id={chunk_id}")
         print(f"source_quote: {rec['source_quote']!r}")
@@ -115,7 +166,8 @@ def main():
         step_c = load_step_c_records(doc_dir, doc_key, chunk_id)
         print(f"--- Step C output for this chunk ({len(step_c)} candidate records) ---")
         for c in step_c:
-            marker = " <== THIS EXAMPLE" if c.get("source_quote", "").strip() == rec["source_quote"].strip() else ""
+            candidate_quote = (c.get("source_quote") or "").strip()
+            marker = " <== THIS EXAMPLE" if candidate_quote == target_quote else ""
             print(f"  {c.get('requirement_id')}: {c.get('source_quote', '')[:110]!r}{marker}")
 
         print(f"\n{'=' * 100}\n")

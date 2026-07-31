@@ -237,17 +237,24 @@ context actually gets lost — but through three genuinely different mechanisms,
 |---|---:|---|
 | `SAME_CHUNK_STEM_EXTRACTED` | 7 | The stem/main clause is already a *separate* Step C record in the same chunk — just not linked to the fragment. Cheapest possible fix: pure proximity reconstruction against data already extracted, no LLM or chunking change needed. |
 | `STEM_NEVER_EXTRACTED` | 3 | The needed text is verbatim in the chunk's raw text, but Step C never extracted it as *any* record — truncated mid-sentence or skipped entirely. Needs either a Step C prompt/schema fix, or reconstruction straight from raw chunk text (bypassing Step C's output). |
-| `CROSS_CHUNK_SPLIT` | 2 | The stem is in a *different*, earlier chunk — confirmed directly for `REQ-cf527f39c8d7` (stem in `chunk_id=12`, item in `chunk_id=13`, `DODI 8551.01`). Exactly the failure mode Codex's PR #182 review warned the original "stop at first stage" methodology would miss. |
+| `CROSS_CHUNK_SPLIT` | 2 | The stem is in a *different*, earlier chunk — confirmed directly for both examples by loading the preceding chunk, not inferred from absence: `REQ-cf527f39c8d7` (stem in `chunk_id=12`, item in `chunk_id=13`, `DODI 8551.01`) and `REQ-48f549669bb2` (stem in `chunk_id=32`, item in `chunk_id=33`, `DODI 8410.03` — this second one was originally asserted without checking the preceding chunk at all; Codex's review of PR #183 caught that gap, and checking it directly confirmed the stem really is one hop back). Exactly the failure mode Codex's PR #182 review warned the original "stop at first stage" methodology would miss. |
 | `CITATION_ONLY_NOT_A_TARGET` | 2 | A `"<term>, as defined in <citation>"` pointer — WP-38.2's `_is_definitional_citation_only()` already correctly rejects these. Not fragments needing reconstruction at all. |
-| `GARBLED_TABLE` | 2 | Chunk text is mangled, flattened tabular content (a table's rows/columns collapsed into run-on prose by Docling/chunking) — no clean stem sentence exists to recover. A genuinely harder problem needing table-structure-aware handling, not a `parent_stem` field. |
+| `GARBLED_TABLE` | 2 | Chunk text is mangled, flattened tabular content — but confirmed via directly re-running Docling on the source page (`eval/audit_wp39_1/check_garbled_table_source.py`, added after Codex's review of PR #183 pointed out the original audit never actually loaded the raw `DoclingDocument` for these) that **the mangling is not a Docling parsing failure**: Docling correctly labels this a `table` item, and `table.export_to_dataframe()` returns real, distinct row values (`"Detection of Events"`, `"Preliminary Analysis & Identification"`, ...). The corruption is introduced by `chunk_text.py`'s handling of body-label items, which serializes tables the same generic way as flowing prose instead of using Docling's own structured table export. Still a genuinely different problem from the other categories (needs table-aware serialization, not a `parent_stem` field) — but a more tractable one than "Docling parsed this badly" would have implied, since the real structure already exists one function call away. |
 | `HEADING_IS_SUBJECT` | 1 | The missing "stem" is really the section heading itself (`REQ-1b1071c8d317`: `parent_header_text` = `"2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."`) — the source document never states a separate subject sentence at all; the office name *is* the subject for every item under it. Already computed, already flows through every chunk record today — zero new engineering to *access* it, just needs to be recognized as a `parent_stem` candidate. |
 | `AMBIGUOUS_MAY_NOT_BE_REQ` | 1 | `REQ-364e0be72ebb`, `"Overview of programmatic and policy updates or changes."` — a bare noun-phrase item in a training-program topic list. Unclear a `parent_stem` even makes this an actionable requirement; closer to descriptive/topic content than a requirement missing context. Flagging rather than force-classifying. |
 
-*What this rules out, concretely:*
-- **Chunking is not the primary bottleneck.** 15 of 18 examples have their needed context in the
-  *same* chunk as the fragment (`SAME_CHUNK_STEM_EXTRACTED` + `STEM_NEVER_EXTRACTED` +
-  `HEADING_IS_SUBJECT`) — confirmed by reading `HybridChunker`'s actual output, not assumed from the
-  Phase Framing's architectural note above. Only 2/18 are genuine cross-chunk splits.
+*What this rules out, concretely (corrected after Codex's review, PR #183, caught the original count
+here — this table's own 7 + 3 + 1 was written up as "15," not 11):*
+- **Chunking is not the primary bottleneck.** 10 of 18 examples (`SAME_CHUNK_STEM_EXTRACTED`'s 7 +
+  `STEM_NEVER_EXTRACTED`'s 3) have their needed context in the *same* chunk as the fragment —
+  confirmed by reading `HybridChunker`'s actual output, not assumed from the Phase Framing's
+  architectural note above. `HEADING_IS_SUBJECT`'s 1 example needs no chunk lookup at all (the context
+  is `parent_header_text`, already on the record regardless of chunking). 11 of 18 total need no
+  chunking fix of any kind. Only 2/18 are genuine cross-chunk splits — and both were confirmed by
+  directly checking the adjacent chunk, not inferred from absence alone: the first version of this
+  audit asserted `REQ-48f549669bb2` was cross-chunk without actually loading the preceding chunk to
+  check (also caught by Codex's review). It's since been verified directly — the stem really is there,
+  one hop back, same as the other confirmed case.
 - **Step C's own LLM input already contains the answer in the large majority of cases** — the model
   had the full stem sentence in front of it (it's in the same chunk `raw_text` that gets sent as its
   prompt input) and either extracted it as a separate, unlinked candidate (7 cases) or dropped it
@@ -260,9 +267,12 @@ context actually gets lost — but through three genuinely different mechanisms,
   context sitting one hop away.
 
 *Step D and embedding, confirmed directly from code, not assumed:*
-- Step D (`pipeline/parse_and_normalize.py`) doesn't touch any of this — it operates only on
-  `source_quote` and the fields already in the record; a hypothetical `parent_stem` field would pass
-  through untouched today (there's nothing in `run()` that would drop an extra field).
+- Step D (`pipeline/parse_and_normalize.py`) doesn't currently *reject* anything based on this — but
+  it also would **not** pass a hypothetical `parent_stem` field through: `run()` builds its
+  `normalized` output dict from an explicit field literal, not a passthrough of the incoming record,
+  so any field not named in that literal is silently dropped (corrected after Codex's review of PR
+  #183 — the original version of this bullet claimed the opposite; see the WP-39.2 recommendation
+  below for what this means for where reconstruction should live).
 - Embedding (`pipeline/embed_and_index.py`'s `build_embedding_text()`) confirmed by reading the code
   directly: embeds `source_quote` plus an optional `\nRef: {source_ref}` suffix — **nothing else,
   today.** Matches Codex's own independent verification during PR #182's review.
@@ -294,17 +304,29 @@ scope (universal vs. targeted).
    of `SAME_CHUNK_STEM_EXTRACTED` + `HEADING_IS_SUBJECT`, plus both `CROSS_CHUNK_SPLIT` cases) are
    solvable with **purely deterministic reconstruction against data already on disk today**: no model
    call, no prompt engineering.
-2. Add a new deterministic reconstruction step (Step D or a new step between C and D) that, only for
-   records already flagged by the existing `_is_orphaned_list_item()`/`_is_dangling_clause()`
-   detectors, attempts — in order, falling through to "leave empty" rather than guessing:
+2. **Placement matters and needs to be decided explicitly, not left implicit** (Codex review, PR
+   #183: the original draft here said "Step D or a new step between C and D" as if those were
+   interchangeable — they aren't. `parse_and_normalize.py`'s `run()` builds its `normalized` output
+   from an explicit field literal, not a passthrough of the incoming record — a new
+   `parent_stem`/`embedding_text` field placed *before* Step D would be silently dropped unless Step
+   D's own schema is also updated to carry it through). Two real options, not one:
+   a. Add the reconstruction logic *inside* Step D, with `parent_stem`/`embedding_text` added to
+      `run()`'s `normalized` field literal directly; or
+   b. Run reconstruction as a separate step *after* Step D, reading `*_requirements_normalized.jsonl`
+      (which already has `chunk_id` on every record) and writing the new fields onto its own output
+      — no changes to `parse_and_normalize.py` at all.
+      (b) is probably cleaner (zero risk to Step D's existing, already-tested rejection logic) and is
+   this WP's recommendation, but WP-39.2 should make the call explicitly rather than assume either.
+3. Whichever placement is chosen, the reconstruction step attempts — only for records already flagged
+   by the existing `_is_orphaned_list_item()`/`_is_dangling_clause()` detectors, in order, falling
+   through to "leave empty" rather than guessing:
    a. the nearest preceding same-chunk Step C record that looks like a stem (ends in `:`, or
       similar structural signal already established in `_is_unrepairable_fragment()`);
    b. if not found, the same check against the *immediately preceding chunk* (same `document_id`,
       sequential `chunk_id`) — covers the confirmed `CROSS_CHUNK_SPLIT` cases;
    c. if still not found, fall back to `parent_header_text` directly — covers `HEADING_IS_SUBJECT`
       at zero additional engineering cost, since that field already exists on every chunk record.
-3. Add `parent_stem` and `embedding_text` fields (Tyler's original schema, Phase Framing above);
-   update `build_embedding_text()` to prefer `embedding_text` when present, falling back to
+   Then update `build_embedding_text()` to prefer `embedding_text` when present, falling back to
    `source_quote` — backward compatible, no reindex forced.
 4. **Leave `STEM_NEVER_EXTRACTED` (3 examples) and `GARBLED_TABLE` (2 examples) out of WP-39.2's
    scope.** The former needs either a Step C fix (out of step with recommendation #1) or raw-chunk-text

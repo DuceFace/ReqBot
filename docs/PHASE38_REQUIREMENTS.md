@@ -545,6 +545,29 @@ in full, not glossed over:*
   predicate locally instead of importing the live function — confirmed the script now reproduces the
   original `{NOT_COVERED_BY_DESIGN: 46, REAL_GAP: 3}` split exactly.
 
+*Round 3 (Gemini, re-reviewing the round-2 fix commit):*
+- **[High] Empty-remainder truthiness bug in `_is_orphaned_list_item()`** — the marker-match branch
+  used `if remainder and len(remainder.split()) <= N`, so a bare marker with *zero* words after it
+  (e.g. `"(1)"` alone) was treated as "no marker match" and let through unrejected — backwards from
+  every other point on this scale (a short remainder is correctly rejected; zero words is strictly
+  less content, not more). Removed the `remainder and` guard.
+
+*Round 4 (Gemini, re-reviewing the round-3 fix commit):*
+- **[Medium] Fixed punctuation-strip set missed quotes/brackets** — `_looks_like_citation_reference()`
+  stripped a fixed set of characters (originally just `",.()"`) to find each word's real first
+  letter; a lowercase prose word wrapped in quotes (e.g. `"'applies within the DoD'"`) had its
+  leading quote mark tested instead of the real first letter, misclassifying it as citation-shaped.
+  Generalized to stripping *any* non-alphanumeric character from both ends (`_NON_ALNUM_EDGE_RE`)
+  instead of growing an enumerated set one character at a time — closes the whole class of gap, not
+  just the one example found this round. Reused proactively in `_is_dangling_clause()`'s first-word
+  extraction too, before it was even flagged there.
+
+*Round 5 (Gemini, re-reviewing the round-4 fix commit):*
+- **[High] `_is_dangling_clause()` rejected real interrogative requirements** — a genuine question
+  starting with a bare copula (e.g. `"Is the system owner responsible for annual recertification?"`)
+  is a complete, self-contained requirement despite matching the bare-copula-opener signal. Added a
+  `?`-detection exemption (initially checking only the trailing non-alphanumeric run of the string).
+
 *Round 6 (Gemini, re-reviewing the round-5 fix commit) — four more findings, three real bugs and
 one hygiene issue:*
 - **[High] ALL-CAPS quotes broke the citation structural check** — `_looks_like_citation_reference()`
@@ -575,6 +598,67 @@ one hygiene issue:*
   default encoding isn't UTF-8. Fixed every instance found across all four WP-38 eval scripts in one
   pass (grepped for the pattern, not just the one file flagged), not just the file Gemini's finding
   named.
+
+*Round 7 (Gemini, re-reviewing the round-6 fix commit):*
+- **[Medium] Round 5's `?`-exemption only checked the trailing non-alphanumeric run** — a real
+  question followed by a trailing parenthetical or control-ID note after the `?` (e.g. `"Is
+  multi-factor authentication enforced? (see NIST SP 800-53)"`) has content after the `?`, so a
+  check scoped to only the string's trailing non-alphanumeric run missed it. Simplified to a
+  whole-string `"?" in stripped` check — safe here since this function only ever fires on an
+  already-narrow bare-copula-first-word trigger, so there's no reason to scope the exemption any
+  narrower than the signal being tested for.
+
+*Round 8 (Gemini, re-reviewing the round-7 fix commit):*
+- **[Medium] Round 6's own ALL-CAPS fix had the wrong scope, checking `remainder.isupper()` instead
+  of `source_quote.isupper()`** — a self-introduced regression: a short, genuine citation-only
+  remainder made purely of acronym/document-ID tokens (e.g. `"Term, as defined in CNSSI 4009."`) is
+  *also* all-uppercase on its own even though the rest of the quote (`"Term,"`) isn't, so round 6's
+  narrower check wrongly bailed out on (failed to reject) real citation-only fragments too. Widened
+  the guard to check the whole quote's casing instead — caught by Gemini's own next automatic
+  re-review of a fix I introduced, demonstrating the iterate-until-clean process catching its own
+  fixes' bugs, not just external findings.
+
+*Round 9 (Gemini, re-reviewing the round-8 fix commit):* no new findings — first fully clean pass
+after 8 rounds of real, verified fixes. Confirmed it specifically re-checked every prior round's
+fixed edge case (None inputs, ALL-CAPS quotes, quoted/bracketed prose, interrogative requirements,
+non-space whitespace, historical script pinning, UTF-8 encoding) rather than a shallow pass.
+
+*Codex, local review of PR #181 (run outside the GitHub review bots, reported directly by Tyler) —
+two findings, both verified via direct execution before acting on either:*
+- **[High] Confirmed via execution: `_is_orphaned_list_item()` still rejects genuinely complete
+  2-word directives** (`"(1) Encrypt CUI."`, `"(2) Patch systems."`, `"(a) Report incidents."`) at
+  the current threshold of 2. This is the fourth round raising the same marker+word-count tension
+  (rounds 1, 6, and now this one) — confirmed by reading `REQ-c6aeb8df528b`'s real source context
+  that the one verified real catch, `"(3) Restrain competition."`, is structurally identical in
+  shape (marker + 2-word verb+object + period) to Codex's counter-examples; no text-level signal
+  distinguishes a directive that needs its missing governing clause from one that doesn't. The
+  threshold is already at its floor — 1 would drop the one verified real catch to a bare-marker-only
+  rule, and raising it re-admits round 6's earlier 3-word hypotheticals. Put to Tyler directly as a
+  genuine precision/recall product decision rather than re-deciding it unilaterally a fourth time
+  with the same reasoning: **kept as-is**, on the strength of zero real false positives found across
+  two independent full-corpus sweeps (1,872 records) against only constructed counter-examples so
+  far. Pinned as an explicit, documented, accepted trade-off — both in
+  `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS`'s own comment and in a dedicated regression test
+  (`test_is_orphaned_list_item_true_for_short_directive_known_accepted_risk`) — so it reads as a
+  deliberate decision, not an unnoticed gap, if ever revisited.
+- **[High] Confirmed via execution: `_is_definitional_citation_only()` still discarded real
+  requirements whose citation opener is normal/title case but whose governing clause happens to be
+  rendered in ALL CAPS** (e.g. `"Compliance data, as defined in DODI 2000.26, SHALL BE REPORTED
+  IMMEDIATELY TO THE ISSO."`) — round 8's guard only fired when the *whole quote* was uppercase, and
+  neither the whole quote nor even the whole remainder is uppercase here (the citation portion,
+  `"DODI 2000.26,"`, isn't), so every word of a real, independent obligation clause still got
+  misclassified as citation-shaped. One of Codex's three examples went further and mixed a
+  title-case citation (`"Executive Order 13556"`) with an all-caps clause in the very same
+  remainder, which a simple `remainder.isupper()` check (round 6's original approach) wouldn't have
+  caught either. Replaced the whole-string uppercase checks from both round 6 and round 8 with a
+  structural signal: flag a run of 3+ *consecutive* all-caps multi-letter words (skipping over, not
+  resetting on, recognized connector words, since a real clause naturally contains "TO"/"THE"
+  mid-run) as unreliable to classify by case. A real citation's acronyms appear as isolated all-caps
+  tokens breaking up otherwise mixed-case document titles and numbers (`"NIST SP 800-53"` is the
+  longest run in this corpus, at 2); a "shouted" clause is a long consecutive run (`"SHALL BE
+  REPORTED IMMEDIATELY..."` runs to 5). Verified directly against all three of Codex's examples plus
+  every prior round's test case (round 6's regression test, round 8's three short-citation
+  positives, the multi-document citation test) before adopting this — all pass.
 
 All fixes re-verified against both the fixture (`eval/verify_wp38_2_rules.py`, still 0 regressions /
 0 scope violations / 0 coverage regressions) and a fresh full-live-corpus sweep before considering

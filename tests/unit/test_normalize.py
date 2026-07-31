@@ -486,6 +486,27 @@ def test_is_orphaned_list_item_false_for_marker_short_but_self_contained():
     )
 
 
+def test_is_orphaned_list_item_true_for_short_directive_known_accepted_risk():
+    # Codex local review, PR #181 (fourth round of this exact tension --
+    # see ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS's comment in
+    # pipeline/parse_and_normalize.py): these are genuinely complete 2-word
+    # imperative directives, confirmed via execution to be wrongly rejected
+    # by the marker+word-count branch at threshold=2 -- structurally
+    # identical in shape to the one real, verified catch in this corpus
+    # ("(3) Restrain competition.", which needs a missing governing clause
+    # to be correctly understood). No text-level signal distinguishes the
+    # two shapes. Tyler's explicit call: keep the threshold as-is and accept
+    # this documented risk, on the strength of zero real false positives
+    # found across two full-corpus sweeps (1,872 records) -- only
+    # constructed counter-examples so far, never one found in real ingested
+    # documents. This test pins that accepted trade-off so it reads as a
+    # deliberate decision, not an unnoticed regression, if it's ever
+    # revisited.
+    assert _is_orphaned_list_item("(1) Encrypt CUI.")
+    assert _is_orphaned_list_item("(2) Patch systems.")
+    assert _is_orphaned_list_item("(a) Report incidents.")
+
+
 def test_is_orphaned_list_item_false_for_citation_with_real_clause_after():
     # Gemini + Codex review, PR #181: _DEFINED_IN_CITATION_RE only anchors
     # the start of the quote, so a real requirement that opens with a
@@ -555,6 +576,32 @@ def test_is_orphaned_list_item_true_for_short_acronym_only_citation():
     assert _is_orphaned_list_item("Term, as defined in CNSSI 4009.")
     assert _is_orphaned_list_item("Data, as defined in DODI 5200.01.")
     assert _is_orphaned_list_item("Control, as defined in NIST SP 800-53.")
+
+
+def test_is_orphaned_list_item_false_for_mixed_case_citation_with_all_caps_clause():
+    # Codex local review, PR #181: round 8's guard checked
+    # `source_quote.isupper()` -- true only when the *entire* quote is
+    # uppercase. A real quote whose citation opener is normal/title case
+    # while only its governing clause is rendered in caps has neither the
+    # whole quote nor even the whole remainder all-uppercase, so round 8's
+    # guard didn't fire and a real obligation clause got misclassified as
+    # citation-shaped word by word. Confirmed via direct execution against
+    # all three of these (the third mixes a title-case citation, "Executive
+    # Order 13556", with an all-caps clause in the very same remainder --
+    # the specific shape that motivated replacing the whole-string check
+    # with a consecutive-all-caps-run check).
+    assert not _is_orphaned_list_item(
+        "Compliance data, as defined in DODI 2000.26, SHALL BE REPORTED "
+        "IMMEDIATELY TO THE ISSO."
+    )
+    assert not _is_orphaned_list_item(
+        "Cybersecurity incidents, as defined in CNSSI 4009, SHALL BE "
+        "REPORTED IMMEDIATELY TO THE ISSO."
+    )
+    assert not _is_orphaned_list_item(
+        "Controlled Unclassified Information, as defined in Executive "
+        "Order 13556, REQUIRES SAFEGUARDING CONTROLS."
+    )
 
 
 def test_is_orphaned_list_item_defined_in_citation_with_multiple_references():

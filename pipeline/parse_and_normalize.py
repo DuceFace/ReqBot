@@ -179,6 +179,25 @@ _LIST_MARKER_RE = re.compile(r"^(?:\(\d+\)|\([a-zA-Z]\)|-\s*[a-zA-Z]\.)\s*")
 # narrow it further, not necessarily abandon it. Documented here plainly so
 # a future reviewer/session doesn't have to re-derive this reasoning --
 # revisit if a real false positive is ever actually found.
+#
+# Fourth round (Codex local review, PR #181): confirmed via direct execution
+# that "(1) Encrypt CUI.", "(2) Patch systems.", "(a) Report incidents." --
+# genuinely complete 2-word imperative directives -- all match this branch
+# at the current threshold=2 and would be wrongly rejected. Structurally
+# identical in shape to "(3) Restrain competition." (marker + 2-word
+# verb+object + period), which needs its missing "shall not be used to:"
+# preamble to be correctly understood -- confirmed by reading that record's
+# real source context (docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings).
+# There is no text-level signal that distinguishes these two shapes; this
+# is the same "no regex can safely do this without real grammatical
+# analysis" wall already hit above, just demonstrated with working code
+# instead of reasoned about abstractly. Threshold is already at its floor
+# (1 would drop the one verified real catch to a bare-marker-only rule;
+# raising it re-admits Gemini's earlier 3-word hypotheticals). Put to Tyler
+# directly as a genuine precision/recall product decision rather than
+# re-deciding it unilaterally a fourth time: keep as-is, accepting the
+# documented risk, on the strength of zero real false positives across two
+# full-corpus sweeps against only constructed counter-examples so far.
 ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 2
 
 # WP-38.2: an entire quote whose only content is a term followed by a
@@ -240,6 +259,62 @@ def _looks_like_citation_reference(word: str) -> bool:
     return not stripped[0].islower()
 
 
+# WP-38.2 (Gemini review round 6, PR #181; corrected round 8; replaced here
+# after Codex's local review of PR #181 found a real false positive in both
+# of those): _looks_like_citation_reference() tells a citation token from
+# real prose by checking whether a word's first letter is lowercase --
+# meaningless once the text it's looking at is ALL CAPS, since every word
+# "looks like" a citation token regardless of what it actually is.
+#
+# Round 6 bailed (didn't reject) whenever `remainder.isupper()` -- but a
+# short, genuine citation-only remainder made purely of acronym/document-ID
+# tokens (e.g. "Term, as defined in CNSSI 4009.") is *also* all-uppercase on
+# its own, so that wrongly let real citation-only fragments through
+# uncaught. Round 8 widened the check to `source_quote.isupper()` (the whole
+# quote) to fix that -- but a real quote whose citation opener is normal/
+# title case while only its *governing clause* is rendered in caps (e.g.
+# "Compliance data, as defined in DODI 2000.26, SHALL BE REPORTED
+# IMMEDIATELY TO THE ISSO.") has neither the whole quote nor even the whole
+# remainder all-uppercase (the citation portion, "DODI 2000.26,", isn't) --
+# so neither round 6's nor round 8's version catches it, and a real
+# obligation clause gets misclassified as citation-shaped word by word,
+# silently discarding a real requirement. Codex's local review confirmed
+# this via direct execution, including a case mixing a title-case citation
+# with an all-caps clause in the very same remainder.
+#
+# What actually distinguishes the two is the *shape* of the all-caps run,
+# not whether the whole string happens to be uppercase: a real citation's
+# acronyms appear as isolated all-caps tokens breaking up otherwise mixed-
+# case document titles and numbers ("NIST SP 800-53" is the longest run in
+# this corpus, at 2), while a "shouted" clause is a long run of consecutive
+# all-caps words ("SHALL BE REPORTED IMMEDIATELY..." runs to 5). Flagging a
+# run of 3+ consecutive all-caps multi-letter words (skipping over, not
+# resetting on, recognized connector words -- a real clause naturally
+# contains "TO"/"THE" mid-run) as unreliable-to-classify-by-case catches all
+# three of Codex's examples while leaving every prior round's test case
+# (round 6, round 8's three short-citation positives, the multi-document
+# citation test) correctly classified -- verified directly against all of
+# them before adopting this.
+_ALL_CAPS_CLAUSE_RUN_THRESHOLD = 3
+
+
+def _has_all_caps_clause_run(remainder: str) -> bool:
+    run = 0
+    for word in remainder.split():
+        stripped = _NON_ALNUM_EDGE_RE.sub("", word)
+        if not stripped:
+            continue
+        if stripped.lower() in _CITATION_CONNECTOR_WORDS:
+            continue
+        if stripped.isalpha() and stripped.isupper():
+            run += 1
+            if run >= _ALL_CAPS_CLAUSE_RUN_THRESHOLD:
+                return True
+        else:
+            run = 0
+    return False
+
+
 def _is_definitional_citation_only(source_quote: str) -> bool:
     """True if source_quote opens with "<term>, as defined in <citation>" and
     everything after that opener still looks like citation reference text --
@@ -248,28 +323,9 @@ def _is_definitional_citation_only(source_quote: str) -> bool:
     match = _DEFINED_IN_CITATION_RE.match(source_quote)
     if not match:
         return False
-    if source_quote.isupper():
-        # WP-38.2 (Gemini review round 6, PR #181; corrected round 8):
-        # _looks_like_citation_reference() tells a citation token from real
-        # prose by checking whether a word's first letter is lowercase --
-        # meaningless when the whole quote is ALL CAPS (e.g. a real
-        # requirement continuing "...SHALL BE REPORTED IMMEDIATELY TO THE
-        # ISSO." would have every word "look like" a citation token). Can't
-        # safely tell citation from prose by case in that situation, so
-        # don't guess -- leave the quote alone.
-        #
-        # Round 6's first version of this guard checked `remainder.isupper()`
-        # (just the text after "as defined in") instead of the whole quote --
-        # wrong scope: a short, genuine citation-only remainder made purely
-        # of acronym/document-ID tokens (e.g. "Term, as defined in CNSSI
-        # 4009.") is *also* all-uppercase on its own, even though the rest of
-        # the quote ("Term,") isn't, which made that version wrongly bail out
-        # on real citation-only fragments too. Checking the whole quote's
-        # casing (not just the citation portion) is the right scope for "was
-        # this whole extraction rendered in ALL CAPS by the source
-        # formatting," which was the actual thing round 6 needed to detect.
-        return False
     remainder = source_quote[match.end():]
+    if _has_all_caps_clause_run(remainder):
+        return False
     return all(_looks_like_citation_reference(w) for w in remainder.split())
 
 

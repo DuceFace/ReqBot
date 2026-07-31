@@ -34,7 +34,7 @@ OUT_DIR = Path(__file__).parent
 
 def load_records(path: Path, doc_key: str) -> list[dict]:
     records = []
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -127,7 +127,7 @@ def main():
     # a future reader verify whether their local corpus matches the one this
     # audit actually drew from, even without the raw population itself being
     # pinned in git (Codex review, PR #180).
-    with open(OUT_DIR / "source_manifest.json", "w") as f:
+    with open(OUT_DIR / "source_manifest.json", "w", encoding="utf-8") as f:
         json.dump({
             "seed": SEED,
             "total_records": total,
@@ -144,7 +144,7 @@ def main():
             discovery.append(rec_out)
     print(f"Discovery pool: {len(discovery)} candidates ({len(discovery) / total:.1%} of corpus)")
 
-    with open(OUT_DIR / "discovery_candidates.jsonl", "w") as f:
+    with open(OUT_DIR / "discovery_candidates.jsonl", "w", encoding="utf-8") as f:
         for rec in discovery:
             f.write(json.dumps(rec) + "\n")
 
@@ -167,7 +167,7 @@ def main():
         chosen = random.sample(pool, n)
         all_chosen.extend(chosen)
 
-    with open(OUT_DIR / "unbiased_sample.jsonl", "w") as f:
+    with open(OUT_DIR / "unbiased_sample.jsonl", "w", encoding="utf-8") as f:
         for rec in all_chosen:
             f.write(json.dumps(rec) + "\n")
 

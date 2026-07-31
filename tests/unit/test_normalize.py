@@ -2,7 +2,9 @@ import json
 from pathlib import Path
 
 from pipeline.parse_and_normalize import (
+    _is_dangling_clause,
     _is_heading_echo,
+    _is_orphaned_list_item,
     _is_unrepairable_fragment,
     build_chunk_text_map,
     compute_stable_id,
@@ -372,3 +374,387 @@ def test_negative_fixture_survives_full_pipeline(tmp_path):
     run(str(req_path), str(chunks_path), "", str(out_dir))
     assert len(_read_jsonl(out_dir / "test_requirements_normalized.jsonl")) == 1
     assert _read_jsonl(out_dir / "test_normalization_failures.jsonl") == []
+
+
+# WP-38.2: real fixtures below are drawn from eval/audit_wp38_1/'s hand-labeled
+# audit (docs/PHASE38_REQUIREMENTS.md's WP-38.1/WP-38.2 Findings), not invented
+# examples -- both the positive and negative cases are real quotes this
+# project's own corpus produced.
+
+def test_is_heading_echo_matches_ancestor_heading_not_just_immediate():
+    # REQ-955ab005b394 (afi10-2402): a real quote that echoes an *ancestor*
+    # heading two levels up, not the chunk's own immediate heading -- the
+    # exact case WP-34.2's original section_title_path[-1]-only check
+    # structurally couldn't catch.
+    assert _is_heading_echo(
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+        ["COMPLIANCE WITH THIS PUBLICATION IS MANDATORY", "1.1. Executive Summary"],
+    )
+
+
+def test_is_heading_echo_false_when_no_heading_in_path_matches():
+    assert not _is_heading_echo(
+        "KERs shall be approved by the MC4EB.",
+        ["Purpose", "KER Approval Process", "1.1. Executive Summary"],
+    )
+
+
+def test_is_heading_echo_false_for_none_section_title_path():
+    # Gemini review, PR #181: removing the immediate-heading-only check also
+    # dropped the guard against section_title_path being None (not just an
+    # empty list) -- a bare `for heading in None:` raises TypeError. Must not
+    # crash, same as the pre-existing empty-list case.
+    assert not _is_heading_echo("Any quote text.", None)
+
+
+def test_is_unrepairable_fragment_no_longer_capped_by_length():
+    # REQ-97e6e5483093 (DODI 5200.44): a real 41-word colon-terminated
+    # fragment that WP-34.2's original 25-word cap let through -- WP-38.2
+    # removed the cap since a colon-ending quote carries no content of its
+    # own regardless of length.
+    assert _is_unrepairable_fragment(
+        "Designate a focal point and resources to represent the acquisition "
+        "executive; risk management executive; and counterintelligence, "
+        "security, and operational communities with access to the DoD "
+        "Component's research, development, acquisition, sustainment "
+        "activities, and ICT supply chain risk analyses for applicable "
+        "systems to:"
+    )
+
+
+def test_is_orphaned_list_item_no_longer_rejects_short_marker_items():
+    # WP-38.2's marker+word-count branch (reject a list-marker-prefixed quote
+    # whose remainder is too short) went through four review rounds (Gemini
+    # rounds 1 and 6, Codex twice), narrowed 6 -> 3 -> 2 words each time, and
+    # was ultimately removed entirely (Codex local review, PR #181, second
+    # pass) rather than narrowed a fifth time: no text-level signal
+    # distinguishes a short child list item that's genuinely self-contained
+    # from one whose obligation is inherited from a parent stem (e.g.
+    # REQ-c6aeb8df528b, "(3) Restrain competition." -- item 3 of a "shall not
+    # be used to:" prohibition list, meaningless standalone), and rejecting
+    # the wrong one silently drops a valid requirement. Product direction
+    # (Tyler): preserve short enumerated child items until hierarchy-aware
+    # parent-stem + child-item reconstruction exists, rather than filter them
+    # here. See _is_orphaned_list_item()'s docstring and
+    # docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings for the full history.
+    #
+    # This means REQ-c6aeb8df528b is now a known, accepted miss (a visible
+    # fragment, not silently dropped) -- pinned here so that's read as
+    # deliberate, not an unnoticed regression.
+    assert not _is_orphaned_list_item("(3) Restrain competition.")
+    assert not _is_orphaned_list_item("(1)")
+    assert not _is_orphaned_list_item("(1) Encrypt stored CUI.")
+    assert not _is_orphaned_list_item("(1) Encrypt CUI.")
+    assert not _is_orphaned_list_item("(2) Patch systems.")
+    assert not _is_orphaned_list_item("(a) Report incidents.")
+
+
+def test_is_orphaned_list_item_defined_in_citation():
+    # REQ-4523443092b8 (afi10-2402): the whole quote is just a term plus a
+    # citation, no independent obligation content.
+    assert _is_orphaned_list_item(
+        "Suspicious activity reporting, as defined in DoDI 2000.26, "
+        "Suspicious Activity Reporting."
+    )
+
+
+def test_is_orphaned_list_item_false_for_marker_with_real_content():
+    # REQ-01a7421e8e0a (DODI 8551.01): a real, self-contained directive that
+    # happens to start with a list marker -- must NOT be caught just because
+    # of the marker.
+    assert not _is_orphaned_list_item(
+        "(6) Directs the PPSM PMO to document the assurance category for "
+        "all PPS in the CAL."
+    )
+
+
+def test_is_orphaned_list_item_false_for_real_quote_no_marker():
+    assert not _is_orphaned_list_item("KERs shall be approved by the MC4EB.")
+
+
+def test_is_orphaned_list_item_false_for_citation_with_real_clause_after():
+    # Gemini + Codex review, PR #181: _DEFINED_IN_CITATION_RE only anchors
+    # the start of the quote, so a real requirement that opens with a
+    # definitional qualifier but continues with a real governing clause must
+    # not be swallowed just because it starts the same way as a genuine
+    # citation-only fragment.
+    assert not _is_orphaned_list_item(
+        "Cybersecurity incidents, as defined in CNSSI 4009, shall be "
+        "reported immediately to the ISSO."
+    )
+    assert not _is_orphaned_list_item(
+        "Covered data, as defined in DoDI X, must be encrypted."
+    )
+
+
+def test_is_orphaned_list_item_false_for_citation_with_obligation_verb_outside_narrow_list():
+    # Gemini review round 2, PR #181: the first fix checked for a small
+    # obligation-verb whitelist (shall/must/will/...) -- any real verb
+    # outside that list (e.g. "requires") still false-positived, because a
+    # verb whitelist can never be exhaustive enough to make that failure
+    # direction safe. Replaced with a structural check (does the remainder
+    # look like ordinary lowercase prose vs. citation-shaped tokens) that
+    # doesn't depend on naming every possible verb.
+    assert not _is_orphaned_list_item(
+        "Controlled Unclassified Information, as defined in Executive Order "
+        "13556, requires safeguarding controls."
+    )
+
+
+def test_is_orphaned_list_item_false_for_citation_with_quoted_prose():
+    # Gemini review round 4, PR #181: the structural check strips a fixed
+    # punctuation set to find each word's real first character -- a lowercase
+    # prose word wrapped in quotes or brackets (e.g. "'applies'") wasn't in
+    # that set, so its leading quote mark was tested instead of the real
+    # first letter, misclassifying it as citation-shaped. Fixed by stripping
+    # *any* non-alphanumeric character from both ends instead of an
+    # enumerated set, closing the whole class of gap rather than the one
+    # example found this round.
+    assert not _is_orphaned_list_item(
+        "Some term, as defined in CNSSI 4009, 'applies within the DoD'."
+    )
+
+
+def test_is_orphaned_list_item_false_for_all_caps_citation_with_real_clause():
+    # Gemini review round 6, PR #181 (guard scope corrected round 8): the
+    # structural citation check tells a citation token from real prose by
+    # checking whether a word's first letter is lowercase -- meaningless
+    # when the whole quote is ALL CAPS, since every word "looks like" a
+    # citation token regardless of what it actually is. Bails out (not
+    # citation-only) whenever the *whole quote* is all-uppercase.
+    assert not _is_orphaned_list_item(
+        "COMPLIANCE DATA, AS DEFINED IN DODI 2000.26, SHALL BE REPORTED "
+        "IMMEDIATELY TO THE ISSO."
+    )
+
+
+def test_is_orphaned_list_item_true_for_short_acronym_only_citation():
+    # Gemini review round 8, PR #181: round 6's first fix checked
+    # `remainder.isupper()` (just the text after "as defined in") instead of
+    # the whole quote -- wrong scope. A short, genuine citation-only
+    # remainder made purely of acronym/document-ID tokens (e.g. "CNSSI
+    # 4009.") is *also* all-uppercase on its own even though the rest of the
+    # quote ("Term,") isn't, which made that version wrongly preserve real
+    # citation-only fragments as if they were real requirements. Checking
+    # the whole quote's casing instead fixes both this and round 6's
+    # original case.
+    assert _is_orphaned_list_item("Term, as defined in CNSSI 4009.")
+    assert _is_orphaned_list_item("Data, as defined in DODI 5200.01.")
+
+
+def test_is_orphaned_list_item_false_for_two_word_acronym_citation_known_accepted_miss():
+    # Gemini review, PR #181 (re-reviewing the ALL-CAPS-clause fix above):
+    # found two real cases where _ALL_CAPS_CLAUSE_RUN_THRESHOLD=3 still let a
+    # short all-caps obligation clause ("MUST COMPLY", 2 words, no digits)
+    # through misclassified as citation-only. No text-level signal
+    # distinguishes a real 2-consecutive-all-caps-word clause from a real
+    # 2-consecutive-all-caps-word citation acronym pair (like "NIST SP") --
+    # threshold lowered to 2, applying the same "prefer a missed catch over a
+    # false rejection of real content" principle Tyler set for
+    # _is_orphaned_list_item()'s marker+word-count branch. This costs the one
+    # test below, which was always a synthetic calibration example (added
+    # round 8), not a real fixture or live-corpus record -- pinned here as a
+    # known, accepted miss rather than left silently changed.
+    assert not _is_orphaned_list_item("Control, as defined in NIST SP 800-53.")
+
+
+def test_is_orphaned_list_item_false_for_mixed_case_citation_with_all_caps_clause():
+    # Codex local review, PR #181: round 8's guard checked
+    # `source_quote.isupper()` -- true only when the *entire* quote is
+    # uppercase. A real quote whose citation opener is normal/title case
+    # while only its governing clause is rendered in caps has neither the
+    # whole quote nor even the whole remainder all-uppercase, so round 8's
+    # guard didn't fire and a real obligation clause got misclassified as
+    # citation-shaped word by word. Confirmed via direct execution against
+    # all three of these (the third mixes a title-case citation, "Executive
+    # Order 13556", with an all-caps clause in the very same remainder --
+    # the specific shape that motivated replacing the whole-string check
+    # with a consecutive-all-caps-run check).
+    assert not _is_orphaned_list_item(
+        "Compliance data, as defined in DODI 2000.26, SHALL BE REPORTED "
+        "IMMEDIATELY TO THE ISSO."
+    )
+    assert not _is_orphaned_list_item(
+        "Cybersecurity incidents, as defined in CNSSI 4009, SHALL BE "
+        "REPORTED IMMEDIATELY TO THE ISSO."
+    )
+    assert not _is_orphaned_list_item(
+        "Controlled Unclassified Information, as defined in Executive "
+        "Order 13556, REQUIRES SAFEGUARDING CONTROLS."
+    )
+
+
+def test_is_orphaned_list_item_false_for_all_caps_clause_with_digit_token():
+    # Gemini review, PR #181: a digit-only token (e.g. "30" in "WITHIN 30
+    # DAYS") failed `.isalpha()` in _has_all_caps_clause_run and *reset* the
+    # consecutive-all-caps-word run instead of being skipped like a connector
+    # word -- a real clause naturally contains numbers ("WITHIN 30 DAYS",
+    # "within 5 business days") without that breaking the clause. Any token
+    # containing a digit is now skipped (transparent), not just pure-digit
+    # tokens, since a real document-ID-shaped token ("2000.26") also mixes
+    # digits with punctuation.
+    assert not _is_orphaned_list_item(
+        "Requirement, as defined in DoDI 2000.26, SHALL REPORT WITHIN 30 DAYS."
+    )
+
+
+def test_is_orphaned_list_item_false_for_short_all_caps_clause_no_digits():
+    # Gemini review, PR #181: a short (2-word) all-caps clause with no digit
+    # token at all ("MUST COMPLY") wasn't fixed by the digit-skip fix above --
+    # it needed _ALL_CAPS_CLAUSE_RUN_THRESHOLD itself lowered from 3 to 2 (see
+    # the constant's own comment for the full reasoning and the one test this
+    # trades away).
+    assert not _is_orphaned_list_item(
+        "Requirement, as defined in DoDI 2000.26, MUST COMPLY."
+    )
+
+
+def test_is_orphaned_list_item_defined_in_citation_with_multiple_references():
+    # Live-corpus generalization check (not in the original 12-example set):
+    # a citation-only quote referencing two documents joined by "and" is
+    # still correctly caught.
+    assert _is_orphaned_list_item(
+        "Readiness Reporting, as defined in DoDD 7730.65, DoD Readiness "
+        "Reporting System, and AFI 10-201, Force Readiness Reporting."
+    )
+
+
+def test_is_dangling_clause_bare_copula_first_word():
+    # REQ-1b1071c8d317 (afi17-203): missing its real subject before "Is".
+    assert _is_dangling_clause(
+        "Is designated Computer Network Defense Service Provider (CNDSP) "
+        "Certification Authority (CA) for Special Access Program (SAP) "
+        "networks and is responsible for coordinating and directing SAP "
+        "enclave-wide CNDSP activities."
+    )
+
+
+def test_is_dangling_clause_false_for_lowercase_start_real_list_item():
+    # REQ-474f99ed3b50 (DODI 5200.01): a real, correctly-kept requirement
+    # extracted starting mid-sentence on a shared governing clause -- this
+    # corpus's DoD/AF-style responsibility lists do this legitimately, which
+    # is why WP-38.2 calibrated away from a blanket "starts lowercase" rule.
+    assert not _is_dangling_clause(
+        "establish, direct, and administer all aspects of their respective "
+        "organization's SCI security programs"
+    )
+
+
+def test_is_dangling_clause_false_for_bare_modal_first_word_real_requirement():
+    # REQ-580c9ef77b37 (DODI 5200.48): a real requirement starting directly
+    # with a bare modal, same shape as a real dangling-clause fragment
+    # ("shall be coordinated with the customer") -- not safely distinguishable
+    # by a modal-first-word check alone, so WP-38.2 doesn't use one.
+    assert not _is_dangling_clause("must have a lawful governmental purpose for such access")
+
+
+def test_is_dangling_clause_false_for_trailing_comma_real_requirement():
+    # REQ-abf7f0a2a776 (DODI 5200.48): a real, complete requirement whose
+    # trailing comma is a punctuation artifact of a longer source list, not a
+    # sign of incomplete content -- why WP-38.2 doesn't use a trailing-comma
+    # rule.
+    assert not _is_dangling_clause(
+        "Reporting or accounting for UD of CUI shall be done in accordance "
+        "with Paragraph 3.5.a(4),"
+    )
+
+
+def test_is_dangling_clause_bare_copula_with_non_space_whitespace_after():
+    # Gemini review, PR #181: splitting only on a literal " " missed a bare
+    # copula followed by a newline/tab instead of a space.
+    assert _is_dangling_clause("Is\nresponsible for coordinating enclave-wide activities.")
+
+
+def test_is_dangling_clause_bare_copula_wrapped_in_quote_marks():
+    assert _is_dangling_clause('"Is designated the CNDSP Certification Authority."')
+
+
+def test_is_dangling_clause_false_for_real_question():
+    # Gemini review round 5, PR #181: a copula-first quote ending in "?" is a
+    # real interrogative requirement (the style NIST SP 800-53A-type
+    # assessment-procedure documents use) -- subject-auxiliary inversion
+    # puts the subject after the copula, which is grammatically complete,
+    # not the same missing-subject problem as the declarative case.
+    assert not _is_dangling_clause(
+        "Is multi-factor authentication enforced for all administrative access?"
+    )
+    assert not _is_dangling_clause("Are security audit logs reviewed at least weekly?")
+
+
+def test_is_dangling_clause_false_for_question_wrapped_in_quotes():
+    assert not _is_dangling_clause(
+        '"Is multi-factor authentication enforced for all administrative access?"'
+    )
+
+
+def test_is_dangling_clause_false_for_question_with_trailing_parenthetical():
+    # Gemini review round 7, PR #181: the round-5 fix only checked the
+    # quote's trailing non-alphanumeric run for "?", which misses a question
+    # mark followed by more content (a trailing parenthetical or control-ID
+    # note). Checking the whole quote is safe here since this function only
+    # ever fires on an already-narrow bare-copula-first-word trigger.
+    assert not _is_dangling_clause(
+        "Is multi-factor authentication enforced? (see NIST SP 800-53)"
+    )
+    assert not _is_dangling_clause("Is audit logging enabled? [Control AC-2]")
+
+
+def test_orphaned_list_item_rejected_in_full_pipeline(tmp_path):
+    # Citation-only branch -- still active (only the marker+word-count branch
+    # was removed; see test_is_orphaned_list_item_no_longer_rejects_short_marker_items).
+    chunk_text = (
+        "Suspicious activity reporting, as defined in DoDI 2000.26, "
+        "Suspicious Activity Reporting."
+    )
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote=chunk_text)
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert _read_jsonl(out_dir / "test_requirements_normalized.jsonl") == []
+    failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
+    assert len(failures) == 1
+    assert failures[0]["error"] == "orphaned_list_item_quote"
+
+
+def test_marker_prefixed_short_fragment_survives_full_pipeline(tmp_path):
+    # Product direction (Tyler, PR #181, Codex local review second pass): the
+    # marker+word-count branch was removed entirely -- a short enumerated
+    # list item like this one may inherit its obligation from a parent stem
+    # ("Classification shall not be used to:"), so it's no longer rejected by
+    # Step D at all. Confirms this end-to-end through run(), not just the
+    # predicate in isolation.
+    chunk_text = "Classification shall not be used to: (1) ... (2) ... (3) Restrain competition."
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="(3) Restrain competition.")
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    normalized = _read_jsonl(out_dir / "test_requirements_normalized.jsonl")
+    assert len(normalized) == 1
+    assert normalized[0]["source_quote"] == "(3) Restrain competition."
+
+
+def test_dangling_clause_rejected_in_full_pipeline(tmp_path):
+    chunk_text = (
+        "The 624 OC is designated Computer Network Defense Service Provider "
+        "Certification Authority for Special Access Program networks."
+    )
+    req = dict(
+        SAMPLE_EXTRACTED, chunk_id=1,
+        source_quote="Is designated Computer Network Defense Service Provider Certification Authority.",
+    )
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert _read_jsonl(out_dir / "test_requirements_normalized.jsonl") == []
+    failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
+    assert len(failures) == 1
+    assert failures[0]["error"] == "dangling_clause_quote"

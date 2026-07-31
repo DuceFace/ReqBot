@@ -64,16 +64,6 @@ PIPELINE_VERSION = "1.0"
 # full investigation.
 QUOTE_GROUNDING_THRESHOLD = 60
 
-# WP-34.2: a colon-terminated source_quote longer than this (in words) is treated
-# as too substantial to be a bare list-header fragment and is left alone rather
-# than rejected. All known real fabrication triggers are well under this --
-# "The MC4EB will:" (3 words), "The process will be as follows:" (6 words), and
-# the longest, "The KER may be sent either by scanned soft copy via SIPRNET or by
-# mail to the address listed below:" (20 words) -- so 25 leaves headroom without
-# being large enough to plausibly swallow a genuinely complete, longer quote that
-# just happens to end mid-punctuation.
-UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25
-
 
 # WP-34.2: minimum fuzz.ratio (0-100, whole-string similarity) between a
 # normalized source_quote and its chunk's own heading before treating it as a
@@ -94,40 +84,317 @@ HEADING_ECHO_THRESHOLD = 90
 
 
 def _is_heading_echo(source_quote: str, section_title_path: list[str]) -> bool:
-    """True if source_quote is just its own chunk's heading, not body content.
+    """True if source_quote is just a heading from its own ancestry, not body content.
 
-    Step C occasionally extracts a chunk's structural heading (e.g. "COMPLIANCE
-    WITH THIS PUBLICATION IS MANDATORY") as if it were a requirement in its own
-    right. Reuses chunk_text.py's _normalize_heading() for both sides so this
-    matches on the same normalized form skip_sections filtering already uses --
-    not separate matching logic (WP-34.2).
+    Step C occasionally extracts a heading (e.g. "COMPLIANCE WITH THIS
+    PUBLICATION IS MANDATORY") as if it were a requirement in its own right.
+    WP-34.2 originally checked only section_title_path[-1] (the chunk's
+    immediate heading). WP-38.1's audit found a code-verified case
+    (REQ-955ab005b394) where a quote echoes an *ancestor* heading two levels
+    up instead -- section_title_path is ordered shallowest-first (root ...
+    immediate parent, see section_parser.py's _ancestry_from_stack), so an
+    echoed heading isn't always the last entry. WP-38.2 checks every entry in
+    the path, not just the last one.
+
+    Reuses chunk_text.py's _normalize_heading() for both sides so this matches
+    on the same normalized form skip_sections filtering already uses -- not
+    separate matching logic (WP-34.2).
     """
     if not section_title_path:
         return False
-    heading = section_title_path[-1]
-    if not heading:
-        return False
     normalized_quote = _normalize_heading(source_quote)
-    normalized_heading = _normalize_heading(heading)
-    if not normalized_quote or not normalized_heading:
+    if not normalized_quote:
         return False
-    return fuzz.ratio(normalized_quote, normalized_heading) >= HEADING_ECHO_THRESHOLD
+    for heading in section_title_path:
+        if not heading:
+            continue
+        normalized_heading = _normalize_heading(heading)
+        if not normalized_heading:
+            continue
+        if fuzz.ratio(normalized_quote, normalized_heading) >= HEADING_ECHO_THRESHOLD:
+            return True
+    return False
 
 
 def _is_unrepairable_fragment(source_quote: str) -> bool:
     """True if source_quote is a truncated list-header with no content of its own.
 
-    A short quote ending in a bare colon (e.g. "The process will be as
-    follows:") carries no obligation content on its own -- Step D.5 enrichment
-    was found fabricating plausible-sounding description text to "complete" it,
-    content that appears nowhere in source_quote (WP-34.2). Only fires on quotes
-    that literally end in a colon; a quote that merely contains one mid-sentence
+    A quote ending in a bare colon (e.g. "The process will be as follows:")
+    carries no obligation content on its own -- Step D.5 enrichment was found
+    fabricating plausible-sounding description text to "complete" it, content
+    that appears nowhere in source_quote (WP-34.2). Only fires on quotes that
+    literally end in a colon; a quote that merely contains one mid-sentence
     (and so has real content following it) is untouched.
+
+    WP-34.2 originally also required the quote to be under 25 words, reasoning
+    that a longer colon-terminated quote might be a genuinely complete quote
+    that just happens to end mid-punctuation. WP-38.1's audit found 3 real
+    colon-terminated list-header fragments at 30, 39, and 41 words that the cap
+    let through, and turned up no example -- in WP-34.2's original spike or
+    WP-38.1's 333-record hand-read audit -- of a genuinely complete quote that
+    legitimately ends in a bare colon. A colon promises content the quote
+    doesn't contain regardless of how many words precede it, so WP-38.2 removed
+    the length cap: the trigger is "ends in a bare colon," full stop.
+    """
+    return source_quote.strip().endswith(":")
+
+
+# WP-38.2: an entire quote whose only content is a term followed by a
+# "as defined in <citation>" cross-reference carries no independent
+# obligation -- it's a definitional pointer, not a requirement (e.g.
+# "Suspicious activity reporting, as defined in DoDI 2000.26, Suspicious
+# Activity Reporting."). Only anchors the START of the quote (no `$`) because
+# a real citation's own reference text legitimately contains internal commas
+# and periods (document numbers, titles) -- anchoring to end-of-string would
+# reject real citation-only quotes just as readily as it rejects the false
+# positive below, so it isn't a safe fix on its own (see
+# _has_obligation_after_citation_opener()).
+_DEFINED_IN_CITATION_RE = re.compile(r"^[^,]{1,80},\s*as defined in\b", re.IGNORECASE)
+
+# WP-38.2 (Gemini review round 2, PR #181): the first fix here checked
+# whether the remainder after "as defined in" contained a word from a small
+# obligation-verb whitelist -- but that check was backwards-fragile: ANY real
+# obligation verb missing from the list (e.g. "requires", "applies",
+# "protects" -- Gemini's own example, "...as defined in Executive Order
+# 13556, requires safeguarding controls.") caused the search to find nothing,
+# which made the function return True (citation-only) and silently discard a
+# real requirement. A verb whitelist can never be exhaustive enough to make
+# that failure direction safe, so this doesn't use one anymore.
+#
+# Instead: a real citation's own reference text in this corpus is
+# consistently made of Title-Case document titles, ALL-CAPS/mixed-case
+# acronyms, and numeric document IDs (e.g. "DoDI 2000.26, Suspicious Activity
+# Reporting"), joined only by commas/"and". A real continuing obligation
+# clause is ordinary lowercase prose ("shall be reported...", "requires
+# safeguarding controls..."). So: does the remainder consist *only* of
+# citation-shaped tokens and a small closed set of connector words, with no
+# other lowercase word at all? If even one ordinary lowercase word shows up,
+# treat it as real prose continuing past the citation, not citation-only
+# content -- this doesn't need to recognize every possible obligation verb,
+# only to recognize what an ordinary English sentence fragment looks like,
+# which is a much smaller, more robust thing to get right.
+_CITATION_CONNECTOR_WORDS = {
+    "and", "or", "the", "of", "for", "in", "a", "an", "at", "to", "within", "per",
+}
+
+# WP-38.2 (Gemini review round 4, PR #181): stripping a fixed, enumerated set
+# of punctuation characters (originally just ",.()")  keeps finding new gaps
+# -- quotes, brackets, smart quotes, dashes, whatever the next real example
+# happens to be wrapped in. Stripping every non-alphanumeric character from
+# both ends, regardless of which specific characters they are, closes that
+# whole class of gap at once instead of growing the enumerated set one
+# reviewer finding at a time.
+_NON_ALNUM_EDGE_RE = re.compile(r"^[^A-Za-z0-9]+|[^A-Za-z0-9]+$")
+
+
+def _looks_like_citation_reference(word: str) -> bool:
+    stripped = _NON_ALNUM_EDGE_RE.sub("", word)
+    if not stripped:
+        return True
+    if stripped.lower() in _CITATION_CONNECTOR_WORDS:
+        return True
+    # Title Case, ALL CAPS, or a mix with digits/periods (acronyms, document
+    # IDs like "2000.26") -- never a lowercase-first ordinary word.
+    return not stripped[0].islower()
+
+
+# WP-38.2 (Gemini review round 6, PR #181; corrected round 8; replaced here
+# after Codex's local review of PR #181 found a real false positive in both
+# of those): _looks_like_citation_reference() tells a citation token from
+# real prose by checking whether a word's first letter is lowercase --
+# meaningless once the text it's looking at is ALL CAPS, since every word
+# "looks like" a citation token regardless of what it actually is.
+#
+# Round 6 bailed (didn't reject) whenever `remainder.isupper()` -- but a
+# short, genuine citation-only remainder made purely of acronym/document-ID
+# tokens (e.g. "Term, as defined in CNSSI 4009.") is *also* all-uppercase on
+# its own, so that wrongly let real citation-only fragments through
+# uncaught. Round 8 widened the check to `source_quote.isupper()` (the whole
+# quote) to fix that -- but a real quote whose citation opener is normal/
+# title case while only its *governing clause* is rendered in caps (e.g.
+# "Compliance data, as defined in DODI 2000.26, SHALL BE REPORTED
+# IMMEDIATELY TO THE ISSO.") has neither the whole quote nor even the whole
+# remainder all-uppercase (the citation portion, "DODI 2000.26,", isn't) --
+# so neither round 6's nor round 8's version catches it, and a real
+# obligation clause gets misclassified as citation-shaped word by word,
+# silently discarding a real requirement. Codex's local review confirmed
+# this via direct execution, including a case mixing a title-case citation
+# with an all-caps clause in the very same remainder.
+#
+# What actually distinguishes the two is the *shape* of the all-caps run,
+# not whether the whole string happens to be uppercase: a real citation's
+# acronyms appear as isolated all-caps tokens breaking up otherwise mixed-
+# case document titles and numbers, while a "shouted" clause is a run of
+# consecutive all-caps words ("SHALL BE REPORTED IMMEDIATELY..." runs to 5).
+# Flagging a run of 2+ consecutive all-caps multi-letter alphabetic words
+# (skipping over, not resetting on, recognized connector words and any token
+# containing a digit -- a real clause naturally contains "TO"/"THE" mid-run,
+# or a number like "WITHIN 30 DAYS", without that breaking the clause) as
+# unreliable-to-classify-by-case catches all three of Codex's examples plus
+# every prior round's test case.
+#
+# Gemini's next automatic re-review (PR #181) found two more real gaps at
+# the original threshold of 3: (1) a digit-only token (e.g. "30" in "SHALL
+# REPORT WITHIN 30 DAYS") failed `.isalpha()` and *reset* the run instead of
+# being skipped like a connector word, breaking runs that should have stayed
+# intact; (2) threshold=3 still missed a short 2-word all-caps clause with no
+# digits at all ("MUST COMPLY"). Fixing (1) alone doesn't fix (2) -- a clause
+# with no digit token in it never benefits from skip-instead-of-reset.
+# Lowering the threshold to 2 is the same "no text-level signal safely
+# distinguishes two genuinely different real shapes" wall already hit and
+# resolved once this session for _is_orphaned_list_item()'s marker+
+# word-count branch: a 2-consecutive-all-caps-word run can be a real citation
+# (an acronym pair like "NIST SP") or a real short clause ("MUST COMPLY"),
+# and nothing about the words themselves tells them apart. Applying the same
+# principle Tyler set there -- a missed catch (leaving a real citation-only
+# fragment unrejected) is a strictly safer failure than a false rejection
+# (silently discarding a real short obligation clause) -- threshold lowered
+# to 2. Confirmed the one existing test this costs
+# (`"Control, as defined in NIST SP 800-53."`) is itself a synthetic
+# calibration example added during round 8, not a real fixture or live-corpus
+# record; no real "as defined in"-citation record in this corpus is
+# ALL-CAPS at all (checked directly), so this trade currently costs nothing
+# against real data on either side.
+_ALL_CAPS_CLAUSE_RUN_THRESHOLD = 2
+
+
+def _has_all_caps_clause_run(remainder: str) -> bool:
+    run = 0
+    for word in remainder.split():
+        stripped = _NON_ALNUM_EDGE_RE.sub("", word)
+        if not stripped:
+            continue
+        if stripped.lower() in _CITATION_CONNECTOR_WORDS:
+            continue
+        if any(c.isdigit() for c in stripped):
+            continue
+        if stripped.isalpha() and stripped.isupper():
+            run += 1
+            if run >= _ALL_CAPS_CLAUSE_RUN_THRESHOLD:
+                return True
+        else:
+            run = 0
+    return False
+
+
+def _is_definitional_citation_only(source_quote: str) -> bool:
+    """True if source_quote opens with "<term>, as defined in <citation>" and
+    everything after that opener still looks like citation reference text --
+    not a real, independent governing clause (WP-38.2, see
+    _looks_like_citation_reference()'s docstring above for the reasoning)."""
+    match = _DEFINED_IN_CITATION_RE.match(source_quote)
+    if not match:
+        return False
+    remainder = source_quote[match.end():]
+    if _has_all_caps_clause_run(remainder):
+        return False
+    return all(_looks_like_citation_reference(w) for w in remainder.split())
+
+
+def _is_orphaned_list_item(source_quote: str) -> bool:
+    """True if source_quote is a definitional cross-reference with no
+    independent content of its own -- "<term>, as defined in <citation>."
+    is a definitional pointer, not an obligation (WP-38.2).
+
+    Does NOT reject a short enumerated-list item by marker + word-count
+    alone (e.g. "(1) Encrypt CUI." vs. "(3) Restrain competition.", which
+    needs its "shall not be used to:" governing clause to be understood
+    correctly) -- a marker+word-count branch here was tried and calibrated
+    through four review rounds (Gemini rounds 1 and 6, Codex twice), narrowed
+    each time, and ultimately removed (Codex local review, PR #181, second
+    pass): no text-level signal distinguishes a short child item that's
+    genuinely self-contained from one whose obligation is inherited from a
+    parent stem, and rejecting the wrong one silently drops a valid
+    requirement -- a worse failure than leaving a visible fragment in place.
+    See docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings for the full history.
+
+    Product direction (Tyler, PR #181): short enumerated child items are not
+    safe to reject by text length alone. They may be valid requirements
+    whose governing clause is inherited from a parent stem. Until
+    hierarchy-aware parent-stem + child-item reconstruction exists (before
+    embedding/search, not as a Step D rejection rule), preserve them --
+    tracked as backlog, not part of WP-38.2's scope.
+
+    Doesn't attempt to catch a bare noun-phrase list item with no marker and
+    no citation (e.g. "Required NM data update rates.") either -- no safe,
+    non-overfit text-level signal for that shape was found during
+    calibration. Left as an honest gap, not silently claimed as covered --
+    see docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings.
     """
     stripped = source_quote.strip()
-    if not stripped.endswith(":"):
+    if not stripped:
         return False
-    return len(stripped.split()) <= UNREPAIRABLE_FRAGMENT_MAX_WORDS
+
+    return _is_definitional_citation_only(stripped)
+
+
+# WP-38.2: bare copulas that, as a quote's very first word, almost always
+# indicate a missing subject (e.g. "Is designated..." extracted without the
+# "[X]" that should precede "is").
+_BARE_COPULA_OPENERS = ("is", "are", "was", "were")
+
+
+def _is_dangling_clause(source_quote: str) -> bool:
+    """True if source_quote's first word is a bare copula with no subject
+    before it (WP-38.2 -- e.g. "Is designated Computer Network Defense
+    Service Provider..." extracted without the "[X]" that should precede
+    "is").
+
+    Three broader candidate signals were tried and rejected during
+    calibration against WP-38.1's audit fixture (eval/audit_wp38_1/) because
+    each produced a real false positive against a genuine, correctly-kept
+    requirement in this corpus:
+
+    - "Starts with a lowercase letter" -- this corpus's real DoD/AF-style
+      responsibility lists commonly extract individual list items starting
+      mid-sentence on a shared "will:" governing clause (e.g. a real,
+      correctly-kept "establish, direct, and administer all aspects of
+      their respective organization's SCI security programs"), so
+      lowercase-first is common in genuine content here, not just fragments.
+    - "First word is a bare modal (shall/will/must/should/may)" -- same
+      cause: a real, correctly-kept record ("must have a lawful governmental
+      purpose for such access") starts exactly this way.
+    - "Ends in a bare trailing comma" -- a real, correctly-kept record
+      ("Reporting or accounting for UD of CUI shall be done in accordance
+      with Paragraph 3.5.a(4),") ends in one too; the comma there is a
+      punctuation artifact of a longer source list, not a sign the quote's
+      own content is incomplete.
+
+    A copula-first quote containing "?" anywhere is excluded too (Gemini
+    round 5, tightened round 7): a real interrogative requirement, the kind
+    assessment-procedure documents like NIST SP 800-53A use (e.g. "Is
+    multi-factor authentication enforced for all administrative access?"),
+    puts the subject *after* the copula via subject-auxiliary inversion --
+    grammatically complete, not a missing subject the way the declarative
+    case is. This corpus doesn't currently have any assessment-
+    questionnaire-style documents ingested, but a future one plausibly
+    could. Round 5's first fix only checked the quote's trailing
+    non-alphanumeric run, which misses a "?" followed by more content (e.g.
+    a trailing parenthetical or control-ID note: "...enforced? (see NIST SP
+    800-53)") -- checking the whole quote for "?" is safe here since this
+    function only ever fires on an already-narrow trigger (bare-copula-first-
+    word); a declarative fragment that happens to also contain a "?"
+    somewhere else is a genuinely contrived case, and exempting it errs
+    toward not discarding real data, the same direction every other choice
+    in this function already errs.
+
+    Only the bare-copula-first-word signal survived calibration with zero
+    false positives against the fixture's 284 real records -- catches 1 of
+    WP-38.1's 6 dangling-clause fragment examples. The other 5 (a preamble
+    ending mid-clause, a subordinate clause with no main clause, a bare
+    modal predicate with no subject) are real fragments but aren't safely
+    distinguishable from genuine subject-less-but-complete list items in
+    this corpus without actual grammatical analysis -- left as an honest
+    gap rather than a rule broad enough to risk discarding real data. See
+    docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings.
+    """
+    stripped = source_quote.strip()
+    if not stripped:
+        return False
+    if "?" in stripped:
+        return False
+    first_word = _NON_ALNUM_EDGE_RE.sub("", stripped.split(maxsplit=1)[0])
+    return first_word.lower() in _BARE_COPULA_OPENERS
 
 
 def compute_document_identity(pdf_path: Path) -> dict:
@@ -479,6 +746,23 @@ def run(
         # these rather than the pipeline ever inventing or assembling real content.
         if _is_unrepairable_fragment(source_quote):
             failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "unrepairable_fragment_quote", "raw": req})
+            continue
+
+        # WP-38.2: reject a definitional cross-reference with no independent
+        # obligation content of its own (e.g. "Term, as defined in CNSSI
+        # 4009."). Does NOT reject a short enumerated-list item by marker or
+        # word count alone -- see _is_orphaned_list_item()'s docstring
+        # (Gemini review, PR #181, caught this comment going stale after that
+        # branch was removed).
+        if _is_orphaned_list_item(source_quote):
+            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "orphaned_list_item_quote", "raw": req})
+            continue
+
+        # WP-38.2: reject a subordinate clause or predicate extracted without
+        # its main clause or subject (e.g. "shall be coordinated with the
+        # customer" -- a dangling predicate with no subject at all).
+        if _is_dangling_clause(source_quote):
+            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "dangling_clause_quote", "raw": req})
             continue
 
         if description:

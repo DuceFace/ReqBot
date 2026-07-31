@@ -8,20 +8,55 @@ import json
 import sys
 from pathlib import Path
 
+from rapidfuzz import fuzz
+
 _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from pipeline.parse_and_normalize import (
-    _is_heading_echo,
-    _is_unrepairable_fragment,
-    UNREPAIRABLE_FRAGMENT_MAX_WORDS,
-)
+from pipeline.chunk_text import _normalize_heading
 
 SKIP_SECTIONS = {
     "GLOSSARY", "REFERENCES", "ACRONYMS", "DEFINITIONS",
     "ABBREVIATIONS", "TABLE OF CONTENTS", "TERMS",
 }
+
+# WP-34.2's original rejection predicates, fully reimplemented locally rather
+# than imported from pipeline.parse_and_normalize -- WP-38.2 changed both
+# _is_unrepairable_fragment() (removed the word cap) and _is_heading_echo()
+# (now walks the whole section_title_path, not just [-1]) in the live
+# pipeline (see docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings). Importing
+# either live function here would silently reclassify this audit's own
+# findings if the script were ever re-run -- confirmed as a real bug for the
+# fragment predicate (Codex review, PR #181: pinning only the word-count
+# *constant* while still calling the live function didn't preserve historical
+# behavior) and the same class of gap was still present for the heading-echo
+# predicate (Gemini review, PR #181, found it independently). Both
+# reimplemented standalone so this script keeps documenting the pre-WP-38.2
+# rule state this audit actually measured, not whatever the live pipeline
+# does today.
+_PRE_WP_38_2_UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25
+_PRE_WP_38_2_HEADING_ECHO_THRESHOLD = 90
+
+
+def _pre_wp38_2_is_unrepairable_fragment(source_quote: str) -> bool:
+    stripped = source_quote.strip()
+    if not stripped.endswith(":"):
+        return False
+    return len(stripped.split()) <= _PRE_WP_38_2_UNREPAIRABLE_FRAGMENT_MAX_WORDS
+
+
+def _pre_wp38_2_is_heading_echo(source_quote: str, section_title_path: list[str]) -> bool:
+    if not section_title_path:
+        return False
+    heading = section_title_path[-1]
+    if not heading:
+        return False
+    normalized_quote = _normalize_heading(source_quote)
+    normalized_heading = _normalize_heading(heading)
+    if not normalized_quote or not normalized_heading:
+        return False
+    return fuzz.ratio(normalized_quote, normalized_heading) >= _PRE_WP_38_2_HEADING_ECHO_THRESHOLD
 
 # (requirement_id: (category, subtype)) -- category is FRAGMENT/OVER_GRAB/JUDGMENT.
 # subtype is the specific sub-shape from PHASE38_REQUIREMENTS.md's Findings
@@ -86,7 +121,7 @@ SAMPLE_PATH = Path(__file__).parent / "unbiased_sample.jsonl"
 
 def main():
     records = {}
-    with open(SAMPLE_PATH) as f:
+    with open(SAMPLE_PATH, encoding="utf-8") as f:
         for line in f:
             rec = json.loads(line)
             records[rec.get("requirement_id")] = rec
@@ -99,8 +134,8 @@ def main():
             continue
         quote = rec.get("source_quote") or ""
         section_path = rec.get("section_title_path") or []
-        heading_echo = _is_heading_echo(quote, section_path)
-        unrepairable = _is_unrepairable_fragment(quote)
+        heading_echo = _pre_wp38_2_is_heading_echo(quote, section_path)
+        unrepairable = _pre_wp38_2_is_unrepairable_fragment(quote)
         word_count = len(quote.strip().split())
         ends_colon = quote.strip().endswith(":")
         heading_upper = {h.upper() for h in section_path}
@@ -108,7 +143,7 @@ def main():
 
         if heading_echo or unrepairable:
             rule_status = "SHOULD_BE_CAUGHT_BUT_ISNT (labeling error? survived despite matching a rule)"
-        elif ends_colon and word_count > UNREPAIRABLE_FRAGMENT_MAX_WORDS:
+        elif ends_colon and word_count > _PRE_WP_38_2_UNREPAIRABLE_FRAGMENT_MAX_WORDS:
             rule_status = "REAL_GAP (colon-terminated fragment, exceeds 25-word cap)"
         elif in_skip_sections:
             rule_status = "REAL_GAP (section is in skip_sections vocab but record wasn't filtered)"
@@ -130,7 +165,7 @@ def main():
             "quote": quote,
         })
 
-    with open(Path(__file__).parent / "labeled_failures.jsonl", "w") as f:
+    with open(Path(__file__).parent / "labeled_failures.jsonl", "w", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(row) + "\n")
 

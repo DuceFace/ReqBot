@@ -19,7 +19,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-38.1 — Extraction Precision Failure Audit | Complete |
-| WP-38.2 — Deterministic Fragment-Rejection Rule Extensions | Not started (properly scoped) |
+| WP-38.2 — Deterministic Fragment-Rejection Rule Extensions | Complete |
 
 ---
 
@@ -424,23 +424,338 @@ something a deterministic rule can reliably do; see Non-Goals.
 subset each rule targets) without rejecting any of the 284 hand-labeled real records, and full
 `pytest` + `ruff check .` are clean.
 
+**Findings (2026-07-31):**
+
+*What shipped, in `pipeline/parse_and_normalize.py`:*
+- `UNREPAIRABLE_FRAGMENT_MAX_WORDS` **removed entirely** (not raised) — `_is_unrepairable_fragment()`
+  now rejects any colon-terminated quote regardless of length. The cap's original justification (a
+  long quote might legitimately end mid-punctuation) had no confirmed real example in either
+  WP-34.2's original spike or WP-38.1's 333-record audit.
+- `_is_heading_echo()` now checks every entry in `section_title_path`, not just the immediate
+  heading (`[-1]`) — catches the ancestor-heading-echo shape WP-38.1's discovery pool found
+  (`REQ-955ab005b394`).
+- Two new rules: `_is_orphaned_list_item()` (a list-marker-prefixed or "as defined in"-citation-only
+  quote with no governing clause) and `_is_dangling_clause()` (a bare-copula-first-word quote
+  missing its subject).
+
+*Calibration against WP-38.1's fixture caught real problems before they shipped — worth recording
+because this is exactly the process working as intended, not a footnote.* The first version of
+`_is_dangling_clause()` used three signals (lowercase-first-letter, bare-modal-first-word, trailing
+bare comma) that all seemed reasonable from the fragment examples alone. Running the new rules
+against all 333 hand-labeled records (not just the 6 targeted dangling-clause examples) surfaced 15
+real regressions against genuinely correct requirements and 4 scope violations against
+over-grab/judgment/malformed-garbled records that must stay untouched — all three broader signals
+turned out to be unsafe:
+- **Lowercase-first-letter**: this corpus's real DoD/AF-style responsibility lists commonly extract
+  individual list items starting mid-sentence on a shared "will:" governing clause — a real,
+  correctly-kept requirement (`REQ-474f99ed3b50`, `"establish, direct, and administer all aspects of
+  their respective organization's SCI security programs"`) starts lowercase exactly like a genuine
+  fragment does.
+- **Bare-modal-first-word** (shall/will/must/should/may): a real, correctly-kept requirement
+  (`REQ-580c9ef77b37`, `"must have a lawful governmental purpose for such access"`) has the identical
+  shape to the targeted fragment `"shall be coordinated with the customer"` — not safely
+  distinguishable by this signal alone.
+- **Trailing bare comma**: a real, correctly-kept requirement (`REQ-abf7f0a2a776`, ending
+  `"...in accordance with Paragraph 3.5.a(4),"`) ends in a comma that's a punctuation artifact of a
+  longer source list, not a sign of incomplete content.
+
+`_is_dangling_clause()` was narrowed to only the bare-copula-first-word signal (`Is`/`Are`/`Was`/`Were`
+as literally the quote's first word), the one signal that produced zero false positives when checked
+against the fixture. This dropped its own targeted catch rate from an originally-hoped-for higher
+number down to 1 of 6 — an honest tradeoff, not a shortfall to paper over: a narrow, safe rule that
+catches less is strictly better than a broad one that silently discards real requirements.
+
+*Real, code-verified results (`eval/verify_wp38_2_rules.py`, checking the actual rule functions
+against all 333 records in `eval/audit_wp38_1/unbiased_sample.jsonl`, committed):*
+
+| Check | Result |
+|---|---|
+| Real-record regressions (must be 0) | **0 / 284** |
+| Scope violations — over_grab/judgment/malformed_garbled caught (must be 0) | **0 / 28** |
+| `colon_too_long` fragments caught | **3 / 3** |
+| `orphaned_list_item` fragments caught | **2 / 12** (was 3/12 before Codex's second local-review pass — see below) |
+| `dangling_clause` fragments caught | **1 / 6** |
+| `malformed_garbled` fragments correctly left untouched | **4 / 4** |
+
+The `orphaned_list_item` and `colon_too_long` shapes were fully or mostly mechanically identifiable
+as scoped. `dangling_clause` was the shape where WP-38.2's own Scope text turned out optimistic —
+"three narrow, safe signals" became one after calibration, because most of that sub-pattern's real
+examples aren't syntactically distinguishable from genuine short requirements without actual
+grammatical analysis, which a regex can't safely do. This mirrors the same "cheapest fix wins, don't
+force it" discipline that reverted WP-37.2 rather than shipping a regression.
+
+*Broader sanity check beyond the fixture:* ran all four rules against the full current live corpus
+(1,872 records, not just the 333-record sample) — 15 records (0.8%, post-final-fix number; see
+below for the sequence of live-corpus figures across review rounds) would be newly rejected on a
+re-ingest, all spot-checked and genuinely correct (more instances of the same real shapes: e.g.
+`"is responsible for"`, four `"<term>, as defined in <citation>"` cross-references not in the
+original 12-example set). No new false positives found outside the fixture either. A small, surgical
+correction, not a broad sweep — consistent with the 7.3% weighted fragment prevalence WP-38.1 found
+(this WP doesn't close that whole gap; it closes the mechanically-safe portion of it).
+
+*Gemini + Codex review (PR #181) caught real bugs on top of the calibration above — worth recording
+in full, not glossed over:*
+- **[High, both reviewers independently, two rounds] `_DEFINED_IN_CITATION_RE` only anchored the
+  start of the quote**, so a real requirement opening with a definitional qualifier but continuing
+  with a real governing clause (e.g. `"Cybersecurity incidents, as defined in CNSSI 4009, shall be
+  reported immediately to the ISSO."`) matched the citation-opener prefix and was discarded whole.
+  Fixing this wasn't a simple end-of-string anchor — real citations legitimately contain internal
+  commas/periods (document numbers, titles), so the two real target examples (`REQ-4523443092b8`,
+  `REQ-e0471aa64a63`) would have broken under a naive `$`-anchored fix too (verified directly — the
+  reviewer's own suggested regex failed both).
+  **Round 1 fix (wrong in a way the same review round didn't catch):** checked whether anything after
+  "as defined in" contained an obligation verb from a small local list
+  (`shall`/`must`/`will`/`should`/`may`/etc.). **Round 2 (Gemini, re-reviewing the fix commit):**
+  this was backwards-fragile — *any* real obligation verb missing from the list (Gemini's example:
+  `"...as defined in Executive Order 13556, requires safeguarding controls."`, using "requires,"
+  not in the list) still found nothing, which made the function return `True` (citation-only) and
+  silently discard the real requirement. A verb whitelist can never be exhaustive enough to make that
+  failure direction safe, no matter how many verbs get added to it — the actual bug was the whole
+  approach, not the specific list. **Final fix:** replaced the verb-whitelist check with a structural
+  one — does the remainder after "as defined in" consist *only* of citation-shaped tokens (Title Case
+  document titles, ALL-CAPS/mixed acronyms, numeric document IDs, a small closed set of connector
+  words) with no ordinary lowercase prose word at all? Real citation reference text in this corpus is
+  consistently shaped that way; a real continuing obligation clause is ordinary lowercase prose. This
+  doesn't need to recognize every possible obligation verb, only what an ordinary English sentence
+  fragment looks like — a much smaller, more robust thing to get right, and verified against every
+  false positive found across both review rounds plus two more live-corpus citation examples not in
+  the original label set.
+- **[High, Codex] `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 6` let real, self-contained short
+  directives through**, both a hypothetical (`"(a) Encrypt all stored CUI."`) and a real live-corpus
+  record (`REQ-63cdc8363326`, `"(1) Identify individual responsibilities for protecting CUI."`) that
+  reads as fully complete and actionable on its own. Lowered to 3 words, which also means
+  `"(7) Communicate PPS securely across the DODIN."` (WP-38.1's own original fragment label,
+  6-word remainder) no longer gets caught — re-reading it during this fix, it's arguably closer to
+  the self-contained shape than the context-dependent one anyway (unlike `"(3) Restrain
+  competition."`, whose meaning actually inverts without its "shall not be used to:" governing
+  clause). `orphaned_list_item` coverage dropped from 4/12 to 3/12 as a direct result — an accepted,
+  correct trade, not a regression.
+- **[High, Gemini] `_is_heading_echo()` crashed on `section_title_path=None`** — WP-38.2's ancestry
+  loop dropped the original `if not section_title_path: return False` guard, and `for heading in
+  None:` raises `TypeError`. Restored the guard.
+- **[Medium, Gemini] `_is_dangling_clause()`'s first-word split missed non-space whitespace and
+  quote-wrapped copulas** — `split(" ", 1)` only splits on a literal space, and `.strip(".,;:")`
+  didn't include quote/bracket characters. Fixed to `split(maxsplit=1)` plus a broader strip set.
+- **[Medium, Codex] `eval/verify_wp38_2_rules.py` only failed on false positives**, not on a targeted
+  subtype's catch count silently dropping (or a rule being broken/deleted entirely) — added a
+  committed per-subtype minimum-catch baseline that now fails the script if coverage regresses.
+- **[Medium, Codex] `eval/audit_wp38_1/verify_against_rules.py` pinned the wrong thing** — an earlier
+  fix (this same PR) pinned the historical 25-word *constant* but still called the live (now-uncapped)
+  `_is_unrepairable_fragment()`, which silently reclassified the 3 original `REAL_GAP` records as
+  `SHOULD_BE_CAUGHT_BUT_ISNT` if the script were ever re-run. Fixed by reimplementing the pre-WP-38.2
+  predicate locally instead of importing the live function — confirmed the script now reproduces the
+  original `{NOT_COVERED_BY_DESIGN: 46, REAL_GAP: 3}` split exactly.
+
+*Round 3 (Gemini, re-reviewing the round-2 fix commit):*
+- **[High] Empty-remainder truthiness bug in `_is_orphaned_list_item()`** — the marker-match branch
+  used `if remainder and len(remainder.split()) <= N`, so a bare marker with *zero* words after it
+  (e.g. `"(1)"` alone) was treated as "no marker match" and let through unrejected — backwards from
+  every other point on this scale (a short remainder is correctly rejected; zero words is strictly
+  less content, not more). Removed the `remainder and` guard.
+
+*Round 4 (Gemini, re-reviewing the round-3 fix commit):*
+- **[Medium] Fixed punctuation-strip set missed quotes/brackets** — `_looks_like_citation_reference()`
+  stripped a fixed set of characters (originally just `",.()"`) to find each word's real first
+  letter; a lowercase prose word wrapped in quotes (e.g. `"'applies within the DoD'"`) had its
+  leading quote mark tested instead of the real first letter, misclassifying it as citation-shaped.
+  Generalized to stripping *any* non-alphanumeric character from both ends (`_NON_ALNUM_EDGE_RE`)
+  instead of growing an enumerated set one character at a time — closes the whole class of gap, not
+  just the one example found this round. Reused proactively in `_is_dangling_clause()`'s first-word
+  extraction too, before it was even flagged there.
+
+*Round 5 (Gemini, re-reviewing the round-4 fix commit):*
+- **[High] `_is_dangling_clause()` rejected real interrogative requirements** — a genuine question
+  starting with a bare copula (e.g. `"Is the system owner responsible for annual recertification?"`)
+  is a complete, self-contained requirement despite matching the bare-copula-opener signal. Added a
+  `?`-detection exemption (initially checking only the trailing non-alphanumeric run of the string).
+
+*Round 6 (Gemini, re-reviewing the round-5 fix commit) — four more findings, three real bugs and
+one hygiene issue:*
+- **[High] ALL-CAPS quotes broke the citation structural check** — `_looks_like_citation_reference()`
+  tells a citation token from real prose by checking whether a word's first letter is lowercase;
+  meaningless when the whole quote is ALL CAPS (every word "looks like" a citation token regardless
+  of what it actually is), so a real ALL-CAPS requirement continuing past its citation
+  (`"...SHALL BE REPORTED IMMEDIATELY TO THE ISSO."`) would've been discarded. Fixed by bailing out
+  (not citation-only) whenever the remainder is itself all-uppercase — this corpus has no known
+  ALL-CAPS body-text requirements today, but the fix costs nothing and closes a real structural gap.
+- **[High] The marker+remainder-length tension, raised a third time** — three new hypothetical
+  short, complete, marker-prefixed directives (`"(1) Encrypt stored CUI."`, `"(2) Restrict root
+  access."`, `"(3) Conduct annual audits."`), all exactly at the 3-word threshold. Weighed explicitly
+  against removing the signal outright: two independent full-corpus sweeps (before and after this
+  round's fix) found zero actual false positives from this branch, only the one real, verified catch
+  (`"(3) Restrain competition."`, 2-word remainder) — a repeatedly-raised but so-far-unconfirmed
+  theoretical risk against a signal with a real catch is grounds to narrow further, not necessarily
+  remove; a real demonstrated false positive would be grounds to remove it outright. Narrowed
+  `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS` from 3 to 2 — excludes all three new hypotheticals while
+  still catching the one real target. Full reasoning recorded in the constant's own comment so a
+  future session doesn't have to re-derive it.
+- **[Low] `eval/audit_wp38_1/verify_against_rules.py` still imported the live (WP-38.2-updated)
+  `_is_heading_echo()`** — the same class of gap as the earlier `_is_unrepairable_fragment` fix
+  (Codex, this same PR), just not caught for the second predicate at the time. Reimplemented the
+  pre-WP-38.2 heading-echo predicate locally too — confirmed the script still reproduces the original
+  `{NOT_COVERED_BY_DESIGN: 46, REAL_GAP: 3}` split.
+- **[Medium, hygiene] Missing `encoding="utf-8"` and bare (non-context-manager) `open()` calls**
+  across `eval/verify_wp38_2_rules.py` and the WP-38.1 audit scripts — real risk on a platform whose
+  default encoding isn't UTF-8. Fixed every instance found across all four WP-38 eval scripts in one
+  pass (grepped for the pattern, not just the one file flagged), not just the file Gemini's finding
+  named.
+
+*Round 7 (Gemini, re-reviewing the round-6 fix commit):*
+- **[Medium] Round 5's `?`-exemption only checked the trailing non-alphanumeric run** — a real
+  question followed by a trailing parenthetical or control-ID note after the `?` (e.g. `"Is
+  multi-factor authentication enforced? (see NIST SP 800-53)"`) has content after the `?`, so a
+  check scoped to only the string's trailing non-alphanumeric run missed it. Simplified to a
+  whole-string `"?" in stripped` check — safe here since this function only ever fires on an
+  already-narrow bare-copula-first-word trigger, so there's no reason to scope the exemption any
+  narrower than the signal being tested for.
+
+*Round 8 (Gemini, re-reviewing the round-7 fix commit):*
+- **[Medium] Round 6's own ALL-CAPS fix had the wrong scope, checking `remainder.isupper()` instead
+  of `source_quote.isupper()`** — a self-introduced regression: a short, genuine citation-only
+  remainder made purely of acronym/document-ID tokens (e.g. `"Term, as defined in CNSSI 4009."`) is
+  *also* all-uppercase on its own even though the rest of the quote (`"Term,"`) isn't, so round 6's
+  narrower check wrongly bailed out on (failed to reject) real citation-only fragments too. Widened
+  the guard to check the whole quote's casing instead — caught by Gemini's own next automatic
+  re-review of a fix I introduced, demonstrating the iterate-until-clean process catching its own
+  fixes' bugs, not just external findings.
+
+*Round 9 (Gemini, re-reviewing the round-8 fix commit):* no new findings — first fully clean pass
+after 8 rounds of real, verified fixes. Confirmed it specifically re-checked every prior round's
+fixed edge case (None inputs, ALL-CAPS quotes, quoted/bracketed prose, interrogative requirements,
+non-space whitespace, historical script pinning, UTF-8 encoding) rather than a shallow pass.
+
+*Codex, local review of PR #181 (run outside the GitHub review bots, reported directly by Tyler) —
+two findings, both verified via direct execution before acting on either:*
+- **[High] Confirmed via execution: `_is_orphaned_list_item()` still rejects genuinely complete
+  2-word directives** (`"(1) Encrypt CUI."`, `"(2) Patch systems."`, `"(a) Report incidents."`) at
+  the current threshold of 2. This is the fourth round raising the same marker+word-count tension
+  (rounds 1, 6, and now this one) — confirmed by reading `REQ-c6aeb8df528b`'s real source context
+  that the one verified real catch, `"(3) Restrain competition."`, is structurally identical in
+  shape (marker + 2-word verb+object + period) to Codex's counter-examples; no text-level signal
+  distinguishes a directive that needs its missing governing clause from one that doesn't. The
+  threshold is already at its floor — 1 would drop the one verified real catch to a bare-marker-only
+  rule, and raising it re-admits round 6's earlier 3-word hypotheticals. Put to Tyler directly as a
+  genuine precision/recall product decision rather than re-deciding it unilaterally a fourth time
+  with the same reasoning: **kept as-is**, on the strength of zero real false positives found across
+  two independent full-corpus sweeps (1,872 records) against only constructed counter-examples so
+  far. Pinned as an explicit, documented, accepted trade-off — both in
+  `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS`'s own comment and in a dedicated regression test
+  (`test_is_orphaned_list_item_true_for_short_directive_known_accepted_risk`) — so it reads as a
+  deliberate decision, not an unnoticed gap, if ever revisited.
+- **[High] Confirmed via execution: `_is_definitional_citation_only()` still discarded real
+  requirements whose citation opener is normal/title case but whose governing clause happens to be
+  rendered in ALL CAPS** (e.g. `"Compliance data, as defined in DODI 2000.26, SHALL BE REPORTED
+  IMMEDIATELY TO THE ISSO."`) — round 8's guard only fired when the *whole quote* was uppercase, and
+  neither the whole quote nor even the whole remainder is uppercase here (the citation portion,
+  `"DODI 2000.26,"`, isn't), so every word of a real, independent obligation clause still got
+  misclassified as citation-shaped. One of Codex's three examples went further and mixed a
+  title-case citation (`"Executive Order 13556"`) with an all-caps clause in the very same
+  remainder, which a simple `remainder.isupper()` check (round 6's original approach) wouldn't have
+  caught either. Replaced the whole-string uppercase checks from both round 6 and round 8 with a
+  structural signal: flag a run of 3+ *consecutive* all-caps multi-letter words (skipping over, not
+  resetting on, recognized connector words, since a real clause naturally contains "TO"/"THE"
+  mid-run) as unreliable to classify by case. A real citation's acronyms appear as isolated all-caps
+  tokens breaking up otherwise mixed-case document titles and numbers (`"NIST SP 800-53"` is the
+  longest run in this corpus, at 2); a "shouted" clause is a long consecutive run (`"SHALL BE
+  REPORTED IMMEDIATELY..."` runs to 5). Verified directly against all three of Codex's examples plus
+  every prior round's test case (round 6's regression test, round 8's three short-citation
+  positives, the multi-document citation test) before adopting this — all pass.
+
+*Codex, local review of PR #181, second pass (re-reviewing the fixes above) — one finding, resolved
+by a product-direction reversal rather than another narrowing:*
+- **Confirmed the ALL-CAPS-clause fix is correct** — Codex's three prior examples now return `False`
+  as expected, protected by the new test coverage.
+- **Re-flagged the marker+word-count tension as still a blocker**, correctly noting that the new test
+  (`test_is_orphaned_list_item_true_for_short_directive_known_accepted_risk`, since removed) had
+  pinned the false-rejection as expected behavior rather than fixed it, and asked directly whether
+  that was really the intended product call. It was Tyler's call from earlier in this same session
+  (see the entry above) — but put to him again given Codex was still calling it a blocker, since a
+  second independent flag on the same tension is worth a genuine second look, not a reflexive
+  "already decided" dismissal.
+  **Tyler reconsidered and reversed the decision**: remove the marker+word-count branch entirely
+  rather than keep narrowing or accepting the risk. His reasoning, recorded here directly because it
+  sets the actual product direction going forward, not just this WP's scope: *short enumerated child
+  items are not safe to reject by text length alone — many real requirements inherit their obligation
+  from a parent stem, and deleting child items breaks requirement continuity. The correct long-term
+  fix is parent-stem + child-item reconstruction before embedding/search, not filtering short
+  children as fragments. Losing the "(3) Restrain competition." catch is an acceptable cost: a
+  visible fragment left in place is less harmful than silently dropping a valid inherited
+  requirement.*
+  Implemented: removed `_LIST_MARKER_RE`, `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS`, and the marker
+  branch of `_is_orphaned_list_item()` entirely — only the citation-only branch remains.
+  `orphaned_list_item` coverage drops from 3/12 to 2/12 as a direct, accepted consequence (loses
+  `REQ-c6aeb8df528b`, `"(3) Restrain competition."`); `MIN_CATCH_BASELINE` in
+  `eval/verify_wp38_2_rules.py` updated to match. Re-verified against the fixture (0 regressions, 0
+  scope violations) and a fresh full-live-corpus sweep (4 remaining `orphaned_list_item` catches, all
+  genuine citation-only pointers, no marker-based false rejections left anywhere in 1,872 records).
+  Parent-stem + child-item reconstruction itself is **not** part of WP-38.2 — tracked as backlog, to
+  be scoped as its own WP if picked up (see `_is_orphaned_list_item()`'s docstring in
+  `pipeline/parse_and_normalize.py` for the pointer left in code).
+
+*Round 10 (Gemini, re-reviewing the marker+word-count removal above) — two findings:*
+- **[High] `_has_all_caps_clause_run()` still missed two real ALL-CAPS-clause shapes at
+  threshold=3.** Two contributing bugs, both confirmed via execution: (1) a digit-only token (e.g.
+  `"30"` in `"SHALL REPORT WITHIN 30 DAYS"`) failed `.isalpha()` and *reset* the consecutive-run
+  counter instead of being skipped like a connector word, even though a real clause naturally
+  contains numbers without that breaking it — fixed by skipping any token containing a digit, not
+  just pure-digit ones (a document-ID-shaped token like `"2000.26"` mixes digits with punctuation
+  too). (2) A short, digit-free 2-word all-caps clause (`"MUST COMPLY"`) never reached threshold=3 at
+  all — the digit fix alone doesn't help here since there's no digit to skip. This is the same "no
+  text-level signal safely distinguishes two genuinely different real shapes" wall already hit and
+  resolved once this session for `_is_orphaned_list_item()`'s marker+word-count branch: a
+  2-consecutive-all-caps-word run can be a real citation acronym pair (`"NIST SP"`) or a real short
+  clause (`"MUST COMPLY"`), and nothing about the words themselves tells them apart. Applied the same
+  principle Tyler set there — a missed catch is a strictly safer failure than a false rejection of
+  real content — and lowered `_ALL_CAPS_CLAUSE_RUN_THRESHOLD` from 3 to 2, rather than asking a third
+  near-identical question in the same session about the same underlying trade-off. This costs one
+  existing test (`"Control, as defined in NIST SP 800-53."`), confirmed to be a synthetic calibration
+  example added during round 8, not a real fixture or live-corpus record — and confirmed directly
+  that **zero** real `"as defined in"`-citation records in this corpus are ALL-CAPS at all, so the
+  trade currently costs nothing against real data on either side. Pinned as a known, accepted miss
+  with its own test, same pattern as the marker+word-count decision above.
+- **[Low] Stale comment in `run()`** — the inline comment above the `_is_orphaned_list_item()` call
+  still described the removed marker-based rejection (`"(3) Restrain competition."` as an example of
+  what gets rejected) after that branch was deleted in the commit just before this review. Updated to
+  describe only the citation-only branch that actually remains.
+
+All fixes re-verified against both the fixture (`eval/verify_wp38_2_rules.py`, still 0 regressions /
+0 scope violations / 0 coverage regressions) and a fresh full-live-corpus sweep before considering
+this WP done — the numbers throughout this Findings section are the post-fix, final ones.
+
+*Not done, by design:* the corpus was not re-ingested and Qdrant was not reindexed as part of this
+WP — these rules only affect *future* Step D runs. Existing indexed data is unaffected until the
+next re-ingest. Re-ingesting the corpus to apply these rules retroactively is a separate decision,
+not assumed here (matches this WP's Non-Goals: not touching indexed data).
+
 ---
 
-## 5. Backlog — Over-Grab Precision (deferred, not WP-38.2)
+## 5. Backlog (deferred, not WP-38.2)
 
-WP-38.1 found genuine over-grab failures (descriptive/definitional prose, reference-only pointers,
-explicit "examples of..." text, acknowledgment-template text) at 5.7% of the audited sample
-unweighted (5.8% population-weighted; 19/333 records) — real, but requiring actual reading
-comprehension to distinguish from real requirements,
-not a text pattern a deterministic rule can key on. Per the Guardrails below and this project's
-established preference for the cheapest fix that actually works: **not building a classifier now.**
-Revisit after WP-38.2 ships, re-measuring the over-grab rate on the post-fix corpus (WP-38.2's rule
-extensions don't touch this category, so the rate itself won't move — but re-measuring confirms it's
-still real before committing to a bigger build). If still material, the original proposal's shape
-(a small second-stage classifier, trained on this project's own documents — DoD/AF corpus preferred
-over off-theme sourcing like NIST 800-53/800-53A per the Phase Framing note above, validated on
-precision *and* recall against a freshly hand-verified set, not `eval/gold_eval_chunks*.jsonl`
-as-is) is still the right shape if and when it's scoped.
+**Over-Grab Precision.** WP-38.1 found genuine over-grab failures (descriptive/definitional prose,
+reference-only pointers, explicit "examples of..." text, acknowledgment-template text) at 5.7% of
+the audited sample unweighted (5.8% population-weighted; 19/333 records) — real, but requiring
+actual reading comprehension to distinguish from real requirements, not a text pattern a
+deterministic rule can key on. Per the Guardrails below and this project's established preference
+for the cheapest fix that actually works: **not building a classifier now.** Revisit after WP-38.2
+ships, re-measuring the over-grab rate on the post-fix corpus (WP-38.2's rule extensions don't touch
+this category, so the rate itself won't move — but re-measuring confirms it's still real before
+committing to a bigger build). If still material, the original proposal's shape (a small
+second-stage classifier, trained on this project's own documents — DoD/AF corpus preferred over
+off-theme sourcing like NIST 800-53/800-53A per the Phase Framing note above, validated on precision
+*and* recall against a freshly hand-verified set, not `eval/gold_eval_chunks*.jsonl` as-is) is still
+the right shape if and when it's scoped.
+
+**Parent-stem + child-item reconstruction.** Added during WP-38.2 (Codex local review of PR #181,
+second pass; product direction from Tyler — see the WP-38.2 Findings entry for the full reasoning).
+A real enumerated-list child item can be genuinely incomplete on its own text (e.g. `"(3) Restrain
+competition."`, needing its `"Classification shall not be used to:"` parent stem to mean what it
+actually means) without being detectable as such by any text-level signal — the fix isn't a better
+Step D rejection rule, it's reconstructing the parent stem + child item relationship before
+embedding/search, so the child item is indexed and retrieved *with* its governing context rather
+than either standing alone (misleading) or being deleted (lossy). Not scoped here — needs its own WP
+to work out where in the pipeline this reconstruction belongs (Step C extraction? A new Step between
+C and D? Enrichment?) and how it interacts with the existing `section_title_path`/hierarchy
+machinery already in `pipeline/chunk_text.py`.
 
 ---
 
@@ -456,9 +771,10 @@ as-is) is still the right shape if and when it's scoped.
       original wording here could never be satisfied by the "negligible rate, no action needed"
       conclusion the Goals and WP-38.1 Scope both explicitly allow for). (WP-38.2 properly scoped as
       a rule-extension WP above; over-grab classifier question explicitly deferred to backlog with a
-      documented re-measurement trigger, not silently dropped.)
-- [ ] Full `pytest` suite and `ruff check .` clean throughout. (WP-38.1's own changes: pending this
-      PR's verification pass. WP-38.2's own gate is separate, tracked in its own section above.)
+      documented re-measurement trigger, not silently dropped. WP-38.2 itself shipped, not just
+      scoped — see its own Findings above.)
+- [x] Full `pytest` suite and `ruff check .` clean throughout. (775 tests passed, including 13 new
+      for WP-38.2's rule functions; `ruff check .` clean.)
 
 ## 7. Guardrails
 

@@ -52,7 +52,8 @@ def _validate_against_live(manifest: dict) -> None:
         if live_path is None:
             mismatches.append(f"{doc_key}: not found in live corpus")
             continue
-        live_count = sum(1 for _ in open(live_path))
+        with open(live_path, encoding="utf-8") as f:
+            live_count = sum(1 for _ in f)
         live_hash = sha256_file(live_path)
         if live_count != meta["record_count"] or live_hash != meta["sha256"]:
             mismatches.append(
@@ -89,15 +90,14 @@ def main():
     )
     args = parser.parse_args()
 
-    sample = [json.loads(l) for l in open(SCRIPT_DIR / "unbiased_sample.jsonl")]
-    labels = {
-        json.loads(l)["requirement_id"]: json.loads(l)["category"]
-        for l in open(SCRIPT_DIR / "labeled_failures.jsonl")
-    }
+    with open(SCRIPT_DIR / "unbiased_sample.jsonl", encoding="utf-8") as f:
+        sample = [json.loads(line) for line in f]
+    with open(SCRIPT_DIR / "labeled_failures.jsonl", encoding="utf-8") as f:
+        labels = {rec["requirement_id"]: rec["category"] for rec in (json.loads(line) for line in f)}
     for rec in sample:
         rec["_category"] = labels.get(rec["requirement_id"], "REAL")
 
-    manifest = json.loads((SCRIPT_DIR / "source_manifest.json").read_text())
+    manifest = json.loads((SCRIPT_DIR / "source_manifest.json").read_text(encoding="utf-8"))
     if args.validate_against_live:
         _validate_against_live(manifest)
 

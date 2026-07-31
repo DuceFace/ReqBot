@@ -157,17 +157,26 @@ knowing the real rate and shape, not assuming it.
   documents through the full current pipeline (Step A→D.6) before auditing anything — this phase's
   own scoping already found that eyeballing the existing corpus mixes fresh and stale (pre-Phase-34)
   data, and stale data doesn't count as evidence of a current problem.
-- Sample and hand-review a real set of extracted records for genuine over-grab / fragment / other
-  failure shapes. Naive keyword matching produces mostly false alarms (confirmed above) — use a
-  better-targeted methodology (e.g., short-quote + no-modal-verb heuristics as a candidate filter,
-  narrowed further by hand review, similar in spirit to WP-35.1's harvester-heuristic-then-verify
-  pattern) rather than a blind full-corpus read.
-- For every genuine failure found, check it against `_is_heading_echo()`, `_is_unrepairable_fragment()`,
-  and the current `skip_sections` vocabulary to classify: real gap in existing coverage, not covered
-  by design (candidate for extension or classifier), or genuinely judgment-requiring.
-- Produce a committed count: X failures found / Y records sampled, broken down by category, with
-  example `requirement_id`s and quotes per category — same rigor as WP-35.1's hand-verified gold set,
-  not a summary without receipts.
+- **Two separate sampling passes, not one (Codex review, PR #179: a single heuristic-narrowed sample
+  cannot support both jobs at once).** (1) *Failure discovery* — a heuristic-narrowed candidate pool
+  (e.g. short-quote + no-modal-verb heuristics, similar in spirit to WP-35.1's harvester-heuristic-
+  then-verify pattern) is fine and efficient for *finding* real examples of each failure shape, since
+  naive keyword matching alone produces mostly false alarms (confirmed above). (2) *Prevalence
+  estimate* — a genuinely random or explicitly stratified-by-document sample, independent of any
+  discovery heuristic, hand-reviewed in full, is required for the "how much of the corpus is actually
+  affected" number the Goals ask for. Records that are genuine over-grabs but don't match the
+  discovery heuristic (wrong length, happens to contain a modal verb, etc.) would otherwise be
+  silently excluded from the denominator too — which could make a real problem look negligible for no
+  reason other than the heuristic's own blind spots, exactly the kind of composite-denominator mistake
+  already caught once in this project (`docs/PHASE36_REQUIREMENTS.md`'s WP-36.2 Findings).
+- For every genuine failure found (either pass), check it against `_is_heading_echo()`,
+  `_is_unrepairable_fragment()`, and the current `skip_sections` vocabulary to classify: real gap in
+  existing coverage, not covered by design (candidate for extension or classifier), or genuinely
+  judgment-requiring.
+- Produce a committed count from the *unbiased* sample specifically — X failures found / Y records in
+  the random/stratified sample — as the real prevalence estimate, broken down by category, with
+  example `requirement_id`s and quotes per category pulled from either sampling pass — same rigor as
+  WP-35.1's hand-verified gold set, not a summary without receipts.
 - End with an explicit, evidenced recommendation: build the classifier (WP-38.2 proposal as
   originally scoped), extend existing deterministic rules instead, some mix, or — if the real rate
   turns out to be negligible post-Phase-34 — that neither is currently warranted.
@@ -213,9 +222,18 @@ two shapes this WP could take, to be finalized once WP-38.1 reports in.
   rules** (e.g., relaxing `_is_unrepairable_fragment()`'s colon-only trigger to also catch short,
   no-modal-verb phrase fragments; extending `skip_sections`) — scope a much smaller, cheaper
   rule-extension WP instead. No classifier, no training data, no new dependency.
-- Either way: re-verify against `eval/eval_harness.py`'s precision/recall measurement (once its own
-  ground-truth concerns are addressed, if they haven't been already) before calling this phase done —
-  same "measure before declaring victory" discipline as every other phase in this project.
+- **Either way: `eval/eval_harness.py` cannot be used to verify this as-is (Codex review, PR #179,
+  verified directly against the code) — it loads each document's `*_extracted_requirements.jsonl`,
+  the raw Step C output, before `_is_unrepairable_fragment()`/`_is_heading_echo()` even run in Step D
+  and before any post-extraction classifier WP-38.2 might add. Scoring that file would show zero
+  change regardless of whether the filter helps, hurts, or does nothing — it isn't measuring the
+  artifact the filter touches.** Whichever WP-38.2 shape gets built, either extend
+  `eval/eval_harness.py` to score the correct later-stage artifact (post-Step-D for a rule extension,
+  post-filter for a classifier) or build an equivalent harness pointed at it — decide which as part of
+  scoping WP-38.2 itself, not assumed here. Re-verify precision *and* recall against that corrected
+  target (and, separately, `eval/gold_eval_chunks*.jsonl`'s own ground-truth concerns still apply if
+  reused) before calling this phase done — same "measure before declaring victory" discipline as every
+  other phase in this project.
 
 ---
 
@@ -223,8 +241,12 @@ two shapes this WP could take, to be finalized once WP-38.1 reports in.
 
 - [ ] WP-38.1's audit is complete: real counts, real categories, real examples, a grounded
       recommendation — not assumed from the original diagnosis alone.
-- [ ] The recommendation is acted on via a properly-scoped WP-38.2 (classifier or rule extension, per
-      what the evidence actually supports), not pre-decided by this doc.
+- [ ] The recommendation is acted on: either a properly-scoped WP-38.2 (classifier or rule extension,
+      per what the evidence actually supports), **or**, if WP-38.1's evidence supports it, a documented
+      conclusion that no further action is warranted — that's an equally valid, equally evidenced
+      outcome of this phase, not a failure to close it (corrected after Codex review, PR #179: the
+      original wording here could never be satisfied by the "negligible rate, no action needed"
+      conclusion the Goals and WP-38.1 Scope both explicitly allow for).
 - [ ] Full `pytest` suite and `ruff check .` clean throughout.
 
 ## 6. Guardrails

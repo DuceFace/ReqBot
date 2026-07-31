@@ -258,8 +258,15 @@ def _is_orphaned_list_item(source_quote: str) -> bool:
 
     match = _LIST_MARKER_RE.match(stripped)
     if match:
+        # WP-38.2 (Gemini review round 3, PR #181): no `remainder and` guard
+        # here -- a bare marker with *zero* words after it (e.g. "(1)" alone)
+        # is the most degenerate case of this shape, not an exemption from
+        # it. The old truthiness check treated an empty remainder as "no
+        # marker match" and let it through unrejected, backwards from every
+        # other point on this scale (a 1-3 word remainder is correctly
+        # rejected; 0 words is strictly less content, not more).
         remainder = stripped[match.end():].strip()
-        if remainder and len(remainder.split()) <= ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS:
+        if len(remainder.split()) <= ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS:
             return True
 
     return False

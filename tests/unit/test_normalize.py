@@ -428,6 +428,14 @@ def test_is_orphaned_list_item_numbered_marker_short_remainder():
     assert _is_orphaned_list_item("(3) Restrain competition.")
 
 
+def test_is_orphaned_list_item_bare_marker_zero_words():
+    # Gemini review round 3, PR #181: a bare marker with nothing after it at
+    # all is the most degenerate case of this shape, not an exemption --
+    # `remainder` is "" (falsy), and an earlier `if remainder and ...` guard
+    # let that slip through unrejected.
+    assert _is_orphaned_list_item("(1)")
+
+
 def test_is_orphaned_list_item_defined_in_citation():
     # REQ-4523443092b8 (afi10-2402): the whole quote is just a term plus a
     # citation, no independent obligation content.

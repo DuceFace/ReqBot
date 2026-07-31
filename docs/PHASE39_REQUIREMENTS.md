@@ -22,6 +22,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-39.1 — Parent-Stem Context Loss Audit | Complete |
+| WP-39.2 — Parent-Stem Reconstruction | Not started |
 
 ---
 
@@ -367,12 +368,106 @@ implemented, no schema changed, no reindex run. This is audit output only.
 
 ---
 
-## 5. Backlog (deferred, not WP-39.1)
+### WP-39.2 — Parent-Stem Reconstruction
 
-- **The reconstruction fix itself** (WP-39.2 or later) — per WP-39.1's Findings above: a deterministic
-  `parent_stem`/`embedding_text` reconstruction step (same-chunk lookup → preceding-chunk lookup →
-  `parent_header_text` fallback), no Step C prompt change, scoped to the 10/18 traced examples with a
-  cheap, confident fix; the harder `STEM_NEVER_EXTRACTED` and `GARBLED_TABLE` shapes deferred further.
+**Source:** WP-39.1's Findings and Recommendation above (`docs/PHASE39_REQUIREMENTS.md`), scoped
+directly from its evidence rather than assumed — same relationship as WP-38.1 → WP-38.2.
+
+**Problem:** 10 of the 18 known real fragment examples (7 `SAME_CHUNK_STEM_EXTRACTED`, 2
+`CROSS_CHUNK_SPLIT`, 1 `HEADING_IS_SUBJECT`) have their governing context sitting one deterministic
+lookup away — already extracted as a separate Step C record in the same or an adjacent chunk, or
+already computed as `parent_header_text` — but nothing in the pipeline captures it or uses it today.
+`build_embedding_text()` embeds `source_quote` alone. A real (not simulated) embedding-similarity
+check confirmed this measurably hurts retrieval, worst exactly where the bare quote carries the least
+content on its own (+0.264 similarity recovered for `"shall be coordinated with the customer"`
+against a realistic query).
+
+**Scope:**
+- **Define the reconstruction-candidate selector — this is new work, not a reuse of Step D's rejection
+  predicates.** WP-39.1 confirmed directly that `_is_orphaned_list_item()`/`_is_dangling_clause()`
+  flag only 1 of the 10 cheap-win examples (WP-38.2 deliberately narrowed/removed those predicates so
+  fragile-but-real requirements would *survive*, not so they'd be identifiable later). Candidacy is a
+  different, likely broader question than rejection-safety — false positives here just mean an
+  unhelpful `parent_stem` gets attached to an already-complete quote (a minor embedding-quality cost),
+  not a silently deleted requirement, so the precision bar can reasonably be lower than Step D's.
+  Starting point per WP-39.1: reuse structural signals already proven safe in this codebase (a
+  list-marker prefix, the deleted `_LIST_MARKER_RE` pattern; a short word count; the record's own
+  preceding same-chunk neighbor ending in `:`) as a *candidacy* heuristic. Calibrate against the same
+  18 known examples WP-39.1 traced (validate the selector actually catches the 10 intended cheap wins
+  and doesn't fire on the 8 that shouldn't get a `parent_stem` — the 2 `CITATION_ONLY_NOT_A_TARGET`
+  examples especially, since those are correctly non-actionable already).
+- **Reconstruction lookup, in order, falling through to "leave empty" rather than guessing** (per
+  WP-39.1's Recommendation):
+  1. the nearest preceding same-chunk record (from Step C's raw output, matched by `chunk_id`) that
+     looks like a stem — ends in `:`, or a similar structural signal already established in
+     `_is_unrepairable_fragment()`;
+  2. if not found, the same check against the *immediately preceding chunk* (same `document_id`,
+     sequential `chunk_id`) — covers the confirmed `CROSS_CHUNK_SPLIT` cases;
+  3. if still not found, fall back to `parent_header_text` directly — covers `HEADING_IS_SUBJECT` at
+     zero additional engineering cost, since that field already exists on every chunk record today.
+- **Placement: a new step *after* Step D**, reading `*_requirements_normalized.jsonl` (already has
+  `chunk_id` on every record) and writing `parent_stem`/`embedding_text` onto its own output — no
+  changes to `parse_and_normalize.py`'s existing, already-tested rejection logic (per WP-39.1's own
+  recommendation; confirmed `run()` builds `normalized` from an explicit field literal, so placing
+  reconstruction *before* Step D would need to touch that schema regardless — after avoids that
+  entirely).
+- Add `parent_stem` and `embedding_text` fields to the schema (Tyler's original example: `source_quote`
+  + `parent_stem` + a combined `embedding_text`). Update `pipeline/embed_and_index.py`'s
+  `build_embedding_text()` to prefer `embedding_text` when present, falling back to `source_quote` when
+  absent — backward compatible, no forced reindex.
+- Validate against the 10 known cheap-win examples specifically: did each recover the *correct* stem
+  (matching what WP-39.1 already hand-verified), not just *some* non-empty value.
+- Re-run WP-39.1's own retrieval-similarity methodology (real `nomic-embed-text` embeddings via
+  `core.config.load()`, not simulated) across a broader sample post-fix — WP-39.1 only spot-checked 3
+  examples; confirm the improvement generalizes before calling this done.
+
+**Non-goals:**
+- **Not touching Step C's LLM prompt.** Per WP-39.1's recommendation — this WP is a deterministic,
+  no-model-call fix.
+- **Not attempting `STEM_NEVER_EXTRACTED` (3 examples) or `GARBLED_TABLE` (2 examples).** The former
+  needs either a Step C fix or raw-chunk-text stitching (a different mechanism from the lookup above);
+  the latter needs table-structure-aware serialization in `chunk_text.py` (WP-39.1 confirmed the real
+  table structure exists via Docling's `export_to_dataframe()` — a genuinely different, separately
+  scoped fix, not this WP's job). Both explicitly deferred so this WP isn't blocked shipping the
+  well-evidenced 10/18.
+- **Not forcing a `parent_stem` guess onto `AMBIGUOUS_MAY_NOT_BE_REQ`** (1 example) — same "honest gap
+  over false confidence" discipline as `_is_orphaned_list_item()`'s bare-noun-phrase case in WP-38.2.
+- **Not re-ingesting or reindexing the corpus as part of this WP** — schema/code changes only affect
+  future runs, matching WP-38.2's own precedent; re-ingesting the rest of the corpus is a separate,
+  explicit decision.
+- **Not building a general contextual-embedding system.** Targeted, per-record, only for records the
+  candidate selector actually flags — not the universal per-record approach WP-37.2 tried and reverted.
+
+**Tests/verification:**
+- New unit tests for the candidate-selector heuristic and each of the three lookup steps, using real
+  corpus examples (same discipline as WP-38.2's rule tests — cite real `requirement_id`s, not
+  hypotheticals).
+- Regression check against all 18 WP-39.1 examples: the 10 cheap wins recover the correct stem, the 8
+  others (`STEM_NEVER_EXTRACTED`, `GARBLED_TABLE`, `CITATION_ONLY_NOT_A_TARGET`, `AMBIGUOUS_MAY_NOT_BE_REQ`)
+  correctly get no `parent_stem` attached.
+- `build_embedding_text()` tests confirming `embedding_text` is preferred when present and the fallback
+  to `source_quote` still works when absent.
+- Retrieval-similarity re-check (real embeddings) across a broader sample, not just the 3 WP-39.1
+  spot-checked.
+- Full `pytest` suite and `ruff check .` clean throughout.
+
+**Gate:** `parent_stem`/`embedding_text` reconstruction implemented and placed per the recommendation
+above; validated against all 18 known examples with *correct* (not just non-empty) results; retrieval
+improvement re-confirmed on a broader sample; Step D's existing rejection logic untouched; full test
+suite and `ruff check .` clean.
+
+**Findings:** _(pending — filled in once WP-39.2 runs)_
+
+---
+
+## 5. Backlog (deferred, not WP-39.1 or WP-39.2)
+
+- **`STEM_NEVER_EXTRACTED` (3 examples) and `GARBLED_TABLE` (2 examples)** — explicitly out of
+  WP-39.2's scope (see its Non-Goals above). The former needs either a Step C prompt fix or
+  raw-chunk-text stitching; the latter needs table-structure-aware serialization in `chunk_text.py`
+  (WP-39.1 confirmed real table structure exists via Docling's `export_to_dataframe()` — a separately
+  scoped fix, not a `parent_stem` field). Worth their own WP if the rate justifies it after WP-39.2
+  ships and the corpus is re-measured.
 - **Over-Grab Precision** — still open from Phase 38, unrelated to this phase's problem; see
   `docs/PHASE38_REQUIREMENTS.md`'s Backlog.
 

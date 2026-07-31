@@ -513,14 +513,15 @@ These are quality experiments, not guaranteed product work.
    path deliberately and accept the duplication. Don't assume fixing one
    path covers the others.
 
-   Blocking prerequisite: there is no retrieval-precision eval set today.
-   eval/eval_harness.py measures Step C extraction precision/recall (gold
-   chunk -> extracted requirements), not query -> ranked-result relevance.
-   The archived PHASE15 plan assumed a "Phase 15 evaluation query set"
-   existed as a success-criteria reference, but that phase was deferred
-   before one was ever built. Build a small query -> relevant-requirement_ids
-   gold set (reusing the existing gold_eval_chunks hand-labeling pattern)
-   before any Precision@5 number can mean anything.
+   [RESOLVED -- Phase 37, WP-37.1, 2026-07-31] Former blocking prerequisite:
+   there was no retrieval-precision eval set. eval/eval_harness.py measures
+   Step C extraction precision/recall (gold chunk -> extracted requirements),
+   not query -> ranked-result relevance -- a different thing. Now exists:
+   eval/retrieval_eval_harness.py (recall@k, MRR) against
+   eval/gold_retrieval_queries.jsonl (16 hand-verified queries, real
+   documented baseline in docs/PHASE37_REQUIREMENTS.md's WP-37.1 Findings).
+   Use that harness directly for this reranker spike's own Precision@5 gate
+   rather than building a second, separate eval set.
 
    Secondary implementation notes:
    - retrieve()'s fusion_limit is only widened past top_k when min_score > 0
@@ -583,6 +584,52 @@ These are quality experiments, not guaranteed product work.
      queries to know what it's actually good for.
    - Clearly label grc_context results as lower-confidence than curated
      requirements.
+
+6. [DETERMINISTIC VARIANT TRIED AND REVERTED -- Phase 37, WP-37.2,
+   2026-07-31; LLM-generated variant remains UNTESTED] Contextual
+   per-chunk embeddings (Anthropic's Contextual Retrieval technique)
+   (Corrected after Codex review, PR #178: the original header on this item
+   labeled the full LLM-generated technique itself as "tried and reverted,"
+   which is wrong and could mislead future triage into treating Anthropic's
+   actual published approach as experimentally rejected. Only the cheap
+   deterministic precursor below was ever built or measured.)
+
+   WP-37.2 tried the free, deterministic version first (document title +
+   section_title_path + a truncated parent_context excerpt, prepended before
+   embedding, no LLM call) and measured a real regression against WP-37.1's
+   harness, not an improvement: mean recall@5 0.6683->0.58, MRR 0.8542->0.7217
+   under a controlled (--no-hyde) before/after comparison
+   (docs/PHASE37_REQUIREMENTS.md WP-37.2 Findings has the full per-query
+   table -- 11 of 12 non-zero queries regressed or held flat (5 regressed,
+   6 flat), 1 was genuinely mixed, none improved). Reverted -- not deployed.
+
+   Hypothesis, evidenced but not proven as sole cause (corrected after Codex
+   review, PR #178 -- the original draft cited a record that, checking the
+   actual retrieved-results data directly, never appeared in either run's
+   top-20 at all): this corpus's DoD/AF documents are organized by
+   procedural/administrative structure ("SECTION 2: RESPONSIBILITIES",
+   "3.7.2. Methodology", "1.2. POLICY") rather than by topic, so section
+   headings and surrounding paragraph text don't reliably correlate with
+   what a specific requirement clause is actually about -- the load-bearing
+   assumption the deterministic technique depended on. A verified example
+   consistent with this: a firewall/boundary-protection requirement
+   (REQ-e41d286c83f4, afi17-203) confirmed present at rank 4 in the before
+   run and confirmed absent from the after run's full top-20 has a new
+   prefix describing incident-response "Methodology" -- procedural framing,
+   not its own topic. One example in a hybrid RRF system with many
+   simultaneously-changed candidates can't fully isolate causation on its
+   own; treat this as a well-evidenced hypothesis, not a proven mechanism.
+
+   This means naively scaling straight to the LLM-generated version isn't a
+   safe next step either -- an LLM given the same section-heading/
+   parent_context inputs could make the same mistake. If revisited, the
+   prompt needs to explicitly recognize and skip procedural/administrative
+   framing (section numbers, "RESPONSIBILITIES"/"POLICY"/"DECLARATION"-style
+   headings) rather than just summarizing whatever surrounding text exists.
+   Re-measure against the same eval/retrieval_eval_harness.py +
+   eval/gold_retrieval_queries.jsonl before considering it an improvement --
+   don't assume the published technique's benchmark numbers transfer to a
+   structurally different corpus.
 
 
 ================================================================

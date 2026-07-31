@@ -513,14 +513,15 @@ These are quality experiments, not guaranteed product work.
    path deliberately and accept the duplication. Don't assume fixing one
    path covers the others.
 
-   Blocking prerequisite: there is no retrieval-precision eval set today.
-   eval/eval_harness.py measures Step C extraction precision/recall (gold
-   chunk -> extracted requirements), not query -> ranked-result relevance.
-   The archived PHASE15 plan assumed a "Phase 15 evaluation query set"
-   existed as a success-criteria reference, but that phase was deferred
-   before one was ever built. Build a small query -> relevant-requirement_ids
-   gold set (reusing the existing gold_eval_chunks hand-labeling pattern)
-   before any Precision@5 number can mean anything.
+   [RESOLVED -- Phase 37, WP-37.1, 2026-07-31] Former blocking prerequisite:
+   there was no retrieval-precision eval set. eval/eval_harness.py measures
+   Step C extraction precision/recall (gold chunk -> extracted requirements),
+   not query -> ranked-result relevance -- a different thing. Now exists:
+   eval/retrieval_eval_harness.py (recall@k, MRR) against
+   eval/gold_retrieval_queries.jsonl (16 hand-verified queries, real
+   documented baseline in docs/PHASE37_REQUIREMENTS.md's WP-37.1 Findings).
+   Use that harness directly for this reranker spike's own Precision@5 gate
+   rather than building a second, separate eval set.
 
    Secondary implementation notes:
    - retrieve()'s fusion_limit is only widened past top_k when min_score > 0
@@ -583,6 +584,39 @@ These are quality experiments, not guaranteed product work.
      queries to know what it's actually good for.
    - Clearly label grc_context results as lower-confidence than curated
      requirements.
+
+6. [TRIED AND REVERTED -- Phase 37, WP-37.2, 2026-07-31] LLM-generated
+   per-chunk contextual embeddings (Anthropic's full Contextual Retrieval
+   technique)
+   WP-37.2 tried the free, deterministic version first (document title +
+   section_title_path + a truncated parent_context excerpt, prepended before
+   embedding) and measured a real regression against WP-37.1's harness, not
+   an improvement: mean recall@5 0.6683->0.58, MRR 0.8542->0.7217 under a
+   controlled (--no-hyde) before/after comparison (docs/PHASE37_REQUIREMENTS.md
+   WP-37.2 Findings has the full per-query table and root-cause example).
+   Reverted -- not deployed.
+
+   Root cause, not just observed: this corpus's DoD/AF documents are
+   organized by procedural/administrative structure ("SECTION 2:
+   RESPONSIBILITIES", "3.2. DECLARATION", "1.2. POLICY") rather than by
+   topic, so section headings and surrounding paragraph text don't reliably
+   correlate with what a specific requirement clause is actually about --
+   the load-bearing assumption the deterministic technique depended on.
+   Confirmed concretely: a firewall/boundary-protection requirement filed
+   under a "DECLARATION" section (about an unrelated administrative
+   process) got its embedding pulled toward "declaration process" and away
+   from its own real topic once that section heading was prepended.
+
+   This means naively scaling straight to the LLM-generated version isn't a
+   safe next step either -- an LLM given the same section-heading/
+   parent_context inputs could make the same mistake. If revisited, the
+   prompt needs to explicitly recognize and skip procedural/administrative
+   framing (section numbers, "RESPONSIBILITIES"/"POLICY"/"DECLARATION"-style
+   headings) rather than just summarizing whatever surrounding text exists.
+   Re-measure against the same eval/retrieval_eval_harness.py +
+   eval/gold_retrieval_queries.jsonl before considering it an improvement --
+   don't assume the published technique's benchmark numbers transfer to a
+   structurally different corpus.
 
 
 ================================================================

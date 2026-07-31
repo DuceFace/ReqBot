@@ -17,7 +17,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-37.1 — Retrieval-Quality Eval Harness (Baseline) | Complete |
-| WP-37.2 — Contextual Chunk Embeddings | Not started |
+| WP-37.2 — Contextual Chunk Embeddings | Complete — negative result, reverted (not deployed) |
 
 ---
 
@@ -274,18 +274,81 @@ against the exact same labeled query set WP-37.1 established; no regression in e
 `reqbot ask` manually exercised against a few real questions post-reindex to confirm results still
 look sane, not just that the numbers moved.
 
+**Findings (2026-07-31) — negative result, reverted, not deployed:**
+
+- **Implemented and unit-tested** `build_context_prefix()`/extended `build_embedding_text()` in
+  `pipeline/embed_and_index.py` exactly per Scope: document title + `section_title_path` as a header
+  line, plus a word-boundary-truncated (100-char cap) `parent_context` excerpt — deterministic,
+  metadata-only, no LLM call. Naive sentence-boundary splitting (on `". "`) was tried first and
+  rejected before writing any code: this corpus's DoD/AF documents are full of numbered outline
+  markers (`"1.4.1. Establish... 1.4.2. Provide..."`) that a period-based split mis-splits on, so
+  truncation is word-boundary-only.
+- **Controlled before/after comparison, following this WP's own Scope guardrail against HyDE noise
+  (Codex review, PR #177):** ran WP-37.1's exact harness with `--no-hyde` against both the old
+  (bare-`source_quote`) index and the new (contextual-prefix) index — same queries, same labels, only
+  the embedded text differs. Real numbers, `eval/spike_results/wp_37_2/{before,after}_no_hyde/`:
+
+  | Metric | Before | After | Δ |
+  |---|---|---|---|
+  | Mean recall@5 | 0.6683 | 0.5800 | **−0.0883** |
+  | Mean recall@10 | 0.7118 | 0.6503 | **−0.0615** |
+  | Mean recall@20 | 0.7523 | 0.7220 | **−0.0303** |
+  | Mean MRR | 0.8542 | 0.7217 | **−0.1325** |
+
+  Every aggregate metric regressed. Also ran production defaults (`hyde=True`) on both sides for a
+  realistic-behavior cross-check: WP-37.1's original baseline (recall@5=0.6719, MRR=0.8611) vs. this
+  WP's after-state (recall@5=0.58, MRR=0.8264) — same direction, same rough magnitude. The regression
+  is consistent whether or not HyDE noise is controlled for, so it isn't an artifact of that risk.
+- **Per-query breakdown (`--no-hyde`, the controlled comparison): 11 of 12 non-zero queries got worse
+  or stayed flat; zero improved.** All 7 narrow queries held roughly steady (one dip: Q-N01's
+  recall@5 1.0→0.5, recovering to 1.0 by recall@20). All 5 broad queries regressed, two severely
+  (Q-B02: MRR 0.25→0.0769, its top-10 lost its only true positive entirely; Q-B05: MRR 1.0→0.3333).
+- **Root-caused, not just observed.** Read the actual new embedding text for Q-B02's ("firewalls and
+  boundary protection devices") missed true positive, `REQ-0b553500baf4`: its prefix is
+  `"DODI 8551.01 — SECTION 2: RESPONSIBILITIES > 3.2. DECLARATION."` plus a `parent_context` excerpt
+  about *"the PPSM program implements an automated declaration process..."* — the section is titled
+  and organized around a bureaucratic *process* (declaration), not the *substantive topic* (boundary
+  protection devices) the requirement clause is actually about. Prepending that prefix pulls the
+  embedding toward "declaration process" semantics and away from the "firewall/boundary protection"
+  signal the bare quote carried on its own. This isn't a one-off: DoD/AF regulatory documents are
+  broadly organized by procedural/administrative structure (`"SECTION 2: RESPONSIBILITIES"`,
+  `"3.2. DECLARATION"`, `"1.2. POLICY"`) rather than by topic, unlike more topically-organized prose
+  documents — section headings and surrounding paragraph text don't reliably correlate with a specific
+  requirement clause's actual subject matter in this corpus, the load-bearing assumption this WP's
+  deterministic technique depends on.
+- **Reverted, not merged into production.** `pipeline/embed_and_index.py` restored to its pre-WP-37.2
+  form (`git checkout main -- pipeline/embed_and_index.py`); its own unit tests removed with it (dead
+  code otherwise); the live Qdrant index reindexed back to the bare-`source_quote` embeddings and
+  confirmed at 1,876/1,876 points. `reqbot ask` manually re-exercised post-revert against a real
+  question ("What are the encryption requirements for protecting data?") — five on-topic, sensibly
+  ranked results, sane behavior confirmed. This phase's Gate only requires a real, honestly-reported
+  delta "whatever direction it actually is" — it does not require shipping a change that measurably
+  makes retrieval worse.
+- **This is still a real, useful result, not a wasted WP.** It rules out the cheap, free version of
+  contextual embeddings for this specific corpus and gives a concrete, evidenced reason why (procedural
+  vs. topical document structure) rather than a vague "didn't help." That reason specifically argues
+  *against* naively scaling straight to Anthropic's full LLM-generated-context technique next, since an
+  LLM given the same section-heading/parent_context inputs could make the same mistake — a future
+  attempt needs the LLM prompt to explicitly recognize and skip procedural/administrative framing, not
+  just summarize whatever surrounding text exists. See `docs/TODO_future_improvements.txt` for the
+  backlog item.
+
 ---
 
 ## 5. Success Gate
 
-- [ ] Qdrant's live index matches the full processed corpus (confirmed via `reqbot status` vs.
+- [x] Qdrant's live index matches the full processed corpus (confirmed via `reqbot status` vs.
       `reqbot docs`), not the 173/1,876-point drift found while scoping this phase.
-- [ ] A committed, hand-verified retrieval-quality labeled query set exists, with a documented
+- [x] A committed, hand-verified retrieval-quality labeled query set exists, with a documented
       baseline (recall@k, MRR) against current production `reqbot ask` behavior.
-- [ ] Contextual chunk embeddings are implemented and the corpus is reindexed with them.
-- [ ] A real, honestly-reported before/after delta exists on the exact same query set — whatever
-      direction it actually points.
-- [ ] Full `pytest` suite and `ruff check .` clean; `reqbot ask` manually exercised post-change.
+- [x] Contextual chunk embeddings were implemented, unit-tested, and the corpus was reindexed with
+      them for real measurement — **not** left deployed: the measured result was a real regression, so
+      the code was reverted and the live index restored to bare-`source_quote` embeddings (WP-37.2
+      Findings). This gate is about honest measurement, not about a change surviving contact with data.
+- [x] A real, honestly-reported before/after delta exists on the exact same query set, controlled for
+      HyDE sampling noise — the delta pointed negative, reported as such, not reframed as a partial win.
+- [x] Full `pytest` suite and `ruff check .` clean; `reqbot ask` manually exercised both post-change
+      (mid-experiment) and post-revert (final state) to confirm sane behavior throughout.
 
 ## 6. Guardrails
 

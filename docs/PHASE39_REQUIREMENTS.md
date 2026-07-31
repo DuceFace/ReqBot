@@ -317,9 +317,28 @@ scope (universal vs. targeted).
       — no changes to `parse_and_normalize.py` at all.
       (b) is probably cleaner (zero risk to Step D's existing, already-tested rejection logic) and is
    this WP's recommendation, but WP-39.2 should make the call explicitly rather than assume either.
-3. Whichever placement is chosen, the reconstruction step attempts — only for records already flagged
-   by the existing `_is_orphaned_list_item()`/`_is_dangling_clause()` detectors, in order, falling
-   through to "leave empty" rather than guessing:
+3. **The trigger condition needs its own new selector — not the existing Step D rejection
+   predicates** (Codex local review of PR #183: caught that the original draft here said "only for
+   records already flagged by the existing `_is_orphaned_list_item()`/`_is_dangling_clause()`
+   detectors" — checked directly against the current code and this is wrong. WP-38.2 deliberately
+   removed `_is_orphaned_list_item()`'s marker/list-item branch entirely and kept
+   `_is_dangling_clause()` narrowed to bare-copula-openers only, precisely so these fragile-but-real
+   requirements would *survive* un-rejected rather than risk a false rejection. Checked all 7 of the
+   `SAME_CHUNK_STEM_EXTRACTED`/`CROSS_CHUNK_SPLIT` "cheap win" examples against both current
+   detectors: only `REQ-1b1071c8d317` (the bare-copula case) is flagged by either one. Gating
+   reconstruction on these predicates would miss essentially all of the 10 cheap wins this
+   recommendation is built on — the two jobs are opposites: Step D's predicates decide "is this
+   unsafe enough to delete," precision-first; reconstruction candidacy needs to decide "is this short
+   enough to plausibly benefit from more context," which is a different, likely broader question).
+   **WP-39.2 needs to define this selector itself as part of its own scope** — not assumed solved
+   here. A plausible starting point (not a commitment): reuse the *structural* signals already proven
+   safe in this file (list-marker prefix via a regex like the deleted `_LIST_MARKER_RE`, a short word
+   count, a colon-terminated preceding record) as a *candidacy* heuristic rather than a *rejection*
+   heuristic — false positives here are far cheaper than in Step D (attaching an unhelpful
+   `parent_stem` to an already-complete quote is a minor embedding-quality cost, not a silently
+   deleted requirement), so the precision bar can reasonably be lower than Step D's.
+4. Whichever placement and trigger condition are chosen, the reconstruction step attempts, in order,
+   falling through to "leave empty" rather than guessing:
    a. the nearest preceding same-chunk Step C record that looks like a stem (ends in `:`, or
       similar structural signal already established in `_is_unrepairable_fragment()`);
    b. if not found, the same check against the *immediately preceding chunk* (same `document_id`,
@@ -328,14 +347,14 @@ scope (universal vs. targeted).
       at zero additional engineering cost, since that field already exists on every chunk record.
    Then update `build_embedding_text()` to prefer `embedding_text` when present, falling back to
    `source_quote` — backward compatible, no reindex forced.
-4. **Leave `STEM_NEVER_EXTRACTED` (3 examples) and `GARBLED_TABLE` (2 examples) out of WP-39.2's
+5. **Leave `STEM_NEVER_EXTRACTED` (3 examples) and `GARBLED_TABLE` (2 examples) out of WP-39.2's
    scope.** The former needs either a Step C fix (out of step with recommendation #1) or raw-chunk-text
    stitching (a meaningfully different, riskier mechanism than steps 2a-2c); the latter needs
    table-structure-aware handling, a different problem entirely. Both are real, but scoping them into
    the same WP as the 10 cheap wins risks the whole WP stalling on the hard 30% instead of shipping
    the easy, well-evidenced 70%. Worth their own future WP if the rate justifies it after WP-39.2
    ships and the corpus is re-measured.
-5. `AMBIGUOUS_MAY_NOT_BE_REQ` (1 example): don't force a `parent_stem` guess onto it. If it stays
+6. `AMBIGUOUS_MAY_NOT_BE_REQ` (1 example): don't force a `parent_stem` guess onto it. If it stays
    unrejected and unreconstructed after WP-39.2, that's the same "honest gap over false confidence"
    discipline already established for `_is_orphaned_list_item()`'s bare-noun-phrase case in WP-38.2.
 

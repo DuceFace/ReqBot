@@ -16,7 +16,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-36.1 — Exact-Match Short-Circuit for the Entailment Check | Not started |
+| WP-36.1 — Exact-Match Short-Circuit for the Entailment Check | Complete |
 | WP-36.2 — Re-sweep the Entailment Threshold Post-Fix | Not started |
 
 ---
@@ -151,6 +151,34 @@ live in WP-35.5's integration run.
 **Gate:** The 4 known exact-match false positives from WP-35.2's original sweep are eliminated
 without any change to the fabricated-example catch rate; the short-circuit is proven not to fire on a
 real near-miss case, not just on literal duplicates.
+
+**Findings (2026-07-31):**
+
+- `is_fabricated_obligation()` confirmed directly (not assumed) to already return `False` for
+  identical strings — no change needed there; only `run()`'s MiniCheck batching needed the
+  short-circuit.
+- Checked the boundary question against real data before implementing: `eval/gold_description_
+  grounding.jsonl` has 10 near-miss pairs (ratio > 0.9 after `normalize_text()`, not exact) — a
+  dropped leading list marker (`(5)`, `e.`), a trailing period, a `will`→`must` modal swap, and the
+  known modality-fabrication catch `REQ-757d551b3e59` itself. None of these are caught by plain
+  literal equality after `normalize_text()`, confirming that boundary (no separate/fuzzier helper)
+  is correct — permissive enough to catch the real exact-copy shape, not so permissive it swallows a
+  case that should still be checked.
+- Confirmed directly against `eval/gold_description_grounding.jsonl`'s `wp_35_1_harvest` partition
+  (8 fabricated, 92 faithful) that none of the 8 fabricated examples are exact matches — the
+  short-circuit provably cannot affect their scoring path.
+- Live-ran the real `pipeline/entailment_gate.run()` (real installed MiniCheck, not mocked) against
+  that same 100-record partition:
+  - All 4 known exact-match false positives (`REQ-938435202cf9`, `REQ-8105d9acb410`,
+    `REQ-fd23f59eb131`, `REQ-69fe659699bb`) now pass.
+  - Fabricated catch rate: 8/8 (up from WP-35.2's entailment-only 7/8 — expected, not a WP-36.1
+    effect: production `run()` combines entailment OR modality, and none of the 8 changed their
+    entailment-scoring path at all).
+  - Faithful false-positive rate dropped from 5/92 (5.4%) to 1/92 (1.1%). The one remaining rejection
+    (`REQ-7b7cbb7ef5b7`) is the already-documented genuine near-paraphrase from WP-35.2's original
+    sweep, correctly *not* short-circuited (Non-Goal: no fuzzy matching) — this WP was never meant to
+    fix that one.
+- Full `pytest` (751 passed) and `ruff check .` clean.
 
 ---
 

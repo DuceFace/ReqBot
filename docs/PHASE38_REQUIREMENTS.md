@@ -473,7 +473,7 @@ against all 333 records in `eval/audit_wp38_1/unbiased_sample.jsonl`, committed)
 | Real-record regressions (must be 0) | **0 / 284** |
 | Scope violations — over_grab/judgment/malformed_garbled caught (must be 0) | **0 / 28** |
 | `colon_too_long` fragments caught | **3 / 3** |
-| `orphaned_list_item` fragments caught | **4 / 12** |
+| `orphaned_list_item` fragments caught | **3 / 12** |
 | `dangling_clause` fragments caught | **1 / 6** |
 | `malformed_garbled` fragments correctly left untouched | **4 / 4** |
 
@@ -485,12 +485,55 @@ grammatical analysis, which a regex can't safely do. This mirrors the same "chea
 force it" discipline that reverted WP-37.2 rather than shipping a regression.
 
 *Broader sanity check beyond the fixture:* ran all four rules against the full current live corpus
-(1,872 records, not just the 333-record sample) — 21 records (1.1%) would be newly rejected on a
+(1,872 records, not just the 333-record sample) — 17 records (0.9%) would be newly rejected on a
 re-ingest, all spot-checked and genuinely correct (more instances of the same real shapes: e.g.
 `"is responsible for"`, two more `"<term>, as defined in <citation>"` cross-references not in the
 original 12-example set). No new false positives found outside the fixture either. A small, surgical
 correction, not a broad sweep — consistent with the 7.3% weighted fragment prevalence WP-38.1 found
 (this WP doesn't close that whole gap; it closes the mechanically-safe portion of it).
+
+*Gemini + Codex review (PR #181) caught real bugs on top of the calibration above — worth recording
+in full, not glossed over:*
+- **[High, both reviewers independently] `_DEFINED_IN_CITATION_RE` only anchored the start of the
+  quote**, so a real requirement opening with a definitional qualifier but continuing with a real
+  governing clause (e.g. `"Cybersecurity incidents, as defined in CNSSI 4009, shall be reported
+  immediately to the ISSO."`) matched the citation-opener prefix and was discarded whole. Fixing this
+  wasn't a simple end-of-string anchor — real citations legitimately contain internal commas/periods
+  (document numbers, titles), so the two real target examples (`REQ-4523443092b8`, `REQ-e0471aa64a63`)
+  would have broken under a naive `$`-anchored fix too (verified directly — the reviewer's own
+  suggested regex failed both). Fixed instead by checking whether anything *after* "as defined in"
+  contains an obligation verb (a small local list — `shall`/`must`/`will`/`should`/`may`/etc. — not
+  the profile's `obligation_verbs`, to keep this module profile-independent); if it does, there's a
+  real clause continuing past the citation.
+- **[High, Codex] `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 6` let real, self-contained short
+  directives through**, both a hypothetical (`"(a) Encrypt all stored CUI."`) and a real live-corpus
+  record (`REQ-63cdc8363326`, `"(1) Identify individual responsibilities for protecting CUI."`) that
+  reads as fully complete and actionable on its own. Lowered to 3 words, which also means
+  `"(7) Communicate PPS securely across the DODIN."` (WP-38.1's own original fragment label,
+  6-word remainder) no longer gets caught — re-reading it during this fix, it's arguably closer to
+  the self-contained shape than the context-dependent one anyway (unlike `"(3) Restrain
+  competition."`, whose meaning actually inverts without its "shall not be used to:" governing
+  clause). `orphaned_list_item` coverage dropped from 4/12 to 3/12 as a direct result — an accepted,
+  correct trade, not a regression.
+- **[High, Gemini] `_is_heading_echo()` crashed on `section_title_path=None`** — WP-38.2's ancestry
+  loop dropped the original `if not section_title_path: return False` guard, and `for heading in
+  None:` raises `TypeError`. Restored the guard.
+- **[Medium, Gemini] `_is_dangling_clause()`'s first-word split missed non-space whitespace and
+  quote-wrapped copulas** — `split(" ", 1)` only splits on a literal space, and `.strip(".,;:")`
+  didn't include quote/bracket characters. Fixed to `split(maxsplit=1)` plus a broader strip set.
+- **[Medium, Codex] `eval/verify_wp38_2_rules.py` only failed on false positives**, not on a targeted
+  subtype's catch count silently dropping (or a rule being broken/deleted entirely) — added a
+  committed per-subtype minimum-catch baseline that now fails the script if coverage regresses.
+- **[Medium, Codex] `eval/audit_wp38_1/verify_against_rules.py` pinned the wrong thing** — an earlier
+  fix (this same PR) pinned the historical 25-word *constant* but still called the live (now-uncapped)
+  `_is_unrepairable_fragment()`, which silently reclassified the 3 original `REAL_GAP` records as
+  `SHOULD_BE_CAUGHT_BUT_ISNT` if the script were ever re-run. Fixed by reimplementing the pre-WP-38.2
+  predicate locally instead of importing the live function — confirmed the script now reproduces the
+  original `{NOT_COVERED_BY_DESIGN: 46, REAL_GAP: 3}` split exactly.
+
+All fixes re-verified against both the fixture (`eval/verify_wp38_2_rules.py`, still 0 regressions /
+0 scope violations / 0 coverage regressions) and a fresh full-live-corpus sweep before considering
+this WP done — the numbers throughout this Findings section are the post-fix, final ones.
 
 *Not done, by design:* the corpus was not re-ingested and Qdrant was not reindexed as part of this
 WP — these rules only affect *future* Step D runs. Existing indexed data is unaffected until the

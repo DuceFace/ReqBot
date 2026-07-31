@@ -399,6 +399,14 @@ def test_is_heading_echo_false_when_no_heading_in_path_matches():
     )
 
 
+def test_is_heading_echo_false_for_none_section_title_path():
+    # Gemini review, PR #181: removing the immediate-heading-only check also
+    # dropped the guard against section_title_path being None (not just an
+    # empty list) -- a bare `for heading in None:` raises TypeError. Must not
+    # crash, same as the pre-existing empty-list case.
+    assert not _is_heading_echo("Any quote text.", None)
+
+
 def test_is_unrepairable_fragment_no_longer_capped_by_length():
     # REQ-97e6e5483093 (DODI 5200.44): a real 41-word colon-terminated
     # fragment that WP-34.2's original 25-word cap let through -- WP-38.2
@@ -443,6 +451,34 @@ def test_is_orphaned_list_item_false_for_real_quote_no_marker():
     assert not _is_orphaned_list_item("KERs shall be approved by the MC4EB.")
 
 
+def test_is_orphaned_list_item_false_for_marker_short_but_self_contained():
+    # Codex review, PR #181 (both a hypothetical and a real live-corpus
+    # example, REQ-63cdc8363326: "(1) Identify individual responsibilities
+    # for protecting CUI.") -- a short marker-prefixed remainder isn't
+    # automatically a fragment; a genuinely complete short directive must
+    # survive. This is why ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS was
+    # tightened from 6 to 3 words during calibration.
+    assert not _is_orphaned_list_item("(a) Encrypt all stored CUI.")
+    assert not _is_orphaned_list_item(
+        "(1) Identify individual responsibilities for protecting CUI."
+    )
+
+
+def test_is_orphaned_list_item_false_for_citation_with_real_clause_after():
+    # Gemini + Codex review, PR #181: _DEFINED_IN_CITATION_RE only anchors
+    # the start of the quote, so a real requirement that opens with a
+    # definitional qualifier but continues with a real governing clause must
+    # not be swallowed just because it starts the same way as a genuine
+    # citation-only fragment.
+    assert not _is_orphaned_list_item(
+        "Cybersecurity incidents, as defined in CNSSI 4009, shall be "
+        "reported immediately to the ISSO."
+    )
+    assert not _is_orphaned_list_item(
+        "Covered data, as defined in DoDI X, must be encrypted."
+    )
+
+
 def test_is_dangling_clause_bare_copula_first_word():
     # REQ-1b1071c8d317 (afi17-203): missing its real subject before "Is".
     assert _is_dangling_clause(
@@ -481,6 +517,16 @@ def test_is_dangling_clause_false_for_trailing_comma_real_requirement():
         "Reporting or accounting for UD of CUI shall be done in accordance "
         "with Paragraph 3.5.a(4),"
     )
+
+
+def test_is_dangling_clause_bare_copula_with_non_space_whitespace_after():
+    # Gemini review, PR #181: splitting only on a literal " " missed a bare
+    # copula followed by a newline/tab instead of a space.
+    assert _is_dangling_clause("Is\nresponsible for coordinating enclave-wide activities.")
+
+
+def test_is_dangling_clause_bare_copula_wrapped_in_quote_marks():
+    assert _is_dangling_clause('"Is designated the CNDSP Certification Authority."')
 
 
 def test_orphaned_list_item_rejected_in_full_pipeline(tmp_path):

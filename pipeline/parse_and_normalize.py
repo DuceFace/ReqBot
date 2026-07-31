@@ -100,6 +100,8 @@ def _is_heading_echo(source_quote: str, section_title_path: list[str]) -> bool:
     on the same normalized form skip_sections filtering already uses -- not
     separate matching logic (WP-34.2).
     """
+    if not section_title_path:
+        return False
     normalized_quote = _normalize_heading(source_quote)
     if not normalized_quote:
         return False
@@ -144,22 +146,68 @@ _LIST_MARKER_RE = re.compile(r"^(?:\(\d+\)|\([a-zA-Z]\)|-\s*[a-zA-Z]\.)\s*")
 # WP-38.2: after stripping a list marker, a remainder this short (in words) is
 # too terse to carry independent obligation content of its own -- it's a bare
 # fragment of a larger enumerated list, not a self-contained requirement.
-# Calibrated against WP-38.1's audit fixture (eval/audit_wp38_1/): real
-# fragment examples like "(3) Restrain competition." (2-word remainder) and
-# "(7) Communicate PPS securely across the DODIN." (6-word remainder) must be
-# caught; a real, self-contained directive like "(6) Directs the PPSM PMO to
-# document the assurance category for all PPS in the CAL." (15-word
-# remainder) must NOT be -- it's a real directive WP-38.1 filed as
-# judgment-requiring, not a fragment. 6 leaves headroom between the two
-# without swallowing genuinely complete short directives.
-ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 6
+# Originally set to 6, calibrated only against WP-38.1's specific fragment
+# examples -- Codex review (PR #181) found this let real, complete short
+# directives through too, both a hypothetical ("(a) Encrypt all stored CUI.",
+# 4-word remainder) and a real live-corpus record
+# (REQ-63cdc8363326, "(1) Identify individual responsibilities for protecting
+# CUI.", 6-word remainder -- a genuinely complete, actionable directive, not a
+# fragment needing external context). Lowered to 3: still catches the
+# clearest real fragment ("(3) Restrain competition.", 2-word remainder,
+# meaningless/inverted without its "shall not be used to:" governing clause)
+# while no longer swallowing either of the above. This trades away catching
+# "(7) Communicate PPS securely across the DODIN." (6-word remainder,
+# WP-38.1's own original fragment label) -- re-reading it during this
+# calibration, it reads as a plausible, meaningful, self-contained directive
+# on its own, similar in kind to the ones this rule must NOT reject, so
+# losing it is the correct trade, not just an accepted cost.
+ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 3
 
 # WP-38.2: an entire quote whose only content is a term followed by a
 # "as defined in <citation>" cross-reference carries no independent
 # obligation -- it's a definitional pointer, not a requirement (e.g.
 # "Suspicious activity reporting, as defined in DoDI 2000.26, Suspicious
-# Activity Reporting.").
+# Activity Reporting."). Only anchors the START of the quote (no `$`) because
+# a real citation's own reference text legitimately contains internal commas
+# and periods (document numbers, titles) -- anchoring to end-of-string would
+# reject real citation-only quotes just as readily as it rejects the false
+# positive below, so it isn't a safe fix on its own (see
+# _has_obligation_after_citation_opener()).
 _DEFINED_IN_CITATION_RE = re.compile(r"^[^,]{1,80},\s*as defined in\b", re.IGNORECASE)
+
+# WP-38.2 (Gemini + Codex review, PR #181): _DEFINED_IN_CITATION_RE alone
+# false-positives on a real requirement that starts with a definitional
+# qualifier but then continues with a real governing clause, e.g.
+# "Cybersecurity incidents, as defined in CNSSI 4009, shall be reported
+# immediately to the ISSO." -- the regex matches the citation-opener prefix
+# and the function returned True unconditionally, discarding the real
+# requirement. Checked after the opener matches: if anything after "as
+# defined in" contains an obligation verb, there's a real clause continuing
+# past the citation, so this isn't citation-only content after all. A small,
+# local list rather than importing profiles/cybersecurity.json's
+# obligation_verbs -- this module has no other profile dependency, and this
+# check is deliberately narrower than "any obligation-shaped word" (it only
+# needs to catch the common cases; a missed edge case here just means a
+# citation-only quote that has to be reasoned about, not a discarded real
+# requirement -- the two failure directions aren't symmetric, so this list
+# only needs to be safe, not exhaustive).
+_OBLIGATION_VERB_RE = re.compile(
+    r"\b(shall|must|will|should|may|required to|is responsible for|are to|"
+    r"ensure|implement|establish|maintain|enforce)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_definitional_citation_only(source_quote: str) -> bool:
+    """True if source_quote opens with "<term>, as defined in <citation>" and
+    nothing after that opener looks like a real, independent governing clause
+    (WP-38.2, narrowed after Gemini + Codex review, PR #181 -- see
+    _OBLIGATION_VERB_RE's docstring above for why)."""
+    match = _DEFINED_IN_CITATION_RE.match(source_quote)
+    if not match:
+        return False
+    remainder = source_quote[match.end():]
+    return not _OBLIGATION_VERB_RE.search(remainder)
 
 
 def _is_orphaned_list_item(source_quote: str) -> bool:
@@ -190,7 +238,7 @@ def _is_orphaned_list_item(source_quote: str) -> bool:
     if not stripped:
         return False
 
-    if _DEFINED_IN_CITATION_RE.match(stripped):
+    if _is_definitional_citation_only(stripped):
         return True
 
     match = _LIST_MARKER_RE.match(stripped)
@@ -247,7 +295,7 @@ def _is_dangling_clause(source_quote: str) -> bool:
     stripped = source_quote.strip()
     if not stripped:
         return False
-    first_word = stripped.split(" ", 1)[0].strip(".,;:")
+    first_word = stripped.split(maxsplit=1)[0].strip(".,;:\"'()[]")
     return first_word.lower() in _BARE_COPULA_OPENERS
 
 

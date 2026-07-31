@@ -12,23 +12,31 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from pipeline.parse_and_normalize import (
-    _is_heading_echo,
-    _is_unrepairable_fragment,
-)
+from pipeline.parse_and_normalize import _is_heading_echo
 
 SKIP_SECTIONS = {
     "GLOSSARY", "REFERENCES", "ACRONYMS", "DEFINITIONS",
     "ABBREVIATIONS", "TABLE OF CONTENTS", "TERMS",
 }
 
-# WP-34.2's original word cap on _is_unrepairable_fragment(), removed by
-# WP-38.2 (the length check no longer exists in the function at all -- see
-# docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings). Pinned here, not
-# imported, so this script keeps documenting the pre-WP-38.2 rule state this
-# audit actually measured, rather than silently reflecting whatever the
-# constant happens to be today.
+# WP-34.2's original _is_unrepairable_fragment(), word cap included -- WP-38.2
+# removed the cap from the real pipeline function entirely (see
+# docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings), so importing the live
+# function here would silently reclassify this audit's own colon-too-long
+# REAL_GAP findings as SHOULD_BE_CAUGHT_BUT_ISNT if this script were ever
+# re-run (Codex review, PR #181 -- pinning only the word-count *constant*,
+# not this predicate, didn't actually preserve the historical behavior the
+# original comment claimed). Reimplemented locally, standalone, so this
+# script keeps documenting the pre-WP-38.2 rule state this audit actually
+# measured, not whatever the live pipeline function does today.
 _PRE_WP_38_2_UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25
+
+
+def _pre_wp38_2_is_unrepairable_fragment(source_quote: str) -> bool:
+    stripped = source_quote.strip()
+    if not stripped.endswith(":"):
+        return False
+    return len(stripped.split()) <= _PRE_WP_38_2_UNREPAIRABLE_FRAGMENT_MAX_WORDS
 
 # (requirement_id: (category, subtype)) -- category is FRAGMENT/OVER_GRAB/JUDGMENT.
 # subtype is the specific sub-shape from PHASE38_REQUIREMENTS.md's Findings
@@ -107,7 +115,7 @@ def main():
         quote = rec.get("source_quote") or ""
         section_path = rec.get("section_title_path") or []
         heading_echo = _is_heading_echo(quote, section_path)
-        unrepairable = _is_unrepairable_fragment(quote)
+        unrepairable = _pre_wp38_2_is_unrepairable_fragment(quote)
         word_count = len(quote.strip().split())
         ends_colon = quote.strip().endswith(":")
         heading_upper = {h.upper() for h in section_path}

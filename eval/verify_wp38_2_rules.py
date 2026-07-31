@@ -8,7 +8,10 @@ Confirms, against all 333 records in eval/audit_wp38_1/unbiased_sample.jsonl:
      (no regression -- the single most important check).
   2. For each fragment subtype, whether its targeted rule now catches it
      (colon_too_long -> _is_unrepairable_fragment, orphaned_list_item ->
-     _is_orphaned_list_item, dangling_clause -> _is_dangling_clause).
+     _is_orphaned_list_item, dangling_clause -> _is_dangling_clause) -- and
+     FAILS if the catch count drops below the committed baseline below (Codex
+     review, PR #181: an earlier version only checked for false positives, so
+     a rule silently breaking or being deleted entirely would still exit 0).
   3. malformed_garbled (explicitly out of scope) and all over_grab/judgment
      records are correctly left untouched by every rule -- confirms scope
      discipline, not accidental over-reach.
@@ -33,6 +36,16 @@ from pipeline.parse_and_normalize import (
 )
 
 FIXTURE_DIR = _ROOT / "eval" / "audit_wp38_1"
+
+# Committed floor for each targeted subtype's catch count, from the real
+# results recorded in docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings. A drop
+# below these means a rule regressed or was broken/removed -- fails the
+# script rather than just printing a lower number (Codex review, PR #181).
+MIN_CATCH_BASELINE = {
+    "colon_too_long": 3,
+    "orphaned_list_item": 3,
+    "dangling_clause": 1,
+}
 
 
 def rejected_by(rec: dict) -> str | None:
@@ -92,6 +105,7 @@ def main():
         "dangling_clause": "dangling_clause",
         "malformed_garbled": None,  # explicitly out of scope
     }
+    coverage_regressions = []
     for subtype, expected_rule in target_rule.items():
         results = subtype_results.get(subtype, [])
         matched = sum(1 for _, hit in results if hit == expected_rule)
@@ -99,6 +113,9 @@ def main():
             print(f"  {subtype:20s} {matched}/{len(results)} correctly left untouched (out of scope)")
         else:
             print(f"  {subtype:20s} {matched}/{len(results)} caught by its targeted rule")
+            baseline = MIN_CATCH_BASELINE[subtype]
+            if matched < baseline:
+                coverage_regressions.append((subtype, matched, baseline))
         for req_id, hit in results:
             if expected_rule is None:
                 status = "OK (untouched)" if hit is None else f"SCOPE VIOLATION (hit={hit})"
@@ -112,10 +129,15 @@ def main():
         print(f"  !! SCOPE VIOLATION: {req_id} ({category}/{subtype}) rejected by {rule}")
 
     print()
-    if real_regressions or scope_violations:
-        print("FAILED: regressions or scope violations found.")
+    print(f"Coverage regressions -- catch count below committed baseline (MUST be 0): {len(coverage_regressions)}")
+    for subtype, matched, baseline in coverage_regressions:
+        print(f"  !! COVERAGE REGRESSION: {subtype} caught {matched}, baseline is {baseline}")
+
+    print()
+    if real_regressions or scope_violations or coverage_regressions:
+        print("FAILED: regressions, scope violations, or coverage regressions found.")
         sys.exit(1)
-    print("PASSED: no regressions on real records, no scope violations.")
+    print("PASSED: no regressions on real records, no scope violations, no coverage regressions.")
 
 
 if __name__ == "__main__":

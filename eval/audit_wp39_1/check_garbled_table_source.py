@@ -27,6 +27,14 @@ PAGE = 20  # chunk_id=55's page_start/page_end in afi17-203_chunks.jsonl
 
 
 def main():
+    if not PDF_PATH.exists():
+        # raw_pdfs/ is gitignored (see docs/PHASE38_REQUIREMENTS.md's Phase Framing) --
+        # a fresh checkout or CI environment won't have it (Gemini review, PR #183).
+        raise SystemExit(
+            f"Source PDF not found at {PDF_PATH}. raw_pdfs/ is gitignored and not part "
+            f"of this repo -- place afi17-203.pdf there to run this check."
+        )
+
     from docling.document_converter import DocumentConverter
 
     converter = DocumentConverter()

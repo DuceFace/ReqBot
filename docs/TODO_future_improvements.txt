@@ -600,8 +600,8 @@ These are quality experiments, not guaranteed product work.
    harness, not an improvement: mean recall@5 0.6683->0.58, MRR 0.8542->0.7217
    under a controlled (--no-hyde) before/after comparison
    (docs/PHASE37_REQUIREMENTS.md WP-37.2 Findings has the full per-query
-   table -- 10 of 12 non-zero queries regressed or held flat, 1 was
-   genuinely mixed, none improved). Reverted -- not deployed.
+   table -- 11 of 12 non-zero queries regressed or held flat (5 regressed,
+   6 flat), 1 was genuinely mixed, none improved). Reverted -- not deployed.
 
    Hypothesis, evidenced but not proven as sole cause (corrected after Codex
    review, PR #178 -- the original draft cited a record that, checking the

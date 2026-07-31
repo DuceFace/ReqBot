@@ -299,15 +299,17 @@ look sane, not just that the numbers moved.
   realistic-behavior cross-check: WP-37.1's original baseline (recall@5=0.6719, MRR=0.8611) vs. this
   WP's after-state (recall@5=0.58, MRR=0.8264) — same direction, same rough magnitude. The regression
   is consistent whether or not HyDE noise is controlled for, so it isn't an artifact of that risk.
-- **Per-query breakdown (`--no-hyde`, the controlled comparison): 10 of 12 non-zero queries got worse
-  or stayed flat, 1 was genuinely mixed, 0 improved outright** (corrected after Codex review, PR #178
-  — the original draft of this Finding wrongly lumped Q-B04 in with the pure regressions). All 7
-  narrow queries held roughly steady (one dip: Q-N01's recall@5 1.0→0.5, recovering to 1.0 by
-  recall@20). 4 of 5 broad queries regressed outright, two severely (Q-B02: MRR 0.25→0.0769; Q-B05:
-  MRR 1.0→0.3333). **Q-B04 is mixed, not a regression**: recall@10 actually rose (0.3333→0.4) while
-  recall@20 fell (0.4667→0.4) and recall@5/MRR stayed flat (0.2/1.0 both runs) — reported honestly as
-  mixed rather than folded into "regressed," per this WP's own Scope commitment to report per-query
-  movement accurately.
+- **Per-query breakdown (`--no-hyde`, the controlled comparison): 11 of 12 non-zero queries got worse
+  or stayed flat (5 regressed, 6 held flat), 1 was genuinely mixed, 0 improved outright** (corrected
+  after Codex + Gemini review, PR #178 — the original draft of this Finding wrongly lumped Q-B04 in
+  with the pure regressions, and then a follow-up fix mis-summed the regressed+flat total as 10
+  instead of 11; both caught by review, not self-caught, recounted directly against the saved
+  `results.json` files to confirm). All 7 narrow queries held roughly steady (6 exactly flat, one dip:
+  Q-N01's recall@5 1.0→0.5, recovering to 1.0 by recall@20). 4 of 5 broad queries regressed outright,
+  two severely (Q-B02: MRR 0.25→0.0769; Q-B05: MRR 1.0→0.3333). **Q-B04 is mixed, not a regression**:
+  recall@10 actually rose (0.3333→0.4) while recall@20 fell (0.4667→0.4) and recall@5/MRR stayed flat
+  (0.2/1.0 both runs) — reported honestly as mixed rather than folded into "regressed," per this WP's
+  own Scope commitment to report per-query movement accurately.
 - **A verified, evidenced example consistent with the regression hypothesis — not an unretrieved
   record, and not claimed as a proven causal mechanism (corrected after Codex review, PR #178: the
   original draft cited `REQ-0b553500baf4`, which checking the actual `retrieved_ids` arrays directly

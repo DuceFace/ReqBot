@@ -224,17 +224,38 @@ def _looks_like_citation_reference(word: str) -> bool:
 # What actually distinguishes the two is the *shape* of the all-caps run,
 # not whether the whole string happens to be uppercase: a real citation's
 # acronyms appear as isolated all-caps tokens breaking up otherwise mixed-
-# case document titles and numbers ("NIST SP 800-53" is the longest run in
-# this corpus, at 2), while a "shouted" clause is a long run of consecutive
-# all-caps words ("SHALL BE REPORTED IMMEDIATELY..." runs to 5). Flagging a
-# run of 3+ consecutive all-caps multi-letter words (skipping over, not
-# resetting on, recognized connector words -- a real clause naturally
-# contains "TO"/"THE" mid-run) as unreliable-to-classify-by-case catches all
-# three of Codex's examples while leaving every prior round's test case
-# (round 6, round 8's three short-citation positives, the multi-document
-# citation test) correctly classified -- verified directly against all of
-# them before adopting this.
-_ALL_CAPS_CLAUSE_RUN_THRESHOLD = 3
+# case document titles and numbers, while a "shouted" clause is a run of
+# consecutive all-caps words ("SHALL BE REPORTED IMMEDIATELY..." runs to 5).
+# Flagging a run of 2+ consecutive all-caps multi-letter alphabetic words
+# (skipping over, not resetting on, recognized connector words and any token
+# containing a digit -- a real clause naturally contains "TO"/"THE" mid-run,
+# or a number like "WITHIN 30 DAYS", without that breaking the clause) as
+# unreliable-to-classify-by-case catches all three of Codex's examples plus
+# every prior round's test case.
+#
+# Gemini's next automatic re-review (PR #181) found two more real gaps at
+# the original threshold of 3: (1) a digit-only token (e.g. "30" in "SHALL
+# REPORT WITHIN 30 DAYS") failed `.isalpha()` and *reset* the run instead of
+# being skipped like a connector word, breaking runs that should have stayed
+# intact; (2) threshold=3 still missed a short 2-word all-caps clause with no
+# digits at all ("MUST COMPLY"). Fixing (1) alone doesn't fix (2) -- a clause
+# with no digit token in it never benefits from skip-instead-of-reset.
+# Lowering the threshold to 2 is the same "no text-level signal safely
+# distinguishes two genuinely different real shapes" wall already hit and
+# resolved once this session for _is_orphaned_list_item()'s marker+
+# word-count branch: a 2-consecutive-all-caps-word run can be a real citation
+# (an acronym pair like "NIST SP") or a real short clause ("MUST COMPLY"),
+# and nothing about the words themselves tells them apart. Applying the same
+# principle Tyler set there -- a missed catch (leaving a real citation-only
+# fragment unrejected) is a strictly safer failure than a false rejection
+# (silently discarding a real short obligation clause) -- threshold lowered
+# to 2. Confirmed the one existing test this costs
+# (`"Control, as defined in NIST SP 800-53."`) is itself a synthetic
+# calibration example added during round 8, not a real fixture or live-corpus
+# record; no real "as defined in"-citation record in this corpus is
+# ALL-CAPS at all (checked directly), so this trade currently costs nothing
+# against real data on either side.
+_ALL_CAPS_CLAUSE_RUN_THRESHOLD = 2
 
 
 def _has_all_caps_clause_run(remainder: str) -> bool:
@@ -244,6 +265,8 @@ def _has_all_caps_clause_run(remainder: str) -> bool:
         if not stripped:
             continue
         if stripped.lower() in _CITATION_CONNECTOR_WORDS:
+            continue
+        if any(c.isdigit() for c in stripped):
             continue
         if stripped.isalpha() and stripped.isupper():
             run += 1
@@ -725,10 +748,12 @@ def run(
             failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "unrepairable_fragment_quote", "raw": req})
             continue
 
-        # WP-38.2: reject a bare enumerated-list item or definitional
-        # cross-reference extracted without its governing clause (e.g. "(3)
-        # Restrain competition." -- item 3 of a "shall not be used to:" list,
-        # meaningless standalone).
+        # WP-38.2: reject a definitional cross-reference with no independent
+        # obligation content of its own (e.g. "Term, as defined in CNSSI
+        # 4009."). Does NOT reject a short enumerated-list item by marker or
+        # word count alone -- see _is_orphaned_list_item()'s docstring
+        # (Gemini review, PR #181, caught this comment going stale after that
+        # branch was removed).
         if _is_orphaned_list_item(source_quote):
             failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "orphaned_list_item_quote", "raw": req})
             continue

@@ -540,7 +540,22 @@ def test_is_orphaned_list_item_true_for_short_acronym_only_citation():
     # original case.
     assert _is_orphaned_list_item("Term, as defined in CNSSI 4009.")
     assert _is_orphaned_list_item("Data, as defined in DODI 5200.01.")
-    assert _is_orphaned_list_item("Control, as defined in NIST SP 800-53.")
+
+
+def test_is_orphaned_list_item_false_for_two_word_acronym_citation_known_accepted_miss():
+    # Gemini review, PR #181 (re-reviewing the ALL-CAPS-clause fix above):
+    # found two real cases where _ALL_CAPS_CLAUSE_RUN_THRESHOLD=3 still let a
+    # short all-caps obligation clause ("MUST COMPLY", 2 words, no digits)
+    # through misclassified as citation-only. No text-level signal
+    # distinguishes a real 2-consecutive-all-caps-word clause from a real
+    # 2-consecutive-all-caps-word citation acronym pair (like "NIST SP") --
+    # threshold lowered to 2, applying the same "prefer a missed catch over a
+    # false rejection of real content" principle Tyler set for
+    # _is_orphaned_list_item()'s marker+word-count branch. This costs the one
+    # test below, which was always a synthetic calibration example (added
+    # round 8), not a real fixture or live-corpus record -- pinned here as a
+    # known, accepted miss rather than left silently changed.
+    assert not _is_orphaned_list_item("Control, as defined in NIST SP 800-53.")
 
 
 def test_is_orphaned_list_item_false_for_mixed_case_citation_with_all_caps_clause():
@@ -566,6 +581,31 @@ def test_is_orphaned_list_item_false_for_mixed_case_citation_with_all_caps_claus
     assert not _is_orphaned_list_item(
         "Controlled Unclassified Information, as defined in Executive "
         "Order 13556, REQUIRES SAFEGUARDING CONTROLS."
+    )
+
+
+def test_is_orphaned_list_item_false_for_all_caps_clause_with_digit_token():
+    # Gemini review, PR #181: a digit-only token (e.g. "30" in "WITHIN 30
+    # DAYS") failed `.isalpha()` in _has_all_caps_clause_run and *reset* the
+    # consecutive-all-caps-word run instead of being skipped like a connector
+    # word -- a real clause naturally contains numbers ("WITHIN 30 DAYS",
+    # "within 5 business days") without that breaking the clause. Any token
+    # containing a digit is now skipped (transparent), not just pure-digit
+    # tokens, since a real document-ID-shaped token ("2000.26") also mixes
+    # digits with punctuation.
+    assert not _is_orphaned_list_item(
+        "Requirement, as defined in DoDI 2000.26, SHALL REPORT WITHIN 30 DAYS."
+    )
+
+
+def test_is_orphaned_list_item_false_for_short_all_caps_clause_no_digits():
+    # Gemini review, PR #181: a short (2-word) all-caps clause with no digit
+    # token at all ("MUST COMPLY") wasn't fixed by the digit-skip fix above --
+    # it needed _ALL_CAPS_CLAUSE_RUN_THRESHOLD itself lowered from 3 to 2 (see
+    # the constant's own comment for the full reasoning and the one test this
+    # trades away).
+    assert not _is_orphaned_list_item(
+        "Requirement, as defined in DoDI 2000.26, MUST COMPLY."
     )
 
 

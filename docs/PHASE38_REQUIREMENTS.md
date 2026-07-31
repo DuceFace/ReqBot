@@ -692,6 +692,32 @@ by a product-direction reversal rather than another narrowing:*
   be scoped as its own WP if picked up (see `_is_orphaned_list_item()`'s docstring in
   `pipeline/parse_and_normalize.py` for the pointer left in code).
 
+*Round 10 (Gemini, re-reviewing the marker+word-count removal above) — two findings:*
+- **[High] `_has_all_caps_clause_run()` still missed two real ALL-CAPS-clause shapes at
+  threshold=3.** Two contributing bugs, both confirmed via execution: (1) a digit-only token (e.g.
+  `"30"` in `"SHALL REPORT WITHIN 30 DAYS"`) failed `.isalpha()` and *reset* the consecutive-run
+  counter instead of being skipped like a connector word, even though a real clause naturally
+  contains numbers without that breaking it — fixed by skipping any token containing a digit, not
+  just pure-digit ones (a document-ID-shaped token like `"2000.26"` mixes digits with punctuation
+  too). (2) A short, digit-free 2-word all-caps clause (`"MUST COMPLY"`) never reached threshold=3 at
+  all — the digit fix alone doesn't help here since there's no digit to skip. This is the same "no
+  text-level signal safely distinguishes two genuinely different real shapes" wall already hit and
+  resolved once this session for `_is_orphaned_list_item()`'s marker+word-count branch: a
+  2-consecutive-all-caps-word run can be a real citation acronym pair (`"NIST SP"`) or a real short
+  clause (`"MUST COMPLY"`), and nothing about the words themselves tells them apart. Applied the same
+  principle Tyler set there — a missed catch is a strictly safer failure than a false rejection of
+  real content — and lowered `_ALL_CAPS_CLAUSE_RUN_THRESHOLD` from 3 to 2, rather than asking a third
+  near-identical question in the same session about the same underlying trade-off. This costs one
+  existing test (`"Control, as defined in NIST SP 800-53."`), confirmed to be a synthetic calibration
+  example added during round 8, not a real fixture or live-corpus record — and confirmed directly
+  that **zero** real `"as defined in"`-citation records in this corpus are ALL-CAPS at all, so the
+  trade currently costs nothing against real data on either side. Pinned as a known, accepted miss
+  with its own test, same pattern as the marker+word-count decision above.
+- **[Low] Stale comment in `run()`** — the inline comment above the `_is_orphaned_list_item()` call
+  still described the removed marker-based rejection (`"(3) Restrain competition."` as an example of
+  what gets rejected) after that branch was deleted in the commit just before this review. Updated to
+  describe only the citation-only branch that actually remains.
+
 All fixes re-verified against both the fixture (`eval/verify_wp38_2_rules.py`, still 0 regressions /
 0 scope violations / 0 coverage regressions) and a fresh full-live-corpus sweep before considering
 this WP done — the numbers throughout this Findings section are the post-fix, final ones.

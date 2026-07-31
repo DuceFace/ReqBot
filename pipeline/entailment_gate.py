@@ -292,6 +292,7 @@ def run(enriched_jsonl: str, output_dir: str) -> str:
     # fabricate anything either.
     checkable = [(i, r) for i, r in enumerate(reqs) if (r.get("description") or "").strip()]
 
+    support_probs: dict[int, float] = {}
     scorer = _load_minicheck_scorer()
     if scorer is None:
         log.warning(
@@ -299,11 +300,25 @@ def run(enriched_jsonl: str, output_dir: str) -> str:
             "pip install -e '.[grounding-check]'). Modality-fabrication check "
             "still runs (no extra dependencies)."
         )
-        support_probs: dict[int, float] = {}
     else:
-        pairs = [(r["source_quote"], r["description"]) for _, r in checkable]
-        scores = _score_entailment(scorer, pairs)
-        support_probs = {idx: score for (idx, _), score in zip(checkable, scores)}
+        # Scoring can fail for reasons that have nothing to do with the check
+        # itself (missing NLTK resource, OOM, a transient model-load error) —
+        # caught here, not left to propagate out of run(), so a scoring
+        # failure degrades to "entailment skipped" the same way an
+        # uninstalled minicheck does, rather than losing the deterministic
+        # modality-fabrication check too (Codex review, PR #169: the caller
+        # in run_pipeline.py catches any exception from run() by falling
+        # back to the completely ungated file, which would silently discard
+        # the free/dependency-free check along with the one that failed).
+        try:
+            pairs = [(r.get("source_quote") or "", r["description"]) for _, r in checkable]
+            scores = _score_entailment(scorer, pairs)
+            support_probs = {idx: score for (idx, _), score in zip(checkable, scores)}
+        except Exception as e:
+            log.warning(
+                "MiniCheck scoring failed (%s) — entailment check skipped for this run. "
+                "Modality-fabrication check still runs.", e,
+            )
 
     failures: list[dict] = []
     rejected_count = 0
@@ -312,7 +327,7 @@ def run(enriched_jsonl: str, output_dir: str) -> str:
         support_prob = support_probs.get(idx)
         if support_prob is not None and support_prob < DESCRIPTION_ENTAILMENT_THRESHOLD:
             errors.append("description_not_grounded")
-        if is_fabricated_obligation(req["source_quote"], req["description"]):
+        if is_fabricated_obligation(req.get("source_quote") or "", req["description"]):
             errors.append("description_fabricated_obligation")
 
         if errors:

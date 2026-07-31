@@ -682,15 +682,50 @@ documented, not left implicit — and whichever way it's decided, a requirement 
 - **CLI:** `--skip-description-gate` added to `reqbot ingest`, `reqbot batch`, and standalone
   `run_pipeline.py`, mirroring `--skip-enrichment`'s existing pattern exactly. `README.md` updated
   (pipeline stage list, flag references, Installation section) to document the new extra and flag.
+- **Codex-found (PR #169, two P1s) + Gemini-found (PR #169, one High): three real gaps, all
+  verified by reproduction before fixing.**
+  - *Codex P1:* if MiniCheck is installed but `scorer.score()` itself raises (missing NLTK
+    `punkt_tab` resource — an easy-to-forget separate manual step this WP's own README section
+    documents; OOM; a transient model-load error), the exception escaped `run()` entirely.
+    `run_pipeline.py`'s own caller then catches it and falls back to the **completely ungated**
+    file — silently losing the dependency-free modality-fabrication check too, not just the
+    entailment check that actually failed, contradicting this module's own documented guarantee.
+    Reproduced with a scorer stub that raises on `.score()`: confirmed the whole gate crashed.
+    Fixed by wrapping the scoring call itself in a `try`/`except` inside `run()`, degrading to
+    "entailment skipped" exactly like the not-installed case — the modality check runs regardless.
+  - *Codex P1:* `core/artifact_resolver.py`'s gated-preference change (this WP) assumed every file
+    in a run directory represents one coherent, complete pipeline invocation. That's false for a
+    reused output directory (`--skip-to D --skip-description-gate`, or a failed Step D.6) — Step
+    D.5/D.6 are independently skippable, so a rerun can regenerate `enriched`/`normalized` while
+    leaving an **older, now-inconsistent** `gated` file untouched, and the resolver would keep
+    preferring it forever purely because "gated" outranks "enriched" as a tier — the same latent
+    risk already existed for enriched-over-normalized, just never triggered until this WP made
+    partial-step reruns common. Reproduced: wrote a gated file, then an enriched file 50ms later
+    in the same run dir — resolver returned the stale gated file. Fixed with
+    `_freshest_acceptable_tier()`: a higher tier is only preferred when it is not older than every
+    lower tier present in the same run directory; otherwise falls through to the next tier down.
+  - *Gemini (High):* a record missing `source_quote` entirely (not something the normal pipeline
+    path can produce — Step D's own `empty_source_quote` check, confirmed by reading
+    `parse_and_normalize.py` directly, guarantees anything reaching Step D.6 already has a
+    non-empty string) raised a raw `KeyError` rather than being handled gracefully. Real risk
+    specifically for `entailment_gate.py`'s own standalone CLI entry point, which can be pointed at
+    an arbitrary, non-pipeline-validated file. Reproduced, then fixed with `.get("source_quote") or
+    ""` at both call sites, matching this file's own existing `is_fabricated_obligation()` None-
+    guard precedent.
+  - Re-verified all fixes against the same two real documents used for this WP's original manual
+    verification: identical results (13/151 and 9/290 rejected, same records) — the fixes close
+    real gaps without changing any real-world outcome.
 - Output: `pipeline/entailment_gate.py` (Step D.6 itself), `core/artifact_resolver.py` (gated-
-  preference update), `pipeline/run_pipeline.py` (Step D.6 wiring), `cli/reqbot.py` (flag
-  passthrough), `pyproject.toml` (`grounding-check` extra), `eval/modality_fabrication_check.py`
-  (thinned to import-and-report), `tests/unit/test_entailment_gate.py` (10 new tests: MiniCheck-
-  unavailable graceful skip, entailment rejection, modality rejection, both-reasons co-occurrence,
-  empty-description pass-through, requirement-never-dropped invariant, gated-filename derivation
-  from both enriched and normalized inputs), `tests/unit/test_artifact_resolver.py` (+4 tests for
-  gated preference/fallback/latest-run-wins), `tests/unit/test_modality_fabrication_check.py`
-  (import path updated only, all 32 tests unchanged and still passing).
+  preference update + `_freshest_acceptable_tier()` staleness guard), `pipeline/run_pipeline.py`
+  (Step D.6 wiring), `cli/reqbot.py` (flag passthrough), `pyproject.toml` (`grounding-check` extra),
+  `eval/modality_fabrication_check.py` (thinned to import-and-report), `tests/unit/
+  test_entailment_gate.py` (13 tests: MiniCheck-unavailable graceful skip, entailment rejection,
+  modality rejection, both-reasons co-occurrence, empty-description pass-through, requirement-
+  never-dropped invariant, gated-filename derivation from both enriched and normalized inputs,
+  scoring-failure degradation, missing-`source_quote` guard), `tests/unit/test_artifact_resolver.py`
+  (+6 tests for gated preference/fallback/latest-run-wins/staleness-within-a-run),
+  `tests/unit/test_modality_fabrication_check.py` (import path updated only, all 32 tests unchanged
+  and still passing).
 
 ---
 

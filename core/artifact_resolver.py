@@ -58,16 +58,44 @@ def doc_key_from_extracted_path(path: Path) -> str:
     return _strip_suffix(path.stem, _EXTRACTED_SUFFIX)
 
 
+_TIER_ORDER = ("gated", "enriched", "normalized")
+
+
+def _freshest_acceptable_tier(candidates: dict[str, Path]) -> Path:
+    """Pick the best file among the gated/enriched/normalized candidates in
+    one run directory.
+
+    Prefers a higher tier only when it is not older than every lower tier
+    present. A run directory can be reused across multiple invocations
+    (e.g. `--skip-to D`, or `--skip-to D --skip-description-gate` /
+    a failed Step D.6, WP-35.4) — Step D.5/D.6 are independently skippable,
+    so a later, partial rerun can regenerate a lower tier (enriched or
+    normalized) without regenerating a higher one, leaving that higher tier
+    describing an older, now-inconsistent version of the data. An older
+    "better" file is not actually better (Codex review, PR #169 — found via
+    the exact `--skip-to D --skip-description-gate` scenario: a stale gated
+    file surviving a rerun that only regenerated normalized/enriched). Falls
+    through to the next tier down when that happens.
+    """
+    present = [t for t in _TIER_ORDER if t in candidates]
+    for i, tier in enumerate(present):
+        lower = present[i + 1:]
+        if not lower or all(
+            candidates[tier].stat().st_mtime >= candidates[t].stat().st_mtime for t in lower
+        ):
+            return candidates[tier]
+    return candidates[present[-1]]
+
+
 def resolve_latest_requirement_files(processed_dir: Path) -> dict[str, Path]:
     """Return the best requirements JSONL path for every document under processed_dir.
 
     Groups candidate files by (doc_key, run directory). For each doc_key, picks
     the run directory with the most recently modified candidate file within it
     ("latest run wins" — an older gated file from a previous run never beats a
-    newer normalized file from a later run), then prefers gated over enriched
-    over normalized within that winning run (WP-35.4: gated is enriched output
-    that has additionally passed the description-grounding check, so it's
-    strictly more trustworthy than enriched when both exist).
+    newer normalized file from a later run), then within that winning run picks
+    the freshest acceptable tier (gated > enriched > normalized, but never a
+    tier older than one beneath it — see _freshest_acceptable_tier).
     """
     # {doc_key: {run_dir: {"gated"|"enriched"|"normalized": Path}}}
     by_doc: dict[str, dict[Path, dict[str, Path]]] = {}
@@ -82,8 +110,7 @@ def resolve_latest_requirement_files(processed_dir: Path) -> dict[str, Path]:
     result: dict[str, Path] = {}
     for doc_key, runs in by_doc.items():
         latest_run = max(runs, key=lambda d: max(p.stat().st_mtime for p in runs[d].values()))
-        candidates = runs[latest_run]
-        result[doc_key] = candidates.get("gated") or candidates.get("enriched") or candidates["normalized"]
+        result[doc_key] = _freshest_acceptable_tier(runs[latest_run])
     return result
 
 

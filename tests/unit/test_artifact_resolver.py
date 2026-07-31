@@ -67,6 +67,40 @@ def test_falls_back_to_enriched_when_gated_absent(tmp_path):
     assert result["NIST.SP.800-53"] == enriched
 
 
+def test_falls_back_to_enriched_when_gated_is_stale_within_same_run(tmp_path):
+    # Codex review, PR #169: a run directory can be reused across multiple
+    # invocations (e.g. `--skip-to D --skip-description-gate`, or a failed
+    # Step D.6) -- if that rerun regenerates enriched without regenerating
+    # gated, the old gated file now describes a stale, inconsistent version
+    # of the data and must not be preferred just because it's a "better" tier.
+    run_dir = tmp_path / "NIST.SP.800-53_20260101_000000"
+    gated = run_dir / "NIST.SP.800-53_requirements_gated.jsonl"
+    enriched = run_dir / "NIST.SP.800-53_requirements_enriched.jsonl"
+    _write(gated)
+    _age(gated, seconds_ago=100)
+    _write(enriched)  # regenerated after gated, by a rerun that skipped D.6
+
+    result = resolve_latest_requirement_files(tmp_path)
+
+    assert result["NIST.SP.800-53"] == enriched
+
+
+def test_falls_back_to_normalized_when_both_gated_and_enriched_are_stale(tmp_path):
+    run_dir = tmp_path / "NIST.SP.800-53_20260101_000000"
+    gated = run_dir / "NIST.SP.800-53_requirements_gated.jsonl"
+    enriched = run_dir / "NIST.SP.800-53_requirements_enriched.jsonl"
+    normalized = run_dir / "NIST.SP.800-53_requirements_normalized.jsonl"
+    _write(gated)
+    _write(enriched)
+    _age(gated, seconds_ago=100)
+    _age(enriched, seconds_ago=100)
+    _write(normalized)  # regenerated after both -- a plain --skip-to D rerun
+
+    result = resolve_latest_requirement_files(tmp_path)
+
+    assert result["NIST.SP.800-53"] == normalized
+
+
 def test_newer_enriched_beats_older_gated_across_runs(tmp_path):
     old_run = tmp_path / "NIST.SP.800-53_20250101_000000"
     new_run = tmp_path / "NIST.SP.800-53_20260101_000000"

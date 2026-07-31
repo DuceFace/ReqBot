@@ -32,6 +32,14 @@ class _FakeScorer:
         return pred_label, probs, None, None
 
 
+class _BrokenScorer:
+    """Simulates a MiniCheck instance that loaded but fails during scoring
+    (missing NLTK resource, OOM, transient model error)."""
+
+    def score(self, docs, claims):
+        raise RuntimeError("simulated scoring failure")
+
+
 def _write_jsonl(path: Path, records: list[dict]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         for rec in records:
@@ -95,6 +103,29 @@ def test_rejects_low_entailment_score(tmp_path, monkeypatch):
     failures = _read_jsonl(tmp_path / "doc_description_gate_failures.jsonl")
     assert failures[0]["error"] == ["description_not_grounded"]
     assert failures[0]["support_prob"] == 0.2
+
+
+def test_scoring_failure_degrades_to_entailment_skipped_not_a_crash(tmp_path, monkeypatch):
+    # Codex review, PR #169: a MiniCheck scoring failure (missing NLTK
+    # resource, OOM, transient error) must not propagate out of run() --
+    # run_pipeline.py's caller catches any exception from run() by falling
+    # back to the completely ungated file, which would silently lose the
+    # dependency-free modality check too, not just entailment scoring.
+    monkeypatch.setattr(entailment_gate, "_load_minicheck_scorer", lambda: _BrokenScorer())
+    in_path = tmp_path / "doc_requirements_enriched.jsonl"
+    _write_jsonl(in_path, [FAITHFUL_REQ, MODALITY_FABRICATED_REQ])
+
+    gated_path = Path(entailment_gate.run(str(in_path), str(tmp_path)))
+    records = _read_jsonl(gated_path)
+
+    by_id = {r["requirement_id"]: r for r in records}
+    # Entailment skipped -- faithful record passes through untouched.
+    assert by_id["REQ-1"]["description"] == FAITHFUL_REQ["description"]
+    # Modality check still ran and caught the fabrication.
+    assert by_id["REQ-2"]["description"] == ""
+    failures = _read_jsonl(tmp_path / "doc_description_gate_failures.jsonl")
+    assert failures[0]["error"] == ["description_fabricated_obligation"]
+    assert "support_prob" not in failures[0]
 
 
 def test_keeps_faithful_description_when_score_above_threshold(tmp_path, monkeypatch):
@@ -190,3 +221,21 @@ def test_score_entailment_skips_scorer_call_for_empty_pairs():
     result = entailment_gate._score_entailment(scorer, [])
     assert result == []
     assert scorer.calls == []
+
+
+def test_missing_source_quote_does_not_crash(tmp_path, monkeypatch):
+    # Gemini review, PR #169: a record missing source_quote entirely
+    # (malformed/hand-edited input, not something the normal pipeline path
+    # produces -- Step D's own empty_source_quote check already guarantees
+    # this for anything that reaches Step D.6 normally) previously raised a
+    # raw KeyError instead of being handled gracefully.
+    monkeypatch.setattr(entailment_gate, "_load_minicheck_scorer", lambda: _FakeScorer(0.1))
+    req = {"requirement_id": "REQ-1", "chunk_id": "c1", "description": "Implement X."}
+    in_path = tmp_path / "doc_requirements_enriched.jsonl"
+    _write_jsonl(in_path, [req])
+
+    gated_path = Path(entailment_gate.run(str(in_path), str(tmp_path)))
+    records = _read_jsonl(gated_path)
+
+    assert len(records) == 1
+    assert records[0]["description"] == ""

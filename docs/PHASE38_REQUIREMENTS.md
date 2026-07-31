@@ -46,12 +46,18 @@ ready to build against, all addressed by how this phase is scoped:
    shipped in this exact codebase. The other conversation didn't have this project's phase history
    available. Unresolved question: is the diagnosis based on failures that survive *after* those
    fixes, or could it be re-discovering already-covered ground?
-2. **Data-sourcing check, done directly rather than assumed:** the proposal named NIST 800-53,
-   800-53A, and PCI DSS as label-data sources. Checked `raw_pdfs/` directly — `NIST.SP.800-53r5.pdf`
-   and `NIST.SP.800-53Ar5.pdf` already exist there (not currently ingested into the live corpus, but
-   available). No PCI DSS document exists anywhere in this project; it would need external sourcing,
-   and using more of ReqBot's own actual target corpus may be a better source of negative examples
-   than an off-theme document.
+2. **Data-sourcing check, done directly rather than assumed — and scoped honestly as a local
+   observation, not a repo guarantee (corrected after a local Codex review flagged this, 2026-07-31):
+   `raw_pdfs/` is listed in `.gitignore` and holds no tracked files** (`git ls-files raw_pdfs/`
+   returns nothing) — its contents are whatever happens to be present on a given machine, not
+   something the repository itself provides. On *this* environment specifically, `raw_pdfs/` was
+   checked directly and `NIST.SP.800-53r5.pdf`/`NIST.SP.800-53Ar5.pdf` are present (not currently
+   ingested into the live corpus, but available locally); no PCI DSS document exists here at all.
+   Whoever picks up WP-38.2 needs to independently verify `raw_pdfs/` on their own machine before
+   relying on this — if the 800-53/800-53Ar5 PDFs aren't there, they're publicly available from NIST
+   directly and would need downloading; using more of ReqBot's own actual target corpus (the DoD/AF
+   documents already present) may be a better source of negative examples than an off-theme document
+   regardless.
 3. **Gold-set caution:** if any future validation reuses `eval/gold_eval_chunks*.jsonl`, that dataset
    is documented (prior-session findings) as an unfinished, abandoned hand-correction pass with ~20%
    known-bad labels — not ground truth without a fresh audit first.
@@ -169,6 +175,13 @@ knowing the real rate and shape, not assuming it.
   silently excluded from the denominator too — which could make a real problem look negligible for no
   reason other than the heuristic's own blind spots, exactly the kind of composite-denominator mistake
   already caught once in this project (`docs/PHASE36_REQUIREMENTS.md`'s WP-36.2 Findings).
+  **Minimum size, not left open-ended (local Codex review, 2026-07-31):** the unbiased sample must
+  cover a real minimum — at least 300 records, drawn from at least 8 of the corpus's 13 documents
+  (stratified across document, not concentrated in whichever happens to be largest) — small enough to
+  hand-review in full, large enough that a handful of found/not-found examples don't swing the rate
+  wildly. Report the real achieved size and coverage plainly if it lands short of this, the same
+  scale-honesty WP-35.1/35.2 already apply to their own small hand-labeled sets — don't silently
+  round up to "representative" without saying so.
 - For every genuine failure found (either pass), check it against `_is_heading_echo()`,
   `_is_unrepairable_fragment()`, and the current `skip_sections` vocabulary to classify: real gap in
   existing coverage, not covered by design (candidate for extension or classifier), or genuinely
@@ -212,10 +225,12 @@ two shapes this WP could take, to be finalized once WP-38.1 reports in.
   already coverable by cheap rule extensions:** build a small second-stage classifier, matching the
   original proposal's shape (recall-oriented 8B extractor stays as-is; a cheap, precision-oriented
   classifier filters its output). Training data: a labeled yes/real-requirement vs. no/near-miss set
-  built from this project's own documents — NIST 800-53/800-53A are available as uningested raw PDFs
-  (`raw_pdfs/`); PCI DSS would need external sourcing if still wanted, though more of ReqBot's own
-  actual target corpus (the DoD/AF documents already present) may be a better negative-example source
-  than an off-theme document. Validate on both precision *and* recall (the documented failure mode:
+  built from this project's own documents — NIST 800-53/800-53A were present in `raw_pdfs/` on the
+  machine this phase was scoped on, but that directory is gitignored and not repo-guaranteed (see
+  Phase Framing); re-verify locally before relying on them, and re-download from NIST directly if
+  absent. PCI DSS would need external sourcing if still wanted, though more of ReqBot's own actual
+  target corpus (the DoD/AF documents already present) may be a better negative-example source than
+  an off-theme document. Validate on both precision *and* recall (the documented failure mode:
   an overly aggressive filter starts discarding true positives too) against a freshly hand-verified
   label set — explicitly not `eval/gold_eval_chunks*.jsonl` as-is.
 - **If WP-38.1 finds the failures are mostly already coverable by extending existing deterministic
@@ -230,10 +245,17 @@ two shapes this WP could take, to be finalized once WP-38.1 reports in.
   artifact the filter touches.** Whichever WP-38.2 shape gets built, either extend
   `eval/eval_harness.py` to score the correct later-stage artifact (post-Step-D for a rule extension,
   post-filter for a classifier) or build an equivalent harness pointed at it — decide which as part of
-  scoping WP-38.2 itself, not assumed here. Re-verify precision *and* recall against that corrected
-  target (and, separately, `eval/gold_eval_chunks*.jsonl`'s own ground-truth concerns still apply if
-  reused) before calling this phase done — same "measure before declaring victory" discipline as every
-  other phase in this project.
+  scoping WP-38.2 itself, not assumed here.
+- **Concrete precondition for precision/recall validation, not left vague (local Codex review,
+  2026-07-31: the prior wording — "once `eval/gold_eval_chunks*.jsonl`'s concerns are addressed" —
+  named no owner and no gate for actually addressing them).** Prefer WP-38.1's own hand-verified
+  audit fixture (the unbiased random/stratified sample, Scope above) as the ground truth for this
+  validation instead — it's freshly built, known-clean by construction (every record hand-reviewed
+  during WP-38.1), and already labeled with the categories that matter (genuine requirement vs.
+  over-grab vs. fragment). Only fall back to auditing/replacing `eval/gold_eval_chunks*.jsonl` if
+  WP-38.1's fixture turns out too small or too narrow to validate against on its own. Re-verify
+  precision *and* recall against whichever ground truth is actually used before calling this phase
+  done — same "measure before declaring victory" discipline as every other phase in this project.
 
 ---
 

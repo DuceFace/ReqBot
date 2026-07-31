@@ -620,6 +620,18 @@ def test_is_dangling_clause_false_for_question_wrapped_in_quotes():
     )
 
 
+def test_is_dangling_clause_false_for_question_with_trailing_parenthetical():
+    # Gemini review round 7, PR #181: the round-5 fix only checked the
+    # quote's trailing non-alphanumeric run for "?", which misses a question
+    # mark followed by more content (a trailing parenthetical or control-ID
+    # note). Checking the whole quote is safe here since this function only
+    # ever fires on an already-narrow bare-copula-first-word trigger.
+    assert not _is_dangling_clause(
+        "Is multi-factor authentication enforced? (see NIST SP 800-53)"
+    )
+    assert not _is_dangling_clause("Is audit logging enabled? [Control AC-2]")
+
+
 def test_orphaned_list_item_rejected_in_full_pipeline(tmp_path):
     chunk_text = "Classification shall not be used to: (1) ... (2) ... (3) Restrain competition."
     req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="(3) Restrain competition.")

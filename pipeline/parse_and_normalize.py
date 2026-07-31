@@ -313,13 +313,6 @@ def _is_orphaned_list_item(source_quote: str) -> bool:
 # "[X]" that should precede "is").
 _BARE_COPULA_OPENERS = ("is", "are", "was", "were")
 
-# WP-38.2 (Gemini review round 5, PR #181): finds whatever trailing
-# punctuation/wrapper run sits after the quote's last alphanumeric character,
-# so a "?" can be detected even wrapped in a closing quote/bracket
-# (`"...enforced?"` style). Same non-alphanumeric-edge idea as
-# _NON_ALNUM_EDGE_RE above, applied at the end only.
-_TRAILING_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]*$")
-
 
 def _is_dangling_clause(source_quote: str) -> bool:
     """True if source_quote's first word is a bare copula with no subject
@@ -347,14 +340,23 @@ def _is_dangling_clause(source_quote: str) -> bool:
       punctuation artifact of a longer source list, not a sign the quote's
       own content is incomplete.
 
-    A copula-first quote ending in "?" is excluded too (Gemini round 5): a
-    real interrogative requirement, the kind assessment-procedure documents
-    like NIST SP 800-53A use (e.g. "Is multi-factor authentication enforced
-    for all administrative access?"), puts the subject *after* the copula
-    via subject-auxiliary inversion -- grammatically complete, not a missing
-    subject the way the declarative case is. This corpus doesn't currently
-    have any assessment-questionnaire-style documents ingested, but a future
-    one plausibly could.
+    A copula-first quote containing "?" anywhere is excluded too (Gemini
+    round 5, tightened round 7): a real interrogative requirement, the kind
+    assessment-procedure documents like NIST SP 800-53A use (e.g. "Is
+    multi-factor authentication enforced for all administrative access?"),
+    puts the subject *after* the copula via subject-auxiliary inversion --
+    grammatically complete, not a missing subject the way the declarative
+    case is. This corpus doesn't currently have any assessment-
+    questionnaire-style documents ingested, but a future one plausibly
+    could. Round 5's first fix only checked the quote's trailing
+    non-alphanumeric run, which misses a "?" followed by more content (e.g.
+    a trailing parenthetical or control-ID note: "...enforced? (see NIST SP
+    800-53)") -- checking the whole quote for "?" is safe here since this
+    function only ever fires on an already-narrow trigger (bare-copula-first-
+    word); a declarative fragment that happens to also contain a "?"
+    somewhere else is a genuinely contrived case, and exempting it errs
+    toward not discarding real data, the same direction every other choice
+    in this function already errs.
 
     Only the bare-copula-first-word signal survived calibration with zero
     false positives against the fixture's 284 real records -- catches 1 of
@@ -369,7 +371,7 @@ def _is_dangling_clause(source_quote: str) -> bool:
     stripped = source_quote.strip()
     if not stripped:
         return False
-    if "?" in _TRAILING_NON_ALNUM_RE.search(stripped).group():
+    if "?" in stripped:
         return False
     first_word = _NON_ALNUM_EDGE_RE.sub("", stripped.split(maxsplit=1)[0])
     return first_word.lower() in _BARE_COPULA_OPENERS

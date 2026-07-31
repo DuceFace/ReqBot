@@ -575,6 +575,24 @@ def test_is_dangling_clause_bare_copula_wrapped_in_quote_marks():
     assert _is_dangling_clause('"Is designated the CNDSP Certification Authority."')
 
 
+def test_is_dangling_clause_false_for_real_question():
+    # Gemini review round 5, PR #181: a copula-first quote ending in "?" is a
+    # real interrogative requirement (the style NIST SP 800-53A-type
+    # assessment-procedure documents use) -- subject-auxiliary inversion
+    # puts the subject after the copula, which is grammatically complete,
+    # not the same missing-subject problem as the declarative case.
+    assert not _is_dangling_clause(
+        "Is multi-factor authentication enforced for all administrative access?"
+    )
+    assert not _is_dangling_clause("Are security audit logs reviewed at least weekly?")
+
+
+def test_is_dangling_clause_false_for_question_wrapped_in_quotes():
+    assert not _is_dangling_clause(
+        '"Is multi-factor authentication enforced for all administrative access?"'
+    )
+
+
 def test_orphaned_list_item_rejected_in_full_pipeline(tmp_path):
     chunk_text = "Classification shall not be used to: (1) ... (2) ... (3) Restrain competition."
     req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="(3) Restrain competition.")

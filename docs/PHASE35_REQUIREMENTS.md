@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 | WP-35.2 — Threshold Calibration Sweep | Complete |
 | WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Complete |
 | WP-35.4 — Production Step D.5/D.6 Entailment Gate | Complete |
-| WP-35.5 — Integration Gate | Not started |
+| WP-35.5 — Integration Gate | Complete |
 
 ---
 
@@ -756,19 +756,65 @@ they compose correctly against a real, full pipeline run.
 
 **Gate:** Phase 35's Success Gate below is met.
 
+**Findings (2026-07-31):**
+
+- **Full, fresh, real end-to-end pipeline run** — `reqbot ingest raw_pdfs/afpd_17-1.pdf --no-index`
+  (the actual CLI entry point, not a standalone module call like WP-35.4's manual verification used)
+  — confirming the whole orchestration, not just `entailment_gate.py` in isolation: Step D (73 raw →
+  64 normalized) → Step D.5 (64 enriched) → **Step D.6 ran automatically, no flag needed** (loaded 64,
+  wrote 64 gated + a 5-record failures file) → **Step E's own log line confirms it read from the
+  gated file, not the enriched one** (`"Loading normalized requirements from:
+  ...afpd_17-1_requirements_gated.jsonl"`) → final output: 64 requirements. Requirement count
+  preserved end-to-end (73 raw → 64 after Step D's own unrelated checks → 64 through D.5/D.6/E) —
+  confirms WP-35.4's chosen semantics (clear description, never drop the requirement) held in a real
+  run, not just unit tests.
+- **`core/artifact_resolver.py` confirmed against the real corpus, not just synthetic `tmp_path`
+  tests:** `resolve_requirement_file()` correctly resolved to this fresh run's
+  `afpd_17-1_requirements_gated.jsonl`, in preference to an *older* `afpd_17-1` run from 2026-07-29
+  that only has non-gated files — both the gated-tier preference and the latest-run-wins logic
+  confirmed together on real, pre-existing multi-run corpus state.
+- **A real, honest limitation surfaced by testing against fresh data the calibration set never
+  covered — not glossed over, logged as `docs/TODO_future_improvements.txt` item 33.** All 5
+  rejected descriptions in this run are **byte-identical to their own `source_quote`** (e.g.
+  `"Participate in cyberspace governance forums."` verbatim on both sides), scoring
+  `support_prob` 0.6782–0.8442 — below the 0.85 threshold despite having zero new content to be
+  "fabricated." WP-35.3's modality check correctly did not flag any of these (nothing obligatory was
+  invented) — confirming the two checks' specificity is doing exactly what it's designed to do; this
+  is purely an entailment-threshold weakness for very short, verbatim premise/hypothesis pairs.
+  Checked directly: this exact shape (`description == source_quote`) could never have been surfaced
+  by either of WP-35.1's harvester heuristics (`_is_citation_fragment_shaped` requires the
+  description to be *longer*; `_is_modality_shaped` requires an obligation word present on one side
+  and absent from the other — identical text trivially fails both), so it was structurally invisible
+  to WP-35.2's calibration sweep, not a regression from a previously-measured number. This is exactly
+  the kind of gap the "provisional, not confident" caveat (carried through WP-35.2/35.3/35.4's docs
+  from the start) exists to warn about — real-world evidence of it, not a hypothetical. Not fixed in
+  this WP, per its own Non-Goals (not a new failure-mode investigation); logged with a concrete
+  suggested direction (a cheap exact-match short-circuit ahead of the MiniCheck call, or a targeted
+  future harvest of short verbatim-pair examples) for whoever picks it up next.
+- `docs/PHASE33_REQUIREMENTS.md`'s WP-33.3 Findings (categories 1 and 3, both cite the description-
+  fabrication symptom this phase fixes, plus the Conclusion's forward-looking "claim/entailment
+  problem... worth scoping as its own investigation" note) updated with closing pointers to this
+  phase's actual implementation, closing the loop WP-34.4's spike opened back in Phase 34.
+- `docs/TODO_future_improvements.txt` item 31 marked `[RESOLVED -- Phase 35, WP-35.1 through
+  WP-35.4]`, replacing its now-stale "not yet implemented" scoping text with a concise pointer to
+  this phase doc — matching item 25's existing resolved-item format.
+- Full `pytest` suite (746 tests) passes; `ruff check .` clean.
+
 ---
 
 ## 5. Success Gate
 
 Phase 35 is complete when:
 
-1. WP-35.1's labeled dataset is committed and documented.
-2. WP-35.2's threshold is chosen with real sweep evidence against that dataset.
-3. WP-35.3's secondary check catches the known modality-fabrication pattern WP-34.4 found.
-4. WP-35.4's gate runs in the real pipeline with durable, distinguishable failure reasons.
-5. WP-35.5's integration gate confirms end-to-end behavior against a real document.
-6. Full unit suite passes (`pytest`); `ruff check .` passes.
-7. `docs/TODO_future_improvements.txt` item 31 is marked resolved, pointing at this phase.
+1. ✅ WP-35.1's labeled dataset is committed and documented.
+2. ✅ WP-35.2's threshold is chosen with real sweep evidence against that dataset.
+3. ✅ WP-35.3's secondary check catches the known modality-fabrication pattern WP-34.4 found.
+4. ✅ WP-35.4's gate runs in the real pipeline with durable, distinguishable failure reasons.
+5. ✅ WP-35.5's integration gate confirms end-to-end behavior against a real document.
+6. ✅ Full unit suite passes (`pytest`); `ruff check .` passes.
+7. ✅ `docs/TODO_future_improvements.txt` item 31 is marked resolved, pointing at this phase.
+
+**Phase 35 is complete.**
 
 ---
 

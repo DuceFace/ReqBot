@@ -372,48 +372,20 @@ ACTIVE BACKLOG
     documents' acronym lists, since it means those entries currently reach
     Step C unfiltered as candidate requirements.
 
-31. [SCOPED -- Phase 35, docs/PHASE35_REQUIREMENTS.md, 2026-07-30, not yet
-    implemented] Production Step D.5 description-grounding entailment gate
-    (WP-34.4 spike concluded viable-with-a-fix, Phase 34)
-    WP-34.4's spike (`eval/entailment_spike.py`,
-    `eval/spike_results/wp_34_4/report.md`) tested MiniCheck (flan-t5-large,
-    github.com/Liyan06/MiniCheck) as an NLI/entailment check for whether
-    Step D.5's `description` is actually grounded in `source_quote` --
-    catching the fabricated-description symptom WP-33.3 found (a citation or
-    fragment quote paired with an invented, plausible-sounding description)
-    without rejecting real faithful paraphrases. Result: 5/6 known-fabricated
-    examples caught, 0/9 false positives, on real (source_quote, description)
-    pairs pulled from this repo's own enriched output, with a wide score
-    margin among the caught cases (known-bad max 0.133, known-good min
-    0.852). Investigation only, per the spike's own Non-Goals -- no
-    production code was changed. Now scoped as Phase 35 (see header above,
-    docs/PHASE35_REQUIREMENTS.md) -- not yet implemented: add a Step D.5 (or
-    new Step D.6) rejection gate using this model, mirroring WP-32.1's Step D
-    grounding-check pattern (reject below a threshold, log the failure
-    reason, don't silently drop -- though whether "reject" means dropping
-    the whole requirement or just the description field is itself an open
-    WP-35.4 decision, not settled here).
-    **Known limitation, found by Codex review on PR #164, must be scoped
-    into the fix, not just noted:** the one miss (support_prob=0.9197) was a
-    dictionary-style definition reframed as an imperative obligation --
-    every individual fact carried over faithfully, but the "you must
-    implement this" framing itself was invented, not present in the source.
-    A premise/hypothesis entailment check scored on factual content alone
-    doesn't reliably catch modality/obligation fabrication layered on top of
-    otherwise-faithful facts. Whatever implements this gate should account
-    for that failure mode specifically (e.g. a secondary check for whether
-    the description introduces obligation language -- "must", "shall",
-    "implement", "ensure" -- absent from the quote), not assume the
-    entailment score alone is sufficient.
-    Needs before implementing: a real threshold sweep (WP-34.4's 15-pair set
-    only established the technique works, not a calibrated cutoff -- compare
-    WP-32.1's actual sweep against 2,452 gold examples), a decision on
-    whether it runs inline during Step D.5 or as a separate pass, and the new
-    dependency questions the spike deferred (MiniCheck needs
-    `pip install --user --break-system-packages` from its GitHub source, not
-    plain `pip install minicheck` -- that PyPI name is squatted by an
-    unrelated package -- plus one NLTK data download; neither is in
-    `pyproject.toml` yet since nothing ships this dependency today).
+31. [RESOLVED -- Phase 35, WP-35.1 through WP-35.4] Production Step D.6
+    description-grounding entailment gate. Shipped as
+    `pipeline/entailment_gate.py`: a calibrated MiniCheck entailment
+    threshold (WP-35.2, swept against a real labeled dataset built in
+    WP-35.1) plus a deterministic obligation/modality-fabrication check
+    (WP-35.3, closing the specific gap the entailment score alone can't
+    catch -- factual content reframed as an invented imperative), wired into
+    the real pipeline as Step D.6 (WP-35.4). A rejected description is
+    cleared, never drops the requirement. MiniCheck is a new optional
+    `grounding-check` extra (`pyproject.toml`), not a base dependency. See
+    `docs/PHASE35_REQUIREMENTS.md` for the full calibration evidence,
+    design-decision rationale, and WP-35.5's end-to-end integration
+    confirmation (item 33 below is a real, honest limitation the integration
+    run surfaced -- not something this item's resolution glosses over).
 
 32. `_is_unrepairable_fragment` only catches colon-terminated fragments, not
     bare enumerated list-item topic phrases (found during WP-35.1's
@@ -432,6 +404,44 @@ ACTIVE BACKLOG
     a labeled dataset, not production code) -- worth a real look if this
     shape recurs at meaningful scale once WP-35.2's threshold sweep runs
     against the fuller dataset.
+
+33. MiniCheck's entailment score sometimes rejects a description that is a
+    verbatim (word-for-word identical) copy of its own source_quote (found
+    during WP-35.5's integration run, Phase 35, against a real fresh ingest
+    of `afpd_17-1.pdf`)
+    Step D.6's entailment check (WP-35.2/35.4) rejected 5/64 requirements'
+    descriptions in a live full-pipeline run -- every one of the 5 has
+    `description` byte-identical to `source_quote` (e.g.
+    `"Participate in cyberspace governance forums."` -> the exact same text
+    as its own description), with `support_prob` scores of 0.6782-0.8442,
+    below the 0.85 threshold. A verbatim copy cannot be "fabricated" in any
+    meaningful sense -- there's zero new content -- so this looks like a real
+    MiniCheck calibration weakness specifically for very short premise/
+    hypothesis pairs, not a description-fabrication catch. WP-35.3's
+    modality check correctly did not flag any of these (nothing obligatory
+    was invented), confirming the two checks' specificity is working as
+    designed; this is purely an entailment-threshold false-positive.
+    Separately notable: per `ENRICH_SINGLE_PROMPT_TEMPLATE`'s own
+    instructions, Step D.5 is supposed to return `description: ""` when
+    source text is "self-explanatory" rather than echo it verbatim -- these
+    5 records suggest that instruction isn't always followed, which is *why*
+    the shape exists to be scored at all, but is a separate, pre-existing
+    Step D.5 prompt-following question, not something WP-35.5 is scoped to
+    investigate.
+    Not fixed here -- WP-35.5 is an integration gate, not a new failure-mode
+    investigation (its own Non-Goals). Also a real gap in WP-35.1's
+    calibration dataset: this exact shape (description == source_quote
+    verbatim) was never a candidate either harvester heuristic could
+    surface (`_is_citation_fragment_shaped` requires the description to be
+    *longer* than the quote by 2x; `_is_modality_shaped` requires an
+    obligation-verb word present in one side and absent from the other --
+    identical text trivially fails both), so it was invisible to WP-35.2's
+    threshold sweep entirely. Worth a real look before treating the 0.85
+    threshold as anything but provisional (already the documented stance,
+    `eval/spike_results/wp_35_2/report.md`) -- either add a cheap
+    exact/near-exact-match short-circuit ("description == source_quote ->
+    always grounded, skip the model") ahead of the MiniCheck call, or
+    deliberately harvest more short-pair examples for a future recalibration.
 
 
 ================================================================

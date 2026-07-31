@@ -16,4 +16,7 @@ regexes = [
   # docs/PHASE32_REQUIREMENTS.md, PR #144, purely because of nearby wording, not the value
   # itself).
   '''REQ-[0-9a-f]{12}''',
+  # Public document key value present in deterministic eval artifacts; gitleaks' generic-api-key
+  # rule matches this as a false positive.
+  '''NIST\.SP\.800-125''',
 ]

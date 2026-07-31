@@ -1,0 +1,71 @@
+{
+  "documents": {
+    "CJCSI 6510.02G": {
+      "record_count": 87,
+      "sha256": "9d7de14412e7ed84c64745275323d935bbeae4d3f86aa28297474294f2c73d56",
+      "source_file": "CJCSI 6510.02G_requirements_gated.jsonl"
+    },
+    "DODI 5200.01": {
+      "record_count": 67,
+      "sha256": "f05a273a86fa2e3155eb942b85c709cc248e6533eb5af224cab87fc239d39340",
+      "source_file": "DODI 5200.01_requirements_enriched.jsonl"
+    },
+    "DODI 5200.44": {
+      "record_count": 95,
+      "sha256": "d8f03815d669541c877d0367a51ed1fdb1ae27396964218578016e00130a4866",
+      "source_file": "DODI 5200.44_requirements_enriched.jsonl"
+    },
+    "DODI 5200.48": {
+      "record_count": 225,
+      "sha256": "97bea0d1247b42aa6547e0a375be00255f6b61193d283aa4e12ae9d424d7f35f",
+      "source_file": "DODI 5200.48_requirements_enriched.jsonl"
+    },
+    "DODI 8410.03": {
+      "record_count": 142,
+      "sha256": "e6f53b9f922a523008b854221690d9d58db61d8639299ecd966da29bc24c0b8a",
+      "source_file": "DODI 8410.03_requirements_enriched.jsonl"
+    },
+    "DODI 8551.01": {
+      "record_count": 58,
+      "sha256": "edb5868a9e6cf053847776833a9068339d2c84c901b5ea88b572e87996a7d160",
+      "source_file": "DODI 8551.01_requirements_enriched.jsonl"
+    },
+    "NIST.SP.800-125": {
+      "record_count": 151,
+      "sha256": "da4a42f739554bbcde27603a2e133e19cc61d4ef040860297cf36b56f389bc7e",
+      "source_file": "NIST.SP.800-125_requirements_gated.jsonl"
+    },
+    "afi10-2402": {
+      "record_count": 290,
+      "sha256": "d8d76fdc49e49cbed04f453d97ae5efd80673855b7f5187b491f4f4eeff01202",
+      "source_file": "afi10-2402_requirements_enriched.jsonl"
+    },
+    "afi13-550": {
+      "record_count": 169,
+      "sha256": "37ed59bf3b29a2fb24c90f109ee5300a2c6af9348d70435399a47b0d79882bd0",
+      "source_file": "afi13-550_requirements_enriched.jsonl"
+    },
+    "afi17-203": {
+      "record_count": 115,
+      "sha256": "e181ebf3766c1dce2d6d7e5c6b140c5683d6b134fdf9dd98482fd616c98dfbbd",
+      "source_file": "afi17-203_requirements_enriched.jsonl"
+    },
+    "afman17-2101": {
+      "record_count": 144,
+      "sha256": "8778d421da3d1151dcb2def45971657bddc8192f33226077a465643a632a88c9",
+      "source_file": "afman17-2101_requirements_enriched.jsonl"
+    },
+    "afpd_17-1": {
+      "record_count": 64,
+      "sha256": "6ed993bd4f601d8709622980fdfe59a6fe4d2f620a3a85356ba1b8f3584e177b",
+      "source_file": "afpd_17-1_requirements_gated.jsonl"
+    },
+    "dafman17-1305": {
+      "record_count": 265,
+      "sha256": "0c3f5d9a1f52182491c23d0a0995d282f38be99bb63641644a45b2f3de0ae342",
+      "source_file": "dafman17-1305_requirements_enriched.jsonl"
+    }
+  },
+  "seed": 3801,
+  "total_records": 1872
+}

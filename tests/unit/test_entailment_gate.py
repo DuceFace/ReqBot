@@ -1,10 +1,14 @@
-"""Unit tests for pipeline/entailment_gate.py's Step D.6 orchestration (WP-35.4).
+"""Unit tests for pipeline/entailment_gate.py's Step D.6 orchestration
+(WP-35.4, exact-match short-circuit WP-36.1).
 
 Covers run(): MiniCheck-unavailable graceful skip, entailment rejection,
 modality rejection, both firing together, empty-description pass-through,
-and the "requirement is never dropped" invariant. MiniCheck itself is always
-mocked via monkeypatch — an optional dependency (pyproject.toml's
-`grounding-check` extra) that these tests must not require being installed.
+the "requirement is never dropped" invariant, and the exact-match
+short-circuit (excluded from the MiniCheck batch entirely, still passes
+through the modality check, a near-miss is not short-circuited). MiniCheck
+itself is always mocked via monkeypatch — an optional dependency
+(pyproject.toml's `grounding-check` extra) that these tests must not
+require being installed.
 
 is_fabricated_obligation()'s own fixture-level behavior is covered by
 tests/unit/test_modality_fabrication_check.py; this file only exercises it
@@ -221,6 +225,101 @@ def test_score_entailment_skips_scorer_call_for_empty_pairs():
     result = entailment_gate._score_entailment(scorer, [])
     assert result == []
     assert scorer.calls == []
+
+
+def test_exact_match_description_skips_scorer_and_is_never_rejected(tmp_path, monkeypatch):
+    # WP-36.1: a byte-identical copy can't be fabricated by definition. Fake
+    # scorer would reject everything (0.0) if it were ever called for this
+    # record -- proves the short-circuit actually excludes it from the batch,
+    # not just that it happens to score above threshold.
+    scorer = _FakeScorer(0.0)
+    monkeypatch.setattr(entailment_gate, "_load_minicheck_scorer", lambda: scorer)
+    exact_req = {
+        "requirement_id": "REQ-EXACT",
+        "chunk_id": "c9",
+        "source_quote": "DoD Components will use only NSA-approved cryptographic products.",
+        "description": "DoD Components will use only NSA-approved cryptographic products.",
+    }
+    in_path = tmp_path / "doc_requirements_enriched.jsonl"
+    _write_jsonl(in_path, [exact_req])
+
+    gated_path = Path(entailment_gate.run(str(in_path), str(tmp_path)))
+    records = _read_jsonl(gated_path)
+
+    assert records[0]["description"] == exact_req["description"]
+    assert scorer.calls == []  # excluded from the batch entirely
+    failures = _read_jsonl(tmp_path / "doc_description_gate_failures.jsonl")
+    assert failures == []
+
+
+def test_exact_match_ignores_whitespace_and_casing_differences(tmp_path, monkeypatch):
+    scorer = _FakeScorer(0.0)
+    monkeypatch.setattr(entailment_gate, "_load_minicheck_scorer", lambda: scorer)
+    req = {
+        "requirement_id": "REQ-EXACT-WS",
+        "chunk_id": "c10",
+        "source_quote": "  DoD Components   WILL use only NSA-approved products.",
+        "description": "dod components will use only nsa-approved products.",
+    }
+    in_path = tmp_path / "doc_requirements_enriched.jsonl"
+    _write_jsonl(in_path, [req])
+
+    gated_path = Path(entailment_gate.run(str(in_path), str(tmp_path)))
+    records = _read_jsonl(gated_path)
+
+    assert records[0]["description"] == req["description"]
+    assert scorer.calls == []
+
+
+def test_near_miss_is_not_short_circuited_and_still_scored(tmp_path, monkeypatch):
+    # A single trailing-period difference is NOT an exact match (WP-36.1 is
+    # literal equality only, no fuzzy matching) -- must still reach MiniCheck.
+    scorer = _FakeScorer(0.95)
+    monkeypatch.setattr(entailment_gate, "_load_minicheck_scorer", lambda: scorer)
+    req = {
+        "requirement_id": "REQ-NEARMISS",
+        "chunk_id": "c11",
+        "source_quote": "Organizations should also follow the recommendations from NIST SP 800-53",
+        "description": "Organizations should also follow the recommendations from NIST SP 800-53.",
+    }
+    in_path = tmp_path / "doc_requirements_enriched.jsonl"
+    _write_jsonl(in_path, [req])
+
+    entailment_gate.run(str(in_path), str(tmp_path))
+
+    assert len(scorer.calls) == 1
+    docs, claims = scorer.calls[0]
+    assert docs == [req["source_quote"]]
+    assert claims == [req["description"]]
+
+
+def test_exact_match_description_still_goes_through_modality_check(tmp_path, monkeypatch):
+    # is_fabricated_obligation() is already False-by-construction for
+    # identical strings (confirmed directly, not assumed -- WP-36.1 Scope) --
+    # this proves the modality check still runs on exact-match records (no
+    # short-circuit needed there) and correctly finds nothing to reject.
+    monkeypatch.setattr(entailment_gate, "_load_minicheck_scorer", lambda: None)
+    exact_req = {
+        "requirement_id": "REQ-EXACT-MODALITY",
+        "chunk_id": "c12",
+        "source_quote": "The ISSO maintains access logs.",
+        "description": "The ISSO maintains access logs.",
+    }
+    in_path = tmp_path / "doc_requirements_enriched.jsonl"
+    _write_jsonl(in_path, [exact_req])
+
+    gated_path = Path(entailment_gate.run(str(in_path), str(tmp_path)))
+    records = _read_jsonl(gated_path)
+
+    assert records[0]["description"] == exact_req["description"]
+    failures = _read_jsonl(tmp_path / "doc_description_gate_failures.jsonl")
+    assert failures == []
+
+
+def test_is_exact_match_handles_none_without_crashing():
+    assert entailment_gate._is_exact_match(None, "Implement X.") is False
+    assert entailment_gate._is_exact_match("Implement X.", None) is False
+    assert entailment_gate._is_exact_match(None, None) is False
 
 
 def test_missing_source_quote_does_not_crash(tmp_path, monkeypatch):

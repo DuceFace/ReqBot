@@ -405,8 +405,12 @@ ACTIVE BACKLOG
     shape recurs at meaningful scale once WP-35.2's threshold sweep runs
     against the fuller dataset.
 
-33. [SCOPED -- Phase 36, docs/PHASE36_REQUIREMENTS.md, 2026-07-31, not yet
-    implemented] MiniCheck's entailment score already-measurably rejects a
+33. [PARTIALLY RESOLVED -- Phase 36, docs/PHASE36_REQUIREMENTS.md: WP-36.1
+    (exact-match short-circuit) merged 2026-07-31 -- all 4 known exact-match
+    false positives confirmed eliminated with no change to fabricated-catch
+    rate, live-verified against real MiniCheck. WP-36.2 (threshold re-sweep,
+    now that exact matches no longer reach the model) still pending.]
+    MiniCheck's entailment score already-measurably rejects a
     description that is a verbatim (word-for-word identical) copy of its own
     source_quote -- 80% of WP-35.2's own reported false-positive rate, not
     an edge case (found during WP-35.5's integration run, Phase 35, against

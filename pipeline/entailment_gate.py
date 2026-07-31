@@ -47,6 +47,12 @@ continues" precedent Step D.5 already established for its own LLM call) but
 the modality-fabrication check still runs — it has no extra dependencies
 beyond what the base install already includes, so there's no reason to lose
 that coverage just because the heavier check is unavailable.
+
+A description that is a byte-identical copy of its own source_quote is
+short-circuited past MiniCheck entirely (_is_exact_match, WP-36.1) — see
+that function's docstring for why (WP-35.5 found MiniCheck scores this
+shape inconsistently, sometimes below threshold, despite zero possible
+fabrication in a verbatim copy).
 """
 
 import argparse
@@ -252,6 +258,43 @@ def _score_entailment(scorer, pairs: list[tuple[str, str]]) -> list[float]:
 
 
 # ---------------------------------------------------------------------------
+# WP-36.1: exact-match short-circuit ahead of MiniCheck.
+#
+# WP-35.5's live integration run found MiniCheck scoring a description that
+# is a byte-identical copy of its own source_quote inconsistently -- support_prob
+# as low as 0.6782 against the 0.85 threshold, despite a verbatim copy being
+# unable to introduce fabricated content by definition. Checked against
+# eval/gold_description_grounding.jsonl: 77 of 92 wp_35_1_harvest faithful
+# records (84%) are this exact shape, and 4 of WP-35.2's original 5 measured
+# false positives are this pattern (docs/PHASE36_REQUIREMENTS.md Sec 1). An
+# exact match is excluded from the batch sent to MiniCheck entirely (real
+# compute saved, not just a discarded score -- same pattern as the existing
+# empty-description exclusion below). is_fabricated_obligation() already
+# returns False for two identical strings on its own (confirmed directly,
+# not assumed), so the modality check needs no matching short-circuit.
+# ---------------------------------------------------------------------------
+
+def _is_exact_match(source_quote: str, description: str) -> bool:
+    """True if description is a byte-identical copy of source_quote after
+    normalize_text() (whitespace collapse + lowercasing) -- the same
+    normalization every other check in this file already relies on.
+
+    Literal equality only, not fuzzy/near-match: checked directly against
+    eval/gold_description_grounding.jsonl's near-miss records (a dropped
+    leading list marker, a trailing period, a "will"/"must" swap) -- none of
+    those are caught by this comparison, so they still reach MiniCheck as
+    intended (docs/PHASE36_REQUIREMENTS.md's WP-36.1 Findings).
+
+    A missing/None source_quote or description can't be an exact match of
+    anything -- pass through as not-exact rather than crash in
+    normalize_text(), mirroring is_fabricated_obligation()'s own guard.
+    """
+    if not source_quote or not description:
+        return False
+    return normalize_text(source_quote) == normalize_text(description)
+
+
+# ---------------------------------------------------------------------------
 # Step D.6 orchestration
 # ---------------------------------------------------------------------------
 
@@ -292,6 +335,14 @@ def run(enriched_jsonl: str, output_dir: str) -> str:
     # fabricate anything either.
     checkable = [(i, r) for i, r in enumerate(reqs) if (r.get("description") or "").strip()]
 
+    # WP-36.1: an exact copy can't be fabricated by definition -- skip it
+    # before MiniCheck ever sees it rather than trusting the model to score
+    # it correctly (see module comment above _is_exact_match for why).
+    scoreable = [
+        (i, r) for i, r in checkable
+        if not _is_exact_match(r.get("source_quote") or "", r["description"])
+    ]
+
     support_probs: dict[int, float] = {}
     scorer = _load_minicheck_scorer()
     if scorer is None:
@@ -311,9 +362,9 @@ def run(enriched_jsonl: str, output_dir: str) -> str:
         # back to the completely ungated file, which would silently discard
         # the free/dependency-free check along with the one that failed).
         try:
-            pairs = [(r.get("source_quote") or "", r["description"]) for _, r in checkable]
+            pairs = [(r.get("source_quote") or "", r["description"]) for _, r in scoreable]
             scores = _score_entailment(scorer, pairs)
-            support_probs = {idx: score for (idx, _), score in zip(checkable, scores)}
+            support_probs = {idx: score for (idx, _), score in zip(scoreable, scores)}
         except Exception as e:
             log.warning(
                 "MiniCheck scoring failed (%s) — entailment check skipped for this run. "

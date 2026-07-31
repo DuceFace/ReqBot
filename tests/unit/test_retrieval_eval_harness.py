@@ -3,6 +3,8 @@ run_harness() orchestration (WP-37.1). retrieve() is always mocked via
 monkeypatch -- no live Qdrant/Ollama calls in these tests, only the pure
 recall@k/MRR computation and per-query error handling.
 """
+import pytest
+
 from eval import retrieval_eval_harness as harness
 
 
@@ -118,3 +120,67 @@ def test_load_gold_queries_reads_jsonl(tmp_path):
     assert len(queries) == 2
     assert queries[0]["query_id"] == "Q-1"
     assert queries[1]["shape"] == "zero"
+
+
+def _write_gold(tmp_path):
+    path = tmp_path / "queries.jsonl"
+    path.write_text(
+        '{"query_id": "Q-1", "query": "a query", "shape": "narrow", "relevant_requirement_ids": ["REQ-1"]}\n',
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_main_rejects_top_k_below_max_k_values(tmp_path, monkeypatch, capsys):
+    # Gemini + Codex review, PR #177: a lower --top-k silently truncates the
+    # candidate set that recall@10/@20 are computed against.
+    gold = _write_gold(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["retrieval_eval_harness.py", "--gold", str(gold), "--top-k", "5",
+         "--qdrant-url", "http://x", "--ollama-url", "http://y",
+         "--output-dir", str(tmp_path / "out")],
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        harness.main()
+    assert exc_info.value.code != 0
+    assert "--top-k must be at least 20" in capsys.readouterr().err
+
+
+def test_main_exits_nonzero_when_a_query_fails(tmp_path, monkeypatch):
+    # Codex review, PR #177: a transient retrieve() failure must not produce
+    # a silently "successful" exit code on an incomplete report.
+    gold = _write_gold(tmp_path)
+
+    def failing_retrieve(query, **kwargs):
+        raise RuntimeError("simulated failure")
+
+    monkeypatch.setattr(harness, "retrieve", failing_retrieve)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["retrieval_eval_harness.py", "--gold", str(gold),
+         "--qdrant-url", "http://x", "--ollama-url", "http://y",
+         "--output-dir", str(tmp_path / "out")],
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        harness.main()
+    assert exc_info.value.code == 1
+    # Report is still written -- partial results remain useful for debugging.
+    assert (tmp_path / "out" / "results.json").exists()
+
+
+def test_main_exits_zero_when_all_queries_succeed(tmp_path, monkeypatch):
+    gold = _write_gold(tmp_path)
+
+    def fake_retrieve(query, **kwargs):
+        return _fake_result(["REQ-1"])
+
+    monkeypatch.setattr(harness, "retrieve", fake_retrieve)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["retrieval_eval_harness.py", "--gold", str(gold),
+         "--qdrant-url", "http://x", "--ollama-url", "http://y",
+         "--output-dir", str(tmp_path / "out")],
+    )
+    harness.main()  # must not raise/exit nonzero
+    assert (tmp_path / "out" / "results.json").exists()

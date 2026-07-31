@@ -246,6 +246,14 @@ Anthropic's research found this hurts most.
 - If the result is a regression on some query shapes and an improvement on others, report that
   honestly rather than only the net number — matches this project's own "verify before applying"
   discipline extended to a phase's own conclusion, not just its inputs.
+- **Control for HyDE sampling noise before trusting the delta (Codex review, PR #177, verified real):**
+  `core.ask.generate_hyde_hypothesis()` samples at `temperature=0.3` with no seed, so HyDE's third RRF
+  leg differs slightly between any two runs of the same query against the same index — a single-run
+  before/after delta could partly reflect this instead of the embedding change under test. Either run
+  the comparison with `--no-hyde` (isolates the change being measured, at the cost of not reflecting
+  real `hyde=True` production behavior) or run N≥3 repeats per side and compare distributions, not
+  single point estimates. Not fixed by caching/seeding HyDE in `core/ask.py` itself — that's a change
+  to production retrieval logic, out of both WP-37.1's and WP-37.2's own Non-Goals.
 
 **Non-goals:**
 - No LLM-generated per-chunk context (see Phase Non-Goals) — deterministic, metadata-based context

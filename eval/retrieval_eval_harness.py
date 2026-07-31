@@ -17,6 +17,19 @@ Output: recall@k (k=5,10,20) and MRR per query and in aggregate, plus a
         returned, since recall/MRR are undefined when nothing is relevant).
 
 No retrieval code changes happen here -- measurement only (WP-37.1 Non-Goals).
+
+CAUTION for WP-37.2's before/after comparison (Codex review, PR #177, verified
+real): core.ask.generate_hyde_hypothesis() samples at temperature=0.3 with no
+seed, so HyDE's third RRF leg differs slightly between separate runs of the
+*same* query against the *same* index. A single-run recall delta between a
+before/after pair could therefore partly reflect HyDE sampling noise, not the
+embedding change under test. Mitigate by either running with hyde=False for
+the controlled comparison (isolates the change being measured, at the cost of
+not reflecting real hyde=True production behavior) or by running N>=3 repeats
+per side and comparing distributions rather than single point estimates --
+not fixed here, since caching/seeding HyDE would mean changing core/ask.py's
+retrieval logic itself, out of this WP's own Non-Goals. See
+docs/PHASE37_REQUIREMENTS.md's WP-37.2 Scope.
 """
 import argparse
 import json
@@ -169,17 +182,63 @@ def format_report(report: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _positive_int(value: str) -> int:
+    """Argparse type: integer that must be > 0."""
+    try:
+        iv = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid integer value: '{value}'")
+    if iv <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return iv
+
+
+def _non_negative_float(value: str) -> float:
+    """Argparse type: float that must be >= 0."""
+    try:
+        fv = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid float value: '{value}'")
+    if fv < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative number")
+    return fv
+
+
 def main() -> None:
+    # Load config for qdrant/ollama-url and min-score defaults -- same pattern as
+    # core/ask.py's own main(), so this harness works out of the box against
+    # whatever ~/.config/reqbot/config.json already points at (Gemini review, PR #177).
+    # top-k is deliberately NOT config-driven (see its own default below): this
+    # harness's recall@10/@20 correctness depends on top-k never being smaller
+    # than max(K_VALUES), which a lower configured default could silently violate.
+    try:
+        from core import config as _config
+        _cfg = _config.load()
+        _default_qdrant_url = _cfg.qdrant_url
+        _default_ollama_url = _cfg.ollama_url
+        _default_min_score = _cfg.min_score
+    except Exception as e:
+        log.warning("Could not load config defaults (%s) — using hardcoded defaults", e)
+        _default_qdrant_url = "http://localhost:6333"
+        _default_ollama_url = "http://localhost:11434"
+        _default_min_score = 0.02
+
     parser = argparse.ArgumentParser(description="WP-37.1: retrieval-quality eval harness")
     parser.add_argument("--gold", default=str(_ROOT / "eval" / "gold_retrieval_queries.jsonl"))
-    parser.add_argument("--qdrant-url", default="http://localhost:6333")
-    parser.add_argument("--ollama-url", default="http://localhost:11434")
-    parser.add_argument("--top-k", type=int, default=max(K_VALUES))
-    parser.add_argument("--min-score", type=float, default=0.02)
+    parser.add_argument("--qdrant-url", default=_default_qdrant_url)
+    parser.add_argument("--ollama-url", default=_default_ollama_url)
+    parser.add_argument("--top-k", type=_positive_int, default=max(K_VALUES))
+    parser.add_argument("--min-score", type=_non_negative_float, default=_default_min_score)
     parser.add_argument("--no-hyde", action="store_true", help="Disable HyDE (production default is on)")
     parser.add_argument("--no-rewrite", action="store_true", help="Disable query rewrite (production default is on)")
     parser.add_argument("--output-dir", default=str(_ROOT / "eval" / "spike_results" / "wp_37_1"))
     args = parser.parse_args()
+
+    if args.top_k < max(K_VALUES):
+        parser.error(
+            f"--top-k must be at least {max(K_VALUES)} (recall@{max(K_VALUES)} would silently "
+            f"compute against a truncated candidate set otherwise)"
+        )
 
     queries = load_gold_queries(args.gold)
     print(f"Loaded {len(queries)} labeled queries from {args.gold}")
@@ -202,6 +261,14 @@ def main() -> None:
 
     print(report_md)
     print(f"Wrote {out_dir / 'results.json'} and {out_dir / 'report.md'}")
+
+    # A transient Qdrant/Ollama failure on even one query silently shrinks every
+    # aggregate's denominator -- the report still looks like a complete, valid
+    # run unless this exits nonzero (Codex review, PR #177).
+    failed = report["aggregate"]["failed_query_count"]
+    if failed:
+        log.error("%d/%d quer(y/ies) failed to run -- report is incomplete", failed, len(queries))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

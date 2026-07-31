@@ -405,11 +405,19 @@ ACTIVE BACKLOG
     shape recurs at meaningful scale once WP-35.2's threshold sweep runs
     against the fuller dataset.
 
-33. [PARTIALLY RESOLVED -- Phase 36, docs/PHASE36_REQUIREMENTS.md: WP-36.1
+33. [MOSTLY RESOLVED -- Phase 36, docs/PHASE36_REQUIREMENTS.md: WP-36.1
     (exact-match short-circuit) merged 2026-07-31 -- all 4 known exact-match
     false positives confirmed eliminated with no change to fabricated-catch
-    rate, live-verified against real MiniCheck. WP-36.2 (threshold re-sweep,
-    now that exact matches no longer reach the model) still pending.]
+    rate, live-verified against real MiniCheck (composite gate, real data:
+    8/8 fabrications caught, 1/92 faithful false positives). WP-36.2
+    (threshold re-sweep) deliberately DEFERRED as of 2026-07-31, not
+    abandoned -- current live numbers already beat WP-36.2's own hand-check
+    estimate for a raised threshold (that estimate was entailment-alone,
+    doesn't credit the modality check's share of the 8/8 catch rate), so a
+    resweep may honestly conclude "no change" rather than find a better
+    number. Not blocking anything; revisit only if a larger fabricated-
+    example dataset makes recalibration worthwhile. See
+    docs/PHASE36_REQUIREMENTS.md's WP-36.2 section for the full note.]
     MiniCheck's entailment score already-measurably rejects a
     description that is a verbatim (word-for-word identical) copy of its own
     source_quote -- 80% of WP-35.2's own reported false-positive rate, not
@@ -433,7 +441,11 @@ ACTIVE BACKLOG
     it was already the dominant driver of WP-35.2's own reported false-
     positive rate.** 77 of the 92 `wp_35_1_harvest` faithful records in
     `eval/gold_description_grounding.jsonl` (84%) are exact
-    `description == source_quote` matches (the faithful holdout is a random
+    `description == source_quote` matches by literal string equality (78/92,
+    85%, once WP-36.1 later corrected the count to match its actual
+    `normalize_text()`-based comparison, catching one capitalization-only
+    match this literal check missed, `REQ-22336c31702a`) (the faithful
+    holdout is a random
     sample of everything neither harvester heuristic flags, not gated by
     the heuristics themselves -- an exact match trivially passes into it).
     `eval/spike_results/wp_35_2/results.json`'s `scored_records` show 4 of

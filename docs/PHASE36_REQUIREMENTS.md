@@ -17,7 +17,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-36.1 — Exact-Match Short-Circuit for the Entailment Check | Complete |
-| WP-36.2 — Re-sweep the Entailment Threshold Post-Fix | Not started |
+| WP-36.2 — Re-sweep the Entailment Threshold Post-Fix | Deferred (2026-07-31) — see `docs/TODO_future_improvements.txt` item 33 |
 
 ---
 
@@ -186,6 +186,18 @@ real near-miss case, not just on literal duplicates.
 ---
 
 ### WP-36.2 — Re-sweep the Entailment Threshold Post-Fix
+
+**Deferred (2026-07-31), not abandoned.** WP-36.1 alone already measures well on the live composite
+gate (entailment OR modality, threshold still 0.85): 8/8 fabrications caught, 1/92 faithful false
+positives (`docs/PHASE36_REQUIREMENTS.md`'s WP-36.1 Findings above). That's *better* on the FP axis
+than this WP's own hand-check estimate for a raised threshold (0.95 gave 8/92 FP) — but that estimate
+was entailment-alone, from `eval/spike_results/wp_35_2/results.json`, and doesn't account for the
+modality check's independent contribution to the 8/8 catch rate at 0.85. **Whoever picks this WP back
+up should re-derive the hand-check against the deployed composite behavior first, not reuse the
+entailment-alone numbers above** — it's plausible the honest conclusion is "0.85 already wins, no
+threshold change warranted," not that 0.95 is better. Tracked as a fine-tuning backlog item in
+`docs/TODO_future_improvements.txt` item 33; production quality is good enough now that this isn't
+blocking anything.
 
 **Source:** WP-36.1's short-circuit changes which records the MiniCheck threshold is actually
 exercised against — WP-35.2's original sweep numbers no longer describe the deployed check's real

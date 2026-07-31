@@ -397,24 +397,53 @@ against a realistic query).
   and doesn't fire on the 8 that shouldn't get a `parent_stem` — the 2 `CITATION_ONLY_NOT_A_TARGET`
   examples especially, since those are correctly non-actionable already).
 - **Reconstruction lookup, in order, falling through to "leave empty" rather than guessing** (per
-  WP-39.1's Recommendation):
+  WP-39.1's Recommendation; step 1's exact matching signal corrected below after Codex's local review
+  of PR #184 found a real counter-example):
   1. the nearest preceding same-chunk record (from Step C's raw output, matched by `chunk_id`) that
-     looks like a stem — ends in `:`, or a similar structural signal already established in
-     `_is_unrepairable_fragment()`;
+     contains an introductory colon — **not necessarily as the record's last character.** Checked
+     directly: `REQ-48f549669bb2`'s actual preceding stem in `DODI 8410.03`'s chunk 32 is Step C's own
+     record `"This section will define for all parties: The characteristics of the NM information to
+     be exchanged..."` — Step C already merged the stem with its first sibling `(a)` item into one
+     combined quote ending in a period, not a colon. A strict "record *ends in* `:`" match (the
+     original draft here, and the same shape as `_is_unrepairable_fragment()`'s own trigger) misses
+     this case entirely. The reconstruction logic needs to extract the text *up to and including* the
+     first colon within a matching record, not require the colon to be the record's own ending —
+     calibrate this against all 18 known examples during implementation, the same way every text
+     signal in this file has been calibrated rather than assumed correct on the first pass;
   2. if not found, the same check against the *immediately preceding chunk* (same `document_id`,
      sequential `chunk_id`) — covers the confirmed `CROSS_CHUNK_SPLIT` cases;
   3. if still not found, fall back to `parent_header_text` directly — covers `HEADING_IS_SUBJECT` at
      zero additional engineering cost, since that field already exists on every chunk record today.
-- **Placement: a new step *after* Step D**, reading `*_requirements_normalized.jsonl` (already has
-  `chunk_id` on every record) and writing `parent_stem`/`embedding_text` onto its own output — no
-  changes to `parse_and_normalize.py`'s existing, already-tested rejection logic (per WP-39.1's own
-  recommendation; confirmed `run()` builds `normalized` from an explicit field literal, so placing
-  reconstruction *before* Step D would need to touch that schema regardless — after avoids that
-  entirely).
+- **Placement: extend the enrichment stage (Step D.5, `pipeline/enrich_requirements.py`), not a new
+  untracked output file** (corrected after Codex's local review of PR #184 — the original draft here
+  said "a new step after Step D, writing to its own output," but checked directly against
+  `core/artifact_resolver.py`: `resolve_latest_requirement_files()` only discovers the three
+  hardcoded suffixes `_requirements_gated`/`_requirements_enriched`/`_requirements_normalized`. A
+  reconstruction step writing to any other file name would be invisible to that resolver — `reindex`
+  and every other caller of it would keep silently selecting an existing tier without `parent_stem`/
+  `embedding_text`, and the fix would do nothing on any run after the one that happened to explicitly
+  target the new file). `enrich_requirements.py`'s own docstring already describes exactly the right
+  shape: `"Input: requirements_normalized.jsonl (from Step D). Output: requirements_enriched.jsonl —
+  same schema, with enrichment fields populated."` Adding `parent_stem`/`embedding_text` as two more
+  fields this stage populates keeps output landing in the `_requirements_enriched` tier the resolver
+  already recognizes and already prefers over `normalized` — no resolver changes needed, and still no
+  changes to `parse_and_normalize.py`'s Step D rejection logic (this is Step D.5, not Step D).
 - Add `parent_stem` and `embedding_text` fields to the schema (Tyler's original example: `source_quote`
   + `parent_stem` + a combined `embedding_text`). Update `pipeline/embed_and_index.py`'s
   `build_embedding_text()` to prefer `embedding_text` when present, falling back to `source_quote` when
   absent — backward compatible, no forced reindex.
+- **Also add both new fields to the indexed Qdrant *payload*, not just the embedding computation**
+  (Codex local review of PR #184, real gap: `build_payload()` builds the stored payload from its own
+  explicit field literal — same pattern as `parse_and_normalize.py`'s `normalized` dict — and doesn't
+  include either new field today. Improving `build_embedding_text()` alone only makes a fragment
+  easier to *find*; the record a user actually gets back still renders bare `source_quote`/
+  `description`, since that's literally all `core/ask.py` has access to
+  (`hit.get("description") or hit.get("source_quote", "")` — confirmed by reading the code). Without
+  this, the phase's own stated goal — "the child item is retrieved *with* its governing context
+  rather than standing alone" — isn't actually met even after everything else in this WP ships;
+  ranking would improve but the displayed result would still be the same dangling fragment). Scope
+  includes updating whichever of `core/ask.py`/the API/the UI render results to actually surface
+  `parent_stem` when present, not just storing it unused in the payload.
 - Validate against the 10 known cheap-win examples specifically: did each recover the *correct* stem
   (matching what WP-39.1 already hand-verified), not just *some* non-empty value.
 - Re-run WP-39.1's own retrieval-similarity methodology (real `nomic-embed-text` embeddings via
@@ -432,9 +461,11 @@ against a realistic query).
   well-evidenced 10/18.
 - **Not forcing a `parent_stem` guess onto `AMBIGUOUS_MAY_NOT_BE_REQ`** (1 example) — same "honest gap
   over false confidence" discipline as `_is_orphaned_list_item()`'s bare-noun-phrase case in WP-38.2.
-- **Not re-ingesting or reindexing the corpus as part of this WP** — schema/code changes only affect
-  future runs, matching WP-38.2's own precedent; re-ingesting the rest of the corpus is a separate,
-  explicit decision.
+- **Not re-ingesting or reindexing the full production corpus as part of this WP** — schema/code
+  changes only affect future runs, matching WP-38.2's own precedent; re-ingesting the rest of the
+  corpus is a separate, explicit decision. (Distinct from the `reindex` *sanity check* in
+  Tests/verification below, which only needs a small local run to confirm the resolver picks up the
+  new fields correctly — not a full corpus reindex.)
 - **Not building a general contextual-embedding system.** Targeted, per-record, only for records the
   candidate selector actually flags — not the universal per-record approach WP-37.2 tried and reverted.
 
@@ -447,14 +478,24 @@ against a realistic query).
   correctly get no `parent_stem` attached.
 - `build_embedding_text()` tests confirming `embedding_text` is preferred when present and the fallback
   to `source_quote` still works when absent.
+- **`build_payload()` tests confirming `parent_stem`/`embedding_text` are actually indexed into
+  Qdrant, not just used at embedding time** — and an end-to-end check that `core/ask.py` (or whichever
+  consumer is updated) surfaces `parent_stem` in what a query actually returns for one of the 10 known
+  examples, not just that the field exists unused in the payload.
+- **`reindex` sanity check**: confirm `core.artifact_resolver.resolve_latest_requirement_files()`
+  picks up the enrichment-stage output with the new fields on a real run, not a different tier missing
+  them — the specific failure mode this WP's Placement section above was rewritten to avoid.
 - Retrieval-similarity re-check (real embeddings) across a broader sample, not just the 3 WP-39.1
   spot-checked.
 - Full `pytest` suite and `ruff check .` clean throughout.
 
 **Gate:** `parent_stem`/`embedding_text` reconstruction implemented and placed per the recommendation
-above; validated against all 18 known examples with *correct* (not just non-empty) results; retrieval
-improvement re-confirmed on a broader sample; Step D's existing rejection logic untouched; full test
-suite and `ruff check .` clean.
+above; validated against all 18 known examples with *correct* (not just non-empty) results —
+including `REQ-48f549669bb2`'s merged-stem case, not just the 9 that fit the simpler pattern; both
+fields present in the indexed Qdrant payload *and* actually surfaced by at least one result-rendering
+consumer, not just computed and left unused; `reindex` confirmed to pick up the new fields on a real
+run; retrieval improvement re-confirmed on a broader sample; Step D's existing rejection logic
+untouched; full test suite and `ruff check .` clean.
 
 **Findings:** _(pending — filled in once WP-39.2 runs)_
 

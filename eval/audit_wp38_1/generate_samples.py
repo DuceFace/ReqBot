@@ -16,7 +16,12 @@ Two outputs, written under eval/audit_wp38_1/:
 import hashlib
 import json
 import random
+import sys
 from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 from core.artifact_resolver import resolve_latest_requirement_files
 
@@ -102,6 +107,19 @@ def main():
 
     total = len(all_records)
     print(f"\nTotal records across {len(files)} documents: {total}")
+
+    # Validate before writing anything -- an empty/missing local corpus (e.g. a
+    # machine without ~/documents/processed populated) must not silently
+    # clobber the committed manifest/samples with garbage and then crash with
+    # a ZeroDivisionError further down (Codex review, PR #180).
+    if not files or total == 0:
+        raise SystemExit(
+            f"No requirement files resolved under ~/documents/processed "
+            f"(files={len(files)}, total_records={total}) -- refusing to "
+            f"overwrite the committed audit artifacts with an empty/invalid "
+            f"population. Populate the local corpus (see docs/OPERATIONS.md) "
+            f"before regenerating samples."
+        )
 
     # Source population isn't committed to the repo (it lives outside it, in
     # ~/documents/processed, and can change on re-ingest) -- a manifest of

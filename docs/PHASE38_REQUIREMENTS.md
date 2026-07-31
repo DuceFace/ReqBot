@@ -403,12 +403,19 @@ something a deterministic rule can reliably do; see Non-Goals.
 **Tests/verification:**
 - **WP-38.1's own audit fixture is the regression test, already built and committed**
   (`eval/audit_wp38_1/unbiased_sample.jsonl` + `labeled_failures.jsonl`, 333 hand-labeled records:
-  284 confirmed-real, 25 fragment, 19 over-grab, 5 judgment-requiring). After the new rules ship,
-  re-run them against all 333 and confirm: (1) none of the 284 real records get rejected (no
-  regression — the single most important check), (2) the fragment sub-shapes each rule targets are
-  now actually rejected, (3) over-grab/judgment records are correctly left untouched (confirms scope
-  discipline, not accidental over-reach). This reuses a genuinely independent, already-hand-verified
-  fixture rather than validating a rule against the same reasoning that produced it.
+  284 confirmed-real, 25 fragment, 19 over-grab, 5 judgment-requiring). `labeled_failures.jsonl`
+  carries a `subtype` field per record (`orphaned_list_item`, `dangling_clause`, `colon_too_long`,
+  `malformed_garbled` for fragments; a separate set for over-grab/judgment), not just the broad
+  category (Codex review, PR #180 — the gate below needs the specific sub-shape each rule targets,
+  not just "fragment" in general, to be mechanically checkable rather than eyeballed). After the
+  new rules ship, re-run them against all 333 and confirm: (1) none of the 284 real records get
+  rejected (no regression — the single most important check), (2) filtering `labeled_failures.jsonl`
+  by `subtype` for each rule's specific target (e.g. `orphaned_list_item` for the list-item rule)
+  shows those records now rejected, (3) the `malformed_garbled` subtype and all `over_grab`/
+  `judgment` records are correctly left untouched (confirms scope discipline — this WP explicitly
+  doesn't target malformed/garbled fragments either, see Scope above). This reuses a genuinely
+  independent, already-hand-verified fixture rather than validating a rule against the same
+  reasoning that produced it.
 - Standard unit tests for each new/changed rule function, following `tests/unit/test_normalize.py`'s
   existing fixture style (same file WP-34.2's own tests live in).
 - `ruff check .` clean.

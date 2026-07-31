@@ -8,16 +8,63 @@ ratio from that sample therefore estimates the *sample's* composition, not
 the corpus's -- the same class of mistake as PHASE36_REQUIREMENTS.md's
 WP-36.2 finding (Codex review, PR #180). This computes both numbers so the
 correction is visible, not silently swapped in.
+
+Reads population counts from the committed source_manifest.json by default,
+not from the caller's live ~/documents/processed -- the whole point of
+committing that manifest was to make this reproducible from the PR's own
+artifacts alone, without depending on a local corpus that may differ or be
+missing entirely (Codex review, PR #180: the first version of this script
+recomputed live and crashed with KeyError on a machine with a different
+corpus). Pass --validate-against-live to additionally re-resolve the live
+corpus and confirm its record counts and file hashes still match the
+manifest -- optional, and only needed if you suspect local drift.
 """
+import argparse
 import json
 from collections import defaultdict
 from pathlib import Path
 
-from core.artifact_resolver import resolve_latest_requirement_files
-
 SCRIPT_DIR = Path(__file__).parent
 FAILURE_CATEGORIES = ("FRAGMENT", "OVER_GRAB")
-ALL_CATEGORIES = ("FRAGMENT", "OVER_GRAB", "JUDGMENT")
+
+
+def _validate_against_live(manifest: dict) -> None:
+    import sys
+
+    _root = Path(__file__).resolve().parent.parent.parent
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
+    from core.artifact_resolver import resolve_latest_requirement_files
+
+    import hashlib
+
+    def sha256_file(path: Path) -> str:
+        hasher = hashlib.sha256()
+        with open(path, "rb") as f:
+            for block in iter(lambda: f.read(65536), b""):
+                hasher.update(block)
+        return hasher.hexdigest()
+
+    files = resolve_latest_requirement_files(Path.home() / "documents" / "processed")
+    mismatches = []
+    for doc_key, meta in manifest["documents"].items():
+        live_path = files.get(doc_key)
+        if live_path is None:
+            mismatches.append(f"{doc_key}: not found in live corpus")
+            continue
+        live_count = sum(1 for _ in open(live_path))
+        live_hash = sha256_file(live_path)
+        if live_count != meta["record_count"] or live_hash != meta["sha256"]:
+            mismatches.append(
+                f"{doc_key}: manifest={meta['record_count']} records/{meta['sha256'][:12]}.. "
+                f"vs live={live_count} records/{live_hash[:12]}.. ({live_path.name})"
+            )
+    if mismatches:
+        print("VALIDATION FAILED -- local corpus differs from the manifest this audit used:")
+        for m in mismatches:
+            print(f"  {m}")
+    else:
+        print(f"Validated: local corpus matches the manifest for all {len(manifest['documents'])} documents.")
 
 
 def _weighted_and_unweighted(by_doc, population, total_population, categories):
@@ -35,6 +82,13 @@ def _weighted_and_unweighted(by_doc, population, total_population, categories):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--validate-against-live", action="store_true",
+        help="Also re-resolve ~/documents/processed and confirm it matches source_manifest.json.",
+    )
+    args = parser.parse_args()
+
     sample = [json.loads(l) for l in open(SCRIPT_DIR / "unbiased_sample.jsonl")]
     labels = {
         json.loads(l)["requirement_id"]: json.loads(l)["category"]
@@ -43,8 +97,11 @@ def main():
     for rec in sample:
         rec["_category"] = labels.get(rec["requirement_id"], "REAL")
 
-    files = resolve_latest_requirement_files(Path.home() / "documents" / "processed")
-    population = {doc_key: sum(1 for _ in open(path)) for doc_key, path in files.items()}
+    manifest = json.loads((SCRIPT_DIR / "source_manifest.json").read_text())
+    if args.validate_against_live:
+        _validate_against_live(manifest)
+
+    population = {doc_key: meta["record_count"] for doc_key, meta in manifest["documents"].items()}
     total_population = sum(population.values())
 
     by_doc = defaultdict(list)

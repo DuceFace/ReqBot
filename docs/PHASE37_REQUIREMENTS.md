@@ -5,7 +5,10 @@ closed — see Phase Framing below)
 **Date:** 2026-07-31
 **Preceded by:** Phase 36 (Entailment-Gate Calibration Fix: Exact-Match Short-Circuit) — WP-36.1
 complete, WP-36.2 deliberately deferred as backlog (`docs/PHASE36_REQUIREMENTS.md`).
-**Followed by:** None currently planned.
+**Followed by:** Phase 38 (Extraction Precision: Failure Audit & Targeted Fixes) —
+`docs/PHASE38_REQUIREMENTS.md`, drafted 2026-07-31. Different pipeline stage (extraction precision
+vs. retrieval quality) and a different origin (a separate conversation's diagnosis, not this phase's
+own findings) — not a continuation of this phase's own work.
 
 ---
 

@@ -530,16 +530,31 @@ def test_is_orphaned_list_item_false_for_citation_with_quoted_prose():
 
 
 def test_is_orphaned_list_item_false_for_all_caps_citation_with_real_clause():
-    # Gemini review round 6, PR #181: the structural citation check tells a
-    # citation token from real prose by checking whether a word's first
-    # letter is lowercase -- meaningless when the whole quote is ALL CAPS,
-    # since every word "looks like" a citation token regardless of what it
-    # actually is. Fixed by bailing out (not citation-only) whenever the
-    # remainder after "as defined in" is itself all-uppercase.
+    # Gemini review round 6, PR #181 (guard scope corrected round 8): the
+    # structural citation check tells a citation token from real prose by
+    # checking whether a word's first letter is lowercase -- meaningless
+    # when the whole quote is ALL CAPS, since every word "looks like" a
+    # citation token regardless of what it actually is. Bails out (not
+    # citation-only) whenever the *whole quote* is all-uppercase.
     assert not _is_orphaned_list_item(
         "COMPLIANCE DATA, AS DEFINED IN DODI 2000.26, SHALL BE REPORTED "
         "IMMEDIATELY TO THE ISSO."
     )
+
+
+def test_is_orphaned_list_item_true_for_short_acronym_only_citation():
+    # Gemini review round 8, PR #181: round 6's first fix checked
+    # `remainder.isupper()` (just the text after "as defined in") instead of
+    # the whole quote -- wrong scope. A short, genuine citation-only
+    # remainder made purely of acronym/document-ID tokens (e.g. "CNSSI
+    # 4009.") is *also* all-uppercase on its own even though the rest of the
+    # quote ("Term,") isn't, which made that version wrongly preserve real
+    # citation-only fragments as if they were real requirements. Checking
+    # the whole quote's casing instead fixes both this and round 6's
+    # original case.
+    assert _is_orphaned_list_item("Term, as defined in CNSSI 4009.")
+    assert _is_orphaned_list_item("Data, as defined in DODI 5200.01.")
+    assert _is_orphaned_list_item("Control, as defined in NIST SP 800-53.")
 
 
 def test_is_orphaned_list_item_defined_in_citation_with_multiple_references():

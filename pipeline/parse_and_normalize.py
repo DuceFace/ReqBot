@@ -248,16 +248,28 @@ def _is_definitional_citation_only(source_quote: str) -> bool:
     match = _DEFINED_IN_CITATION_RE.match(source_quote)
     if not match:
         return False
-    remainder = source_quote[match.end():]
-    if remainder.isupper():
-        # WP-38.2 (Gemini review round 6, PR #181): _looks_like_citation_reference()
-        # tells a citation token from real prose by checking whether a word's
-        # first letter is lowercase -- meaningless when the whole quote is
-        # ALL CAPS (e.g. a real requirement continuing "...SHALL BE REPORTED
-        # IMMEDIATELY TO THE ISSO." would have every word "look like" a
-        # citation token). Can't safely tell citation from prose by case in
-        # that situation, so don't guess -- leave the quote alone.
+    if source_quote.isupper():
+        # WP-38.2 (Gemini review round 6, PR #181; corrected round 8):
+        # _looks_like_citation_reference() tells a citation token from real
+        # prose by checking whether a word's first letter is lowercase --
+        # meaningless when the whole quote is ALL CAPS (e.g. a real
+        # requirement continuing "...SHALL BE REPORTED IMMEDIATELY TO THE
+        # ISSO." would have every word "look like" a citation token). Can't
+        # safely tell citation from prose by case in that situation, so
+        # don't guess -- leave the quote alone.
+        #
+        # Round 6's first version of this guard checked `remainder.isupper()`
+        # (just the text after "as defined in") instead of the whole quote --
+        # wrong scope: a short, genuine citation-only remainder made purely
+        # of acronym/document-ID tokens (e.g. "Term, as defined in CNSSI
+        # 4009.") is *also* all-uppercase on its own, even though the rest of
+        # the quote ("Term,") isn't, which made that version wrongly bail out
+        # on real citation-only fragments too. Checking the whole quote's
+        # casing (not just the citation portion) is the right scope for "was
+        # this whole extraction rendered in ALL CAPS by the source
+        # formatting," which was the actual thing round 6 needed to detect.
         return False
+    remainder = source_quote[match.end():]
     return all(_looks_like_citation_reference(w) for w in remainder.split())
 
 

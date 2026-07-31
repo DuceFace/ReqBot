@@ -494,17 +494,31 @@ correction, not a broad sweep — consistent with the 7.3% weighted fragment pre
 
 *Gemini + Codex review (PR #181) caught real bugs on top of the calibration above — worth recording
 in full, not glossed over:*
-- **[High, both reviewers independently] `_DEFINED_IN_CITATION_RE` only anchored the start of the
-  quote**, so a real requirement opening with a definitional qualifier but continuing with a real
-  governing clause (e.g. `"Cybersecurity incidents, as defined in CNSSI 4009, shall be reported
-  immediately to the ISSO."`) matched the citation-opener prefix and was discarded whole. Fixing this
-  wasn't a simple end-of-string anchor — real citations legitimately contain internal commas/periods
-  (document numbers, titles), so the two real target examples (`REQ-4523443092b8`, `REQ-e0471aa64a63`)
-  would have broken under a naive `$`-anchored fix too (verified directly — the reviewer's own
-  suggested regex failed both). Fixed instead by checking whether anything *after* "as defined in"
-  contains an obligation verb (a small local list — `shall`/`must`/`will`/`should`/`may`/etc. — not
-  the profile's `obligation_verbs`, to keep this module profile-independent); if it does, there's a
-  real clause continuing past the citation.
+- **[High, both reviewers independently, two rounds] `_DEFINED_IN_CITATION_RE` only anchored the
+  start of the quote**, so a real requirement opening with a definitional qualifier but continuing
+  with a real governing clause (e.g. `"Cybersecurity incidents, as defined in CNSSI 4009, shall be
+  reported immediately to the ISSO."`) matched the citation-opener prefix and was discarded whole.
+  Fixing this wasn't a simple end-of-string anchor — real citations legitimately contain internal
+  commas/periods (document numbers, titles), so the two real target examples (`REQ-4523443092b8`,
+  `REQ-e0471aa64a63`) would have broken under a naive `$`-anchored fix too (verified directly — the
+  reviewer's own suggested regex failed both).
+  **Round 1 fix (wrong in a way the same review round didn't catch):** checked whether anything after
+  "as defined in" contained an obligation verb from a small local list
+  (`shall`/`must`/`will`/`should`/`may`/etc.). **Round 2 (Gemini, re-reviewing the fix commit):**
+  this was backwards-fragile — *any* real obligation verb missing from the list (Gemini's example:
+  `"...as defined in Executive Order 13556, requires safeguarding controls."`, using "requires,"
+  not in the list) still found nothing, which made the function return `True` (citation-only) and
+  silently discard the real requirement. A verb whitelist can never be exhaustive enough to make that
+  failure direction safe, no matter how many verbs get added to it — the actual bug was the whole
+  approach, not the specific list. **Final fix:** replaced the verb-whitelist check with a structural
+  one — does the remainder after "as defined in" consist *only* of citation-shaped tokens (Title Case
+  document titles, ALL-CAPS/mixed acronyms, numeric document IDs, a small closed set of connector
+  words) with no ordinary lowercase prose word at all? Real citation reference text in this corpus is
+  consistently shaped that way; a real continuing obligation clause is ordinary lowercase prose. This
+  doesn't need to recognize every possible obligation verb, only what an ordinary English sentence
+  fragment looks like — a much smaller, more robust thing to get right, and verified against every
+  false positive found across both review rounds plus two more live-corpus citation examples not in
+  the original label set.
 - **[High, Codex] `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 6` let real, self-contained short
   directives through**, both a hypothetical (`"(a) Encrypt all stored CUI."`) and a real live-corpus
   record (`REQ-63cdc8363326`, `"(1) Identify individual responsibilities for protecting CUI."`) that

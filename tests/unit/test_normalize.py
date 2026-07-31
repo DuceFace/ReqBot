@@ -479,6 +479,30 @@ def test_is_orphaned_list_item_false_for_citation_with_real_clause_after():
     )
 
 
+def test_is_orphaned_list_item_false_for_citation_with_obligation_verb_outside_narrow_list():
+    # Gemini review round 2, PR #181: the first fix checked for a small
+    # obligation-verb whitelist (shall/must/will/...) -- any real verb
+    # outside that list (e.g. "requires") still false-positived, because a
+    # verb whitelist can never be exhaustive enough to make that failure
+    # direction safe. Replaced with a structural check (does the remainder
+    # look like ordinary lowercase prose vs. citation-shaped tokens) that
+    # doesn't depend on naming every possible verb.
+    assert not _is_orphaned_list_item(
+        "Controlled Unclassified Information, as defined in Executive Order "
+        "13556, requires safeguarding controls."
+    )
+
+
+def test_is_orphaned_list_item_defined_in_citation_with_multiple_references():
+    # Live-corpus generalization check (not in the original 12-example set):
+    # a citation-only quote referencing two documents joined by "and" is
+    # still correctly caught.
+    assert _is_orphaned_list_item(
+        "Readiness Reporting, as defined in DoDD 7730.65, DoD Readiness "
+        "Reporting System, and AFI 10-201, Force Readiness Reporting."
+    )
+
+
 def test_is_dangling_clause_bare_copula_first_word():
     # REQ-1b1071c8d317 (afi17-203): missing its real subject before "Is".
     assert _is_dangling_clause(

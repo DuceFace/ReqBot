@@ -175,39 +175,54 @@ ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 3
 # _has_obligation_after_citation_opener()).
 _DEFINED_IN_CITATION_RE = re.compile(r"^[^,]{1,80},\s*as defined in\b", re.IGNORECASE)
 
-# WP-38.2 (Gemini + Codex review, PR #181): _DEFINED_IN_CITATION_RE alone
-# false-positives on a real requirement that starts with a definitional
-# qualifier but then continues with a real governing clause, e.g.
-# "Cybersecurity incidents, as defined in CNSSI 4009, shall be reported
-# immediately to the ISSO." -- the regex matches the citation-opener prefix
-# and the function returned True unconditionally, discarding the real
-# requirement. Checked after the opener matches: if anything after "as
-# defined in" contains an obligation verb, there's a real clause continuing
-# past the citation, so this isn't citation-only content after all. A small,
-# local list rather than importing profiles/cybersecurity.json's
-# obligation_verbs -- this module has no other profile dependency, and this
-# check is deliberately narrower than "any obligation-shaped word" (it only
-# needs to catch the common cases; a missed edge case here just means a
-# citation-only quote that has to be reasoned about, not a discarded real
-# requirement -- the two failure directions aren't symmetric, so this list
-# only needs to be safe, not exhaustive).
-_OBLIGATION_VERB_RE = re.compile(
-    r"\b(shall|must|will|should|may|required to|is responsible for|are to|"
-    r"ensure|implement|establish|maintain|enforce)\b",
-    re.IGNORECASE,
-)
+# WP-38.2 (Gemini review round 2, PR #181): the first fix here checked
+# whether the remainder after "as defined in" contained a word from a small
+# obligation-verb whitelist -- but that check was backwards-fragile: ANY real
+# obligation verb missing from the list (e.g. "requires", "applies",
+# "protects" -- Gemini's own example, "...as defined in Executive Order
+# 13556, requires safeguarding controls.") caused the search to find nothing,
+# which made the function return True (citation-only) and silently discard a
+# real requirement. A verb whitelist can never be exhaustive enough to make
+# that failure direction safe, so this doesn't use one anymore.
+#
+# Instead: a real citation's own reference text in this corpus is
+# consistently made of Title-Case document titles, ALL-CAPS/mixed-case
+# acronyms, and numeric document IDs (e.g. "DoDI 2000.26, Suspicious Activity
+# Reporting"), joined only by commas/"and". A real continuing obligation
+# clause is ordinary lowercase prose ("shall be reported...", "requires
+# safeguarding controls..."). So: does the remainder consist *only* of
+# citation-shaped tokens and a small closed set of connector words, with no
+# other lowercase word at all? If even one ordinary lowercase word shows up,
+# treat it as real prose continuing past the citation, not citation-only
+# content -- this doesn't need to recognize every possible obligation verb,
+# only to recognize what an ordinary English sentence fragment looks like,
+# which is a much smaller, more robust thing to get right.
+_CITATION_CONNECTOR_WORDS = {
+    "and", "or", "the", "of", "for", "in", "a", "an", "at", "to", "within", "per",
+}
+
+
+def _looks_like_citation_reference(word: str) -> bool:
+    stripped = word.strip(",.()")
+    if not stripped:
+        return True
+    if stripped.lower() in _CITATION_CONNECTOR_WORDS:
+        return True
+    # Title Case, ALL CAPS, or a mix with digits/periods (acronyms, document
+    # IDs like "2000.26") -- never a lowercase-first ordinary word.
+    return not stripped[0].islower()
 
 
 def _is_definitional_citation_only(source_quote: str) -> bool:
     """True if source_quote opens with "<term>, as defined in <citation>" and
-    nothing after that opener looks like a real, independent governing clause
-    (WP-38.2, narrowed after Gemini + Codex review, PR #181 -- see
-    _OBLIGATION_VERB_RE's docstring above for why)."""
+    everything after that opener still looks like citation reference text --
+    not a real, independent governing clause (WP-38.2, see
+    _looks_like_citation_reference()'s docstring above for the reasoning)."""
     match = _DEFINED_IN_CITATION_RE.match(source_quote)
     if not match:
         return False
     remainder = source_quote[match.end():]
-    return not _OBLIGATION_VERB_RE.search(remainder)
+    return all(_looks_like_citation_reference(w) for w in remainder.split())
 
 
 def _is_orphaned_list_item(source_quote: str) -> bool:

@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 | WP-35.2 — Threshold Calibration Sweep | Complete |
 | WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Complete |
 | WP-35.4 — Production Step D.5/D.6 Entailment Gate | Complete |
-| WP-35.5 — Integration Gate | Not started |
+| WP-35.5 — Integration Gate | Complete |
 
 ---
 
@@ -756,19 +756,112 @@ they compose correctly against a real, full pipeline run.
 
 **Gate:** Phase 35's Success Gate below is met.
 
+**Findings (2026-07-31):**
+
+- **Full, fresh, real end-to-end pipeline run** — `reqbot ingest raw_pdfs/afpd_17-1.pdf --no-index`
+  (the actual CLI entry point, not a standalone module call like WP-35.4's manual verification used)
+  — confirming the whole orchestration, not just `entailment_gate.py` in isolation: Step D (73 raw →
+  64 normalized) → Step D.5 (64 enriched) → **Step D.6 ran automatically, no flag needed** (loaded 64,
+  wrote 64 gated + a 5-record failures file) → **Step E's own log line confirms it read from the
+  gated file, not the enriched one** (`"Loading normalized requirements from:
+  ...afpd_17-1_requirements_gated.jsonl"`) → final output: 64 requirements. Requirement count
+  preserved end-to-end (73 raw → 64 after Step D's own unrelated checks → 64 through D.5/D.6/E) —
+  confirms WP-35.4's chosen semantics (clear description, never drop the requirement) held in a real
+  run, not just unit tests.
+- **`core/artifact_resolver.py` confirmed against the real corpus, not just synthetic `tmp_path`
+  tests:** `resolve_requirement_file()` correctly resolved to this fresh run's
+  `afpd_17-1_requirements_gated.jsonl`, in preference to an *older* `afpd_17-1` run from 2026-07-29
+  that only has non-gated files — both the gated-tier preference and the latest-run-wins logic
+  confirmed together on real, pre-existing multi-run corpus state.
+- **A real limitation, surfaced by fresh data — but the diagnosis in this section's first committed
+  version was wrong, caught by Codex review on this WP's own PR (#170), verified before correcting.**
+  All 5 rejected descriptions in the `afpd_17-1.pdf` run are **byte-identical to their own
+  `source_quote`** (e.g. `"Participate in cyberspace governance forums."` verbatim on both sides),
+  scoring `support_prob` 0.6782–0.8442 — below the 0.85 threshold despite having zero new content to
+  be "fabricated." The original write-up here claimed this exact shape was "structurally invisible"
+  to WP-35.1's harvester heuristics and therefore to WP-35.2's calibration — **that claim is false**,
+  and checking it directly makes the real finding worse, not better: the heuristics (citation-
+  fragment/modality-shaped) only gate which records get *flagged as candidate fabrications*; the
+  **faithful holdout** is a separate, heuristic-independent random sample of everything neither
+  heuristic flagged — which an exact match trivially passes into. Counted directly against the
+  committed dataset: **77 of the 92 `wp_35_1_harvest` faithful records (84%) are exact
+  `description == source_quote` matches**, and checking `eval/spike_results/wp_35_2/results.json`'s
+  own `scored_records` shows **4 of the 5 false positives WP-35.2's original sweep reported at
+  threshold 0.85 are this exact pattern** (`REQ-938435202cf9` 0.8473, `REQ-8105d9acb410` 0.2766,
+  `REQ-fd23f59eb131` 0.2507, `REQ-69fe659699bb` 0.3312 — only one FP, `REQ-7b7cbb7ef5b7`, is a real
+  paraphrase). This WP's integration run didn't discover a new blind spot; it **reproduced an
+  already-known, already-measured weakness** that was already 80% of the reported false-positive
+  rate WP-35.2 accepted when choosing the threshold — corrected in
+  `docs/TODO_future_improvements.txt` item 33, which now cites these exact numbers instead of the
+  "invisible to calibration" claim.
+  WP-35.3's modality check correctly did not flag any of these 5 (nothing obligatory was invented) —
+  the two checks' specificity is working as designed; this is purely an entailment-threshold
+  weakness, and given it's already 84% of the faithful calibration set, likely a large share of
+  *real* production traffic too, not a rare edge case. Not fixed in this WP, per its own Non-Goals
+  (not a new failure-mode investigation); the TODO item's suggested direction (a cheap exact-match
+  short-circuit ahead of the MiniCheck call) carries more weight now that its actual scale is known.
+- **A second, targeted full-pipeline run — through the real `run_pipeline.py` orchestration, not a
+  standalone module call — to directly exercise "known fabrication pattern caught," which the
+  `afpd_17-1.pdf` run alone did not demonstrate (Codex review, PR #170: correctly pointed out that a
+  run whose only rejections are false positives doesn't satisfy this WP's own Gate wording).**
+  `afpd_17-1.pdf`'s own known-bad examples (WP-34.4's original spike fixtures) are now structurally
+  prevented before Step C even runs (`skip_sections`, WP-34.2/34.3 — confirmed in WP-35.1's
+  Findings), so a fresh ingest of *that* document can't reproduce them — the wrong document to prove
+  this criterion with. Instead: `python3 pipeline/run_pipeline.py raw_pdfs/NIST.SP.800-125.pdf
+  --output-dir <existing run dir> --skip-to D` (reusing Step C's already-extracted output; Step D.5's
+  own cache returned the same enrichment as before, so this exercises D → D.5 → **D.6** → E fresh,
+  through the real orchestrator, not just `entailment_gate.py` called directly the way WP-35.4's own
+  verification did). Result: `REQ-757d551b3e59` — WP-35.1's known modality-fabrication case
+  ("Implement better control of OSs..." — MiniCheck alone scores it 0.9367, confidently supported;
+  only the modality check catches it) — **is caught, live, through `run_pipeline.py`'s real Step
+  sequencing**, with the identical failure record WP-35.4's manual check found. 151 requirements in,
+  151 out, 13 rejected total — matches WP-35.4's own prior finding on this document exactly (D.5 was
+  cache-hit, not independently re-run, so this isn't a second independent LLM sample of the same
+  document, but it is a real, live confirmation that the full pipeline orchestration — not just the
+  module — correctly wires the known catch end to end).
+- **Revised assessment of "known faithful descriptions pass" (Success Gate below):** not literally
+  universal — the exact-match weakness above is real and already-known-and-accepted since WP-35.2's
+  original sweep (5.4% FP rate was never claimed to be zero). What this WP confirms is that the
+  *documented, calibrated* rate holds in a live full-pipeline run (this run's own FP rate, 5/64 ≈
+  7.8%, is in the same range as WP-35.2's originally measured 5.4%, not a new regression), not that
+  every individual faithful description survives — the "provisional, not confident calibration"
+  stance already carried through WP-35.2/35.3/35.4's docs is precisely why this doesn't block the
+  phase, but it does mean the Gate item below is stated precisely rather than as an unqualified pass.
+- `docs/PHASE33_REQUIREMENTS.md`'s WP-33.3 Findings (categories 1 and 3, both cite the description-
+  fabrication symptom this phase fixes, plus the Conclusion's forward-looking "claim/entailment
+  problem... worth scoping as its own investigation" note) updated with closing pointers to this
+  phase's actual implementation, closing the loop WP-34.4's spike opened back in Phase 34.
+- `docs/TODO_future_improvements.txt` item 31 marked `[RESOLVED -- Phase 35, WP-35.1 through
+  WP-35.4]`, replacing its now-stale "not yet implemented" scoping text with a concise pointer to
+  this phase doc — matching item 25's existing resolved-item format.
+- Full `pytest` suite (746 tests) passes; `ruff check .` clean.
+
 ---
 
 ## 5. Success Gate
 
 Phase 35 is complete when:
 
-1. WP-35.1's labeled dataset is committed and documented.
-2. WP-35.2's threshold is chosen with real sweep evidence against that dataset.
-3. WP-35.3's secondary check catches the known modality-fabrication pattern WP-34.4 found.
-4. WP-35.4's gate runs in the real pipeline with durable, distinguishable failure reasons.
-5. WP-35.5's integration gate confirms end-to-end behavior against a real document.
-6. Full unit suite passes (`pytest`); `ruff check .` passes.
-7. `docs/TODO_future_improvements.txt` item 31 is marked resolved, pointing at this phase.
+1. ✅ WP-35.1's labeled dataset is committed and documented.
+2. ✅ WP-35.2's threshold is chosen with real sweep evidence against that dataset.
+3. ✅ WP-35.3's secondary check catches the known modality-fabrication pattern WP-34.4 found.
+4. ✅ WP-35.4's gate runs in the real pipeline with durable, distinguishable failure reasons.
+5. ✅ WP-35.5's integration gate confirms end-to-end behavior against two real documents: a fresh
+   `afpd_17-1.pdf` ingest (orchestration wiring, requirement-count preservation, artifact-resolver
+   behavior against real corpus state) and a targeted `NIST.SP.800-125.pdf` re-run exercising the
+   known modality-fabrication catch through the real pipeline orchestrator. "Known faithful
+   descriptions pass" holds at the *documented, calibrated* rate (this run's ~7.8% FP is consistent
+   with WP-35.2's originally-measured 5.4%, not a new regression) — not as an unqualified 100%
+   guarantee, which WP-35.2 never claimed. The exact-match false-positive pattern this surfaced is a
+   real, already-known-and-accepted calibration weakness, tracked as
+   `docs/TODO_future_improvements.txt` item 33, not a phase blocker.
+6. ✅ Full unit suite passes (`pytest`); `ruff check .` passes.
+7. ✅ `docs/TODO_future_improvements.txt` item 31 is marked resolved, pointing at this phase.
+
+**Phase 35 is complete.** Item 5 is met on the precise terms above, not on the imprecise "known
+faithful descriptions pass" framing this doc first shipped with — corrected after Codex review
+found both the factual error in the diagnosis and the gap between what was tested and what the Gate
+actually asked for.
 
 ---
 

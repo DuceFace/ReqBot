@@ -323,6 +323,12 @@ five and undercounted as a result, caught in PR #156 review):
    `source_quote: "JP 3-12, Cyberspace Operations, February 5, 2013"` →
    `description: "Provides guidance on cyberspace operations, including requirements for planning,
    executing, and assessing the effectiveness of these operations."` — invented, not grounded).
+   **Closed:** the citation-list *extraction* itself is now structurally prevented before it ever
+   reaches Step C (`skip_sections`, WP-34.2/WP-34.3) — confirmed zero new occurrences across 6
+   freshly-ingested post-fix documents (`docs/PHASE35_REQUIREMENTS.md`'s WP-35.1 Findings). As
+   defense-in-depth for any description-fabrication that isn't tied to a skip-sections-preventable
+   extraction, Step D.6's entailment gate (`pipeline/entailment_gate.py`, WP-35.4) now also
+   independently catches a fabricated `description` at enrichment time.
 2. **Genuine vagueness/administrative meta-statements (5/40, 12.5% — second-largest by count, and
    the pattern the backlog originally hypothesized).** Real examples:
    `"COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"` (standard AF publication boilerplate, all-caps,
@@ -341,6 +347,10 @@ five and undercounted as a result, caught in PR #156 review):
    pattern-completing a truncated legal-style sentence: a low-word-count `source_quote` (which
    existing tooling could flag) accompanied by a *confident, complete-reading* `description` that
    quietly invents content.
+   **Closed:** the bare colon-terminated fragment itself is now rejected at the quote level before
+   Step D.5 ever runs (`_is_unrepairable_fragment`, WP-34.2). As defense-in-depth, Step D.6's
+   entailment gate (`pipeline/entailment_gate.py`, WP-35.4) also independently catches a fabricated
+   `description` at enrichment time, for this or any other quote shape.
 4. **Background/definitional prose extracted despite no obligation language (1/40, 2.5%).** A
    glossary/definitions chunk (`afpd_17-1.pdf` chunk 9) yielded a "requirement" that is pure
    descriptive narrative (`"...the DoD current business and financial management infrastructure...
@@ -418,6 +428,12 @@ enrichments alongside fabricated ones. Whatever checks `description` needs is a 
 problem (do the specific facts named in the description actually appear in the quote), not a
 substring-overlap problem, and is more design work than initially estimated — worth scoping as its
 own investigation before committing to an implementation approach.
+
+**Closed, Phase 35:** that investigation happened as WP-34.4's spike (`docs/PHASE34_REQUIREMENTS.md`)
+and Phase 35 (`docs/PHASE35_REQUIREMENTS.md`) — a claim/entailment check (MiniCheck, WP-35.2) plus a
+deterministic obligation/modality-fabrication check (WP-35.3), calibrated against a real labeled
+dataset (WP-35.1) and wired into the live pipeline as Step D.6 (WP-35.4). `description` fabrication
+is now caught at ingest time, independent of whichever of these five categories produced it.
 
 ---
 

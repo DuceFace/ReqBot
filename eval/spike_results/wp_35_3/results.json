@@ -1,0 +1,218 @@
+{
+  "modality": [
+    {
+      "source_quote": "better control of OSs to ensure that they meet the organization's security requirements",
+      "description": "Implement better control of OSs to ensure they meet the organization's security requirements.",
+      "label": "fabricated_modality",
+      "notes": "New, post-fix (NIST.SP.800-125.pdf, ingested fresh during this WP -- not one of WP-34.4's original documents). source_quote is a noun-phrase fragment ('better control of OSs to ensure that they meet the organization's security requirements') with no obligation verb of its own; description prepends 'Implement', inventing an imperative the quote never states. Real, current evidence that modality-fabrication is not yet structurally prevented the way citation/fragment fabrications are.",
+      "section_title_path": [
+        "Executive Summary"
+      ],
+      "parent_context": "Virtualization is the simulation of the software and/or hardware upon which other software runs. This simulated environment is called a virtual machine (VM) . There are many forms of virtualization, distinguished primarily by computing architecture layer. This publication focuses on the form of virtualization known as full virtualization. In full virtualization , one or more OSs and the applications they contain are run on top of virtual hardware. Each instance of an OS and its applications runs in a separate VM called a guest operating system . The guest OSs on a host are managed by the hyper",
+      "source_pdf": "NIST.SP.800-125.pdf",
+      "chunk_id": 7,
+      "requirement_id": "REQ-757d551b3e59",
+      "run_dir": "NIST.SP.800-125_20260730_215611",
+      "source": "wp_35_1_harvest",
+      "flagged": true
+    },
+    {
+      "source_quote": "Insider Threat, as defined in DoDD 5205.16, The DoD Insider Threat Program, and AFI 16-1402, Insider Threat Program Management.",
+      "description": "Implement Insider Threat Program as defined in DoDD 5205.16 and AFI 16-1402.",
+      "label": "fabricated_modality",
+      "notes": "New, post-fix (afi10-2402.pdf), same late re-harvest as REQ-f7a98a6a365d. source_quote names a term via cross-reference to its defining instructions ('Insider Threat, as defined in DoDD 5205.16... and AFI 16-1402...'), the same definitional-cross-reference shape as REQ-a485fe91aa5f; description invents 'Implement Insider Threat Program', an imperative the quote never states.",
+      "section_title_path": [
+        "PROGRAM OVERVIEW",
+        "1.4. CARM and MA Integration Strategy"
+      ],
+      "parent_context": "1.4.1.  DoDD 3020.40 provides guidance for the integration and synchronization of DoD risk management programs, to  include  CARM.    CARM  programs  will  implement  and  execute CARM guidance and requirements within the overall DoD MA Strategy and Framework by establishing  complementary  partnerships  and  information  cross-flows  between  the  CARM program and AF MA efforts as needed.  Designated MA programs/activities, as defined in DoDD 3020.40, are: 1.4.1.1.  Continuity of Operations (COOP), as defined in DoDD  3020.26, DoD Continuity  Programs, and  AFI  10-208, Air  Force  Continuity",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 20,
+      "requirement_id": "REQ-cbc6374a655f",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "flagged": true
+    },
+    {
+      "source_quote": "Cybersecurity - Prevention of damage to, protection of, and restoration of computers, electronic communications systems, electronic communications services, wire communication, and electronic communication, including information contained therein, to ensure its availability, integrity, authentication, confidentiality, and nonrepudiation.",
+      "description": "Implement cybersecurity measures to prevent damage, protect, and restore computers, electronic communications systems, services, wire communication, and electronic communication to ensure availability, integrity, authentication, confidentiality, and nonrepudiation.",
+      "label": "fabricated_modality",
+      "notes": "WP-34.4 known-bad, originally miscategorized as known-good until Codex's PR #164 review (afpd_definition_reframed_as_imperative). section_title_path=['Terms'] confirms this is a genuine glossary definition; description reframes it as an imperative obligation. This specific historical record predates WP-34.3's TERMS skip_sections fix.",
+      "section_title_path": [
+        "Terms"
+      ],
+      "parent_context": "AF  Information  Network  (AFIN) -  The  globally  interconnected,  end-to-end  set  of  AF information capabilities, and associated processes for collecting, processing, storing, disseminating,  and  managing  information  on-demand  to  AF  warfighters,  policy  makers,  and support  personnel,  including  owned  and  leased  communications  and  computing  systems  and services, software (including applications), data, security  services, other associated services, and national security systems.' (Derived from the JP 3-12 definition of DoDIN). Business  Mission  Area  (BMA) -The BMA ensures",
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 26,
+      "requirement_id": "REQ-a485fe91aa5f",
+      "run_dir": "afpd_17-1_20260729_163823",
+      "source": "wp_34_4_spike",
+      "flagged": true
+    }
+  ],
+  "faithful_false_positives": [],
+  "other_fabricated": [
+    {
+      "source_quote": "The PO, in conjunction with Service Principal/CIO and AO will:",
+      "description": "The PO, in conjunction with Service Principal/CIO and AO will: Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "label": "fabricated_fragment",
+      "notes": "WP-34.4 known-bad (cjcsi_po_service_principal_fragment). Colon-terminated list header; description invents the full list of duties. Same document, chunk 3 -- section_title_path/parent_context weren't captured for this chunk (an early-document hierarchy gap, not a labeling gap).",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "CJCSI 6510.02G.pdf",
+      "chunk_id": 3,
+      "requirement_id": "REQ-da2d52df8841",
+      "run_dir": "CJCSI 6510.02G_20260727_202900",
+      "source": "wp_34_4_spike",
+      "flagged": false
+    },
+    {
+      "source_quote": "BSAs also recommend measures to remediate or mitigate the identified vulnerabilities.",
+      "description": "BSA findings reports are distributed only to the assessed organization, the JS, the relevant CCMD(s) and service(s), the assessment requesting organization, and any organization mandated by DoD or service guidance.",
+      "label": "fabricated_other",
+      "notes": "New, post-fix (afi10-2402.pdf) -- found on a re-harvest after this WP's first commit, once afi10-2402's ingest (still running in the background at that point) actually finished. source_quote is a complete, real sentence about BSAs recommending remediation measures; description is about an entirely different topic (findings-report distribution lists) found nowhere in the quote or parent_context -- not a citation, not a truncated fragment, just wholesale topical drift. Distinct from the other fabricated_other example (REQ-409e58971a57's invented attribution) but grouped the same way: a specific invented claim with no fragment or citation shape driving it.",
+      "section_title_path": [
+        "CARM PROCESSES",
+        "3.3. TCA Assessment Processes."
+      ],
+      "parent_context": "3.3.1.  The CARM Program utilizes products from three separate assessments to determine risk  to  AF  TCAs  and  develop  risk  management  strategies.    The  three  assessments  are  1) Balanced  Survivability  Assessments  (BSA),  2)  Joint  Mission  Assurance  Assessments (JMAA)  conducted  by  the  Defense  Threat  Reduction  Agency  (DTRA),  and  3)  Air  Force Mission Assurance Assessments (AFMAA) conducted by the AFSFC. 3.3.2.  BSAs are mission survivability assessments which identify vulnerabilities and assess the  mission  impact  should  those  vulnerabilities  be  successfully  exp",
+      "source_pdf": "afi10-2402.pdf",
+      "chunk_id": 82,
+      "requirement_id": "REQ-f7a98a6a365d",
+      "run_dir": "afi10-2402_20260730_220821",
+      "source": "wp_35_1_harvest",
+      "flagged": false
+    },
+    {
+      "source_quote": "DoDI 8500.01, Cybersecurity, March 14, 2014",
+      "description": "Establishes policies and procedures for implementing cybersecurity measures in accordance with NIST SP 800-53 Rev. 4.",
+      "label": "fabricated_citation",
+      "notes": "WP-34.4 known-bad (afpd_dodi_8500_citation). Bare bibliography entry; description invents a specific framework reference (NIST SP 800-53 Rev. 4) absent from the citation. From afpd_17-1.pdf chunk 8 -- a References-list chunk (see REQ-ddc1112cabc9, REQ-04dd14fe4baf, REQ-5968a12bc1d6, REQ-44408bbfebbe below, all the same chunk).",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-466a23120b21",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_34_4_spike",
+      "flagged": false
+    },
+    {
+      "source_quote": "DoDI 8115.02, Information Technology Portfolio Management Implementation, October 30, 2006",
+      "description": "Requires the development of an IT portfolio management plan that includes a comprehensive inventory of all DoD IT systems and applications.",
+      "label": "fabricated_citation",
+      "notes": "New citation-shaped fabrication (not in WP-34.4's original set), same References-list chunk (afpd_17-1.pdf chunk 8) as REQ-466a23120b21. Description invents a specific plan requirement ('comprehensive inventory of all DoD IT systems') the bare citation never states.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-ddc1112cabc9",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_35_1_harvest",
+      "flagged": false
+    },
+    {
+      "source_quote": "JP 3-12, Cyberspace Operations, February 5, 2013",
+      "description": "Provides guidance on cyberspace operations, including requirements for planning, executing, and assessing the effectiveness of these operations.",
+      "label": "fabricated_citation",
+      "notes": "WP-34.4 known-bad (afpd_jp3_12_citation). Same References-list chunk as REQ-466a23120b21.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-04dd14fe4baf",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_34_4_spike",
+      "flagged": false
+    },
+    {
+      "source_quote": "All HAF Functionals, MAJCOMs, DRUs, and FOAs will:",
+      "description": "Identify the Protection Level of their cyber and computer/communications assets and apply integrated defense measures IAW AFI 31-101, Integrated Defense.",
+      "label": "fabricated_fragment",
+      "notes": "WP-34.4 known-bad (afpd_haf_functionals_fragment). Also a WP-34.2 heading-echo case -- section_title_path confirms this exact quote is its own chunk's heading ('3.14. All HAF Functionals...'), so a fresh ingest now rejects it before Step D.5 ever runs. Kept here as real historical evidence of the pattern, same as WP-34.4 treated it.",
+      "section_title_path": [
+        "2. Policy. The AF will:",
+        "3.14. All HAF Functionals, MAJCOMs, DRUs, and FOAs will:"
+      ],
+      "parent_context": "3.14.1.  Participate  in  the  cyberspace  governance  forums,  as  required.  Identify  new cyberspace requirements to responsible CFL. 3.14.2.  Ensure all cyberspace investments are identified and registered in the SAF/CIO A6-directed management control system. 3.14.3.  Maintain  enterprise  architectures  for  their  areas  of    responsibility,  to  include mission-unique IS solution architectures, and be able to integrate their  architectural data using AF-directed repositories. 3.14.4.  Develop  and  exercise  contingency  plans  for  mission  assurance  when  operating under conditions ",
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 24,
+      "requirement_id": "REQ-917e508c8a6d",
+      "run_dir": "afpd_17-1_20260729_163823",
+      "source": "wp_34_4_spike",
+      "flagged": false
+    },
+    {
+      "source_quote": "a. Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "description": "The PO, in conjunction with Service Principal/CIO and AO will: Address the operational readiness of cybersecurity solutions and cryptographic products employed to provide continuous protection to national security information transmitted via command, control, communications, computers, intelligence, surveillance, and reconnaissance (C4ISR), information technology (IT), and weapons systems.",
+      "label": "fabricated_other",
+      "notes": "Subtler than a bare citation: this record's own source_quote is just 'a. Address the operational readiness...' (the sub-bullet body, no actor named) -- but the description prepends 'The PO, in conjunction with Service Principal/CIO and AO will:', an attribution that is real text elsewhere in the same document (it's REQ-da2d52df8841's own source_quote) but is absent from *this* record's source_quote. Grounding is evaluated per-record against that record's own source_quote, so this counts as invented content by this project's existing standard -- an attribution-hallucination flavor distinct from both the citation and fragment shapes.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "CJCSI 6510.02G.pdf",
+      "chunk_id": 3,
+      "requirement_id": "REQ-d700d6df28b0",
+      "run_dir": "CJCSI 6510.02G_20260727_202900",
+      "source": "wp_35_1_harvest",
+      "flagged": false
+    },
+    {
+      "source_quote": "Distribution: A, B, C",
+      "description": "Distribution must be made to A, B, and C as per Reference J-6.",
+      "label": "fabricated_other",
+      "notes": "WP-34.4 known-bad (cjcsi_distribution_fabricated_attribution). A short administrative line gets a fabricated attribution ('as per Reference J-6') invented, not present in the quote.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "CJCSI 6510.02G.pdf",
+      "chunk_id": 0,
+      "requirement_id": "REQ-409e58971a57",
+      "run_dir": "CJCSI 6510.02G_20260729_020101",
+      "source": "wp_34_4_spike",
+      "flagged": false
+    },
+    {
+      "source_quote": "(3) Mean time between failures of network equipment or connectivity.",
+      "description": "Mean time between failures of network equipment or connectivity must be measured.",
+      "label": "fabricated_fragment",
+      "notes": "New, post-fix (DODI 8410.03.pdf). source_quote is a bare enumerated list-item topic phrase ('(3) Mean time between failures of network equipment or connectivity.') with no obligation verb of its own -- parent_context confirms it's item 3 of a list of SLA topics to address, not an instruction. Description invents a specific obligation ('must be measured') the quote never states. Notably this one does *not* end in a colon, so parse_and_normalize.py's _is_unrepairable_fragment (which only fires on colon-terminated quotes) would not catch it -- a real gap worth a future look, out of scope for this WP to fix.",
+      "section_title_path": [
+        "4.  SLAs"
+      ],
+      "parent_context": "NM systems shall be located within the network topology in a manner that ensures they can monitor and report on SLA compliance. NM SLAs shall at a minimum address the following areas identified in International Telecommunications Union - Telecommunications Recommendation M.3342 (Reference (z)) and TM Forum GB917 Release 3.0 (Reference (aa)): Identification of the organizations between which the agreement is established, to include technical and organizational points of contact. A description of the NM services that will be provided along with scope, limitations, and other terms of reference th",
+      "source_pdf": "DODI 8410.03.pdf",
+      "chunk_id": 34,
+      "requirement_id": "REQ-c6d23854cd0b",
+      "run_dir": "DODI 8410.03_20260730_220814",
+      "source": "wp_35_1_harvest",
+      "flagged": false
+    },
+    {
+      "source_quote": "DoDI 8330.01, Interoperability of Information Technology (IT), including National Security Systems (NSS), May 21, 2014",
+      "description": "Establishes requirements for IT systems, including National Security Systems (NSS), to ensure interoperability across the DoD.",
+      "label": "fabricated_citation",
+      "notes": "Same References-list chunk as REQ-466a23120b21 (afpd_17-1.pdf chunk 8). Description invents a specific interoperability-requirements claim the bare citation never states. Flagged by the modality heuristic rather than the fragment heuristic only because 'ensure' happens to appear in the description and not the quote -- same citation-fabrication shape as the others from this chunk, not a distinct pattern.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-5968a12bc1d6",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_35_1_harvest",
+      "flagged": false
+    },
+    {
+      "source_quote": "CJCSI 5123.01G Charter of the Joint Requirements Oversight Council, February 12, 2015",
+      "description": "Charter of the Joint Requirements Oversight Council, which is responsible for reviewing and approving requirements for DoD IT systems and applications.",
+      "label": "fabricated_citation",
+      "notes": "Same References-list chunk as REQ-466a23120b21. Description invents specific charter authority ('responsible for reviewing and approving requirements') beyond what a bare citation title states.",
+      "section_title_path": [],
+      "parent_context": null,
+      "source_pdf": "afpd_17-1.pdf",
+      "chunk_id": 8,
+      "requirement_id": "REQ-44408bbfebbe",
+      "run_dir": "afpd_17-1_20260727_202422",
+      "source": "wp_35_1_harvest",
+      "flagged": false
+    }
+  ]
+}

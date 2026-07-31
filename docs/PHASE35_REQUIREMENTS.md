@@ -18,7 +18,7 @@ in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-35.1 — Build a Labeled Calibration Dataset for Description Faithfulness | Complete |
 | WP-35.2 — Threshold Calibration Sweep | Complete |
-| WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Not started |
+| WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Complete |
 | WP-35.4 — Production Step D.5/D.6 Entailment Gate | Not started |
 | WP-35.5 — Integration Gate | Not started |
 
@@ -438,6 +438,55 @@ real miss WP-34.4 found (`support_prob=0.9197` on a case that should have been r
 check even where the entailment score alone would pass it; the "will" → "must" and other real modal
 paraphrases already confirmed faithful in WP-34.4's own fixtures are not falsely rejected; the
 "ensure"-as-purpose-clause case specifically does not cause a false negative on the original miss.
+
+**Findings (2026-07-31):**
+
+- Confirmed against this repo's own fixtures (Codex's PR #165 review) that neither naive framing
+  works: "any obligation word anywhere in the quote makes any obligation word in description fine"
+  under-catches the known miss (the quote's "ensure" is a purpose clause, not the actor being
+  commanded to do anything), while "every obligation word in description must appear literally in
+  the quote" over-catches real modal-verb paraphrases like `dodi_nsa_approved_crypto` (will → must).
+- **Design: split `obligation_verbs` into two functionally different classes, not one flat list.**
+  `MODAL_MARKERS` (`shall`, `must`, `will`, `are to`, `is responsible for`, `required`/`required to`)
+  express obligation without naming an action — substituting among these restates existing modality.
+  `ACTION_VERBS` (`implement`, `establish`, `maintain`, `enforce`, `ensure`) each name a specific
+  act — introducing one with no counterpart anywhere in the quote invents a *new* action, not just a
+  modality restatement. This split falls directly out of the fixture set: every real fabrication
+  found (`afpd_definition_reframed_as_imperative`, and WP-35.1's `REQ-757d551b3e59`/
+  `REQ-cbc6374a655f`) introduces a brand-new `ACTION_VERB` (always "Implement" in the observed cases)
+  into a quote that names no action of its own at all; every real paraphrase found (`will`→`must`,
+  `required`(adj.)→`must`, `support`→`maintain` alongside an already-present `must`) only ever
+  substitutes within/around an already-obligatory sentence.
+- **`ensure` is genuinely ambiguous and needed its own rule.** It's the one word that appears in both
+  the `ACTION_VERBS` list and, idiomatically, in purpose clauses ("...to ensure availability...").
+  Resolved with a bare-infinitive check (`_is_infinitive_purpose_clause`): an `ACTION_VERBS` match
+  immediately preceded by "to " is treated as non-governing (explains *why*, doesn't command *who*).
+  Applied to all `ACTION_VERBS` uniformly, not just `ensure` — the same non-finite grammatical shape
+  applies regardless of which verb follows "to ", and no fixture required narrowing it further.
+- **The actual rule:** a description fabricates an obligation only if (a) it introduces a governing
+  `ACTION_VERBS` word absent from the quote, AND (b) the quote itself asserts no obligation at all —
+  no `MODAL_MARKERS` word and no governing `ACTION_VERBS` word of its own. If the quote already
+  asserts *some* obligation (by either mechanism), a new/substituted action verb is treated as a
+  paraphrase of an already-obligatory sentence, not a fabricated new command. This is a deliberately
+  narrow rule (per this WP's own Non-Goals — not a grammar/mood classifier) and is exactly why
+  `REQ-35dfe9353e60` (quote already has "must"; description swaps "support"→"maintain") correctly
+  passes while structurally near-identical `REQ-cbc6374a655f` (quote has no obligation marker at
+  all; description adds "Implement") correctly fails.
+- **Validated against WP-35.1's full dataset, not just the two originating fixtures:** all 3
+  `fabricated_modality` records caught (3/3), zero false positives across all 94 `faithful` records
+  (including the 4 specifically WP-35.1-flagged near-synonym paraphrase fixtures —
+  `REQ-679a055fb375`, `REQ-efc38d9d853d`, `REQ-35dfe9353e60`, `REQ-668a74c21bd2`). The 11 other
+  fabricated-subtype records (citation/fragment/other — not this check's job) also weren't
+  incidentally flagged, for whatever that's worth as an informational data point; not a claim this
+  check should ever be relied on for those subtypes.
+- Output: `eval/modality_fabrication_check.py` (the check itself — `is_fabricated_obligation()` plus
+  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (18 tests: the known
+  WP-34.4/Codex miss, the 4 real paraphrase fixtures, plus unit coverage of the helper functions),
+  and `eval/spike_results/wp_35_3/report.md`/`results.json` (full validation output, mirroring the
+  `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/` precedent).
+- Per this WP's own Scope, deliberately not wired into `pipeline/parse_and_normalize.py` yet — how
+  this combines with WP-35.2's entailment threshold (independent rejects vs. one combined decision)
+  is an explicit WP-35.4 design decision, not pre-decided here.
 
 ---
 

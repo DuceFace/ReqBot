@@ -18,8 +18,8 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-38.1 — Extraction Precision Failure Audit | Not started |
-| WP-38.2 — Precision Filter or Targeted Rule Extensions (brainstorm only, scope TBD) | Not started |
+| WP-38.1 — Extraction Precision Failure Audit | Complete |
+| WP-38.2 — Deterministic Fragment-Rejection Rule Extensions | Not started (properly scoped) |
 
 ---
 
@@ -212,66 +212,227 @@ knowing the real rate and shape, not assuming it.
 freshly-verified (not stale) sample of the corpus, with real counts per category and a grounded
 recommendation for what — if anything — WP-38.2 should build.
 
+**Findings (2026-07-31):**
+
+*Corpus freshness.* Cross-checked every document's latest processed run against WP-34.2/34.3's
+merge times (2026-07-30 13:07/14:12 CDT). 12 of 13 documents already had a run newer than both
+fixes. `CJCSI 6510.02G`'s latest run (`20260729_020101`) predated them — the same run this phase's
+own Phase Framing spot-check had already flagged as unusable evidence. Re-ingested it fresh
+(`CJCSI 6510.02G_20260731_152438`, 87 requirements) before sampling anything, so all 13 documents
+now reflect the current pipeline. Corpus total: 1,872 requirements (via
+`core.artifact_resolver.resolve_latest_requirement_files()` — the same "latest run, best tier"
+resolver `reindex` itself uses, so the audit reads exactly what the live pipeline currently
+produces).
+
+*Sampling (both passes specified by Scope above, kept genuinely separate):*
+- **Unbiased/stratified sample** (the prevalence denominator): 333 records, stratified
+  proportionally by document with a 15-record floor per document, seed `3801` (reproducible —
+  script and inputs committed at `eval/audit_wp38_1/`). All 13 documents represented, exceeding
+  the ≥300-record/≥8-document minimum.
+- **Discovery pool** (heuristic-narrowed, for finding examples only — never used for the count
+  below): 183 records flagged by short-quote / no-terminal-punctuation / all-caps-heading /
+  definition-opener signals. 9.8% hit rate on the signals alone, consistent with this phase's
+  earlier finding that naive heuristics overselect — most of the value here was in *which*
+  examples it surfaced, not its own hit rate.
+
+*Prevalence, from the unbiased sample only (333 records, all hand-read):*
+
+| Category | Count | % of sample |
+|---|---:|---:|
+| Real, correctly-extracted requirement | 284 | 85.3% |
+| Fragment / incomplete extraction | 25 | 7.5% |
+| Genuine over-grab (non-requirement text) | 19 | 5.7% |
+| Judgment-requiring / ambiguous | 5 | 1.5% |
+
+**The diagnosis is real and non-trivial: ~13.2% (44/333) of the current, post-Phase-34 corpus is a
+clear-cut precision failure** — an order of magnitude above the Phase Framing spot-check's crude
+regex sweep (10/1,876, 0.5%), confirming that spot-check's own conclusion that keyword matching
+alone understates the problem. Failures were found in 10 of the 13 documents sampled (not
+concentrated in one outlier document); `CJCSI 6510.02G`'s freshly re-ingested sample had zero
+flagged records, a small (n=15) but reassuring sign for the just-shipped fix.
+
+*Fragment sub-shapes (25 total):*
+- **Orphaned list item** (12) — a real list item's text extracted without the governing sentence
+  that gives it meaning, most often numbered/lettered markers: `REQ-c6aeb8df528b` (DODI 5200.01)
+  — `"(3) Restrain competition."` — is actually item 3 of a "classification shall not be used
+  to:" prohibition list; alone it reads as nonsensical. `REQ-48f549669bb2` (DODI 8410.03) —
+  `"Required NM data update rates."` — a bare noun-phrase list item.
+- **Dangling/preamble clause** (6) — a subordinate clause with no main clause attached:
+  `REQ-4aeeff50f15b` (DODI 5200.01) — `"Under the authority, direction, and control of the Chief
+  Management Officer of the Department of Defense, in addition to the responsibilities in section
+  11 of this enclosure and in accordance with References (a), (c), and DoDD 5110.04 (Reference
+  (af)),"` — a responsibilities-list preamble with no verb, trailing comma.
+- **Colon-terminated, too long for the existing rule** (3, code-verified `REAL_GAP` — see below).
+- **Malformed/garbled extraction** (4) — table or form content that didn't parse into coherent
+  prose: `REQ-17290369ef3b` (afi17-203) — `"If the originator / recipient of the incident report
+  (IR) is, 2 = and the Primary Recipient will be."` The discovery pool surfaced two even starker
+  examples (not in the prevalence count, but real): `REQ-e6ac0743a77a` (DODI 5200.48) and
+  `REQ-e026f6b5506a` (NIST.SP.800-125) both cut off mid-sentence with no closing punctuation at
+  all.
+
+*Over-grab sub-shapes (19 total):*
+- **Descriptive/definitional/background prose** (13) — sentences that describe or explain rather
+  than obligate, heavily concentrated in `NIST.SP.800-125` (a guidance document, not a directive —
+  5 of its 26 sampled records): `REQ-189d6285eaa2` — `"Most hypervisor software currently only
+  uses passwords for access control; this may be too weak for some organizations' security
+  policies..."` — real prose from the source, but description of current practice, not an
+  obligation.
+- **Reference-only / administrative boilerplate** (4): `REQ-9c62641ac103` (DODI 8410.03) —
+  `"This Instruction is effective August 29, 2012."`
+- **Explicit "examples of..." text** (1): `REQ-e41d286c83f4` (afi17-203) — `"Examples of
+  strategies include modifying network access controls (e.g., firewall)..."` — this is the exact
+  same record `docs/PHASE37_REQUIREMENTS.md`'s WP-37.2 cited as its root-cause retrieval example;
+  independently flagged here as a probable over-grab, on unrelated grounds.
+- **Form/acknowledgment-template text** (1): `REQ-db943fb3ade5` (dafman17-1305) — `"I will obtain
+  and maintain the necessary DCWF Foundational and Residential Qualifications..."` — first-person
+  signature-block language, the same shape as the AUP-acknowledgment false match WP-37.1's gold
+  query set already had to hand-exclude (`REQ-fe7ffa6bad30`).
+
+*Rule-coverage classification (every genuine failure checked against the real code, not just
+reasoned about — `eval/audit_wp38_1/verify_against_rules.py`, calling `_is_heading_echo()` and
+`_is_unrepairable_fragment()` directly against each record's actual `source_quote` and
+`section_title_path`):*
+- **3 of 44 are `REAL_GAP`** — genuine bugs in existing coverage, not new territory. All three are
+  colon-terminated list-header fragments (`REQ-97e6e5483093`, 41 words; `REQ-a22b2ca5ab90`, 30
+  words; `REQ-9266f0704b0e`, 39 words) that `_is_unrepairable_fragment()`'s own logic would
+  correctly reject — except its `UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25` cap (chosen in WP-34.2
+  specifically to avoid rejecting long-but-complete quotes) is too tight. A colon-ending quote
+  carries no content of its own regardless of how many words precede the colon — the length cap's
+  original justification doesn't actually hold.
+- **A 4th `REAL_GAP`, found via the discovery pool** (not counted in the 44/333, since discovery
+  isn't the prevalence sample, but real and code-confirmed): `REQ-955ab005b394` (afi10-2402) —
+  `"COMPLIANCE WITH THIS PUBLICATION IS MANDATORY"` — is a verbatim echo of an *ancestor* heading
+  (`section_title_path[0]`, two levels up from the chunk's own immediate heading). Confirmed
+  directly: `_is_heading_echo(quote, section_title_path)` → `False` (checks only
+  `section_title_path[-1]`, the immediate heading), but `_is_heading_echo(quote,
+  [section_title_path[0]])` → `True`. The rule was scoped (correctly, per its own docstring) to
+  the chunk's own immediate heading only — it was never designed to walk the full ancestor chain,
+  so this isn't a coding mistake, but it is a real, reproducible blind spot.
+- **41 of 44 are `NOT_COVERED_BY_DESIGN`** — no current rule targets these shapes at all.
+  `_is_heading_echo()` and `_is_unrepairable_fragment()` were built narrowly (WP-34.2) against two
+  specific fabrication patterns found at the time; orphaned list items, dangling clauses,
+  descriptive/definitional prose, reference-only pointers, and acknowledgment-template text are a
+  materially different, wider set of shapes that Phase 34 was never scoped to catch.
+- **0 of 44 are `SHOULD_BE_CAUGHT_BUT_ISNT`** — no case where an existing rule's trigger condition
+  is met but the record slipped through anyway (which would indicate an implementation bug rather
+  than a scope gap). Every failure here survived because no rule currently targets its shape, not
+  because an existing rule is broken.
+
+**Recommendation:** Evidenced, not assumed — see WP-38.2 below. The fragment shapes (7.5% of
+corpus) are mechanically identifiable from `source_quote` text alone (list-item markers, missing
+finite verbs, colon-termination) and cheap/low-risk to fix with deterministic rule extensions,
+the same shape as the WP-34.2 fix that already shipped successfully. The over-grab shapes (5.7%)
+require actual reading comprehension to tell "describes" from "obligates" — not something a regex
+can reliably do — and are the better candidate for a classifier *if* they remain material once the
+cheap fixes are in and re-measured. Recommendation: **rule extensions now (WP-38.2, scoped below);
+defer the classifier question** for the over-grab shapes as tracked backlog rather than building it
+against today's unvalidated-post-fix numbers.
+
 ---
 
-### WP-38.2 — Precision Filter or Targeted Rule Extensions (brainstorm only — not locked)
+### WP-38.2 — Deterministic Fragment-Rejection Rule Extensions
 
-**Deliberately not fully scoped.** Writing a hard Scope/Gate for a classifier before knowing the real
-failure rate and shape would repeat the exact mistake Phase 37's WP-37.2 exists as a lesson against —
-a plausible-sounding technique that, tested for real, didn't hold up. This section is a sketch of the
-two shapes this WP could take, to be finalized once WP-38.1 reports in.
+**Now properly scoped, per WP-38.1's evidenced recommendation above** (real numbers, not the
+original proposal assumed at face value). This WP targets only the **fragment** shapes (7.5% of
+the audited sample, 25/333) — all four are mechanically identifiable from `source_quote` text
+alone, the same shape as the WP-34.2 fix that already shipped successfully. It deliberately does
+**not** touch the over-grab shapes (5.7%, 19/333) — those require judging "describes" vs.
+"obligates," not something a deterministic rule can reliably do; see Non-Goals.
 
-- **If WP-38.1 finds a meaningful, non-trivial rate of genuine over-grab/fragment failures not
-  already coverable by cheap rule extensions:** build a small second-stage classifier, matching the
-  original proposal's shape (recall-oriented 8B extractor stays as-is; a cheap, precision-oriented
-  classifier filters its output). Training data: a labeled yes/real-requirement vs. no/near-miss set
-  built from this project's own documents — NIST 800-53/800-53A were present in `raw_pdfs/` on the
-  machine this phase was scoped on, but that directory is gitignored and not repo-guaranteed (see
-  Phase Framing); re-verify locally before relying on them, and re-download from NIST directly if
-  absent. PCI DSS would need external sourcing if still wanted, though more of ReqBot's own actual
-  target corpus (the DoD/AF documents already present) may be a better negative-example source than
-  an off-theme document. Validate on both precision *and* recall (the documented failure mode:
-  an overly aggressive filter starts discarding true positives too) against a freshly hand-verified
-  label set — explicitly not `eval/gold_eval_chunks*.jsonl` as-is.
-- **If WP-38.1 finds the failures are mostly already coverable by extending existing deterministic
-  rules** (e.g., relaxing `_is_unrepairable_fragment()`'s colon-only trigger to also catch short,
-  no-modal-verb phrase fragments; extending `skip_sections`) — scope a much smaller, cheaper
-  rule-extension WP instead. No classifier, no training data, no new dependency.
-- **Either way: `eval/eval_harness.py` cannot be used to verify this as-is (Codex review, PR #179,
-  verified directly against the code) — it loads each document's `*_extracted_requirements.jsonl`,
-  the raw Step C output, before `_is_unrepairable_fragment()`/`_is_heading_echo()` even run in Step D
-  and before any post-extraction classifier WP-38.2 might add. Scoring that file would show zero
-  change regardless of whether the filter helps, hurts, or does nothing — it isn't measuring the
-  artifact the filter touches.** Whichever WP-38.2 shape gets built, either extend
-  `eval/eval_harness.py` to score the correct later-stage artifact (post-Step-D for a rule extension,
-  post-filter for a classifier) or build an equivalent harness pointed at it — decide which as part of
-  scoping WP-38.2 itself, not assumed here.
-- **Concrete precondition for precision/recall validation, not left vague (local Codex review,
-  2026-07-31: the prior wording — "once `eval/gold_eval_chunks*.jsonl`'s concerns are addressed" —
-  named no owner and no gate for actually addressing them).** Prefer WP-38.1's own hand-verified
-  audit fixture (the unbiased random/stratified sample, Scope above) as the ground truth for this
-  validation instead — it's freshly built, known-clean by construction (every record hand-reviewed
-  during WP-38.1), and already labeled with the categories that matter (genuine requirement vs.
-  over-grab vs. fragment). Only fall back to auditing/replacing `eval/gold_eval_chunks*.jsonl` if
-  WP-38.1's fixture turns out too small or too narrow to validate against on its own. Re-verify
-  precision *and* recall against whichever ground truth is actually used before calling this phase
-  done — same "measure before declaring victory" discipline as every other phase in this project.
+**Scope:**
+- **Raise or remove `UNREPAIRABLE_FRAGMENT_MAX_WORDS`** (`pipeline/parse_and_normalize.py`,
+  currently 25). WP-38.1 found 3 real colon-terminated list-header fragments (30–41 words) that the
+  cap lets through. The cap's original justification — avoiding rejection of a "genuinely complete,
+  longer quote that just happens to end mid-punctuation" — has no confirmed real example in this
+  audit; a colon-ending quote inherently promises content it doesn't contain, regardless of length.
+  Calibrate the exact behavior (raise vs. remove) against WP-38.1's own fixture (below), not assumed
+  here.
+- **New rule: orphaned list item.** A quote starting with a list-item marker (`(1)`, `(a)`, `- d.`,
+  etc.) or a short, verb-less noun phrase, with no governing clause attached, carries no independent
+  obligation content (12 of the 25 fragment examples were this shape — the largest single fragment
+  sub-pattern). Exact detection (marker regex, finite-verb check, or both) is an implementation
+  decision, calibrated against the fixture below rather than fixed in this scoping doc.
+- **New rule: dangling/preamble clause.** A quote that is a subordinate clause with no main clause
+  (opens with "under," "in addition to," "consistent with," etc., or ends in a trailing comma with
+  nothing following) is not a self-contained requirement (6 of 25 fragment examples). Same
+  calibrate-against-fixture approach as above.
+- **Extend `_is_heading_echo()` to check the full `section_title_path`, not just `section_title_path[-1]`.**
+  WP-38.1's discovery pool found a code-verified case (`REQ-955ab005b394`) where a quote exactly
+  echoes an *ancestor* heading two levels up — the immediate-heading-only check the function was
+  scoped to in WP-34.2 structurally cannot catch this. Match against every entry in the path, not
+  just the last one.
+- **Malformed/garbled extraction (4 of 25 fragment examples) is explicitly not a rule-extension
+  target here** — these look like Docling table/form-parsing artifacts, not a `source_quote`-level
+  text pattern a deterministic rule could reasonably key on. Note as a carry-forward for a future
+  WP if it recurs at a rate worth addressing; not scoped further here.
+
+**Non-Goals:**
+- **Not touching the over-grab shapes** (descriptive/definitional prose, reference-only pointers,
+  explicit "examples of..." text, acknowledgment-template text) — WP-38.1 found these require actual
+  reading comprehension, not a text pattern. Tracked as backlog below, not folded into this WP.
+- **Not building a classifier.** Revisit only if the over-grab rate is re-measured after this WP
+  ships and still looks material — not committed to now, per the Guardrails' "cheapest fix wins."
+- **Not touching `skip_sections`** — WP-38.1 found no failures attributable to a `skip_sections` gap
+  (0 of 44 genuine failures had a heading in the existing vocabulary that should have excluded them).
+- **`eval/eval_harness.py` still cannot verify this as-is** (Codex review, PR #179, verified directly
+  against the code) — it scores `*_extracted_requirements.jsonl`, the raw Step C output, before Step
+  D's rejection logic (old or new) ever runs. Not extending it is fine for this WP specifically,
+  since verification uses WP-38.1's own fixture instead (below) — but any future WP that wants an
+  automated precision/recall regression check across the full pipeline still needs to fix this first.
+
+**Tests/verification:**
+- **WP-38.1's own audit fixture is the regression test, already built and committed**
+  (`eval/audit_wp38_1/unbiased_sample.jsonl` + `labeled_failures.jsonl`, 333 hand-labeled records:
+  284 confirmed-real, 25 fragment, 19 over-grab, 5 judgment-requiring). After the new rules ship,
+  re-run them against all 333 and confirm: (1) none of the 284 real records get rejected (no
+  regression — the single most important check), (2) the fragment sub-shapes each rule targets are
+  now actually rejected, (3) over-grab/judgment records are correctly left untouched (confirms scope
+  discipline, not accidental over-reach). This reuses a genuinely independent, already-hand-verified
+  fixture rather than validating a rule against the same reasoning that produced it.
+- Standard unit tests for each new/changed rule function, following `tests/unit/test_normalize.py`'s
+  existing fixture style (same file WP-34.2's own tests live in).
+- `ruff check .` clean.
+
+**Gate:** The new/changed rules reject WP-38.1's 25 hand-labeled fragment examples (or the specific
+subset each rule targets) without rejecting any of the 284 hand-labeled real records, and full
+`pytest` + `ruff check .` are clean.
 
 ---
 
-## 5. Success Gate
+## 5. Backlog — Over-Grab Precision (deferred, not WP-38.2)
 
-- [ ] WP-38.1's audit is complete: real counts, real categories, real examples, a grounded
-      recommendation — not assumed from the original diagnosis alone.
-- [ ] The recommendation is acted on: either a properly-scoped WP-38.2 (classifier or rule extension,
+WP-38.1 found genuine over-grab failures (descriptive/definitional prose, reference-only pointers,
+explicit "examples of..." text, acknowledgment-template text) at 5.7% of the audited sample
+(19/333) — real, but requiring actual reading comprehension to distinguish from real requirements,
+not a text pattern a deterministic rule can key on. Per the Guardrails below and this project's
+established preference for the cheapest fix that actually works: **not building a classifier now.**
+Revisit after WP-38.2 ships, re-measuring the over-grab rate on the post-fix corpus (WP-38.2's rule
+extensions don't touch this category, so the rate itself won't move — but re-measuring confirms it's
+still real before committing to a bigger build). If still material, the original proposal's shape
+(a small second-stage classifier, trained on this project's own documents — DoD/AF corpus preferred
+over off-theme sourcing like NIST 800-53/800-53A per the Phase Framing note above, validated on
+precision *and* recall against a freshly hand-verified set, not `eval/gold_eval_chunks*.jsonl`
+as-is) is still the right shape if and when it's scoped.
+
+---
+
+## 6. Success Gate
+
+- [x] WP-38.1's audit is complete: real counts, real categories, real examples, a grounded
+      recommendation — not assumed from the original diagnosis alone. (333-record hand-labeled
+      unbiased sample + 183-record discovery pool, both committed at `eval/audit_wp38_1/`.)
+- [x] The recommendation is acted on: either a properly-scoped WP-38.2 (classifier or rule extension,
       per what the evidence actually supports), **or**, if WP-38.1's evidence supports it, a documented
       conclusion that no further action is warranted — that's an equally valid, equally evidenced
       outcome of this phase, not a failure to close it (corrected after Codex review, PR #179: the
       original wording here could never be satisfied by the "negligible rate, no action needed"
-      conclusion the Goals and WP-38.1 Scope both explicitly allow for).
-- [ ] Full `pytest` suite and `ruff check .` clean throughout.
+      conclusion the Goals and WP-38.1 Scope both explicitly allow for). (WP-38.2 properly scoped as
+      a rule-extension WP above; over-grab classifier question explicitly deferred to backlog with a
+      documented re-measurement trigger, not silently dropped.)
+- [ ] Full `pytest` suite and `ruff check .` clean throughout. (WP-38.1's own changes: pending this
+      PR's verification pass. WP-38.2's own gate is separate, tracked in its own section above.)
 
-## 6. Guardrails
+## 7. Guardrails
 
 - No classifier gets built on the assumption that the "precision problem" diagnosis is correct at an
   unknown scale — WP-38.1's real numbers decide that, not the spark notes alone.

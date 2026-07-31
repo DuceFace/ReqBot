@@ -141,11 +141,27 @@ and reverting a Step D rule that was never going to solve this from that side.
 **Scope:**
 - **Start from known examples, not a fresh trawl.** WP-38.1's audit fixture
   (`eval/audit_wp38_1/`) already has hand-labeled, real examples of both target shapes: 12
-  `orphaned_list_item` records and 6 `dangling_clause` records (`eval/audit_wp38_1/labeled_failures.jsonl`),
-  several with the missing context already identified in prose during WP-38.2's own Findings (e.g.
-  `REQ-c6aeb8df528b`, `"(3) Restrain competition."`, stem `"Classification shall not be used to:"`).
-  Trace these ~18 real cases through the pipeline first; only broaden to a fresh sample if that's not
-  enough signal to answer the Goals.
+  `orphaned_list_item` records and 6 `dangling_clause` records, several with the missing context
+  already identified in prose during WP-38.2's own Findings (e.g. `REQ-c6aeb8df528b`, `"(3) Restrain
+  competition."`, stem `"Classification shall not be used to:"`). **Note (Codex local review, PR
+  #182): `labeled_failures.jsonl` is only the label sheet** —
+  `category`/`subtype`/`quote`/`doc_key` and a few derived flags, no `chunk_id`, `source_pdf`,
+  `document_id`, or artifact path (verified directly: it genuinely has none of these fields). Tracing
+  needs the full record — join back to `unbiased_sample.jsonl` by `requirement_id` first (that file
+  has `chunk_id`, `source_pdf`, `_source_file`, `document_id`, and `document_hash_full`). Trace these
+  ~18 real cases through the pipeline first; only broaden to a fresh sample if that's not enough
+  signal to answer the Goals.
+- **Verify the local corpus before trusting any `chunk_id` lookup against it** (Codex local review,
+  PR #182) — the processed corpus this fixture was built from lives outside the repo, in
+  `~/documents/processed`, and isn't guaranteed to still match on whatever machine WP-39.1 actually
+  runs on. First step: check `eval/audit_wp38_1/source_manifest.json`'s per-document sha256 against
+  the current files `core.artifact_resolver.resolve_latest_requirement_files()` resolves. (Checked
+  directly while writing this doc, 2026-07-31: all 13 documents match exactly, 0 drift — but that's
+  today's state on this machine, not a standing guarantee, so the audit re-checks this itself rather
+  than trusting this note.) If any document is missing or its hash has changed (a re-ingest happened
+  since WP-38.1's audit ran, which can reassign `chunk_id`s), don't trust that document's `chunk_id`
+  values as-is — re-match its affected records by `document_hash_full` + exact `source_quote` text
+  instead, and note which examples needed the fallback.
 - **For each traced example, check every representation independently — do not stop at the first
   stage where a specific field or record lacks the link** (Codex review, PR #182: a stem missing from
   one representation doesn't mean it's gone — it may still be recoverable through a different channel

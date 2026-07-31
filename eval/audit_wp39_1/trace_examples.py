@@ -134,7 +134,13 @@ def load_step_c_records(doc_dir: Path, doc_key: str, chunk_id: int) -> list[dict
             if not line:
                 continue
             rec = json.loads(line)
-            if rec.get("chunk_id") == chunk_id:
+            # Gemini review, PR #183: flagged this as inconsistent with load_chunk()'s
+            # bare indexing -- checked directly (2,445 real Step C records across the
+            # corpus, 0 missing chunk_id) and aligned in the *opposite* direction from
+            # what was suggested: chunk_id is a required identity field here, same as
+            # in load_chunk(), so a missing one means a genuinely corrupt fixture and
+            # should raise loudly, not silently fail to match.
+            if rec["chunk_id"] == chunk_id:
                 out.append(rec)
     return out
 

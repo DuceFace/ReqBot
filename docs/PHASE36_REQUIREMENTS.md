@@ -165,15 +165,31 @@ matches. Removing that entire slice changes what "5.4% FP rate" or any other swe
 means — the original table's numbers describe a check that no longer exists in the same form.
 
 **Scope:**
-- Re-run `eval/threshold_sweep.py` (or a filtered variant) against `eval/gold_description_grounding.jsonl`
-  with exact-match records excluded from consideration entirely (they no longer reach the model, so
-  they shouldn't appear in either the faithful or the false-positive count), using the same
-  `FP_RATE_CAP` diminishing-returns selection methodology as WP-35.2's original sweep — not a
-  different rule invented for this WP.
+- **Re-sweep against the full composite gate's behavior, not just MiniCheck's conditional behavior on
+  the records it still sees — this distinction matters and was verified with real numbers, not
+  assumed (Codex review, PR #171).** The `FP_RATE_CAP` denominator must stay the full 92-record
+  `wp_35_1_harvest` faithful population, with every exact-match record counted as an automatic accept
+  regardless of which threshold is being swept (the short-circuit guarantees they pass; excluding
+  them from the denominator entirely would misrepresent what fraction of *real* faithful traffic the
+  deployed gate actually rejects). Only the 15 non-exact-match faithful records' pass/fail varies with
+  the swept threshold. Checked directly against the committed `eval/spike_results/wp_35_2/
+  results.json` scores: excluding the 77 short-circuited records from the denominator entirely (the
+  wrong methodology, in this WP's own first-drafted version of this Scope) makes threshold 0.95 look
+  disqualified (8/15 ≈ 53% FP against the reduced denominator) and the sweep would still land back on
+  0.85, silently defeating this WP's entire purpose. Under the correct composite denominator, 0.95
+  has an 8/92 ≈ 8.7% FP rate — within the 10% cap — while catching **100% of the 8 known fabricated
+  examples** (up from 7/8 at 0.85). This is real, verified evidence that a better threshold is likely
+  available once the short-circuit is in place — confirm it holds with the actual resweep script
+  (not just this hand-check) before treating 0.95 as the new answer.
+- Re-run `eval/threshold_sweep.py` (or a filtered variant implementing the composite-denominator
+  methodology above) against `eval/gold_description_grounding.jsonl`, using the same `FP_RATE_CAP`
+  diminishing-returns selection rule as WP-35.2's original sweep — not a different rule invented for
+  this WP, just applied to the corrected population.
 - Document whether the chosen threshold actually changes from 0.85, and why or why not — a real,
   evidence-backed answer either way, not an assumption. Given the independent fabricated partition is
   still only 8 examples (WP-35.2's own documented "provisional, not confident" limitation), carry that
-  same caveat forward here rather than treating a new number as more confident than the data supports.
+  same caveat forward here rather than treating a new number as more confident than the data supports
+  — even though the hand-check above is promising, 8 examples is still 8 examples.
 - Update `DESCRIPTION_ENTAILMENT_THRESHOLD` in `pipeline/entailment_gate.py` if the resweep concludes
   a different number is warranted; update its surrounding comment (currently cites WP-35.2's sweep
   numbers directly) to reflect the new evidence.

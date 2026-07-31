@@ -473,7 +473,7 @@ against all 333 records in `eval/audit_wp38_1/unbiased_sample.jsonl`, committed)
 | Real-record regressions (must be 0) | **0 / 284** |
 | Scope violations — over_grab/judgment/malformed_garbled caught (must be 0) | **0 / 28** |
 | `colon_too_long` fragments caught | **3 / 3** |
-| `orphaned_list_item` fragments caught | **3 / 12** |
+| `orphaned_list_item` fragments caught | **2 / 12** (was 3/12 before Codex's second local-review pass — see below) |
 | `dangling_clause` fragments caught | **1 / 6** |
 | `malformed_garbled` fragments correctly left untouched | **4 / 4** |
 
@@ -485,9 +485,10 @@ grammatical analysis, which a regex can't safely do. This mirrors the same "chea
 force it" discipline that reverted WP-37.2 rather than shipping a regression.
 
 *Broader sanity check beyond the fixture:* ran all four rules against the full current live corpus
-(1,872 records, not just the 333-record sample) — 17 records (0.9%) would be newly rejected on a
+(1,872 records, not just the 333-record sample) — 15 records (0.8%, post-final-fix number; see
+below for the sequence of live-corpus figures across review rounds) would be newly rejected on a
 re-ingest, all spot-checked and genuinely correct (more instances of the same real shapes: e.g.
-`"is responsible for"`, two more `"<term>, as defined in <citation>"` cross-references not in the
+`"is responsible for"`, four `"<term>, as defined in <citation>"` cross-references not in the
 original 12-example set). No new false positives found outside the fixture either. A small, surgical
 correction, not a broad sweep — consistent with the 7.3% weighted fragment prevalence WP-38.1 found
 (this WP doesn't close that whole gap; it closes the mechanically-safe portion of it).
@@ -660,6 +661,37 @@ two findings, both verified via direct execution before acting on either:*
   every prior round's test case (round 6's regression test, round 8's three short-citation
   positives, the multi-document citation test) before adopting this — all pass.
 
+*Codex, local review of PR #181, second pass (re-reviewing the fixes above) — one finding, resolved
+by a product-direction reversal rather than another narrowing:*
+- **Confirmed the ALL-CAPS-clause fix is correct** — Codex's three prior examples now return `False`
+  as expected, protected by the new test coverage.
+- **Re-flagged the marker+word-count tension as still a blocker**, correctly noting that the new test
+  (`test_is_orphaned_list_item_true_for_short_directive_known_accepted_risk`, since removed) had
+  pinned the false-rejection as expected behavior rather than fixed it, and asked directly whether
+  that was really the intended product call. It was Tyler's call from earlier in this same session
+  (see the entry above) — but put to him again given Codex was still calling it a blocker, since a
+  second independent flag on the same tension is worth a genuine second look, not a reflexive
+  "already decided" dismissal.
+  **Tyler reconsidered and reversed the decision**: remove the marker+word-count branch entirely
+  rather than keep narrowing or accepting the risk. His reasoning, recorded here directly because it
+  sets the actual product direction going forward, not just this WP's scope: *short enumerated child
+  items are not safe to reject by text length alone — many real requirements inherit their obligation
+  from a parent stem, and deleting child items breaks requirement continuity. The correct long-term
+  fix is parent-stem + child-item reconstruction before embedding/search, not filtering short
+  children as fragments. Losing the "(3) Restrain competition." catch is an acceptable cost: a
+  visible fragment left in place is less harmful than silently dropping a valid inherited
+  requirement.*
+  Implemented: removed `_LIST_MARKER_RE`, `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS`, and the marker
+  branch of `_is_orphaned_list_item()` entirely — only the citation-only branch remains.
+  `orphaned_list_item` coverage drops from 3/12 to 2/12 as a direct, accepted consequence (loses
+  `REQ-c6aeb8df528b`, `"(3) Restrain competition."`); `MIN_CATCH_BASELINE` in
+  `eval/verify_wp38_2_rules.py` updated to match. Re-verified against the fixture (0 regressions, 0
+  scope violations) and a fresh full-live-corpus sweep (4 remaining `orphaned_list_item` catches, all
+  genuine citation-only pointers, no marker-based false rejections left anywhere in 1,872 records).
+  Parent-stem + child-item reconstruction itself is **not** part of WP-38.2 — tracked as backlog, to
+  be scoped as its own WP if picked up (see `_is_orphaned_list_item()`'s docstring in
+  `pipeline/parse_and_normalize.py` for the pointer left in code).
+
 All fixes re-verified against both the fixture (`eval/verify_wp38_2_rules.py`, still 0 regressions /
 0 scope violations / 0 coverage regressions) and a fresh full-live-corpus sweep before considering
 this WP done — the numbers throughout this Findings section are the post-fix, final ones.
@@ -671,21 +703,33 @@ not assumed here (matches this WP's Non-Goals: not touching indexed data).
 
 ---
 
-## 5. Backlog — Over-Grab Precision (deferred, not WP-38.2)
+## 5. Backlog (deferred, not WP-38.2)
 
-WP-38.1 found genuine over-grab failures (descriptive/definitional prose, reference-only pointers,
-explicit "examples of..." text, acknowledgment-template text) at 5.7% of the audited sample
-unweighted (5.8% population-weighted; 19/333 records) — real, but requiring actual reading
-comprehension to distinguish from real requirements,
-not a text pattern a deterministic rule can key on. Per the Guardrails below and this project's
-established preference for the cheapest fix that actually works: **not building a classifier now.**
-Revisit after WP-38.2 ships, re-measuring the over-grab rate on the post-fix corpus (WP-38.2's rule
-extensions don't touch this category, so the rate itself won't move — but re-measuring confirms it's
-still real before committing to a bigger build). If still material, the original proposal's shape
-(a small second-stage classifier, trained on this project's own documents — DoD/AF corpus preferred
-over off-theme sourcing like NIST 800-53/800-53A per the Phase Framing note above, validated on
-precision *and* recall against a freshly hand-verified set, not `eval/gold_eval_chunks*.jsonl`
-as-is) is still the right shape if and when it's scoped.
+**Over-Grab Precision.** WP-38.1 found genuine over-grab failures (descriptive/definitional prose,
+reference-only pointers, explicit "examples of..." text, acknowledgment-template text) at 5.7% of
+the audited sample unweighted (5.8% population-weighted; 19/333 records) — real, but requiring
+actual reading comprehension to distinguish from real requirements, not a text pattern a
+deterministic rule can key on. Per the Guardrails below and this project's established preference
+for the cheapest fix that actually works: **not building a classifier now.** Revisit after WP-38.2
+ships, re-measuring the over-grab rate on the post-fix corpus (WP-38.2's rule extensions don't touch
+this category, so the rate itself won't move — but re-measuring confirms it's still real before
+committing to a bigger build). If still material, the original proposal's shape (a small
+second-stage classifier, trained on this project's own documents — DoD/AF corpus preferred over
+off-theme sourcing like NIST 800-53/800-53A per the Phase Framing note above, validated on precision
+*and* recall against a freshly hand-verified set, not `eval/gold_eval_chunks*.jsonl` as-is) is still
+the right shape if and when it's scoped.
+
+**Parent-stem + child-item reconstruction.** Added during WP-38.2 (Codex local review of PR #181,
+second pass; product direction from Tyler — see the WP-38.2 Findings entry for the full reasoning).
+A real enumerated-list child item can be genuinely incomplete on its own text (e.g. `"(3) Restrain
+competition."`, needing its `"Classification shall not be used to:"` parent stem to mean what it
+actually means) without being detectable as such by any text-level signal — the fix isn't a better
+Step D rejection rule, it's reconstructing the parent stem + child item relationship before
+embedding/search, so the child item is indexed and retrieved *with* its governing context rather
+than either standing alone (misleading) or being deleted (lossy). Not scoped here — needs its own WP
+to work out where in the pipeline this reconstruction belongs (Step C extraction? A new Step between
+C and D? Enrichment?) and how it interacts with the existing `section_title_path`/hierarchy
+machinery already in `pipeline/chunk_text.py`.
 
 ---
 

@@ -41,9 +41,15 @@ FIXTURE_DIR = _ROOT / "eval" / "audit_wp38_1"
 # results recorded in docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings. A drop
 # below these means a rule regressed or was broken/removed -- fails the
 # script rather than just printing a lower number (Codex review, PR #181).
+# orphaned_list_item dropped from 3 to 2 (Codex local review, PR #181, second
+# pass): the marker+word-count branch of _is_orphaned_list_item() -- which
+# caught REQ-c6aeb8df528b, "(3) Restrain competition." -- was removed
+# entirely per Tyler's product decision (see _is_orphaned_list_item()'s
+# docstring). Only the citation-only branch remains, which still catches its
+# 2 targets.
 MIN_CATCH_BASELINE = {
     "colon_too_long": 3,
-    "orphaned_list_item": 3,
+    "orphaned_list_item": 2,
     "dangling_clause": 1,
 }
 

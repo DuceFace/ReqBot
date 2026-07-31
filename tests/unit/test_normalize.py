@@ -422,32 +422,31 @@ def test_is_unrepairable_fragment_no_longer_capped_by_length():
     )
 
 
-def test_is_orphaned_list_item_numbered_marker_short_remainder():
-    # REQ-c6aeb8df528b (DODI 5200.01): item 3 of a "shall not be used to:"
-    # prohibition list, meaningless standalone.
-    assert _is_orphaned_list_item("(3) Restrain competition.")
-
-
-def test_is_orphaned_list_item_bare_marker_zero_words():
-    # Gemini review round 3, PR #181: a bare marker with nothing after it at
-    # all is the most degenerate case of this shape, not an exemption --
-    # `remainder` is "" (falsy), and an earlier `if remainder and ...` guard
-    # let that slip through unrejected.
-    assert _is_orphaned_list_item("(1)")
-
-
-def test_is_orphaned_list_item_false_for_three_word_marker_directives():
-    # Gemini review round 6, PR #181: raised the same list-marker/word-count
-    # tension a third time with three new hypothetical short, complete,
-    # marker-prefixed directives, all 3-word remainders -- one word longer
-    # than ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS was lowered to (3 -> 2) in
-    # response, specifically to exclude examples exactly this shape while
-    # still catching the one real, verified 2-word target. See
-    # ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS's own comment for the full
-    # weighing of "narrow further" vs. "remove the signal entirely."
+def test_is_orphaned_list_item_no_longer_rejects_short_marker_items():
+    # WP-38.2's marker+word-count branch (reject a list-marker-prefixed quote
+    # whose remainder is too short) went through four review rounds (Gemini
+    # rounds 1 and 6, Codex twice), narrowed 6 -> 3 -> 2 words each time, and
+    # was ultimately removed entirely (Codex local review, PR #181, second
+    # pass) rather than narrowed a fifth time: no text-level signal
+    # distinguishes a short child list item that's genuinely self-contained
+    # from one whose obligation is inherited from a parent stem (e.g.
+    # REQ-c6aeb8df528b, "(3) Restrain competition." -- item 3 of a "shall not
+    # be used to:" prohibition list, meaningless standalone), and rejecting
+    # the wrong one silently drops a valid requirement. Product direction
+    # (Tyler): preserve short enumerated child items until hierarchy-aware
+    # parent-stem + child-item reconstruction exists, rather than filter them
+    # here. See _is_orphaned_list_item()'s docstring and
+    # docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings for the full history.
+    #
+    # This means REQ-c6aeb8df528b is now a known, accepted miss (a visible
+    # fragment, not silently dropped) -- pinned here so that's read as
+    # deliberate, not an unnoticed regression.
+    assert not _is_orphaned_list_item("(3) Restrain competition.")
+    assert not _is_orphaned_list_item("(1)")
     assert not _is_orphaned_list_item("(1) Encrypt stored CUI.")
-    assert not _is_orphaned_list_item("(2) Restrict root access.")
-    assert not _is_orphaned_list_item("(3) Conduct annual audits.")
+    assert not _is_orphaned_list_item("(1) Encrypt CUI.")
+    assert not _is_orphaned_list_item("(2) Patch systems.")
+    assert not _is_orphaned_list_item("(a) Report incidents.")
 
 
 def test_is_orphaned_list_item_defined_in_citation():
@@ -471,40 +470,6 @@ def test_is_orphaned_list_item_false_for_marker_with_real_content():
 
 def test_is_orphaned_list_item_false_for_real_quote_no_marker():
     assert not _is_orphaned_list_item("KERs shall be approved by the MC4EB.")
-
-
-def test_is_orphaned_list_item_false_for_marker_short_but_self_contained():
-    # Codex review, PR #181 (both a hypothetical and a real live-corpus
-    # example, REQ-63cdc8363326: "(1) Identify individual responsibilities
-    # for protecting CUI.") -- a short marker-prefixed remainder isn't
-    # automatically a fragment; a genuinely complete short directive must
-    # survive. This is why ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS was
-    # tightened from 6 to 3 words during calibration.
-    assert not _is_orphaned_list_item("(a) Encrypt all stored CUI.")
-    assert not _is_orphaned_list_item(
-        "(1) Identify individual responsibilities for protecting CUI."
-    )
-
-
-def test_is_orphaned_list_item_true_for_short_directive_known_accepted_risk():
-    # Codex local review, PR #181 (fourth round of this exact tension --
-    # see ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS's comment in
-    # pipeline/parse_and_normalize.py): these are genuinely complete 2-word
-    # imperative directives, confirmed via execution to be wrongly rejected
-    # by the marker+word-count branch at threshold=2 -- structurally
-    # identical in shape to the one real, verified catch in this corpus
-    # ("(3) Restrain competition.", which needs a missing governing clause
-    # to be correctly understood). No text-level signal distinguishes the
-    # two shapes. Tyler's explicit call: keep the threshold as-is and accept
-    # this documented risk, on the strength of zero real false positives
-    # found across two full-corpus sweeps (1,872 records) -- only
-    # constructed counter-examples so far, never one found in real ingested
-    # documents. This test pins that accepted trade-off so it reads as a
-    # deliberate decision, not an unnoticed regression, if it's ever
-    # revisited.
-    assert _is_orphaned_list_item("(1) Encrypt CUI.")
-    assert _is_orphaned_list_item("(2) Patch systems.")
-    assert _is_orphaned_list_item("(a) Report incidents.")
 
 
 def test_is_orphaned_list_item_false_for_citation_with_real_clause_after():
@@ -695,8 +660,13 @@ def test_is_dangling_clause_false_for_question_with_trailing_parenthetical():
 
 
 def test_orphaned_list_item_rejected_in_full_pipeline(tmp_path):
-    chunk_text = "Classification shall not be used to: (1) ... (2) ... (3) Restrain competition."
-    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="(3) Restrain competition.")
+    # Citation-only branch -- still active (only the marker+word-count branch
+    # was removed; see test_is_orphaned_list_item_no_longer_rejects_short_marker_items).
+    chunk_text = (
+        "Suspicious activity reporting, as defined in DoDI 2000.26, "
+        "Suspicious Activity Reporting."
+    )
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote=chunk_text)
     req_path = tmp_path / "test_extracted_requirements.jsonl"
     chunks_path = tmp_path / "test_chunks.jsonl"
     _write_jsonl(req_path, [req])
@@ -707,6 +677,26 @@ def test_orphaned_list_item_rejected_in_full_pipeline(tmp_path):
     failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
     assert len(failures) == 1
     assert failures[0]["error"] == "orphaned_list_item_quote"
+
+
+def test_marker_prefixed_short_fragment_survives_full_pipeline(tmp_path):
+    # Product direction (Tyler, PR #181, Codex local review second pass): the
+    # marker+word-count branch was removed entirely -- a short enumerated
+    # list item like this one may inherit its obligation from a parent stem
+    # ("Classification shall not be used to:"), so it's no longer rejected by
+    # Step D at all. Confirms this end-to-end through run(), not just the
+    # predicate in isolation.
+    chunk_text = "Classification shall not be used to: (1) ... (2) ... (3) Restrain competition."
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="(3) Restrain competition.")
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    normalized = _read_jsonl(out_dir / "test_requirements_normalized.jsonl")
+    assert len(normalized) == 1
+    assert normalized[0]["source_quote"] == "(3) Restrain competition."
 
 
 def test_dangling_clause_rejected_in_full_pipeline(tmp_path):

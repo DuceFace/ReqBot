@@ -139,67 +139,6 @@ def _is_unrepairable_fragment(source_quote: str) -> bool:
     return source_quote.strip().endswith(":")
 
 
-# WP-38.2: list-item marker prefix -- numbered "(1)", lettered "(a)"/"(A)", or
-# a leading dash-letter marker like "- d." -- optionally followed by whitespace.
-_LIST_MARKER_RE = re.compile(r"^(?:\(\d+\)|\([a-zA-Z]\)|-\s*[a-zA-Z]\.)\s*")
-
-# WP-38.2: after stripping a list marker, a remainder this short (in words) is
-# too terse to carry independent obligation content of its own -- it's a bare
-# fragment of a larger enumerated list, not a self-contained requirement.
-#
-# History: originally 6, calibrated only against WP-38.1's specific fragment
-# examples. Codex review (PR #181) found real, complete short directives
-# getting swallowed too -- a hypothetical ("(a) Encrypt all stored CUI.",
-# 4-word remainder) and a real live-corpus record (REQ-63cdc8363326, "(1)
-# Identify individual responsibilities for protecting CUI.", 6-word
-# remainder). Lowered to 3. Gemini review round 6 raised the same concern
-# again at the new threshold, with three more hypotheticals, all 3-word
-# remainders ("(1) Encrypt stored CUI.", "(2) Restrict root access.", "(3)
-# Conduct annual audits.").
-#
-# This is now the third round pointing at the same fundamental tension:
-# word-count alone can't reliably distinguish "(3) Restrain competition."
-# (genuinely needs its "shall not be used to:" governing clause -- meaning
-# inverts without it) from a genuinely self-contained short directive of the
-# same length, and no regex can safely tell those apart without real
-# grammatical analysis. Lowered again, to 2 -- still catches the one real,
-# verified target in both WP-38.1's fixture and two full-corpus sweeps
-# ("(3) Restrain competition.", 2-word remainder), while excluding Gemini's
-# three new 3-word hypotheticals along with everything longer.
-#
-# Weighed deliberately against removing this signal entirely: Codex's and
-# Gemini's counter-examples are hypotheticals, not found in the corpus --
-# two independent full-corpus sweeps (1,872 records, before and after this
-# change) found zero actual false positives from this specific marker+
-# remainder-length branch, only the one real, correct catch. A real
-# demonstrated false positive would be grounds to remove the signal outright
-# (the discipline that reverted WP-37.2 and dropped the broader
-# _is_dangling_clause() signals); a repeatedly-raised but so-far-unconfirmed
-# theoretical risk against a signal with a real, verified catch is grounds to
-# narrow it further, not necessarily abandon it. Documented here plainly so
-# a future reviewer/session doesn't have to re-derive this reasoning --
-# revisit if a real false positive is ever actually found.
-#
-# Fourth round (Codex local review, PR #181): confirmed via direct execution
-# that "(1) Encrypt CUI.", "(2) Patch systems.", "(a) Report incidents." --
-# genuinely complete 2-word imperative directives -- all match this branch
-# at the current threshold=2 and would be wrongly rejected. Structurally
-# identical in shape to "(3) Restrain competition." (marker + 2-word
-# verb+object + period), which needs its missing "shall not be used to:"
-# preamble to be correctly understood -- confirmed by reading that record's
-# real source context (docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings).
-# There is no text-level signal that distinguishes these two shapes; this
-# is the same "no regex can safely do this without real grammatical
-# analysis" wall already hit above, just demonstrated with working code
-# instead of reasoned about abstractly. Threshold is already at its floor
-# (1 would drop the one verified real catch to a bare-marker-only rule;
-# raising it re-admits Gemini's earlier 3-word hypotheticals). Put to Tyler
-# directly as a genuine precision/recall product decision rather than
-# re-deciding it unilaterally a fourth time: keep as-is, accepting the
-# documented risk, on the strength of zero real false positives across two
-# full-corpus sweeps against only constructed counter-examples so far.
-ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 2
-
 # WP-38.2: an entire quote whose only content is a term followed by a
 # "as defined in <citation>" cross-reference carries no independent
 # obligation -- it's a definitional pointer, not a requirement (e.g.
@@ -330,50 +269,40 @@ def _is_definitional_citation_only(source_quote: str) -> bool:
 
 
 def _is_orphaned_list_item(source_quote: str) -> bool:
-    """True if source_quote is a bare enumerated-list item or definitional
-    cross-reference with no governing clause or independent content of its
-    own (WP-38.2 -- the largest single fragment sub-pattern WP-38.1's audit
-    found, 12 of 25 fragment examples).
+    """True if source_quote is a definitional cross-reference with no
+    independent content of its own -- "<term>, as defined in <citation>."
+    is a definitional pointer, not an obligation (WP-38.2).
 
-    Two narrow, safe signals rather than one broad one, deliberately, to
-    avoid rejecting a genuinely complete short directive that happens to
-    start with a list marker:
+    Does NOT reject a short enumerated-list item by marker + word-count
+    alone (e.g. "(1) Encrypt CUI." vs. "(3) Restrain competition.", which
+    needs its "shall not be used to:" governing clause to be understood
+    correctly) -- a marker+word-count branch here was tried and calibrated
+    through four review rounds (Gemini rounds 1 and 6, Codex twice), narrowed
+    each time, and ultimately removed (Codex local review, PR #181, second
+    pass): no text-level signal distinguishes a short child item that's
+    genuinely self-contained from one whose obligation is inherited from a
+    parent stem, and rejecting the wrong one silently drops a valid
+    requirement -- a worse failure than leaving a visible fragment in place.
+    See docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings for the full history.
 
-    1. A list-marker prefix ("(3)", "(a)", "- d.") followed by a very short
-       remainder -- too terse to carry independent content.
-    2. The entire quote is just "<term>, as defined in <citation>." -- a
-       definitional pointer, not an obligation.
+    Product direction (Tyler, PR #181): short enumerated child items are not
+    safe to reject by text length alone. They may be valid requirements
+    whose governing clause is inherited from a parent stem. Until
+    hierarchy-aware parent-stem + child-item reconstruction exists (before
+    embedding/search, not as a Step D rejection rule), preserve them --
+    tracked as backlog, not part of WP-38.2's scope.
 
     Doesn't attempt to catch a bare noun-phrase list item with no marker and
-    no citation (e.g. "Required NM data update rates.") -- no safe,
+    no citation (e.g. "Required NM data update rates.") either -- no safe,
     non-overfit text-level signal for that shape was found during
-    calibration; distinguishing it from a real short requirement needs actual
-    grammatical analysis (is the quote's head a noun phrase or a finite verb
-    clause), not something regex can reliably do. Left as an honest gap, not
-    silently claimed as covered -- see docs/PHASE38_REQUIREMENTS.md's WP-38.2
-    Findings.
+    calibration. Left as an honest gap, not silently claimed as covered --
+    see docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings.
     """
     stripped = source_quote.strip()
     if not stripped:
         return False
 
-    if _is_definitional_citation_only(stripped):
-        return True
-
-    match = _LIST_MARKER_RE.match(stripped)
-    if match:
-        # WP-38.2 (Gemini review round 3, PR #181): no `remainder and` guard
-        # here -- a bare marker with *zero* words after it (e.g. "(1)" alone)
-        # is the most degenerate case of this shape, not an exemption from
-        # it. The old truthiness check treated an empty remainder as "no
-        # marker match" and let it through unrejected, backwards from every
-        # other point on this scale (a 1-3 word remainder is correctly
-        # rejected; 0 words is strictly less content, not more).
-        remainder = stripped[match.end():].strip()
-        if len(remainder.split()) <= ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS:
-            return True
-
-    return False
+    return _is_definitional_citation_only(stripped)
 
 
 # WP-38.2: bare copulas that, as a quote's very first word, almost always

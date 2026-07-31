@@ -78,13 +78,32 @@ MODAL_MARKERS = [
     "required to", "required", "requires", "require",
 ]
 
-# Verbs that name a specific act. Each is distinct — not interchangeable
-# with each other or with a MODAL_MARKER. Reuses profiles/cybersecurity.json's
-# own obligation_verbs list (minus the ones that are really modality markers,
-# not action verbs) rather than inventing a separate vocabulary, per WP-35.3
-# Scope ("reusing the cybersecurity profile's own obligation_verbs list...
-# rather than inventing a separate vocabulary").
-ACTION_VERBS = ["implement", "establish", "maintain", "enforce", "ensure"]
+# Verbs that name a specific act. Each base form is distinct — not
+# interchangeable with each other or with a MODAL_MARKER. Reuses
+# profiles/cybersecurity.json's own obligation_verbs list (minus the ones
+# that are really modality markers, not action verbs) rather than inventing
+# a separate vocabulary, per WP-35.3 Scope ("reusing the cybersecurity
+# profile's own obligation_verbs list... rather than inventing a separate
+# vocabulary").
+#
+# Each base form maps to its attested surface inflections (third-person
+# singular, past/participle, gerund) — source quotes routinely state a
+# governing action in third-person-singular present tense ("The ISSO
+# maintains access logs"), and a faithful description that normalizes this
+# to imperative form ("Maintain access logs") must not be treated as
+# introducing a new action just because the exact surface string differs
+# (Gemini review, PR #168: exact-match regex missed "maintains"/"enforces").
+# A small closed set per verb, not a general morphological engine — matches
+# this WP's own "narrow, targeted check" Non-Goal; these five verbs' English
+# inflections are fixed and few, no stemming logic needed.
+ACTION_VERB_FORMS = {
+    "implement": ["implement", "implements", "implemented", "implementing"],
+    "establish": ["establish", "establishes", "established", "establishing"],
+    "maintain": ["maintain", "maintains", "maintained", "maintaining"],
+    "enforce": ["enforce", "enforces", "enforced", "enforcing"],
+    "ensure": ["ensure", "ensures", "ensured", "ensuring"],
+}
+ACTION_VERBS = list(ACTION_VERB_FORMS)
 
 
 def _is_infinitive_purpose_clause(text: str, verb_start: int) -> bool:
@@ -100,15 +119,24 @@ def _is_infinitive_purpose_clause(text: str, verb_start: int) -> bool:
 
 
 def _governing_action_verbs_in(text: str) -> set[str]:
-    """ACTION_VERBS present in text as a governing (non-infinitive) verb."""
+    """ACTION_VERBS base forms present in text as a governing (non-infinitive)
+    verb, matched via any attested surface inflection (see ACTION_VERB_FORMS).
+    Results are keyed by base form regardless of which inflection matched, so
+    "The ISSO maintains X" (quote) and "Maintain X" (description) compare
+    equal — a tense/person normalization, not a new action."""
     normalized = normalize_text(text)
     found = set()
-    for verb in ACTION_VERBS:
-        for m in re.finditer(r"\b" + re.escape(verb) + r"\b", normalized):
-            if _is_infinitive_purpose_clause(normalized, m.start()):
-                continue
-            found.add(verb)
-            break
+    for base, forms in ACTION_VERB_FORMS.items():
+        for form in forms:
+            matched = False
+            for m in re.finditer(r"\b" + re.escape(form) + r"\b", normalized):
+                if _is_infinitive_purpose_clause(normalized, m.start()):
+                    continue
+                found.add(base)
+                matched = True
+                break
+            if matched:
+                break
     return found
 
 

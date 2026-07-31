@@ -134,6 +134,28 @@ def test_governing_action_verbs_empty_for_no_match():
     assert _governing_action_verbs_in("the system processes login requests") == set()
 
 
+def test_governing_action_verbs_matches_third_person_singular_inflection():
+    # Gemini review, PR #168: exact-match regex missed inflected forms like
+    # "maintains"/"enforces", which are the normal way regulatory quotes
+    # state a governing action in third-person-singular present tense.
+    assert _governing_action_verbs_in("The ISSO maintains access logs.") == {"maintain"}
+    assert _governing_action_verbs_in("The system enforces multi-factor authentication.") == {"enforce"}
+
+
+def test_governing_action_verbs_matches_past_and_gerund_inflections():
+    assert "establish" in _governing_action_verbs_in("Controls were established by the ISSM.")
+    assert "implement" in _governing_action_verbs_in("The team is implementing the new policy.")
+
+
+def test_does_not_flag_third_person_to_imperative_normalization():
+    # A faithful tense/person normalization (quote states the action in
+    # third-person-singular; description restates it as an imperative) is
+    # not a new fabricated action -- both sides resolve to the same base verb.
+    quote = "The ISSO maintains access logs."
+    description = "Maintain access logs."
+    assert is_fabricated_obligation(quote, description) is False
+
+
 # ---------------------------------------------------------------------------
 # _has_modal_marker / _has_governing_obligation
 # ---------------------------------------------------------------------------

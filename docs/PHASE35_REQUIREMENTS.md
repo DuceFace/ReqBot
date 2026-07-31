@@ -479,11 +479,26 @@ paraphrases already confirmed faithful in WP-34.4's own fixtures are not falsely
   fabricated-subtype records (citation/fragment/other — not this check's job) also weren't
   incidentally flagged, for whatever that's worth as an informational data point; not a claim this
   check should ever be relied on for those subtypes.
+- **Gemini-found (PR #168): `ACTION_VERBS` exact-match regex missed inflected surface forms.**
+  `_governing_action_verbs_in` originally matched only the bare base form (`\bmaintain\b`, etc.),
+  which does not match "maintains"/"enforces"/"established"/"implementing" — the ordinary way
+  regulatory source_quote text states a governing action in third-person-singular present tense or
+  past/gerund form (e.g. `"The ISSO maintains access logs."`). Verified by reproduction before
+  fixing: `is_fabricated_obligation("The ISSO maintains access logs.", "Maintain access logs.")`
+  incorrectly returned `True` — a faithful tense/person normalization would have been rejected as
+  fabricated in production. Fixed by matching each base verb against its small, closed set of
+  attested inflections (`ACTION_VERB_FORMS`) and keying results by base form regardless of which
+  surface inflection matched, so a quote's "maintains" and a description's "Maintain" compare equal.
+  Re-validated after the fix: still 3/3 `fabricated_modality` caught, 0/94 false positives — the fix
+  closes a real gap without needing new dataset examples to prove it (none of WP-35.1's 108 records
+  happened to contain an inflected action verb, which is exactly why this shipped uncaught by the
+  dataset validation and needed a reviewer to find it structurally instead).
 - Output: `eval/modality_fabrication_check.py` (the check itself — `is_fabricated_obligation()` plus
-  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (18 tests: the known
-  WP-34.4/Codex miss, the 4 real paraphrase fixtures, plus unit coverage of the helper functions),
-  and `eval/spike_results/wp_35_3/report.md`/`results.json` (full validation output, mirroring the
-  `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/` precedent).
+  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (22 tests: the known
+  WP-34.4/Codex miss, the 4 real paraphrase fixtures, the inflected-verb-form fix, plus unit coverage
+  of the helper functions), and `eval/spike_results/wp_35_3/report.md`/`results.json` (full
+  validation output, mirroring the `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/`
+  precedent).
 - Per this WP's own Scope, deliberately not wired into `pipeline/parse_and_normalize.py` yet — how
   this combines with WP-35.2's entailment threshold (independent rejects vs. one combined decision)
   is an explicit WP-35.4 design decision, not pre-decided here.

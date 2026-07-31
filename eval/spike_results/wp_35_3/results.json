@@ -95,7 +95,7 @@
       "requirement_id": "REQ-466a23120b21",
       "run_dir": "afpd_17-1_20260727_202422",
       "source": "wp_34_4_spike",
-      "flagged": false
+      "flagged": true
     },
     {
       "source_quote": "DoDI 8115.02, Information Technology Portfolio Management Implementation, October 30, 2006",
@@ -198,7 +198,7 @@
       "requirement_id": "REQ-5968a12bc1d6",
       "run_dir": "afpd_17-1_20260727_202422",
       "source": "wp_35_1_harvest",
-      "flagged": false
+      "flagged": true
     },
     {
       "source_quote": "CJCSI 5123.01G Charter of the Joint Requirements Oversight Council, February 12, 2015",

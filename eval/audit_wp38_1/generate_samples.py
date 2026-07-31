@@ -13,6 +13,7 @@ Two outputs, written under eval/audit_wp38_1/:
   - unbiased_sample.jsonl: stratified-by-document random sample, independent
     of the discovery heuristic, used for the actual prevalence estimate.
 """
+import hashlib
 import json
 import random
 from pathlib import Path
@@ -72,6 +73,14 @@ def is_discovery_candidate(rec: dict) -> list[str]:
     return signals
 
 
+def _sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(65536), b""):
+            hasher.update(block)
+    return hasher.hexdigest()
+
+
 def main():
     random.seed(SEED)
     files = resolve_latest_requirement_files(Path.home() / "documents" / "processed")
@@ -79,14 +88,33 @@ def main():
 
     all_records = []
     per_doc_counts = {}
+    manifest_docs = {}
     for doc_key, path in sorted(files.items()):
         recs = load_records(path, doc_key)
         all_records.extend(recs)
         per_doc_counts[doc_key] = len(recs)
+        manifest_docs[doc_key] = {
+            "source_file": path.name,
+            "record_count": len(recs),
+            "sha256": _sha256_file(path),
+        }
         print(f"  {doc_key:30s} {path.name:45s} {len(recs)}")
 
     total = len(all_records)
     print(f"\nTotal records across {len(files)} documents: {total}")
+
+    # Source population isn't committed to the repo (it lives outside it, in
+    # ~/documents/processed, and can change on re-ingest) -- a manifest of
+    # per-document file names, record counts, and content hashes at least lets
+    # a future reader verify whether their local corpus matches the one this
+    # audit actually drew from, even without the raw population itself being
+    # pinned in git (Codex review, PR #180).
+    with open(OUT_DIR / "source_manifest.json", "w") as f:
+        json.dump({
+            "seed": SEED,
+            "total_records": total,
+            "documents": manifest_docs,
+        }, f, indent=2, sort_keys=True)
 
     # --- Discovery pool: heuristic-narrowed, full corpus ---
     discovery = []

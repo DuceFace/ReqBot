@@ -226,9 +226,12 @@ produces).
 
 *Sampling (both passes specified by Scope above, kept genuinely separate):*
 - **Unbiased/stratified sample** (the prevalence denominator): 333 records, stratified
-  proportionally by document with a 15-record floor per document, seed `3801` (reproducible —
-  script and inputs committed at `eval/audit_wp38_1/`). All 13 documents represented, exceeding
-  the ≥300-record/≥8-document minimum.
+  proportionally by document with a 15-record floor per document, seed `3801`. Script, outputs, and
+  a source manifest (per-document file name, record count, and sha256 — the raw 1,872-record
+  population itself lives outside the repo in `~/documents/processed` and isn't committed, so the
+  manifest is what lets a future reader verify whether their corpus matches the one this audit
+  actually drew from) are all committed at `eval/audit_wp38_1/` (Codex review, PR #180). All 13
+  documents represented, exceeding the ≥300-record/≥8-document minimum.
 - **Discovery pool** (heuristic-narrowed, for finding examples only — never used for the count
   below): 183 records flagged by short-quote / no-terminal-punctuation / all-caps-heading /
   definition-opener signals. 9.8% hit rate on the signals alone, consistent with this phase's
@@ -237,19 +240,35 @@ produces).
 
 *Prevalence, from the unbiased sample only (333 records, all hand-read):*
 
-| Category | Count | % of sample |
-|---|---:|---:|
-| Real, correctly-extracted requirement | 284 | 85.3% |
-| Fragment / incomplete extraction | 25 | 7.5% |
-| Genuine over-grab (non-requirement text) | 19 | 5.7% |
-| Judgment-requiring / ambiguous | 5 | 1.5% |
+| Category | Count | % of sample (unweighted) | % of corpus (population-weighted) |
+|---|---:|---:|---:|
+| Real, correctly-extracted requirement | 284 | 85.3% | 85.4% |
+| Fragment / incomplete extraction | 25 | 7.5% | 7.3% |
+| Genuine over-grab (non-requirement text) | 19 | 5.7% | 5.8% |
+| Judgment-requiring / ambiguous | 5 | 1.5% | 1.5% |
 
-**The diagnosis is real and non-trivial: ~13.2% (44/333) of the current, post-Phase-34 corpus is a
-clear-cut precision failure** — an order of magnitude above the Phase Framing spot-check's crude
-regex sweep (10/1,876, 0.5%), confirming that spot-check's own conclusion that keyword matching
-alone understates the problem. Failures were found in 10 of the 13 documents sampled (not
-concentrated in one outlier document); `CJCSI 6510.02G`'s freshly re-ingested sample had zero
-flagged records, a small (n=15) but reassuring sign for the just-shipped fix.
+(Weighted column via `eval/audit_wp38_1/compute_weighted_prevalence.py`, committed — corrects for
+the 15-record floor over-representing 3 smaller documents, see below. The corrections are all
+small here, but the weighted column is the one that actually estimates corpus-wide prevalence.)
+
+**The headline rate needs one correction before it's a real corpus estimate.** The 15-record floor
+binds for 3 of 13 documents (`DODI 5200.01`, `DODI 8551.01`, `afpd_17-1` — each would have received
+fewer than 15 records under pure proportional allocation), so those documents are over-represented
+in the raw 333 relative to their true share of the 1,872-record corpus. Reporting the unweighted
+44/333 ratio as-is estimates the sample's composition, not the corpus's — the same class of mistake
+as `docs/PHASE36_REQUIREMENTS.md`'s WP-36.2 finding (Codex review, PR #180, caught before this
+number shipped). Weighting each document's local failure rate by its true population share
+(`eval/audit_wp38_1/compute_weighted_prevalence.py`, committed) gives **13.1%**, against 13.2%
+unweighted — in this case the correction is small (the over-sampled documents' failure rates
+happened to roughly bracket the corpus average), but the estimator was still the wrong one, and the
+weighted number is the one that should be treated as authoritative.
+
+**The diagnosis is real and non-trivial: ~13.1% of the current, post-Phase-34 corpus is a clear-cut
+precision failure** — an order of magnitude above the Phase Framing spot-check's crude regex sweep
+(10/1,876, 0.5%), confirming that spot-check's own conclusion that keyword matching alone
+understates the problem. Failures were found in 10 of the 13 documents sampled (not concentrated in
+one outlier document); `CJCSI 6510.02G`'s freshly re-ingested sample had zero flagged records, a
+small (n=15) but reassuring sign for the just-shipped fix.
 
 *Fragment sub-shapes (25 total):*
 - **Orphaned list item** (12) — a real list item's text extracted without the governing sentence
@@ -318,15 +337,15 @@ reasoned about — `eval/audit_wp38_1/verify_against_rules.py`, calling `_is_hea
   than a scope gap). Every failure here survived because no rule currently targets its shape, not
   because an existing rule is broken.
 
-**Recommendation:** Evidenced, not assumed — see WP-38.2 below. The fragment shapes (7.5% of
-corpus) are mechanically identifiable from `source_quote` text alone (list-item markers, missing
-finite verbs, colon-termination) and cheap/low-risk to fix with deterministic rule extensions,
-the same shape as the WP-34.2 fix that already shipped successfully. The over-grab shapes (5.7%)
-require actual reading comprehension to tell "describes" from "obligates" — not something a regex
-can reliably do — and are the better candidate for a classifier *if* they remain material once the
-cheap fixes are in and re-measured. Recommendation: **rule extensions now (WP-38.2, scoped below);
-defer the classifier question** for the over-grab shapes as tracked backlog rather than building it
-against today's unvalidated-post-fix numbers.
+**Recommendation:** Evidenced, not assumed — see WP-38.2 below. The fragment shapes (7.3% of
+corpus, population-weighted) are mechanically identifiable from `source_quote` text alone
+(list-item markers, missing finite verbs, colon-termination) and cheap/low-risk to fix with
+deterministic rule extensions, the same shape as the WP-34.2 fix that already shipped
+successfully. The over-grab shapes (5.8%) require actual reading comprehension to tell "describes"
+from "obligates" — not something a regex can reliably do — and are the better candidate for a
+classifier *if* they remain material once the cheap fixes are in and re-measured. Recommendation:
+**rule extensions now (WP-38.2, scoped below); defer the classifier question** for the over-grab
+shapes as tracked backlog rather than building it against today's unvalidated-post-fix numbers.
 
 ---
 
@@ -334,10 +353,11 @@ against today's unvalidated-post-fix numbers.
 
 **Now properly scoped, per WP-38.1's evidenced recommendation above** (real numbers, not the
 original proposal assumed at face value). This WP targets only the **fragment** shapes (7.5% of
-the audited sample, 25/333) — all four are mechanically identifiable from `source_quote` text
-alone, the same shape as the WP-34.2 fix that already shipped successfully. It deliberately does
-**not** touch the over-grab shapes (5.7%, 19/333) — those require judging "describes" vs.
-"obligates," not something a deterministic rule can reliably do; see Non-Goals.
+the audited sample unweighted, 7.3% population-weighted; 25/333 records) — all four are
+mechanically identifiable from `source_quote` text alone, the same shape as the WP-34.2 fix that
+already shipped successfully. It deliberately does **not** touch the over-grab shapes (5.7%
+unweighted, 5.8% weighted; 19/333) — those require judging "describes" vs. "obligates," not
+something a deterministic rule can reliably do; see Non-Goals.
 
 **Scope:**
 - **Raise or remove `UNREPAIRABLE_FRAGMENT_MAX_WORDS`** (`pipeline/parse_and_normalize.py`,
@@ -403,7 +423,8 @@ subset each rule targets) without rejecting any of the 284 hand-labeled real rec
 
 WP-38.1 found genuine over-grab failures (descriptive/definitional prose, reference-only pointers,
 explicit "examples of..." text, acknowledgment-template text) at 5.7% of the audited sample
-(19/333) — real, but requiring actual reading comprehension to distinguish from real requirements,
+unweighted (5.8% population-weighted; 19/333 records) — real, but requiring actual reading
+comprehension to distinguish from real requirements,
 not a text pattern a deterministic rule can key on. Per the Guardrails below and this project's
 established preference for the cheapest fix that actually works: **not building a classifier now.**
 Revisit after WP-38.2 ships, re-measuring the over-grab rate on the post-fix corpus (WP-38.2's rule

@@ -323,10 +323,14 @@ scope (universal vs. targeted).
    detectors" — checked directly against the current code and this is wrong. WP-38.2 deliberately
    removed `_is_orphaned_list_item()`'s marker/list-item branch entirely and kept
    `_is_dangling_clause()` narrowed to bare-copula-openers only, precisely so these fragile-but-real
-   requirements would *survive* un-rejected rather than risk a false rejection. Checked all 7 of the
-   `SAME_CHUNK_STEM_EXTRACTED`/`CROSS_CHUNK_SPLIT` "cheap win" examples against both current
-   detectors: only `REQ-1b1071c8d317` (the bare-copula case) is flagged by either one. Gating
-   reconstruction on these predicates would miss essentially all of the 10 cheap wins this
+   requirements would *survive* un-rejected rather than risk a false rejection. Checked all 10 cheap-win
+   candidates (`SAME_CHUNK_STEM_EXTRACTED`'s 7 + `CROSS_CHUNK_SPLIT`'s 2 + `HEADING_IS_SUBJECT`'s 1)
+   against both current detectors (corrected after Codex's local review of PR #183 caught the first
+   version of this only summing to 7 and misdescribing which categories that 7 covered — it was
+   actually a 7-example subset spanning all three categories, not an exhaustive check of any one of
+   them; now all 10 are checked): only `REQ-1b1071c8d317` (`HEADING_IS_SUBJECT`, the bare-copula
+   case) is flagged by either one — every other example, across all three categories, returns `False`
+   for both. Gating reconstruction on these predicates would miss 9 of the 10 cheap wins this
    recommendation is built on — the two jobs are opposites: Step D's predicates decide "is this
    unsafe enough to delete," precision-first; reconstruction candidacy needs to decide "is this short
    enough to plausibly benefit from more context," which is a different, likely broader question).

@@ -215,9 +215,10 @@ means — the original table's numbers describe a check that no longer exists in
 - Manual: the two real-document re-verifications above, with before/after `support_prob` values
   recorded for the specific records checked (not just a pass/fail summary).
 
-**Gate:** A threshold is chosen with real sweep evidence against the corrected (exact-matches-excluded)
-population; the two real documents' previously-documented false positive and true positive are
-re-confirmed live, not just against the static dataset.
+**Gate:** A threshold is chosen with real sweep evidence against the corrected composite-denominator
+population (exact matches counted as automatic accepts, not excluded); the two real documents'
+previously-documented false positive and true positive are re-confirmed live, not just against the
+static dataset.
 
 ---
 

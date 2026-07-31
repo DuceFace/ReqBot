@@ -28,6 +28,7 @@ def _args(pdf_path, output_dir, no_index=False):
         max_chunks=None,
         no_index=no_index,
         skip_enrichment=False,
+        skip_description_gate=False,
         profile="cybersecurity",
         ollama_url="http://ollama:11434",
         qdrant_url="http://qdrant:6333",

@@ -1,9 +1,11 @@
 """Checklist service — generates audit checklist items from validated requirement records.
 
-Prefers enriched requirement output (*_requirements_enriched.jsonl, Step D.5) when
-available for a document, so checklist items reflect final domain_tags, description,
-and requirement_type. Falls back to normalized output (*_requirements_normalized.jsonl,
-Step D) when enriched output does not yet exist.
+Prefers gated requirement output (*_requirements_gated.jsonl, Step D.6, WP-35.4) when
+available, then enriched output (*_requirements_enriched.jsonl, Step D.5), so checklist
+items reflect final domain_tags, description, and requirement_type -- with description
+additionally having passed the description-grounding gate when a gated file exists.
+Falls back to normalized output (*_requirements_normalized.jsonl, Step D) when neither
+exists.
 
 Returns structured data; all display and export logic stays in cli/reqbot.py and
 pipeline/checklist_export.py (WP-21.4).

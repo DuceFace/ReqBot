@@ -1,6 +1,12 @@
-"""Unit tests for WP-35.3's obligation/modality-fabrication check."""
+"""Unit tests for WP-35.3's obligation/modality-fabrication check.
 
-from eval.modality_fabrication_check import (
+Tests the check functions in pipeline/entailment_gate.py directly (WP-35.4
+moved them there from eval/modality_fabrication_check.py, which now just
+imports and validation-reports on them) — this file's name/scope is
+unchanged, only the import source moved.
+"""
+
+from pipeline.entailment_gate import (
     _governing_action_verbs_in,
     _has_governing_obligation,
     _has_modal_marker,

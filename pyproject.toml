@@ -33,6 +33,21 @@ dependencies = [
 # need, regardless of how light their own dependencies are.
 remote = ["anthropic>=0.40.0", "openai>=1.50.0"]
 mcp = ["mcp>=1.0.0"]  # WP-26.1-approved: official Python MCP SDK (mcp.server.fastmcp)
+# WP-35.4: Step D.6's description-grounding entailment check (pipeline/entailment_gate.py).
+# Gated out of base -- its GitHub install pulls torch/transformers/datasets/openai/pyarrow,
+# a heavy footprint not needed for basic ingestion (docs/PHASE35_REQUIREMENTS.md §3
+# Non-Goals). Pinned to the exact commit this repo's threshold (WP-35.2) was calibrated
+# against, matching this project's general dependency-pinning discipline.
+#
+# `pip install minicheck` installs an unrelated PyPI package that happens to squat this
+# name (a formal state-machine model checker, nothing to do with NLI/fact-checking) --
+# the real MiniCheck (Liyan06/MiniCheck, Bespoke Labs/UPenn) only installs from GitHub,
+# hence the git URL below rather than a plain "minicheck" spec (docs/PHASE34_REQUIREMENTS.md).
+# Also needs one NLTK resource this extra can't install on its own: run
+# `python3 -c "import nltk; nltk.download('punkt_tab')"` after installing.
+grounding-check = [
+    "minicheck @ git+https://github.com/Liyan06/MiniCheck.git@b58b9fa69acbd1015ec970fa65dd752413a053d2",
+]
 dev = ["pytest==9.1.1", "ruff==0.15.22", "pytest-cov==7.1.0"]
 
 [project.scripts]

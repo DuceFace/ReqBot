@@ -114,6 +114,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             enrichment_model=enrichment_model,
             max_chunks=args.max_chunks,
             skip_enrichment=args.skip_enrichment,
+            skip_description_gate=args.skip_description_gate,
             profile_name=args.profile,
         )
     except RuntimeError as e:
@@ -271,6 +272,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
                 extraction_model=batch_extraction_model,
                 enrichment_model=batch_enrichment_model,
                 skip_enrichment=args.skip_enrichment,
+                skip_description_gate=args.skip_description_gate,
             )
         except RuntimeError as e:
             log.error("Pipeline FAILED for %s: %s", pdf_path.name, e)
@@ -514,8 +516,9 @@ def cmd_reindex(args: argparse.Namespace) -> int:
     No LLM re-extraction — JSONL/chunks are the system of record. Uses an
     atomic temp-collection + alias-swap for both collections so the live
     index is never touched until indexing succeeds. Prefers
-    *_requirements_enriched.jsonl over *_requirements_normalized.jsonl per
-    document, "latest run wins" when multiple runs exist.
+    *_requirements_gated.jsonl over *_requirements_enriched.jsonl over
+    *_requirements_normalized.jsonl per document, "latest run wins" when
+    multiple runs exist.
     --requirements-only skips the slower, CPU-bound grc_context rebuild.
     """
     from core.artifact_resolver import resolve_latest_requirement_files
@@ -1460,6 +1463,12 @@ def main() -> None:
         help="Skip Pass 2 enrichment (description/tags/type). Index source_quote-only output directly.",
     )
     p_ingest.add_argument(
+        "--skip-description-gate",
+        action="store_true",
+        dest="skip_description_gate",
+        help="Skip Step D.6 description-grounding gate (WP-35.4). Index enriched output without checking descriptions for fabrication.",
+    )
+    p_ingest.add_argument(
         "--profile",
         type=str,
         default="cybersecurity",
@@ -1518,6 +1527,12 @@ def main() -> None:
         action="store_true",
         dest="skip_enrichment",
         help="Skip Pass 2 enrichment (description/tags/type). Index source_quote-only output directly.",
+    )
+    p_batch.add_argument(
+        "--skip-description-gate",
+        action="store_true",
+        dest="skip_description_gate",
+        help="Skip Step D.6 description-grounding gate (WP-35.4). Index enriched output without checking descriptions for fabrication.",
     )
     p_batch.add_argument("--ollama-url", type=str, default=_cfg.ollama_url, dest="ollama_url")
     p_batch.add_argument("--qdrant-url", type=str, default=_cfg.qdrant_url, dest="qdrant_url")

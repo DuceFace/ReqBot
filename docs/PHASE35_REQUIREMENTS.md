@@ -19,7 +19,7 @@ in `CLAUDE.md` or anywhere else.
 | WP-35.1 — Build a Labeled Calibration Dataset for Description Faithfulness | Complete |
 | WP-35.2 — Threshold Calibration Sweep | Complete |
 | WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Complete |
-| WP-35.4 — Production Step D.5/D.6 Entailment Gate | Not started |
+| WP-35.4 — Production Step D.5/D.6 Entailment Gate | Complete |
 | WP-35.5 — Integration Gate | Not started |
 
 ---
@@ -617,6 +617,115 @@ failure reasons; known fabrication patterns from WP-34.4 are caught in a live pi
 the eval script; the requirement-vs-description-field question above is explicitly decided and
 documented, not left implicit — and whichever way it's decided, a requirement with a genuinely valid
 `source_quote` is never silently lost solely because `description` failed this check.
+
+**Findings (2026-07-31):**
+
+- **All three open design questions from Scope, decided and documented, not defaulted:**
+  - *Dependency footprint:* new `grounding-check` optional extra in `pyproject.toml`, not base
+    install. MiniCheck's GitHub install pulls torch/transformers/datasets/openai/pyarrow — a heavy
+    footprint basic ingestion doesn't need, unlike docling (WP-34.1), which had no choice but to go
+    base since it's the only ingestion path left. Pinned to the exact commit this repo's WP-35.2
+    threshold was calibrated against
+    (`git+https://github.com/Liyan06/MiniCheck.git@b58b9fa69acbd1015ec970fa65dd752413a053d2`), with
+    the PyPI name-collision warning from `docs/PHASE34_REQUIREMENTS.md` carried into the dependency
+    comment itself so a future contributor doesn't rediscover it the hard way.
+  - *Reject semantics:* **(a)** — clear the `description` field (set to `""`) on rejection, never
+    drop the requirement. `source_quote`, `domain_tags`, `requirement_type`, and every other field
+    pass through unchanged even when `description` is cleared. Matches Step D.5's own existing
+    enrichment-failure precedent exactly, per the Scope's reasoning.
+  - *Sequencing:* a new Step D.6 (`pipeline/entailment_gate.py`), not folded into Step D.5. Runs on
+    whatever `index_path` currently is (enriched if D.5 succeeded, normalized otherwise) whenever
+    Step D ran — so a description carried over from Step C (D.5 skipped or failed outright) still
+    gets checked, not just freshly-enriched ones. Confirmed via reading `enrich_requirements.py`
+    directly: a failed per-record enrichment call leaves that record's `description` exactly as Step
+    C/D produced it, not blanked — so there's real content worth checking either way.
+  - *How the two checks combine (WP-35.3's own open question):* **OR, not AND** — either check
+    rejecting is enough. They catch different fabrication shapes by design (Gap 2, §1): requiring
+    both to agree would silently reopen the exact blind spot WP-35.3 exists to close, since
+    MiniCheck's own per-subtype numbers (WP-35.2's report) show `fabricated_modality` is precisely
+    the subtype it's weakest at (1/2 caught at the chosen threshold).
+- **Architectural consequence found by reading `core/artifact_resolver.py` before assuming a new
+  output file would "just work": every downstream consumer of a document's requirements — GUI,
+  checklist, evidence, `reqbot reindex` — goes through `resolve_latest_requirement_files()`/
+  `resolve_requirement_file()`, not through `run_pipeline.py`'s own `index_path` variable.** Adding
+  `*_requirements_gated.jsonl` without teaching this shared resolver about it would have made the
+  gate a no-op for every consumer except a single fresh pipeline run — silently bypassed everywhere
+  else. Fixed: `_GATED_SUFFIX` added, preference order now gated > enriched > normalized (both in
+  `doc_key_from_requirements_path()` and `resolve_latest_requirement_files()`), with "latest run
+  wins" still taking priority over file-type preference, matching the existing enriched-over-
+  normalized precedent exactly. `services/checklist_service.py` and `cli/reqbot.py`'s docstrings
+  updated to match; the one-off, already-historical `record_baseline_dirs.py` (a WP-14.4 pre-step
+  script) deliberately left untouched — checked, not a live consumer of "the best available file"
+  for any current feature.
+- **Moved WP-35.3's check into `pipeline/entailment_gate.py` as real production logic, rather than
+  importing production code from `eval/`.** `eval/modality_fabrication_check.py` now only imports
+  `is_fabricated_obligation` and validation-reports against it — mirroring the existing, opposite-
+  direction precedent (`eval/harvest_description_grounding_candidates.py` already imports
+  `normalize_text` from `pipeline/parse_and_normalize.py`): `pipeline/` holds canonical production
+  logic, `eval/` scripts reuse it for reporting, never the other way around. Zero behavior change —
+  confirmed by re-running the WP-35.3 validation script post-move: still 3/3 `fabricated_modality`
+  caught, 0/94 false positives, identical to pre-move.
+- **Manual verification, against real corpus documents, not just the standalone eval script (Tests/
+  verification requirement):** ran `pipeline/entailment_gate.py` directly against two real, already-
+  enriched local documents.
+  - `NIST.SP.800-125.pdf` (151 requirements): 13 rejected (12 `description_not_grounded`, 1
+    `description_fabricated_obligation`). The known WP-35.1 fabrication `REQ-757d551b3e59`
+    ("Implement better control of OSs...") was caught live — and its `support_prob` was `0.9367`,
+    confidently *above* the entailment threshold, confirming live, in production code (not just the
+    eval script) that MiniCheck alone would have missed this exact case and the modality check is
+    what actually caught it. Requirement count in: 151, out: 151 — nothing dropped.
+  - `afi10-2402.pdf` (290 requirements): 9 rejected. The known WP-35.1 fabrication
+    `REQ-cbc6374a655f` ("Implement Insider Threat Program...") was caught by **both** checks at once
+    (`support_prob=0.4524`, well below threshold, and the modality check both fired) — confirming
+    the failures record correctly captures co-occurring reasons rather than picking just one.
+    Requirement count in: 290, out: 290.
+- **CLI:** `--skip-description-gate` added to `reqbot ingest`, `reqbot batch`, and standalone
+  `run_pipeline.py`, mirroring `--skip-enrichment`'s existing pattern exactly. `README.md` updated
+  (pipeline stage list, flag references, Installation section) to document the new extra and flag.
+- **Codex-found (PR #169, two P1s) + Gemini-found (PR #169, one High): three real gaps, all
+  verified by reproduction before fixing.**
+  - *Codex P1:* if MiniCheck is installed but `scorer.score()` itself raises (missing NLTK
+    `punkt_tab` resource — an easy-to-forget separate manual step this WP's own README section
+    documents; OOM; a transient model-load error), the exception escaped `run()` entirely.
+    `run_pipeline.py`'s own caller then catches it and falls back to the **completely ungated**
+    file — silently losing the dependency-free modality-fabrication check too, not just the
+    entailment check that actually failed, contradicting this module's own documented guarantee.
+    Reproduced with a scorer stub that raises on `.score()`: confirmed the whole gate crashed.
+    Fixed by wrapping the scoring call itself in a `try`/`except` inside `run()`, degrading to
+    "entailment skipped" exactly like the not-installed case — the modality check runs regardless.
+  - *Codex P1:* `core/artifact_resolver.py`'s gated-preference change (this WP) assumed every file
+    in a run directory represents one coherent, complete pipeline invocation. That's false for a
+    reused output directory (`--skip-to D --skip-description-gate`, or a failed Step D.6) — Step
+    D.5/D.6 are independently skippable, so a rerun can regenerate `enriched`/`normalized` while
+    leaving an **older, now-inconsistent** `gated` file untouched, and the resolver would keep
+    preferring it forever purely because "gated" outranks "enriched" as a tier — the same latent
+    risk already existed for enriched-over-normalized, just never triggered until this WP made
+    partial-step reruns common. Reproduced: wrote a gated file, then an enriched file 50ms later
+    in the same run dir — resolver returned the stale gated file. Fixed with
+    `_freshest_acceptable_tier()`: a higher tier is only preferred when it is not older than every
+    lower tier present in the same run directory; otherwise falls through to the next tier down.
+  - *Gemini (High):* a record missing `source_quote` entirely (not something the normal pipeline
+    path can produce — Step D's own `empty_source_quote` check, confirmed by reading
+    `parse_and_normalize.py` directly, guarantees anything reaching Step D.6 already has a
+    non-empty string) raised a raw `KeyError` rather than being handled gracefully. Real risk
+    specifically for `entailment_gate.py`'s own standalone CLI entry point, which can be pointed at
+    an arbitrary, non-pipeline-validated file. Reproduced, then fixed with `.get("source_quote") or
+    ""` at both call sites, matching this file's own existing `is_fabricated_obligation()` None-
+    guard precedent.
+  - Re-verified all fixes against the same two real documents used for this WP's original manual
+    verification: identical results (13/151 and 9/290 rejected, same records) — the fixes close
+    real gaps without changing any real-world outcome.
+- Output: `pipeline/entailment_gate.py` (Step D.6 itself), `core/artifact_resolver.py` (gated-
+  preference update + `_freshest_acceptable_tier()` staleness guard), `pipeline/run_pipeline.py`
+  (Step D.6 wiring), `cli/reqbot.py` (flag passthrough), `pyproject.toml` (`grounding-check` extra),
+  `eval/modality_fabrication_check.py` (thinned to import-and-report), `tests/unit/
+  test_entailment_gate.py` (13 tests: MiniCheck-unavailable graceful skip, entailment rejection,
+  modality rejection, both-reasons co-occurrence, empty-description pass-through, requirement-
+  never-dropped invariant, gated-filename derivation from both enriched and normalized inputs,
+  scoring-failure degradation, missing-`source_quote` guard), `tests/unit/test_artifact_resolver.py`
+  (+6 tests for gated preference/fallback/latest-run-wins/staleness-within-a-run),
+  `tests/unit/test_modality_fabrication_check.py` (import path updated only, all 32 tests unchanged
+  and still passing).
 
 ---
 

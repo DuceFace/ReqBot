@@ -545,6 +545,37 @@ in full, not glossed over:*
   predicate locally instead of importing the live function — confirmed the script now reproduces the
   original `{NOT_COVERED_BY_DESIGN: 46, REAL_GAP: 3}` split exactly.
 
+*Round 6 (Gemini, re-reviewing the round-5 fix commit) — four more findings, three real bugs and
+one hygiene issue:*
+- **[High] ALL-CAPS quotes broke the citation structural check** — `_looks_like_citation_reference()`
+  tells a citation token from real prose by checking whether a word's first letter is lowercase;
+  meaningless when the whole quote is ALL CAPS (every word "looks like" a citation token regardless
+  of what it actually is), so a real ALL-CAPS requirement continuing past its citation
+  (`"...SHALL BE REPORTED IMMEDIATELY TO THE ISSO."`) would've been discarded. Fixed by bailing out
+  (not citation-only) whenever the remainder is itself all-uppercase — this corpus has no known
+  ALL-CAPS body-text requirements today, but the fix costs nothing and closes a real structural gap.
+- **[High] The marker+remainder-length tension, raised a third time** — three new hypothetical
+  short, complete, marker-prefixed directives (`"(1) Encrypt stored CUI."`, `"(2) Restrict root
+  access."`, `"(3) Conduct annual audits."`), all exactly at the 3-word threshold. Weighed explicitly
+  against removing the signal outright: two independent full-corpus sweeps (before and after this
+  round's fix) found zero actual false positives from this branch, only the one real, verified catch
+  (`"(3) Restrain competition."`, 2-word remainder) — a repeatedly-raised but so-far-unconfirmed
+  theoretical risk against a signal with a real catch is grounds to narrow further, not necessarily
+  remove; a real demonstrated false positive would be grounds to remove it outright. Narrowed
+  `ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS` from 3 to 2 — excludes all three new hypotheticals while
+  still catching the one real target. Full reasoning recorded in the constant's own comment so a
+  future session doesn't have to re-derive it.
+- **[Low] `eval/audit_wp38_1/verify_against_rules.py` still imported the live (WP-38.2-updated)
+  `_is_heading_echo()`** — the same class of gap as the earlier `_is_unrepairable_fragment` fix
+  (Codex, this same PR), just not caught for the second predicate at the time. Reimplemented the
+  pre-WP-38.2 heading-echo predicate locally too — confirmed the script still reproduces the original
+  `{NOT_COVERED_BY_DESIGN: 46, REAL_GAP: 3}` split.
+- **[Medium, hygiene] Missing `encoding="utf-8"` and bare (non-context-manager) `open()` calls**
+  across `eval/verify_wp38_2_rules.py` and the WP-38.1 audit scripts — real risk on a platform whose
+  default encoding isn't UTF-8. Fixed every instance found across all four WP-38 eval scripts in one
+  pass (grepped for the pattern, not just the one file flagged), not just the file Gemini's finding
+  named.
+
 All fixes re-verified against both the fixture (`eval/verify_wp38_2_rules.py`, still 0 regressions /
 0 scope violations / 0 coverage regressions) and a fresh full-live-corpus sweep before considering
 this WP done — the numbers throughout this Findings section are the post-fix, final ones.

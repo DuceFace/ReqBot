@@ -66,11 +66,18 @@ def rejected_by(rec: dict) -> str | None:
 
 
 def main():
-    sample = [json.loads(l) for l in open(FIXTURE_DIR / "unbiased_sample.jsonl")]
-    labels = {
-        json.loads(l)["requirement_id"]: (json.loads(l)["category"], json.loads(l)["subtype"])
-        for l in open(FIXTURE_DIR / "labeled_failures.jsonl")
-    }
+    # WP-38.2 (Gemini review round 6, PR #181): explicit encoding + context
+    # managers -- without encoding="utf-8", reading regulatory text with
+    # smart quotes/dashes falls back to the platform default (a real risk on
+    # e.g. Windows), and bare open() calls leave file handles to close
+    # implicitly rather than deterministically.
+    with open(FIXTURE_DIR / "unbiased_sample.jsonl", encoding="utf-8") as f:
+        sample = [json.loads(line) for line in f]
+    with open(FIXTURE_DIR / "labeled_failures.jsonl", encoding="utf-8") as f:
+        labels = {
+            rec["requirement_id"]: (rec["category"], rec["subtype"])
+            for rec in (json.loads(line) for line in f)
+        }
 
     real_regressions = []
     subtype_results: dict[str, list[tuple[str, str | None]]] = defaultdict(list)

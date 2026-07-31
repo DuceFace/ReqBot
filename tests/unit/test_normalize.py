@@ -436,6 +436,20 @@ def test_is_orphaned_list_item_bare_marker_zero_words():
     assert _is_orphaned_list_item("(1)")
 
 
+def test_is_orphaned_list_item_false_for_three_word_marker_directives():
+    # Gemini review round 6, PR #181: raised the same list-marker/word-count
+    # tension a third time with three new hypothetical short, complete,
+    # marker-prefixed directives, all 3-word remainders -- one word longer
+    # than ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS was lowered to (3 -> 2) in
+    # response, specifically to exclude examples exactly this shape while
+    # still catching the one real, verified 2-word target. See
+    # ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS's own comment for the full
+    # weighing of "narrow further" vs. "remove the signal entirely."
+    assert not _is_orphaned_list_item("(1) Encrypt stored CUI.")
+    assert not _is_orphaned_list_item("(2) Restrict root access.")
+    assert not _is_orphaned_list_item("(3) Conduct annual audits.")
+
+
 def test_is_orphaned_list_item_defined_in_citation():
     # REQ-4523443092b8 (afi10-2402): the whole quote is just a term plus a
     # citation, no independent obligation content.
@@ -512,6 +526,19 @@ def test_is_orphaned_list_item_false_for_citation_with_quoted_prose():
     # example found this round.
     assert not _is_orphaned_list_item(
         "Some term, as defined in CNSSI 4009, 'applies within the DoD'."
+    )
+
+
+def test_is_orphaned_list_item_false_for_all_caps_citation_with_real_clause():
+    # Gemini review round 6, PR #181: the structural citation check tells a
+    # citation token from real prose by checking whether a word's first
+    # letter is lowercase -- meaningless when the whole quote is ALL CAPS,
+    # since every word "looks like" a citation token regardless of what it
+    # actually is. Fixed by bailing out (not citation-only) whenever the
+    # remainder after "as defined in" is itself all-uppercase.
+    assert not _is_orphaned_list_item(
+        "COMPLIANCE DATA, AS DEFINED IN DODI 2000.26, SHALL BE REPORTED "
+        "IMMEDIATELY TO THE ISSO."
     )
 
 

@@ -146,22 +146,40 @@ _LIST_MARKER_RE = re.compile(r"^(?:\(\d+\)|\([a-zA-Z]\)|-\s*[a-zA-Z]\.)\s*")
 # WP-38.2: after stripping a list marker, a remainder this short (in words) is
 # too terse to carry independent obligation content of its own -- it's a bare
 # fragment of a larger enumerated list, not a self-contained requirement.
-# Originally set to 6, calibrated only against WP-38.1's specific fragment
-# examples -- Codex review (PR #181) found this let real, complete short
-# directives through too, both a hypothetical ("(a) Encrypt all stored CUI.",
-# 4-word remainder) and a real live-corpus record
-# (REQ-63cdc8363326, "(1) Identify individual responsibilities for protecting
-# CUI.", 6-word remainder -- a genuinely complete, actionable directive, not a
-# fragment needing external context). Lowered to 3: still catches the
-# clearest real fragment ("(3) Restrain competition.", 2-word remainder,
-# meaningless/inverted without its "shall not be used to:" governing clause)
-# while no longer swallowing either of the above. This trades away catching
-# "(7) Communicate PPS securely across the DODIN." (6-word remainder,
-# WP-38.1's own original fragment label) -- re-reading it during this
-# calibration, it reads as a plausible, meaningful, self-contained directive
-# on its own, similar in kind to the ones this rule must NOT reject, so
-# losing it is the correct trade, not just an accepted cost.
-ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 3
+#
+# History: originally 6, calibrated only against WP-38.1's specific fragment
+# examples. Codex review (PR #181) found real, complete short directives
+# getting swallowed too -- a hypothetical ("(a) Encrypt all stored CUI.",
+# 4-word remainder) and a real live-corpus record (REQ-63cdc8363326, "(1)
+# Identify individual responsibilities for protecting CUI.", 6-word
+# remainder). Lowered to 3. Gemini review round 6 raised the same concern
+# again at the new threshold, with three more hypotheticals, all 3-word
+# remainders ("(1) Encrypt stored CUI.", "(2) Restrict root access.", "(3)
+# Conduct annual audits.").
+#
+# This is now the third round pointing at the same fundamental tension:
+# word-count alone can't reliably distinguish "(3) Restrain competition."
+# (genuinely needs its "shall not be used to:" governing clause -- meaning
+# inverts without it) from a genuinely self-contained short directive of the
+# same length, and no regex can safely tell those apart without real
+# grammatical analysis. Lowered again, to 2 -- still catches the one real,
+# verified target in both WP-38.1's fixture and two full-corpus sweeps
+# ("(3) Restrain competition.", 2-word remainder), while excluding Gemini's
+# three new 3-word hypotheticals along with everything longer.
+#
+# Weighed deliberately against removing this signal entirely: Codex's and
+# Gemini's counter-examples are hypotheticals, not found in the corpus --
+# two independent full-corpus sweeps (1,872 records, before and after this
+# change) found zero actual false positives from this specific marker+
+# remainder-length branch, only the one real, correct catch. A real
+# demonstrated false positive would be grounds to remove the signal outright
+# (the discipline that reverted WP-37.2 and dropped the broader
+# _is_dangling_clause() signals); a repeatedly-raised but so-far-unconfirmed
+# theoretical risk against a signal with a real, verified catch is grounds to
+# narrow it further, not necessarily abandon it. Documented here plainly so
+# a future reviewer/session doesn't have to re-derive this reasoning --
+# revisit if a real false positive is ever actually found.
+ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 2
 
 # WP-38.2: an entire quote whose only content is a term followed by a
 # "as defined in <citation>" cross-reference carries no independent
@@ -231,6 +249,15 @@ def _is_definitional_citation_only(source_quote: str) -> bool:
     if not match:
         return False
     remainder = source_quote[match.end():]
+    if remainder.isupper():
+        # WP-38.2 (Gemini review round 6, PR #181): _looks_like_citation_reference()
+        # tells a citation token from real prose by checking whether a word's
+        # first letter is lowercase -- meaningless when the whole quote is
+        # ALL CAPS (e.g. a real requirement continuing "...SHALL BE REPORTED
+        # IMMEDIATELY TO THE ISSO." would have every word "look like" a
+        # citation token). Can't safely tell citation from prose by case in
+        # that situation, so don't guess -- leave the quote alone.
+        return False
     return all(_looks_like_citation_reference(w) for w in remainder.split())
 
 

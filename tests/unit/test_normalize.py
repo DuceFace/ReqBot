@@ -2,7 +2,9 @@ import json
 from pathlib import Path
 
 from pipeline.parse_and_normalize import (
+    _is_dangling_clause,
     _is_heading_echo,
+    _is_orphaned_list_item,
     _is_unrepairable_fragment,
     build_chunk_text_map,
     compute_stable_id,
@@ -372,3 +374,146 @@ def test_negative_fixture_survives_full_pipeline(tmp_path):
     run(str(req_path), str(chunks_path), "", str(out_dir))
     assert len(_read_jsonl(out_dir / "test_requirements_normalized.jsonl")) == 1
     assert _read_jsonl(out_dir / "test_normalization_failures.jsonl") == []
+
+
+# WP-38.2: real fixtures below are drawn from eval/audit_wp38_1/'s hand-labeled
+# audit (docs/PHASE38_REQUIREMENTS.md's WP-38.1/WP-38.2 Findings), not invented
+# examples -- both the positive and negative cases are real quotes this
+# project's own corpus produced.
+
+def test_is_heading_echo_matches_ancestor_heading_not_just_immediate():
+    # REQ-955ab005b394 (afi10-2402): a real quote that echoes an *ancestor*
+    # heading two levels up, not the chunk's own immediate heading -- the
+    # exact case WP-34.2's original section_title_path[-1]-only check
+    # structurally couldn't catch.
+    assert _is_heading_echo(
+        "COMPLIANCE WITH THIS PUBLICATION IS MANDATORY",
+        ["COMPLIANCE WITH THIS PUBLICATION IS MANDATORY", "1.1. Executive Summary"],
+    )
+
+
+def test_is_heading_echo_false_when_no_heading_in_path_matches():
+    assert not _is_heading_echo(
+        "KERs shall be approved by the MC4EB.",
+        ["Purpose", "KER Approval Process", "1.1. Executive Summary"],
+    )
+
+
+def test_is_unrepairable_fragment_no_longer_capped_by_length():
+    # REQ-97e6e5483093 (DODI 5200.44): a real 41-word colon-terminated
+    # fragment that WP-34.2's original 25-word cap let through -- WP-38.2
+    # removed the cap since a colon-ending quote carries no content of its
+    # own regardless of length.
+    assert _is_unrepairable_fragment(
+        "Designate a focal point and resources to represent the acquisition "
+        "executive; risk management executive; and counterintelligence, "
+        "security, and operational communities with access to the DoD "
+        "Component's research, development, acquisition, sustainment "
+        "activities, and ICT supply chain risk analyses for applicable "
+        "systems to:"
+    )
+
+
+def test_is_orphaned_list_item_numbered_marker_short_remainder():
+    # REQ-c6aeb8df528b (DODI 5200.01): item 3 of a "shall not be used to:"
+    # prohibition list, meaningless standalone.
+    assert _is_orphaned_list_item("(3) Restrain competition.")
+
+
+def test_is_orphaned_list_item_defined_in_citation():
+    # REQ-4523443092b8 (afi10-2402): the whole quote is just a term plus a
+    # citation, no independent obligation content.
+    assert _is_orphaned_list_item(
+        "Suspicious activity reporting, as defined in DoDI 2000.26, "
+        "Suspicious Activity Reporting."
+    )
+
+
+def test_is_orphaned_list_item_false_for_marker_with_real_content():
+    # REQ-01a7421e8e0a (DODI 8551.01): a real, self-contained directive that
+    # happens to start with a list marker -- must NOT be caught just because
+    # of the marker.
+    assert not _is_orphaned_list_item(
+        "(6) Directs the PPSM PMO to document the assurance category for "
+        "all PPS in the CAL."
+    )
+
+
+def test_is_orphaned_list_item_false_for_real_quote_no_marker():
+    assert not _is_orphaned_list_item("KERs shall be approved by the MC4EB.")
+
+
+def test_is_dangling_clause_bare_copula_first_word():
+    # REQ-1b1071c8d317 (afi17-203): missing its real subject before "Is".
+    assert _is_dangling_clause(
+        "Is designated Computer Network Defense Service Provider (CNDSP) "
+        "Certification Authority (CA) for Special Access Program (SAP) "
+        "networks and is responsible for coordinating and directing SAP "
+        "enclave-wide CNDSP activities."
+    )
+
+
+def test_is_dangling_clause_false_for_lowercase_start_real_list_item():
+    # REQ-474f99ed3b50 (DODI 5200.01): a real, correctly-kept requirement
+    # extracted starting mid-sentence on a shared governing clause -- this
+    # corpus's DoD/AF-style responsibility lists do this legitimately, which
+    # is why WP-38.2 calibrated away from a blanket "starts lowercase" rule.
+    assert not _is_dangling_clause(
+        "establish, direct, and administer all aspects of their respective "
+        "organization's SCI security programs"
+    )
+
+
+def test_is_dangling_clause_false_for_bare_modal_first_word_real_requirement():
+    # REQ-580c9ef77b37 (DODI 5200.48): a real requirement starting directly
+    # with a bare modal, same shape as a real dangling-clause fragment
+    # ("shall be coordinated with the customer") -- not safely distinguishable
+    # by a modal-first-word check alone, so WP-38.2 doesn't use one.
+    assert not _is_dangling_clause("must have a lawful governmental purpose for such access")
+
+
+def test_is_dangling_clause_false_for_trailing_comma_real_requirement():
+    # REQ-abf7f0a2a776 (DODI 5200.48): a real, complete requirement whose
+    # trailing comma is a punctuation artifact of a longer source list, not a
+    # sign of incomplete content -- why WP-38.2 doesn't use a trailing-comma
+    # rule.
+    assert not _is_dangling_clause(
+        "Reporting or accounting for UD of CUI shall be done in accordance "
+        "with Paragraph 3.5.a(4),"
+    )
+
+
+def test_orphaned_list_item_rejected_in_full_pipeline(tmp_path):
+    chunk_text = "Classification shall not be used to: (1) ... (2) ... (3) Restrain competition."
+    req = dict(SAMPLE_EXTRACTED, chunk_id=1, source_quote="(3) Restrain competition.")
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert _read_jsonl(out_dir / "test_requirements_normalized.jsonl") == []
+    failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
+    assert len(failures) == 1
+    assert failures[0]["error"] == "orphaned_list_item_quote"
+
+
+def test_dangling_clause_rejected_in_full_pipeline(tmp_path):
+    chunk_text = (
+        "The 624 OC is designated Computer Network Defense Service Provider "
+        "Certification Authority for Special Access Program networks."
+    )
+    req = dict(
+        SAMPLE_EXTRACTED, chunk_id=1,
+        source_quote="Is designated Computer Network Defense Service Provider Certification Authority.",
+    )
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    assert _read_jsonl(out_dir / "test_requirements_normalized.jsonl") == []
+    failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
+    assert len(failures) == 1
+    assert failures[0]["error"] == "dangling_clause_quote"

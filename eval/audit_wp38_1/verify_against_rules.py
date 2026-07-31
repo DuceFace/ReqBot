@@ -15,13 +15,20 @@ if str(_ROOT) not in sys.path:
 from pipeline.parse_and_normalize import (
     _is_heading_echo,
     _is_unrepairable_fragment,
-    UNREPAIRABLE_FRAGMENT_MAX_WORDS,
 )
 
 SKIP_SECTIONS = {
     "GLOSSARY", "REFERENCES", "ACRONYMS", "DEFINITIONS",
     "ABBREVIATIONS", "TABLE OF CONTENTS", "TERMS",
 }
+
+# WP-34.2's original word cap on _is_unrepairable_fragment(), removed by
+# WP-38.2 (the length check no longer exists in the function at all -- see
+# docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings). Pinned here, not
+# imported, so this script keeps documenting the pre-WP-38.2 rule state this
+# audit actually measured, rather than silently reflecting whatever the
+# constant happens to be today.
+_PRE_WP_38_2_UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25
 
 # (requirement_id: (category, subtype)) -- category is FRAGMENT/OVER_GRAB/JUDGMENT.
 # subtype is the specific sub-shape from PHASE38_REQUIREMENTS.md's Findings
@@ -108,7 +115,7 @@ def main():
 
         if heading_echo or unrepairable:
             rule_status = "SHOULD_BE_CAUGHT_BUT_ISNT (labeling error? survived despite matching a rule)"
-        elif ends_colon and word_count > UNREPAIRABLE_FRAGMENT_MAX_WORDS:
+        elif ends_colon and word_count > _PRE_WP_38_2_UNREPAIRABLE_FRAGMENT_MAX_WORDS:
             rule_status = "REAL_GAP (colon-terminated fragment, exceeds 25-word cap)"
         elif in_skip_sections:
             rule_status = "REAL_GAP (section is in skip_sections vocab but record wasn't filtered)"

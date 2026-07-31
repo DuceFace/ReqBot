@@ -19,7 +19,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-38.1 — Extraction Precision Failure Audit | Complete |
-| WP-38.2 — Deterministic Fragment-Rejection Rule Extensions | Not started (properly scoped) |
+| WP-38.2 — Deterministic Fragment-Rejection Rule Extensions | Complete |
 
 ---
 
@@ -424,6 +424,79 @@ something a deterministic rule can reliably do; see Non-Goals.
 subset each rule targets) without rejecting any of the 284 hand-labeled real records, and full
 `pytest` + `ruff check .` are clean.
 
+**Findings (2026-07-31):**
+
+*What shipped, in `pipeline/parse_and_normalize.py`:*
+- `UNREPAIRABLE_FRAGMENT_MAX_WORDS` **removed entirely** (not raised) — `_is_unrepairable_fragment()`
+  now rejects any colon-terminated quote regardless of length. The cap's original justification (a
+  long quote might legitimately end mid-punctuation) had no confirmed real example in either
+  WP-34.2's original spike or WP-38.1's 333-record audit.
+- `_is_heading_echo()` now checks every entry in `section_title_path`, not just the immediate
+  heading (`[-1]`) — catches the ancestor-heading-echo shape WP-38.1's discovery pool found
+  (`REQ-955ab005b394`).
+- Two new rules: `_is_orphaned_list_item()` (a list-marker-prefixed or "as defined in"-citation-only
+  quote with no governing clause) and `_is_dangling_clause()` (a bare-copula-first-word quote
+  missing its subject).
+
+*Calibration against WP-38.1's fixture caught real problems before they shipped — worth recording
+because this is exactly the process working as intended, not a footnote.* The first version of
+`_is_dangling_clause()` used three signals (lowercase-first-letter, bare-modal-first-word, trailing
+bare comma) that all seemed reasonable from the fragment examples alone. Running the new rules
+against all 333 hand-labeled records (not just the 6 targeted dangling-clause examples) surfaced 15
+real regressions against genuinely correct requirements and 4 scope violations against
+over-grab/judgment/malformed-garbled records that must stay untouched — all three broader signals
+turned out to be unsafe:
+- **Lowercase-first-letter**: this corpus's real DoD/AF-style responsibility lists commonly extract
+  individual list items starting mid-sentence on a shared "will:" governing clause — a real,
+  correctly-kept requirement (`REQ-474f99ed3b50`, `"establish, direct, and administer all aspects of
+  their respective organization's SCI security programs"`) starts lowercase exactly like a genuine
+  fragment does.
+- **Bare-modal-first-word** (shall/will/must/should/may): a real, correctly-kept requirement
+  (`REQ-580c9ef77b37`, `"must have a lawful governmental purpose for such access"`) has the identical
+  shape to the targeted fragment `"shall be coordinated with the customer"` — not safely
+  distinguishable by this signal alone.
+- **Trailing bare comma**: a real, correctly-kept requirement (`REQ-abf7f0a2a776`, ending
+  `"...in accordance with Paragraph 3.5.a(4),"`) ends in a comma that's a punctuation artifact of a
+  longer source list, not a sign of incomplete content.
+
+`_is_dangling_clause()` was narrowed to only the bare-copula-first-word signal (`Is`/`Are`/`Was`/`Were`
+as literally the quote's first word), the one signal that produced zero false positives when checked
+against the fixture. This dropped its own targeted catch rate from an originally-hoped-for higher
+number down to 1 of 6 — an honest tradeoff, not a shortfall to paper over: a narrow, safe rule that
+catches less is strictly better than a broad one that silently discards real requirements.
+
+*Real, code-verified results (`eval/verify_wp38_2_rules.py`, checking the actual rule functions
+against all 333 records in `eval/audit_wp38_1/unbiased_sample.jsonl`, committed):*
+
+| Check | Result |
+|---|---|
+| Real-record regressions (must be 0) | **0 / 284** |
+| Scope violations — over_grab/judgment/malformed_garbled caught (must be 0) | **0 / 28** |
+| `colon_too_long` fragments caught | **3 / 3** |
+| `orphaned_list_item` fragments caught | **4 / 12** |
+| `dangling_clause` fragments caught | **1 / 6** |
+| `malformed_garbled` fragments correctly left untouched | **4 / 4** |
+
+The `orphaned_list_item` and `colon_too_long` shapes were fully or mostly mechanically identifiable
+as scoped. `dangling_clause` was the shape where WP-38.2's own Scope text turned out optimistic —
+"three narrow, safe signals" became one after calibration, because most of that sub-pattern's real
+examples aren't syntactically distinguishable from genuine short requirements without actual
+grammatical analysis, which a regex can't safely do. This mirrors the same "cheapest fix wins, don't
+force it" discipline that reverted WP-37.2 rather than shipping a regression.
+
+*Broader sanity check beyond the fixture:* ran all four rules against the full current live corpus
+(1,872 records, not just the 333-record sample) — 21 records (1.1%) would be newly rejected on a
+re-ingest, all spot-checked and genuinely correct (more instances of the same real shapes: e.g.
+`"is responsible for"`, two more `"<term>, as defined in <citation>"` cross-references not in the
+original 12-example set). No new false positives found outside the fixture either. A small, surgical
+correction, not a broad sweep — consistent with the 7.3% weighted fragment prevalence WP-38.1 found
+(this WP doesn't close that whole gap; it closes the mechanically-safe portion of it).
+
+*Not done, by design:* the corpus was not re-ingested and Qdrant was not reindexed as part of this
+WP — these rules only affect *future* Step D runs. Existing indexed data is unaffected until the
+next re-ingest. Re-ingesting the corpus to apply these rules retroactively is a separate decision,
+not assumed here (matches this WP's Non-Goals: not touching indexed data).
+
 ---
 
 ## 5. Backlog — Over-Grab Precision (deferred, not WP-38.2)
@@ -456,9 +529,10 @@ as-is) is still the right shape if and when it's scoped.
       original wording here could never be satisfied by the "negligible rate, no action needed"
       conclusion the Goals and WP-38.1 Scope both explicitly allow for). (WP-38.2 properly scoped as
       a rule-extension WP above; over-grab classifier question explicitly deferred to backlog with a
-      documented re-measurement trigger, not silently dropped.)
-- [ ] Full `pytest` suite and `ruff check .` clean throughout. (WP-38.1's own changes: pending this
-      PR's verification pass. WP-38.2's own gate is separate, tracked in its own section above.)
+      documented re-measurement trigger, not silently dropped. WP-38.2 itself shipped, not just
+      scoped — see its own Findings above.)
+- [x] Full `pytest` suite and `ruff check .` clean throughout. (775 tests passed, including 13 new
+      for WP-38.2's rule functions; `ruff check .` clean.)
 
 ## 7. Guardrails
 

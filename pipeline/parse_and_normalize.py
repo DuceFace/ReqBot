@@ -64,16 +64,6 @@ PIPELINE_VERSION = "1.0"
 # full investigation.
 QUOTE_GROUNDING_THRESHOLD = 60
 
-# WP-34.2: a colon-terminated source_quote longer than this (in words) is treated
-# as too substantial to be a bare list-header fragment and is left alone rather
-# than rejected. All known real fabrication triggers are well under this --
-# "The MC4EB will:" (3 words), "The process will be as follows:" (6 words), and
-# the longest, "The KER may be sent either by scanned soft copy via SIPRNET or by
-# mail to the address listed below:" (20 words) -- so 25 leaves headroom without
-# being large enough to plausibly swallow a genuinely complete, longer quote that
-# just happens to end mid-punctuation.
-UNREPAIRABLE_FRAGMENT_MAX_WORDS = 25
-
 
 # WP-34.2: minimum fuzz.ratio (0-100, whole-string similarity) between a
 # normalized source_quote and its chunk's own heading before treating it as a
@@ -94,40 +84,171 @@ HEADING_ECHO_THRESHOLD = 90
 
 
 def _is_heading_echo(source_quote: str, section_title_path: list[str]) -> bool:
-    """True if source_quote is just its own chunk's heading, not body content.
+    """True if source_quote is just a heading from its own ancestry, not body content.
 
-    Step C occasionally extracts a chunk's structural heading (e.g. "COMPLIANCE
-    WITH THIS PUBLICATION IS MANDATORY") as if it were a requirement in its own
-    right. Reuses chunk_text.py's _normalize_heading() for both sides so this
-    matches on the same normalized form skip_sections filtering already uses --
-    not separate matching logic (WP-34.2).
+    Step C occasionally extracts a heading (e.g. "COMPLIANCE WITH THIS
+    PUBLICATION IS MANDATORY") as if it were a requirement in its own right.
+    WP-34.2 originally checked only section_title_path[-1] (the chunk's
+    immediate heading). WP-38.1's audit found a code-verified case
+    (REQ-955ab005b394) where a quote echoes an *ancestor* heading two levels
+    up instead -- section_title_path is ordered shallowest-first (root ...
+    immediate parent, see section_parser.py's _ancestry_from_stack), so an
+    echoed heading isn't always the last entry. WP-38.2 checks every entry in
+    the path, not just the last one.
+
+    Reuses chunk_text.py's _normalize_heading() for both sides so this matches
+    on the same normalized form skip_sections filtering already uses -- not
+    separate matching logic (WP-34.2).
     """
-    if not section_title_path:
-        return False
-    heading = section_title_path[-1]
-    if not heading:
-        return False
     normalized_quote = _normalize_heading(source_quote)
-    normalized_heading = _normalize_heading(heading)
-    if not normalized_quote or not normalized_heading:
+    if not normalized_quote:
         return False
-    return fuzz.ratio(normalized_quote, normalized_heading) >= HEADING_ECHO_THRESHOLD
+    for heading in section_title_path:
+        if not heading:
+            continue
+        normalized_heading = _normalize_heading(heading)
+        if not normalized_heading:
+            continue
+        if fuzz.ratio(normalized_quote, normalized_heading) >= HEADING_ECHO_THRESHOLD:
+            return True
+    return False
 
 
 def _is_unrepairable_fragment(source_quote: str) -> bool:
     """True if source_quote is a truncated list-header with no content of its own.
 
-    A short quote ending in a bare colon (e.g. "The process will be as
-    follows:") carries no obligation content on its own -- Step D.5 enrichment
-    was found fabricating plausible-sounding description text to "complete" it,
-    content that appears nowhere in source_quote (WP-34.2). Only fires on quotes
-    that literally end in a colon; a quote that merely contains one mid-sentence
+    A quote ending in a bare colon (e.g. "The process will be as follows:")
+    carries no obligation content on its own -- Step D.5 enrichment was found
+    fabricating plausible-sounding description text to "complete" it, content
+    that appears nowhere in source_quote (WP-34.2). Only fires on quotes that
+    literally end in a colon; a quote that merely contains one mid-sentence
     (and so has real content following it) is untouched.
+
+    WP-34.2 originally also required the quote to be under 25 words, reasoning
+    that a longer colon-terminated quote might be a genuinely complete quote
+    that just happens to end mid-punctuation. WP-38.1's audit found 3 real
+    colon-terminated list-header fragments at 30, 39, and 41 words that the cap
+    let through, and turned up no example -- in WP-34.2's original spike or
+    WP-38.1's 333-record hand-read audit -- of a genuinely complete quote that
+    legitimately ends in a bare colon. A colon promises content the quote
+    doesn't contain regardless of how many words precede it, so WP-38.2 removed
+    the length cap: the trigger is "ends in a bare colon," full stop.
+    """
+    return source_quote.strip().endswith(":")
+
+
+# WP-38.2: list-item marker prefix -- numbered "(1)", lettered "(a)"/"(A)", or
+# a leading dash-letter marker like "- d." -- optionally followed by whitespace.
+_LIST_MARKER_RE = re.compile(r"^(?:\(\d+\)|\([a-zA-Z]\)|-\s*[a-zA-Z]\.)\s*")
+
+# WP-38.2: after stripping a list marker, a remainder this short (in words) is
+# too terse to carry independent obligation content of its own -- it's a bare
+# fragment of a larger enumerated list, not a self-contained requirement.
+# Calibrated against WP-38.1's audit fixture (eval/audit_wp38_1/): real
+# fragment examples like "(3) Restrain competition." (2-word remainder) and
+# "(7) Communicate PPS securely across the DODIN." (6-word remainder) must be
+# caught; a real, self-contained directive like "(6) Directs the PPSM PMO to
+# document the assurance category for all PPS in the CAL." (15-word
+# remainder) must NOT be -- it's a real directive WP-38.1 filed as
+# judgment-requiring, not a fragment. 6 leaves headroom between the two
+# without swallowing genuinely complete short directives.
+ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS = 6
+
+# WP-38.2: an entire quote whose only content is a term followed by a
+# "as defined in <citation>" cross-reference carries no independent
+# obligation -- it's a definitional pointer, not a requirement (e.g.
+# "Suspicious activity reporting, as defined in DoDI 2000.26, Suspicious
+# Activity Reporting.").
+_DEFINED_IN_CITATION_RE = re.compile(r"^[^,]{1,80},\s*as defined in\b", re.IGNORECASE)
+
+
+def _is_orphaned_list_item(source_quote: str) -> bool:
+    """True if source_quote is a bare enumerated-list item or definitional
+    cross-reference with no governing clause or independent content of its
+    own (WP-38.2 -- the largest single fragment sub-pattern WP-38.1's audit
+    found, 12 of 25 fragment examples).
+
+    Two narrow, safe signals rather than one broad one, deliberately, to
+    avoid rejecting a genuinely complete short directive that happens to
+    start with a list marker:
+
+    1. A list-marker prefix ("(3)", "(a)", "- d.") followed by a very short
+       remainder -- too terse to carry independent content.
+    2. The entire quote is just "<term>, as defined in <citation>." -- a
+       definitional pointer, not an obligation.
+
+    Doesn't attempt to catch a bare noun-phrase list item with no marker and
+    no citation (e.g. "Required NM data update rates.") -- no safe,
+    non-overfit text-level signal for that shape was found during
+    calibration; distinguishing it from a real short requirement needs actual
+    grammatical analysis (is the quote's head a noun phrase or a finite verb
+    clause), not something regex can reliably do. Left as an honest gap, not
+    silently claimed as covered -- see docs/PHASE38_REQUIREMENTS.md's WP-38.2
+    Findings.
     """
     stripped = source_quote.strip()
-    if not stripped.endswith(":"):
+    if not stripped:
         return False
-    return len(stripped.split()) <= UNREPAIRABLE_FRAGMENT_MAX_WORDS
+
+    if _DEFINED_IN_CITATION_RE.match(stripped):
+        return True
+
+    match = _LIST_MARKER_RE.match(stripped)
+    if match:
+        remainder = stripped[match.end():].strip()
+        if remainder and len(remainder.split()) <= ORPHANED_LIST_ITEM_MAX_REMAINDER_WORDS:
+            return True
+
+    return False
+
+
+# WP-38.2: bare copulas that, as a quote's very first word, almost always
+# indicate a missing subject (e.g. "Is designated..." extracted without the
+# "[X]" that should precede "is").
+_BARE_COPULA_OPENERS = ("is", "are", "was", "were")
+
+
+def _is_dangling_clause(source_quote: str) -> bool:
+    """True if source_quote's first word is a bare copula with no subject
+    before it (WP-38.2 -- e.g. "Is designated Computer Network Defense
+    Service Provider..." extracted without the "[X]" that should precede
+    "is").
+
+    Three broader candidate signals were tried and rejected during
+    calibration against WP-38.1's audit fixture (eval/audit_wp38_1/) because
+    each produced a real false positive against a genuine, correctly-kept
+    requirement in this corpus:
+
+    - "Starts with a lowercase letter" -- this corpus's real DoD/AF-style
+      responsibility lists commonly extract individual list items starting
+      mid-sentence on a shared "will:" governing clause (e.g. a real,
+      correctly-kept "establish, direct, and administer all aspects of
+      their respective organization's SCI security programs"), so
+      lowercase-first is common in genuine content here, not just fragments.
+    - "First word is a bare modal (shall/will/must/should/may)" -- same
+      cause: a real, correctly-kept record ("must have a lawful governmental
+      purpose for such access") starts exactly this way.
+    - "Ends in a bare trailing comma" -- a real, correctly-kept record
+      ("Reporting or accounting for UD of CUI shall be done in accordance
+      with Paragraph 3.5.a(4),") ends in one too; the comma there is a
+      punctuation artifact of a longer source list, not a sign the quote's
+      own content is incomplete.
+
+    Only the bare-copula-first-word signal survived calibration with zero
+    false positives against the fixture's 284 real records -- catches 1 of
+    WP-38.1's 6 dangling-clause fragment examples. The other 5 (a preamble
+    ending mid-clause, a subordinate clause with no main clause, a bare
+    modal predicate with no subject) are real fragments but aren't safely
+    distinguishable from genuine subject-less-but-complete list items in
+    this corpus without actual grammatical analysis -- left as an honest
+    gap rather than a rule broad enough to risk discarding real data. See
+    docs/PHASE38_REQUIREMENTS.md's WP-38.2 Findings.
+    """
+    stripped = source_quote.strip()
+    if not stripped:
+        return False
+    first_word = stripped.split(" ", 1)[0].strip(".,;:")
+    return first_word.lower() in _BARE_COPULA_OPENERS
 
 
 def compute_document_identity(pdf_path: Path) -> dict:
@@ -479,6 +600,21 @@ def run(
         # these rather than the pipeline ever inventing or assembling real content.
         if _is_unrepairable_fragment(source_quote):
             failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "unrepairable_fragment_quote", "raw": req})
+            continue
+
+        # WP-38.2: reject a bare enumerated-list item or definitional
+        # cross-reference extracted without its governing clause (e.g. "(3)
+        # Restrain competition." -- item 3 of a "shall not be used to:" list,
+        # meaningless standalone).
+        if _is_orphaned_list_item(source_quote):
+            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "orphaned_list_item_quote", "raw": req})
+            continue
+
+        # WP-38.2: reject a subordinate clause or predicate extracted without
+        # its main clause or subject (e.g. "shall be coordinated with the
+        # customer" -- a dangling predicate with no subject at all).
+        if _is_dangling_clause(source_quote):
+            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "dangling_clause_quote", "raw": req})
             continue
 
         if description:

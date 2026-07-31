@@ -41,6 +41,49 @@ def test_prefers_enriched_over_normalized_in_same_run(tmp_path):
     assert result["NIST.SP.800-53"] == enriched
 
 
+def test_prefers_gated_over_enriched_and_normalized_in_same_run(tmp_path):
+    # WP-35.4: gated is enriched output that additionally passed the
+    # description-grounding check -- strictly more trustworthy when present.
+    run_dir = tmp_path / "NIST.SP.800-53_20260101_000000"
+    normalized = run_dir / "NIST.SP.800-53_requirements_normalized.jsonl"
+    enriched = run_dir / "NIST.SP.800-53_requirements_enriched.jsonl"
+    gated = run_dir / "NIST.SP.800-53_requirements_gated.jsonl"
+    _write(normalized)
+    _write(enriched)
+    _write(gated)
+
+    result = resolve_latest_requirement_files(tmp_path)
+
+    assert result["NIST.SP.800-53"] == gated
+
+
+def test_falls_back_to_enriched_when_gated_absent(tmp_path):
+    run_dir = tmp_path / "NIST.SP.800-53_20260101_000000"
+    enriched = run_dir / "NIST.SP.800-53_requirements_enriched.jsonl"
+    _write(enriched)
+
+    result = resolve_latest_requirement_files(tmp_path)
+
+    assert result["NIST.SP.800-53"] == enriched
+
+
+def test_newer_enriched_beats_older_gated_across_runs(tmp_path):
+    old_run = tmp_path / "NIST.SP.800-53_20250101_000000"
+    new_run = tmp_path / "NIST.SP.800-53_20260101_000000"
+    old_gated = old_run / "NIST.SP.800-53_requirements_gated.jsonl"
+    new_enriched = new_run / "NIST.SP.800-53_requirements_enriched.jsonl"
+    _write(old_gated)
+    _write(new_enriched)
+    _age(old_gated, seconds_ago=1000)
+    _age(new_enriched, seconds_ago=10)
+
+    result = resolve_latest_requirement_files(tmp_path)
+
+    # A newer enriched file from a later run beats an older gated file from a
+    # previous run -- "latest run wins" still dominates preference.
+    assert result["NIST.SP.800-53"] == new_enriched
+
+
 def test_falls_back_to_normalized_when_enriched_absent(tmp_path):
     run_dir = tmp_path / "NIST.SP.800-53_20260101_000000"
     normalized = run_dir / "NIST.SP.800-53_requirements_normalized.jsonl"
@@ -109,6 +152,11 @@ def test_doc_key_from_requirements_path_handles_embedded_suffix_substring():
 
 def test_doc_key_from_requirements_path_enriched_suffix():
     path = Path("AFI17-101_requirements_enriched.jsonl")
+    assert doc_key_from_requirements_path(path) == "AFI17-101"
+
+
+def test_doc_key_from_requirements_path_gated_suffix():
+    path = Path("AFI17-101_requirements_gated.jsonl")
     assert doc_key_from_requirements_path(path) == "AFI17-101"
 
 

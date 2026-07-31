@@ -68,9 +68,17 @@ ingestion path, so `pip install .` alone is enough to ingest documents.
 Optional extras:
 
 ```bash
-pip install ".[remote]"    # remote synthesis via Anthropic/OpenAI
-pip install ".[dev]"       # test/lint tooling
+pip install ".[remote]"           # remote synthesis via Anthropic/OpenAI
+pip install ".[dev]"              # test/lint tooling
+pip install ".[grounding-check]"  # Step D.6 description-fabrication entailment check (WP-35.4)
 ```
+
+`grounding-check` pulls MiniCheck from its GitHub source (a heavy footprint — torch, transformers,
+datasets — not needed for basic ingestion, which is why this is opt-in rather than a base
+dependency). It also needs one NLTK resource, downloaded separately (not something a pip extra can
+do): `python3 -c "import nltk; nltk.download('punkt_tab')"`. Without this extra, Step D.6's
+MiniCheck-based entailment check is skipped automatically (logged, not fatal) — its deterministic
+modality-fabrication check still runs regardless, since that has no extra dependencies.
 
 `pip install .` is the only supported install path — the older `requirements.txt`
 (`pip install -r requirements.txt`, predating WP-25.2's packaging) was retired in WP-34.1.
@@ -209,6 +217,7 @@ Important options:
 - `--enrichment-model M` - Step D.5 model
 - `--model M` - convenience alias that sets both extraction and enrichment models
 - `--skip-enrichment` - skip Pass 2 enrichment and index Pass 1 output directly
+- `--skip-description-gate` - skip the Step D.6 description-grounding gate (WP-35.4); index enriched output without checking descriptions for fabrication
 - `--max-chunks N` - limit Step C processing for testing
 
 ### `batch`
@@ -364,12 +373,16 @@ Default behavior:
 - Step C runs in Pass 1 mode and extracts `source_quote` + `source_ref`.
 - Step D validates and deduplicates.
 - Step D.5 enriches with `description`, `domain_tags`, and `requirement_type`.
+- Step D.6 checks each `description` for fabrication against its `source_quote` (WP-35.4) and
+  clears (never drops) any that fail — the requirement itself is always kept.
 - `reqbot ingest` indexes both requirements and chunk context after the pipeline completes;
   `--no-index` skips indexing for artifact-only/debug runs.
 
 Advanced behavior:
 
 - `--skip-enrichment` keeps the pipeline in Pass 1 only.
+- `--skip-description-gate` skips Step D.6 (the check still requires the optional `grounding-check`
+  extra to fully run; see Installation).
 
 ## Layout-Aware Extraction
 
@@ -461,6 +474,7 @@ Useful flags:
 
 - `--skip-to {A,B,C,D,E}` - resume from an existing output directory
 - `--skip-enrichment` - stop after Step D
+- `--skip-description-gate` - skip Step D.6 (the description-grounding gate)
 - `--extraction-model M`
 - `--enrichment-model M`
 - `--model M` - set both

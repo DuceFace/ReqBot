@@ -89,6 +89,7 @@ def run(
     timeout: int = 120,
     skip_to: str = "A",
     skip_enrichment: bool = False,
+    skip_description_gate: bool = False,
     profile_name: str = "cybersecurity",
 ) -> str:
     """Run the full extraction pipeline (Steps A-E + optional enrichment) in-process.
@@ -106,12 +107,14 @@ def run(
         timeout:           Per-request LLM timeout in seconds.
         skip_to:           Skip to step ('A'-'E'). Requires prior artifacts.
         skip_enrichment:   Skip Step D.5 enrichment. Returns normalized JSONL path directly.
+        skip_description_gate: Skip Step D.6 description-grounding gate (WP-35.4).
         profile_name:      Domain profile name to load from profiles/<name>.json.
                            Default 'cybersecurity'. Profile is loaded once and passed to
                            Steps C and D.5.
 
     Returns:
-        Path to requirements_enriched.jsonl if enrichment ran, else
+        Path to requirements_gated.jsonl if the Step D.6 gate ran, else
+        requirements_enriched.jsonl if enrichment ran, else
         requirements_normalized.jsonl (str).
 
     Raises:
@@ -249,6 +252,32 @@ def run(
     else:
         log.info("Step D.5 skipped (Step D did not run in this invocation)")
 
+    # Step D.6: Description-grounding entailment gate (WP-35.4). Runs on
+    # whatever index_path currently is (enriched if D.5 succeeded, normalized
+    # otherwise) whenever Step D ran this invocation, so a description
+    # carried through from Step C still gets checked even if D.5 was skipped.
+    # Never drops a requirement -- only clears a rejected description field.
+    # If the gate itself fails (e.g. a corrupt input file), the pipeline
+    # continues with the pre-gate JSONL for indexing, same "pipeline
+    # continues" precedent Step D.5 already established.
+    if "D" in steps_to_run and not skip_description_gate:
+        log.info("=" * 60)
+        log.info("Starting Step D.6 (Description-Grounding Gate)")
+        log.info("=" * 60)
+        try:
+            from pipeline import entailment_gate as _gate_mod
+            gate_result = _gate_mod.run(str(index_path), str(out_dir))
+            index_path = Path(gate_result)
+        except Exception as e:
+            log.warning(
+                "Step D.6 gate failed (%s) — proceeding with ungated JSONL for indexing",
+                e,
+            )
+    elif skip_description_gate:
+        log.info("Step D.6 skipped (--skip-description-gate)")
+    else:
+        log.info("Step D.6 skipped (Step D did not run in this invocation)")
+
     if "E" in steps_to_run:
         log.info("=" * 60)
         log.info("Starting Step E (Aggregate)")
@@ -353,6 +382,12 @@ def main() -> None:
         dest="skip_enrichment",
         help="Skip Step D.5 enrichment (Pass 2). Index normalized JSONL directly without adding description/tags/type.",
     )
+    parser.add_argument(
+        "--skip-description-gate",
+        action="store_true",
+        dest="skip_description_gate",
+        help="Skip Step D.6 description-grounding gate (WP-35.4). Index enriched/normalized JSONL without checking descriptions for fabrication.",
+    )
     args = parser.parse_args()
 
     pdf_path = Path(args.pdf_path).resolve()
@@ -385,6 +420,7 @@ def main() -> None:
             timeout=args.timeout,
             skip_to=args.skip_to,
             skip_enrichment=args.skip_enrichment,
+            skip_description_gate=args.skip_description_gate,
         )
     except RuntimeError as e:
         log.error("%s", e)

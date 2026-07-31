@@ -105,17 +105,40 @@ ACTION_VERB_FORMS = {
 }
 ACTION_VERBS = list(ACTION_VERB_FORMS)
 
+# Nouns that take an obligation-bearing infinitive complement ("a
+# responsibility/duty/obligation/requirement to VERB") — the "to VERB" here
+# is the obligation itself, not a purpose/goal clause explaining why
+# something else happens (Codex review, PR #168: "Personnel have a
+# responsibility to maintain records" -> "Maintain records" was wrongly
+# treated as fabricated because "to maintain" was discarded as a purpose
+# clause). A short closed list, not a general parse — matches this WP's own
+# "narrow, targeted check" Non-Goal.
+OBLIGATION_COMPLEMENT_NOUNS = ["responsibility", "duty", "obligation", "requirement"]
+
 
 def _is_infinitive_purpose_clause(text: str, verb_start: int) -> bool:
-    """True if the verb at verb_start is a bare infinitive ("to VERB").
+    """True if the verb at verb_start is a non-governing bare infinitive
+    ("...to ensure X", explaining why, not commanding who) rather than a
+    governing infinitive complement.
 
-    A bare infinitive reads as a purpose/goal clause ("...to ensure X",
-    explaining why, not commanding who) rather than a finite governing verb
-    of the sentence. Applies to any ACTION_VERB, not just "ensure" — the
-    grammatical role is the same regardless of which verb follows "to ".
+    Two constructions look identical (a literal "to VERB") but are not: a
+    genuine purpose clause vs. an infinitive governed by a modal marker that
+    itself ends in "to" ("required to VERB", "are to VERB" — Gemini review,
+    PR #168) or by an obligation-bearing noun (OBLIGATION_COMPLEMENT_NOUNS,
+    "a responsibility to VERB" — Codex review, PR #168). In both exception
+    cases the "to" is part of what asserts the obligation, not a separate
+    infinitive-of-purpose construction, so the verb is governing.
     """
     prefix = text[:verb_start]
-    return bool(re.search(r"\bto\s+$", prefix))
+    if not re.search(r"\bto\s+$", prefix):
+        return False
+    for marker in MODAL_MARKERS:
+        if marker.endswith("to") and re.search(r"\b" + re.escape(marker) + r"\s+$", prefix):
+            return False
+    for noun in OBLIGATION_COMPLEMENT_NOUNS:
+        if re.search(r"\b" + re.escape(noun) + r"\s+to\s+$", prefix):
+            return False
+    return True
 
 
 def _governing_action_verbs_in(text: str) -> set[str]:
@@ -152,18 +175,25 @@ def _has_governing_obligation(text: str) -> bool:
 
 
 def is_fabricated_obligation(source_quote: str, description: str) -> bool:
-    """True if description invents an obligation absent from source_quote.
+    """True if description asserts an obligation source_quote never states.
 
-    Fires only when both hold: (1) description introduces a governing
-    ACTION_VERB with no counterpart in source_quote, and (2) source_quote
-    itself asserts no obligation at all (no modal marker, no governing
-    action verb of its own) — i.e. there is nothing in the quote for the
-    new action verb to be a paraphrase *of*.
+    Fires when source_quote asserts no obligation of its own at all (no
+    MODAL_MARKER, no governing ACTION_VERB) but description does — via
+    either mechanism. A quote that already asserts *some* obligation permits
+    any restatement/paraphrase of it (a new or substituted action verb, or a
+    different modal marker); there's nothing further to check once the quote
+    already carries an obligation, matching every real paraphrase fixture
+    found (will->must, support->maintain alongside an existing "must", etc.).
+
+    Originally checked only for a newly introduced ACTION_VERB — missed the
+    case where a neutral, non-obligatory quote is reframed as a command
+    purely via a new MODAL_MARKER with no action-verb change at all (e.g.
+    "Encryption transforms data" -> "Encryption must transform data";
+    Codex review, PR #168).
     """
-    new_actions = _governing_action_verbs_in(description) - _governing_action_verbs_in(source_quote)
-    if not new_actions:
+    if _has_governing_obligation(source_quote):
         return False
-    return not _has_governing_obligation(source_quote)
+    return _has_governing_obligation(description)
 
 
 def _load_gold(path: Path) -> list[dict]:

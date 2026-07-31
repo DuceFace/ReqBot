@@ -493,12 +493,43 @@ paraphrases already confirmed faithful in WP-34.4's own fixtures are not falsely
   closes a real gap without needing new dataset examples to prove it (none of WP-35.1's 108 records
   happened to contain an inflected action verb, which is exactly why this shipped uncaught by the
   dataset validation and needed a reviewer to find it structurally instead).
+- **Codex-found (PR #168, two P2s) + Gemini-found (PR #168, one High): the purpose-clause exclusion
+  and the action-verb-only fabrication check were each too narrow, in ways only surfaced by reasoning
+  about the code's own logic against new sentence shapes, not by the dataset (none of WP-35.1's 108
+  records happened to exercise these shapes either).** All three verified by reproduction before
+  fixing:
+  - *Codex:* a description reframing a purely factual quote via a brand-new **modal marker** with no
+    action-verb change at all (`"Encryption transforms data."` → `"Encryption must transform data."`)
+    was missed entirely — `is_fabricated_obligation` only ever checked for a newly introduced
+    `ACTION_VERB`, never for a newly introduced `MODAL_MARKER`. Fixed by making the check symmetric:
+    it now fires whenever `source_quote` asserts no obligation at all (neither mechanism) but
+    `description` asserts one (either mechanism) — simpler than the original action-verb-only
+    formulation, not just more correct.
+  - *Codex:* `"Personnel have a responsibility to maintain records."` → `"Maintain records."` was
+    wrongly flagged as fabricated — the purpose-clause exclusion discarded the quote's own "maintain"
+    because it's a bare "to VERB", but "a responsibility **to** maintain" is the obligation itself
+    (an infinitive complement of an obligation-bearing noun), not a purpose/goal clause.
+  - *Gemini:* `"Agencies are required to implement X."` / `"...are to establish X."` had the identical
+    root problem from the opposite direction — `"required to"`/`"are to"` are themselves
+    `MODAL_MARKERS` phrases that end in a literal "to", so the verb they govern was being discarded
+    as a purpose clause by the same over-broad rule, missing real fabrications where this
+    construction appears in a description against a non-obligatory quote.
+  - **Fixed with one unified change, not two separate patches**, since both findings share the same
+    root cause: `_is_infinitive_purpose_clause` now checks what precedes the "to" — a `MODAL_MARKERS`
+    phrase ending in "to", or one of a short `OBLIGATION_COMPLEMENT_NOUNS` list
+    (`responsibility`/`duty`/`obligation`/`requirement`) — and only treats the infinitive as a
+    non-governing purpose clause when neither applies. The original miss this WP exists to catch
+    (`"...to ensure its availability..."`, preceded by neither) is unaffected and still caught.
+  - Re-validated after all three fixes: still 3/3 `fabricated_modality` caught, 0/94 false positives
+    against WP-35.1's dataset — none of these fixes were data-driven corrections of a wrong dataset
+    read; they were structural gaps a reviewer found by testing the code's logic against sentence
+    shapes the dataset simply didn't happen to contain.
 - Output: `eval/modality_fabrication_check.py` (the check itself — `is_fabricated_obligation()` plus
-  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (22 tests: the known
-  WP-34.4/Codex miss, the 4 real paraphrase fixtures, the inflected-verb-form fix, plus unit coverage
-  of the helper functions), and `eval/spike_results/wp_35_3/report.md`/`results.json` (full
-  validation output, mirroring the `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/`
-  precedent).
+  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (29 tests: the known
+  WP-34.4/Codex miss, the 4 real paraphrase fixtures, the inflected-verb-form fix, the two purpose-
+  clause fixes, the new-modal-marker fix, plus unit coverage of the helper functions), and
+  `eval/spike_results/wp_35_3/report.md`/`results.json` (full validation output, mirroring the
+  `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/` precedent).
 - Per this WP's own Scope, deliberately not wired into `pipeline/parse_and_normalize.py` yet — how
   this combines with WP-35.2's entailment threshold (independent rejects vs. one combined decision)
   is an explicit WP-35.4 design decision, not pre-decided here.

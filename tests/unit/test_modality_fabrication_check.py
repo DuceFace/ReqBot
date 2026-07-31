@@ -79,6 +79,42 @@ def test_does_not_flag_support_maintain_paraphrase_when_quote_already_obligatory
     assert is_fabricated_obligation(quote, description) is False
 
 
+def test_catches_new_modal_marker_with_no_action_verb_change():
+    # Codex review, PR #168: a neutral, non-obligatory quote reframed as a
+    # command purely via a new modal marker -- no action-verb change at all,
+    # so the original new-actions-only check missed this entirely.
+    quote = "Encryption transforms data."
+    description = "Encryption must transform data."
+    assert is_fabricated_obligation(quote, description) is True
+
+
+def test_does_not_flag_obligation_complement_noun_infinitive():
+    # Codex review, PR #168: "a responsibility to VERB" is the obligation
+    # itself, not a purpose clause -- the quote already asserts the duty via
+    # its noun complement, so restating it as an imperative isn't fabricated.
+    quote = "Personnel have a responsibility to maintain records."
+    description = "Maintain records."
+    assert is_fabricated_obligation(quote, description) is False
+
+
+def test_does_not_flag_required_to_infinitive():
+    # Gemini review, PR #168: "required to VERB" / "are to VERB" -- the "to"
+    # is part of the modal marker itself, not a separate purpose clause, so
+    # the verb it governs is already asserted by the quote.
+    quote = "Agencies are required to implement security controls for all systems."
+    description = "Implement security controls for all systems."
+    assert is_fabricated_obligation(quote, description) is False
+
+
+def test_catches_fabricated_action_verb_disguised_as_required_to_infinitive():
+    # The flip side of the above: "required to VERB" in the DESCRIPTION,
+    # against a quote with no obligation at all, must still be caught -- the
+    # governing-infinitive fix must not accidentally create a new blind spot.
+    quote = "Security controls for agency information systems."
+    description = "Agencies are required to implement security controls."
+    assert is_fabricated_obligation(quote, description) is True
+
+
 def test_catches_fabricated_action_verb_on_a_bare_fragment():
     # eval/gold_description_grounding.jsonl REQ-cbc6374a655f — quote is a
     # bare term + citation cross-reference, no obligation of any kind;
@@ -111,6 +147,30 @@ def test_purpose_clause_false_for_sentence_initial_verb():
     text = "implement the control immediately"
     idx = text.index("implement")
     assert _is_infinitive_purpose_clause(text, idx) is False
+
+
+def test_purpose_clause_false_for_required_to_infinitive():
+    text = "agencies are required to implement the control"
+    idx = text.index("implement")
+    assert _is_infinitive_purpose_clause(text, idx) is False
+
+
+def test_purpose_clause_false_for_are_to_infinitive():
+    text = "agencies are to establish a reporting process"
+    idx = text.index("establish")
+    assert _is_infinitive_purpose_clause(text, idx) is False
+
+
+def test_purpose_clause_false_for_obligation_noun_complement():
+    text = "personnel have a responsibility to maintain records"
+    idx = text.index("maintain")
+    assert _is_infinitive_purpose_clause(text, idx) is False
+
+
+def test_purpose_clause_true_when_preceding_word_is_not_a_trigger():
+    text = "including information contained therein to ensure availability"
+    idx = text.index("ensure")
+    assert _is_infinitive_purpose_clause(text, idx) is True
 
 
 # ---------------------------------------------------------------------------

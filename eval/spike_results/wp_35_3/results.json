@@ -109,7 +109,7 @@
       "requirement_id": "REQ-ddc1112cabc9",
       "run_dir": "afpd_17-1_20260727_202422",
       "source": "wp_35_1_harvest",
-      "flagged": false
+      "flagged": true
     },
     {
       "source_quote": "JP 3-12, Cyberspace Operations, February 5, 2013",
@@ -154,7 +154,7 @@
       "requirement_id": "REQ-d700d6df28b0",
       "run_dir": "CJCSI 6510.02G_20260727_202900",
       "source": "wp_35_1_harvest",
-      "flagged": false
+      "flagged": true
     },
     {
       "source_quote": "Distribution: A, B, C",
@@ -168,7 +168,7 @@
       "requirement_id": "REQ-409e58971a57",
       "run_dir": "CJCSI 6510.02G_20260729_020101",
       "source": "wp_34_4_spike",
-      "flagged": false
+      "flagged": true
     },
     {
       "source_quote": "(3) Mean time between failures of network equipment or connectivity.",
@@ -184,7 +184,7 @@
       "requirement_id": "REQ-c6d23854cd0b",
       "run_dir": "DODI 8410.03_20260730_220814",
       "source": "wp_35_1_harvest",
-      "flagged": false
+      "flagged": true
     },
     {
       "source_quote": "DoDI 8330.01, Interoperability of Information Technology (IT), including National Security Systems (NSS), May 21, 2014",
@@ -212,7 +212,7 @@
       "requirement_id": "REQ-44408bbfebbe",
       "run_dir": "afpd_17-1_20260727_202422",
       "source": "wp_35_1_harvest",
-      "flagged": false
+      "flagged": true
     }
   ]
 }

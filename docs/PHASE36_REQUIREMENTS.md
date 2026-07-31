@@ -5,7 +5,10 @@
 **Date:** 2026-07-31
 **Preceded by:** Phase 35 (Production Description-Grounding Entailment Gate) — closed 2026-07-31,
 all five WPs complete, Success Gate met (`docs/PHASE35_REQUIREMENTS.md`).
-**Followed by:** None currently planned.
+**Followed by:** Phase 37 (Retrieval Quality: Eval Harness & Contextual Chunk Embeddings) —
+`docs/PHASE37_REQUIREMENTS.md`, drafted 2026-07-31. WP-36.2 stays deferred rather than folded into
+Phase 37 — different pipeline stage (entailment-check calibration vs. search/retrieval), different
+concern.
 
 ---
 

@@ -33,10 +33,13 @@ identical premise/hypothesis pairs, not a genuine fabrication catch.
 Checking this against the existing calibration data (rather than treating it as a one-off) showed the
 problem is not rare and not new:
 
-- **77 of the 92 `wp_35_1_harvest` faithful records in `eval/gold_description_grounding.jsonl` (84%)
-  are exact `description == source_quote` matches.** The faithful holdout is a random sample of
-  everything neither WP-35.1 harvester heuristic flagged as a candidate fabrication — it is not gated
-  by those heuristics, so an exact match trivially lands in it.
+- **78 of the 92 `wp_35_1_harvest` faithful records in `eval/gold_description_grounding.jsonl` (85%)
+  are exact matches after the same `normalize_text()` normalization the short-circuit itself uses**
+  (77 by byte-identical `description == source_quote`, plus one — `REQ-22336c31702a` — that differs
+  only in leading capitalization; caught by Codex review on WP-36.1's PR #173, after the count below
+  had already been used to scope this WP with the wrong number). The faithful holdout is a random
+  sample of everything neither WP-35.1 harvester heuristic flagged as a candidate fabrication — it is
+  not gated by those heuristics, so an exact match trivially lands in it.
 - **4 of the 5 false positives WP-35.2's original threshold sweep reported at 0.85 are this exact
   pattern** (`REQ-938435202cf9` 0.8473, `REQ-8105d9acb410` 0.2766, `REQ-fd23f59eb131` 0.2507,
   `REQ-69fe659699bb` 0.3312 — checked directly against `eval/spike_results/wp_35_2/results.json`).
@@ -45,7 +48,7 @@ problem is not rare and not new:
   — not worse than — the originally-measured 5.4%), confirming it is a stable, real characteristic of
   the deployed check, not sampling noise from one run.
 
-Given 84% of the calibration set's faithful examples are exact matches, this pattern very plausibly
+Given 85% of the calibration set's faithful examples are exact matches, this pattern very plausibly
 affects a meaningful share of real production traffic too — Step D.5's own enrichment prompt already
 permits (and, per these numbers, sometimes produces) a description that is just the source text
 verbatim when the source is already precise. Every time that happens today, Step D.6 has roughly an
@@ -66,13 +69,13 @@ same rigor (real data, real re-validation, no code merged without evidence) as e
   treated as grounded, skipping the model call for that record entirely — not just accepting
   whatever score the model would have returned.
 - Re-validate against the **existing** `eval/gold_description_grounding.jsonl` dataset — no new
-  harvest needed, it already contains 77 exact-match faithful examples and 8 independent fabricated
+  harvest needed, it already contains 78 exact-match faithful examples and 8 independent fabricated
   examples (none of which are exact matches, since a fabrication by definition introduces content
   absent from the quote — worth confirming directly, not just asserting, per this project's own
   "verify before applying" discipline).
 - Re-sweep the entailment threshold (WP-36.2) now that exact matches no longer pass through the
   model at all — the population the threshold is chosen against has fundamentally changed (removing
-  84% of what was previously the faithful side's mass), so the original 0.85 number's own
+  85% of what was previously the faithful side's mass), so the original 0.85 number's own
   justification needs to be re-derived, not silently carried forward.
 - Live-verify the fix against the same two real documents WP-35.5 already touched
   (`afpd_17-1.pdf`, `NIST.SP.800-125.pdf`): confirm the 5 previously-wrongly-rejected descriptions
@@ -87,7 +90,7 @@ same rigor (real data, real re-validation, no code merged without evidence) as e
   the mistake this phase exists to fix (assuming a pattern generalizes without checking). Explicitly
   deferred, not pre-decided here.
 - **Not a new calibration-dataset harvest.** WP-35.1's existing 108-record dataset already contains
-  enough exact-match examples (77) to validate this fix; building new harvesting infrastructure would
+  enough exact-match examples (78) to validate this fix; building new harvesting infrastructure would
   be disproportionate to a narrow, well-understood problem.
 - **Not a change to WP-35.3's modality check.** It has zero known false positives against the current
   dataset and the two real WP-35.5 documents; out of scope, untouched.
@@ -188,7 +191,7 @@ real near-miss case, not just on literal duplicates.
 exercised against — WP-35.2's original sweep numbers no longer describe the deployed check's real
 population once exact matches stop reaching the model. Depends on WP-36.1.
 
-**Problem:** WP-35.2's threshold (0.85) was chosen against a faithful population that was 84% exact
+**Problem:** WP-35.2's threshold (0.85) was chosen against a faithful population that was 85% exact
 matches. Removing that entire slice changes what "5.4% FP rate" or any other sweep number actually
 means — the original table's numbers describe a check that no longer exists in the same form.
 
@@ -199,11 +202,16 @@ means — the original table's numbers describe a check that no longer exists in
   `wp_35_1_harvest` faithful population, with every exact-match record counted as an automatic accept
   regardless of which threshold is being swept (the short-circuit guarantees they pass; excluding
   them from the denominator entirely would misrepresent what fraction of *real* faithful traffic the
-  deployed gate actually rejects). Only the 15 non-exact-match faithful records' pass/fail varies with
-  the swept threshold. Checked directly against the committed `eval/spike_results/wp_35_2/
-  results.json` scores: excluding the 77 short-circuited records from the denominator entirely (the
-  wrong methodology, in this WP's own first-drafted version of this Scope) makes threshold 0.95 look
-  disqualified (8/15 ≈ 53% FP against the reduced denominator) and the sweep would still land back on
+  deployed gate actually rejects). Only the 14 non-exact-match faithful records' pass/fail varies with
+  the swept threshold (78 records are exact matches under `_is_exact_match()`'s `normalize_text()`
+  comparison, not 77 — corrected after Codex review on WP-36.1's PR #173 found a
+  capitalization-only match, `REQ-22336c31702a`, that the doc's original literal-`==` count missed;
+  its own support_prob, 0.9655, was already above every threshold considered below, so this
+  correction changes the population counts here but not the FP counts or conclusion). Checked
+  directly against the committed `eval/spike_results/wp_35_2/results.json` scores: excluding the 78
+  short-circuited records from the denominator entirely (the wrong methodology, in this WP's own
+  first-drafted version of this Scope) makes threshold 0.95 look disqualified (8/14 ≈ 57% FP against
+  the reduced denominator) and the sweep would still land back on
   0.85, silently defeating this WP's entire purpose. Under the correct composite denominator, 0.95
   has an 8/92 ≈ 8.7% FP rate — within the 10% cap — while catching **100% of the 8 known fabricated
   examples** (up from 7/8 at 0.85). This is real, verified evidence that a better threshold is likely

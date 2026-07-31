@@ -8,7 +8,11 @@
 **Followed by:** Phase 36 (Entailment-Gate Calibration Fix: Exact-Match Short-Circuit) —
 `docs/PHASE36_REQUIREMENTS.md`, drafted 2026-07-31. WP-35.5's integration gate found that the
 entailment threshold chosen in WP-35.2 was calibrated against a faithful population that was 84%
-exact-match (`description == source_quote`) records; that's where Phase 36 came from.
+exact-match (`description == source_quote`) records; that's where Phase 36 came from. (That 84%/77
+figure used literal string equality, the honest count of what was checked at the time; WP-36.1's
+PR #173 later found one more record — `REQ-22336c31702a` — that's exact only after
+case-normalization, making the real number 78/92 (85%). See `docs/PHASE36_REQUIREMENTS.md`'s
+WP-36.1 Findings for the corrected figure.)
 
 ---
 

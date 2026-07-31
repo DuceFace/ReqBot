@@ -190,7 +190,13 @@ def is_fabricated_obligation(source_quote: str, description: str) -> bool:
     purely via a new MODAL_MARKER with no action-verb change at all (e.g.
     "Encryption transforms data" -> "Encryption must transform data";
     Codex review, PR #168).
+
+    A missing/None source_quote or description can't assert or fabricate
+    anything — pass through as not-fabricated rather than crash in
+    normalize_text() (Gemini review, PR #168).
     """
+    if not source_quote or not description:
+        return False
     if _has_governing_obligation(source_quote):
         return False
     return _has_governing_obligation(description)

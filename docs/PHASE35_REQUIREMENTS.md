@@ -524,12 +524,18 @@ paraphrases already confirmed faithful in WP-34.4's own fixtures are not falsely
     against WP-35.1's dataset — none of these fixes were data-driven corrections of a wrong dataset
     read; they were structural gaps a reviewer found by testing the code's logic against sentence
     shapes the dataset simply didn't happen to contain.
+- **Gemini-found (PR #168, Medium): `None` `source_quote`/`description` crashed with `AttributeError`
+  inside `normalize_text()`** rather than passing through — reproduced before fixing
+  (`is_fabricated_obligation(None, "Implement X.")` crashed on `.strip()`). Not a live bug against
+  today's only caller (WP-35.1's gold dataset never has a null field), but a real risk for WP-35.4's
+  eventual production caller, where a missing field is a real possibility. Fixed with an early guard;
+  a missing field asserts nothing and fabricates nothing, so it passes through as not-fabricated.
 - Output: `eval/modality_fabrication_check.py` (the check itself — `is_fabricated_obligation()` plus
-  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (29 tests: the known
+  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (31 tests: the known
   WP-34.4/Codex miss, the 4 real paraphrase fixtures, the inflected-verb-form fix, the two purpose-
-  clause fixes, the new-modal-marker fix, plus unit coverage of the helper functions), and
-  `eval/spike_results/wp_35_3/report.md`/`results.json` (full validation output, mirroring the
-  `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/` precedent).
+  clause fixes, the new-modal-marker fix, the `None`-field guard, plus unit coverage of the helper
+  functions), and `eval/spike_results/wp_35_3/report.md`/`results.json` (full validation output,
+  mirroring the `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/` precedent).
 - Per this WP's own Scope, deliberately not wired into `pipeline/parse_and_normalize.py` yet — how
   this combines with WP-35.2's entailment threshold (independent rejects vs. one combined decision)
   is an explicit WP-35.4 design decision, not pre-decided here.

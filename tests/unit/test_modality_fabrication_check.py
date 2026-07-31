@@ -246,3 +246,13 @@ def test_no_action_verb_in_description_never_flags():
 
 def test_empty_strings_do_not_flag():
     assert is_fabricated_obligation("", "") is False
+
+
+def test_none_source_quote_does_not_crash():
+    # Gemini review, PR #168: a missing/None field previously crashed inside
+    # normalize_text() rather than passing through.
+    assert is_fabricated_obligation(None, "Implement X.") is False
+
+
+def test_none_description_does_not_crash():
+    assert is_fabricated_obligation("A quote.", None) is False

@@ -71,6 +71,9 @@ def load_targets() -> dict:
     labels = {}
     with open(FIXTURE_DIR / "labeled_failures.jsonl", encoding="utf-8") as f:
         for line in f:
+            line = line.strip()
+            if not line:
+                continue
             rec = json.loads(line)
             if rec["category"] == "FRAGMENT" and rec["subtype"] in (
                 "orphaned_list_item", "dangling_clause",
@@ -80,6 +83,9 @@ def load_targets() -> dict:
     full = {}
     with open(FIXTURE_DIR / "unbiased_sample.jsonl", encoding="utf-8") as f:
         for line in f:
+            line = line.strip()
+            if not line:
+                continue
             rec = json.loads(line)
             if rec["requirement_id"] in labels:
                 full[rec["requirement_id"]] = rec
@@ -104,8 +110,13 @@ def resolve_doc_dir(doc_key: str) -> Path:
 
 def load_chunk(doc_dir: Path, doc_key: str, chunk_id: int) -> dict | None:
     path = doc_dir / f"{doc_key}_chunks.jsonl"
+    if not path.exists():
+        return None
     with open(path, encoding="utf-8") as f:
         for line in f:
+            line = line.strip()
+            if not line:
+                continue
             rec = json.loads(line)
             if rec["chunk_id"] == chunk_id:
                 return rec
@@ -119,6 +130,9 @@ def load_step_c_records(doc_dir: Path, doc_key: str, chunk_id: int) -> list[dict
     out = []
     with open(path, encoding="utf-8") as f:
         for line in f:
+            line = line.strip()
+            if not line:
+                continue
             rec = json.loads(line)
             if rec.get("chunk_id") == chunk_id:
                 out.append(rec)

@@ -352,10 +352,20 @@ given the thin independent fabricated partition.
   WP-35.3's secondary check is catching a gap the entailment score was never going to close on its
   own, at any threshold (0.9197 is close enough to the faithful-side cluster that no reasonable
   false-positive-rate cap would push the threshold that high).
+- **Sensitive, not just thin — found by Codex review on this WP's own PR (#167).** The first
+  committed version of this report gave the aggregate catch rate (7/8) without checking how close
+  any individual catch sat to the cutoff. `REQ-c6d23854cd0b` (`fabricated_fragment`,
+  `DODI 8410.03.pdf`) is caught at `support_prob=0.8421` against a `0.85` threshold — a margin of
+  only `0.0079`. A sub-one-point shift in that single score, well within plausible model/prompt
+  noise, would drop catch rate from 7/8 to 6/8. Fixed, not just acknowledged: `eval/
+  threshold_sweep.py` now has a `margin_analysis()` function that reports the narrowest catch/accept
+  on every run, and the report explicitly names the record and margin rather than leaving the
+  aggregate rate to imply more confidence than the evidence supports.
 - **Confidence call: provisional, not a confident production calibration** — carried forward
-  explicitly per the Scope above, given the 8-example independent fabricated partition (documented
-  in WP-35.1's own Findings as a real, twice-confirmed data-scarcity result, not insufficient
-  search). WP-35.4 must not treat `0.85` as beyond-question final without acknowledging this.
+  explicitly per the Scope above, given both the 8-example independent fabricated partition
+  (documented in WP-35.1's own Findings as a real, twice-confirmed data-scarcity result, not
+  insufficient search) and the narrow-margin finding above. WP-35.4 must not treat `0.85` as
+  beyond-question final without acknowledging both caveats.
 - Output: `eval/spike_results/wp_35_2/report.md` and `results.json` (full sweep table, per-subtype
   breakdown, regression check, all 108 scored records). `eval/threshold_sweep.py` and
   `tests/unit/test_threshold_sweep.py` (pure-logic tests for `sweep()`/`regression_check()`, added

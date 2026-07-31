@@ -607,6 +607,22 @@
       }
     ]
   },
+  "margin_analysis": {
+    "threshold": 0.85,
+    "narrowest_catch": {
+      "requirement_id": "REQ-c6d23854cd0b",
+      "label": "fabricated_fragment",
+      "support_prob": 0.8421,
+      "margin": 0.0079
+    },
+    "narrowest_accept": {
+      "requirement_id": "REQ-5a3bc398d988",
+      "label": "faithful",
+      "support_prob": 0.8596,
+      "margin": 0.0096
+    },
+    "missed_fabricated_n": 1
+  },
   "scored_records": [
     {
       "source_quote": "The PO, in conjunction with Service Principal/CIO and AO will:",

@@ -60,6 +60,11 @@ FABRICATED_LABELS = {
 }
 
 
+def _fmt_rate(rate: float | None) -> str:
+    """Format a rate that's None when its partition (faithful/fabricated) is empty."""
+    return f"{rate:.1%}" if rate is not None else "N/A (empty partition)"
+
+
 def load_gold() -> list[dict]:
     records = []
     with open(GOLD_FILE, encoding="utf-8") as f:
@@ -119,6 +124,93 @@ def sweep(scored_records: list[dict], thresholds: list[float]) -> list[dict]:
     return table
 
 
+# Diminishing-returns threshold pick, not blind catch-rate maximization -- an
+# earlier version of this script picked whatever threshold first hit 100%
+# catch rate and it chose 0.95, which "catches" the single hardest fabricated
+# example at the cost of a 58.7% false-positive rate (54/92 faithful
+# descriptions wrongly rejected). That's a real result worth keeping in the
+# swept table, but a threshold no one would actually want to run in
+# production -- exactly the kind of "diminishing returns" case
+# QUOTE_GROUNDING_THRESHOLD's own documented sweep (pipeline/parse_and_
+# normalize.py, WP-32.1) explicitly reasons about ("pushing to 80 nearly
+# triples the false-positive rate for comparatively little extra coverage").
+#
+# Rule: among thresholds whose false-positive rate stays at or below
+# fp_rate_cap, pick the one with the highest catch rate (ties broken toward
+# the lower/more conservative threshold). 10% is a judgment call, not derived
+# from the data -- roughly "no more than 1 in 10 real faithful descriptions
+# gets wrongly rejected," a defensible ceiling for something that will run
+# unattended in production.
+FP_RATE_CAP = 0.10
+
+
+def select_threshold(table: list[dict], fp_rate_cap: float = FP_RATE_CAP) -> dict:
+    """Pick a threshold row from sweep()'s table via the diminishing-returns rule above.
+
+    Guards against an empty faithful or fabricated partition (both rates
+    would be None in that case, per sweep()'s own None-on-empty convention)
+    rather than crashing on a None comparison.
+    """
+    within_cap = [
+        row for row in table
+        if row["false_positive_rate"] is not None and row["false_positive_rate"] <= fp_rate_cap
+    ]
+    candidates = within_cap or table
+    return max(
+        candidates,
+        key=lambda row: (
+            row["catch_rate"] if row["catch_rate"] is not None else -1.0,
+            -row["threshold"],
+        ),
+    )
+
+
+def margin_analysis(scored_records: list[dict], threshold: float) -> dict:
+    """How close is each classification at `threshold` to flipping?
+
+    Surfaces whether the chosen threshold's catch/accept decisions sit on a
+    knife's edge -- found by Codex review on this WP's own PR (#167): one of
+    the 7 harvest-partition fabricated records caught at threshold=0.85
+    scores 0.8421, a margin of only 0.0079. Reporting the aggregate catch
+    rate alone (7/8) makes that catch look as solid as any other; it isn't.
+    """
+    harvest = [r for r in scored_records if r["source"] == "wp_35_1_harvest"]
+    fabricated = [r for r in harvest if r["label"] in FABRICATED_LABELS]
+    faithful = [r for r in harvest if r["label"] == "faithful"]
+
+    caught = [r for r in fabricated if r["support_prob"] < threshold]
+    missed = [r for r in fabricated if r["support_prob"] >= threshold]
+    accepted = [r for r in faithful if r["support_prob"] >= threshold]
+
+    # Smallest margin on the "correct" side of the cutoff in each direction --
+    # the catch/accept that would flip first under the smallest score change.
+    narrowest_catch = min(caught, key=lambda r: threshold - r["support_prob"], default=None)
+    narrowest_accept = min(accepted, key=lambda r: r["support_prob"] - threshold, default=None)
+
+    return {
+        "threshold": threshold,
+        "narrowest_catch": (
+            {
+                "requirement_id": narrowest_catch["requirement_id"],
+                "label": narrowest_catch["label"],
+                "support_prob": narrowest_catch["support_prob"],
+                "margin": round(threshold - narrowest_catch["support_prob"], 4),
+            }
+            if narrowest_catch else None
+        ),
+        "narrowest_accept": (
+            {
+                "requirement_id": narrowest_accept["requirement_id"],
+                "label": narrowest_accept["label"],
+                "support_prob": narrowest_accept["support_prob"],
+                "margin": round(narrowest_accept["support_prob"] - threshold, 4),
+            }
+            if narrowest_accept else None
+        ),
+        "missed_fabricated_n": len(missed),
+    }
+
+
 def regression_check(scored_records: list[dict], threshold: float) -> dict:
     spike_records = [r for r in scored_records if r["source"] == "wp_34_4_spike"]
     results = []
@@ -147,32 +239,11 @@ def main() -> None:
 
     thresholds = THRESHOLD_CANDIDATES
     table = sweep(scored, thresholds)
-
-    # Pick a threshold via a diminishing-returns rule, not blind catch-rate
-    # maximization -- an earlier version of this script picked whatever
-    # threshold first hit 100% catch rate and it chose 0.95, which "catches"
-    # the single hardest fabricated example at the cost of a 58.7% false-
-    # positive rate (54/92 faithful descriptions wrongly rejected). That's a
-    # real result worth keeping in the swept table, but a threshold no one
-    # would actually want to run in production -- exactly the kind of
-    # "diminishing returns" case QUOTE_GROUNDING_THRESHOLD's own documented
-    # sweep (pipeline/parse_and_normalize.py, WP-32.1) explicitly reasons
-    # about ("pushing to 80 nearly triples the false-positive rate for
-    # comparatively little extra coverage").
-    #
-    # Rule: among thresholds whose false-positive rate stays at or below
-    # FP_RATE_CAP, pick the one with the highest catch rate (ties broken
-    # toward the lower/more conservative threshold). 10% is a judgment call,
-    # not derived from the data -- roughly "no more than 1 in 10 real
-    # faithful descriptions gets wrongly rejected," a defensible ceiling for
-    # something that will run unattended in production.
-    FP_RATE_CAP = 0.10
-    within_cap = [row for row in table if row["false_positive_rate"] <= FP_RATE_CAP]
-    candidates = within_cap or table
-    chosen = max(candidates, key=lambda row: (row["catch_rate"], -row["threshold"]))
+    chosen = select_threshold(table)
     chosen_threshold = chosen["threshold"]
 
     regression = regression_check(scored, chosen_threshold)
+    margins = margin_analysis(scored, chosen_threshold)
 
     out_dir = _ROOT / "eval" / "spike_results" / "wp_35_2"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -183,6 +254,7 @@ def main() -> None:
         "sweep_table": table,
         "chosen_threshold": chosen_threshold,
         "regression_check": regression,
+        "margin_analysis": margins,
         "scored_records": scored,
     }
     (out_dir / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
@@ -212,7 +284,9 @@ def main() -> None:
             "independent fabricated examples exist (see docs/PHASE35_REQUIREMENTS.md's WP-35.1 "
             "Findings -- a second corpus-expansion attempt confirmed this is a real data-scarcity "
             "finding, not insufficient search). A single record flipping catch/miss moves the "
-            f"aggregate catch rate by {100 / harvest_fabricated_n:.1f} points. Per-subtype breakdowns "
+            f"aggregate catch rate by "
+            f"{(100 / harvest_fabricated_n if harvest_fabricated_n else 0):.1f} points. "
+            "Per-subtype breakdowns "
             "below are even thinner (as low as 1 example) and must not be read as calibrated "
             "subtype-specific thresholds. The threshold chosen below is a reasonable, evidence-based "
             "pick given what exists today, not a number WP-35.4 should treat as final without "
@@ -227,29 +301,64 @@ def main() -> None:
             "",
         ]
 
+    MARGIN_SENSITIVITY = 0.02  # a catch/accept within this of the cutoff counts as fragile
+    nc = margins["narrowest_catch"]
+    na = margins["narrowest_accept"]
+    if nc and nc["margin"] <= MARGIN_SENSITIVITY:
+        lines += [
+            f"**Sensitive, not just thin: the narrowest catch at `{chosen_threshold}` is "
+            f"`{nc['requirement_id']}` (`{nc['label']}`) at support_prob={nc['support_prob']}, a "
+            f"margin of only {nc['margin']}.** A sub-one-point shift in that single score would drop "
+            f"catch rate from {chosen['catch_count']}/{chosen['fabricated_n']} to "
+            f"{chosen['catch_count'] - 1}/{chosen['fabricated_n']} — found by Codex review on this "
+            "WP's own PR (#167): reporting only the aggregate catch rate makes this catch look as "
+            "solid as any other, and it isn't.",
+            "",
+        ]
+    if na and na["margin"] <= MARGIN_SENSITIVITY:
+        lines += [
+            f"The narrowest correctly-accepted faithful record is `{na['requirement_id']}` "
+            f"(support_prob={na['support_prob']}, margin {na['margin']}) — also close enough to the "
+            "cutoff to be worth naming, though it doesn't change the caveat above.",
+            "",
+        ]
+
     one_step_up = next(
         (row for row in table if row["threshold"] > chosen_threshold), None
     )
+    # What a naive "maximize catch rate, ignore cost" rule would have picked
+    # on *this* run's actual sweep table -- computed from the real data, not
+    # hardcoded to the default flan-t5-large run's numbers, so this paragraph
+    # stays accurate if --model changes the score distribution (Codex, PR #167).
+    naive_pick = max(table, key=lambda row: (
+        row["catch_rate"] if row["catch_rate"] is not None else -1.0, -row["threshold"],
+    ))
+    naive_caveat = ""
+    if naive_pick["threshold"] != chosen_threshold:
+        naive_caveat = (
+            f" A naive \"maximize catch rate\" rule instead picks `{naive_pick['threshold']}` on "
+            f"this run's data, which does reach {_fmt_rate(naive_pick['catch_rate'])} catch rate but "
+            f"at a {_fmt_rate(naive_pick['false_positive_rate'])} false-positive rate -- not a "
+            "threshold anyone would want to run in production."
+        )
     lines += [
         f"## Chosen threshold: `support_prob < {chosen_threshold}` → reject",
         "",
         f"Selection rule: highest catch rate among thresholds with false-positive rate ≤ "
-        f"{FP_RATE_CAP:.0%} (see `eval/threshold_sweep.py`'s own comment for the reasoning -- a "
-        "naive \"maximize catch rate\" rule instead picks 0.95, which does catch all 8 fabricated "
-        "examples but at a 58.7% false-positive rate; not a threshold anyone would want to run in "
-        "production). This mirrors `QUOTE_GROUNDING_THRESHOLD`'s own documented diminishing-returns "
-        "reasoning (`pipeline/parse_and_normalize.py`, WP-32.1).",
+        f"{FP_RATE_CAP:.0%} (see `eval/threshold_sweep.py`'s own `select_threshold()` for the "
+        "reasoning; this mirrors `QUOTE_GROUNDING_THRESHOLD`'s own documented diminishing-returns "
+        f"reasoning, `pipeline/parse_and_normalize.py`, WP-32.1).{naive_caveat}",
         "",
-        f"- False-positive rate: {chosen['false_positive_rate']:.1%} "
+        f"- False-positive rate: {_fmt_rate(chosen['false_positive_rate'])} "
         f"({chosen['false_positive_count']}/{chosen['faithful_n']} faithful wrongly rejected)",
-        f"- Catch rate: {chosen['catch_rate']:.1%} "
+        f"- Catch rate: {_fmt_rate(chosen['catch_rate'])} "
         f"({chosen['catch_count']}/{chosen['fabricated_n']} fabricated correctly rejected)",
     ]
     if one_step_up is not None:
         lines.append(
             f"- One step up (`{one_step_up['threshold']}`) would move catch rate to "
-            f"{one_step_up['catch_rate']:.1%} but false-positive rate to "
-            f"{one_step_up['false_positive_rate']:.1%} -- excluded by the cap above."
+            f"{_fmt_rate(one_step_up['catch_rate'])} but false-positive rate to "
+            f"{_fmt_rate(one_step_up['false_positive_rate'])} -- excluded by the cap above."
         )
     lines += [
         "",
@@ -288,8 +397,8 @@ def main() -> None:
     ]
     for row in table:
         lines.append(
-            f"| {row['threshold']} | {row['false_positive_rate']:.1%} | "
-            f"{row['false_positive_count']}/{row['faithful_n']} | {row['catch_rate']:.1%} | "
+            f"| {row['threshold']} | {_fmt_rate(row['false_positive_rate'])} | "
+            f"{row['false_positive_count']}/{row['faithful_n']} | {_fmt_rate(row['catch_rate'])} | "
             f"{row['catch_count']}/{row['fabricated_n']} |"
         )
 

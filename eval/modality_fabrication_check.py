@@ -74,7 +74,7 @@ from pipeline.parse_and_normalize import normalize_text  # noqa: E402
 # content (WP-35.3 Scope: "will"/"must"/"shall"/"is required to" function
 # interchangeably in DoD/NIST regulatory writing).
 MODAL_MARKERS = [
-    "shall", "must", "will", "are to", "is responsible for",
+    "shall", "must", "will", "are to", "is to", "is responsible for",
     "required to", "required", "requires", "require",
 ]
 

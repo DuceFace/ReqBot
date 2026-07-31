@@ -106,6 +106,15 @@ def test_does_not_flag_required_to_infinitive():
     assert is_fabricated_obligation(quote, description) is False
 
 
+def test_does_not_flag_singular_is_to_modal():
+    # Gemini review, PR #168: MODAL_MARKERS had plural "are to" but not
+    # singular "is to" -- a real DoD/NIST phrasing for a singular actor
+    # ("The ISSO is to maintain access logs.").
+    quote = "The ISSO is to maintain access logs."
+    description = "Maintain access logs."
+    assert is_fabricated_obligation(quote, description) is False
+
+
 def test_catches_fabricated_action_verb_disguised_as_required_to_infinitive():
     # The flip side of the above: "required to VERB" in the DESCRIPTION,
     # against a quote with no obligation at all, must still be caught -- the

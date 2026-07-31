@@ -530,12 +530,27 @@ paraphrases already confirmed faithful in WP-34.4's own fixtures are not falsely
   today's only caller (WP-35.1's gold dataset never has a null field), but a real risk for WP-35.4's
   eventual production caller, where a missing field is a real possibility. Fixed with an early guard;
   a missing field asserts nothing and fabricates nothing, so it passes through as not-fabricated.
+- **Gemini's next review round (PR #168) had two findings — one real, one checked and rejected.**
+  - *Claimed (rejected):* case-sensitive matching causes capitalized modal markers/action verbs
+    ("SHALL", "Implement") to be missed. Checked before acting: `normalize_text()` (imported from
+    `pipeline/parse_and_normalize.py`) already lowercases (`text.strip().lower()`) — confirmed by
+    direct reproduction with a capitalized quote, which classified correctly. This finding's premise
+    was factually wrong; no code change made. Recorded here rather than silently dropped, per this
+    project's "verify before applying" discipline applying in both directions — a reviewer being
+    wrong is itself worth a one-line note, not just a quiet no-op.
+  - *Real:* `MODAL_MARKERS` had plural `"are to"` but not singular `"is to"` — a real DoD/NIST
+    phrasing for a singular actor (`"The ISSO is to maintain access logs."`). Reproduced before
+    fixing: this faithful sentence's own quote wasn't recognized as asserting any obligation, so a
+    faithful `"Maintain access logs."` description was wrongly flagged as fabricated. Fixed by adding
+    `"is to"` to `MODAL_MARKERS`; picked up automatically by the existing modal-marker-ending-in-"to"
+    purpose-clause exemption with no other code change needed.
 - Output: `eval/modality_fabrication_check.py` (the check itself — `is_fabricated_obligation()` plus
-  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (31 tests: the known
+  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (32 tests: the known
   WP-34.4/Codex miss, the 4 real paraphrase fixtures, the inflected-verb-form fix, the two purpose-
-  clause fixes, the new-modal-marker fix, the `None`-field guard, plus unit coverage of the helper
-  functions), and `eval/spike_results/wp_35_3/report.md`/`results.json` (full validation output,
-  mirroring the `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/` precedent).
+  clause fixes, the new-modal-marker fix, the `None`-field guard, the singular "is to" fix, plus unit
+  coverage of the helper functions), and `eval/spike_results/wp_35_3/report.md`/`results.json` (full
+  validation output, mirroring the `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/`
+  precedent).
 - Per this WP's own Scope, deliberately not wired into `pipeline/parse_and_normalize.py` yet — how
   this combines with WP-35.2's entailment threshold (independent rejects vs. one combined decision)
   is an explicit WP-35.4 design decision, not pre-decided here.

@@ -5,7 +5,10 @@
 **Date:** 2026-07-30
 **Preceded by:** Phase 34 (Docling-Only Migration & Actionability Structural Fixes) — closed
 2026-07-30, all four WPs complete or spike-concluded.
-**Followed by:** None currently planned.
+**Followed by:** Phase 36 (Entailment-Gate Calibration Fix: Exact-Match Short-Circuit) —
+`docs/PHASE36_REQUIREMENTS.md`, drafted 2026-07-31. WP-35.5's integration gate found that the
+entailment threshold chosen in WP-35.2 was calibrated against a faithful population that was 84%
+exact-match (`description == source_quote`) records; that's where Phase 36 came from.
 
 ---
 

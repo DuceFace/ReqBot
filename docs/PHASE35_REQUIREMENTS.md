@@ -18,7 +18,7 @@ in `CLAUDE.md` or anywhere else.
 |---|---|
 | WP-35.1 — Build a Labeled Calibration Dataset for Description Faithfulness | Complete |
 | WP-35.2 — Threshold Calibration Sweep | Complete |
-| WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Not started |
+| WP-35.3 — Obligation/Modality-Fabrication Secondary Check | Complete |
 | WP-35.4 — Production Step D.5/D.6 Entailment Gate | Not started |
 | WP-35.5 — Integration Gate | Not started |
 
@@ -438,6 +438,122 @@ real miss WP-34.4 found (`support_prob=0.9197` on a case that should have been r
 check even where the entailment score alone would pass it; the "will" → "must" and other real modal
 paraphrases already confirmed faithful in WP-34.4's own fixtures are not falsely rejected; the
 "ensure"-as-purpose-clause case specifically does not cause a false negative on the original miss.
+
+**Findings (2026-07-31):**
+
+- Confirmed against this repo's own fixtures (Codex's PR #165 review) that neither naive framing
+  works: "any obligation word anywhere in the quote makes any obligation word in description fine"
+  under-catches the known miss (the quote's "ensure" is a purpose clause, not the actor being
+  commanded to do anything), while "every obligation word in description must appear literally in
+  the quote" over-catches real modal-verb paraphrases like `dodi_nsa_approved_crypto` (will → must).
+- **Design: split `obligation_verbs` into two functionally different classes, not one flat list.**
+  `MODAL_MARKERS` (`shall`, `must`, `will`, `are to`, `is responsible for`, `required`/`required to`)
+  express obligation without naming an action — substituting among these restates existing modality.
+  `ACTION_VERBS` (`implement`, `establish`, `maintain`, `enforce`, `ensure`) each name a specific
+  act — introducing one with no counterpart anywhere in the quote invents a *new* action, not just a
+  modality restatement. This split falls directly out of the fixture set: every real fabrication
+  found (`afpd_definition_reframed_as_imperative`, and WP-35.1's `REQ-757d551b3e59`/
+  `REQ-cbc6374a655f`) introduces a brand-new `ACTION_VERB` (always "Implement" in the observed cases)
+  into a quote that names no action of its own at all; every real paraphrase found (`will`→`must`,
+  `required`(adj.)→`must`, `support`→`maintain` alongside an already-present `must`) only ever
+  substitutes within/around an already-obligatory sentence.
+- **`ensure` is genuinely ambiguous and needed its own rule.** It's the one word that appears in both
+  the `ACTION_VERBS` list and, idiomatically, in purpose clauses ("...to ensure availability...").
+  Resolved with a bare-infinitive check (`_is_infinitive_purpose_clause`): an `ACTION_VERBS` match
+  immediately preceded by "to " is treated as non-governing (explains *why*, doesn't command *who*).
+  Applied to all `ACTION_VERBS` uniformly, not just `ensure` — the same non-finite grammatical shape
+  applies regardless of which verb follows "to ", and no fixture required narrowing it further.
+- **The actual rule:** a description fabricates an obligation only if (a) it introduces a governing
+  `ACTION_VERBS` word absent from the quote, AND (b) the quote itself asserts no obligation at all —
+  no `MODAL_MARKERS` word and no governing `ACTION_VERBS` word of its own. If the quote already
+  asserts *some* obligation (by either mechanism), a new/substituted action verb is treated as a
+  paraphrase of an already-obligatory sentence, not a fabricated new command. This is a deliberately
+  narrow rule (per this WP's own Non-Goals — not a grammar/mood classifier) and is exactly why
+  `REQ-35dfe9353e60` (quote already has "must"; description swaps "support"→"maintain") correctly
+  passes while structurally near-identical `REQ-cbc6374a655f` (quote has no obligation marker at
+  all; description adds "Implement") correctly fails.
+- **Validated against WP-35.1's full dataset, not just the two originating fixtures:** all 3
+  `fabricated_modality` records caught (3/3), zero false positives across all 94 `faithful` records
+  (including the 4 specifically WP-35.1-flagged near-synonym paraphrase fixtures —
+  `REQ-679a055fb375`, `REQ-efc38d9d853d`, `REQ-35dfe9353e60`, `REQ-668a74c21bd2`). The 11 other
+  fabricated-subtype records (citation/fragment/other — not this check's job) also weren't
+  incidentally flagged, for whatever that's worth as an informational data point; not a claim this
+  check should ever be relied on for those subtypes.
+- **Gemini-found (PR #168): `ACTION_VERBS` exact-match regex missed inflected surface forms.**
+  `_governing_action_verbs_in` originally matched only the bare base form (`\bmaintain\b`, etc.),
+  which does not match "maintains"/"enforces"/"established"/"implementing" — the ordinary way
+  regulatory source_quote text states a governing action in third-person-singular present tense or
+  past/gerund form (e.g. `"The ISSO maintains access logs."`). Verified by reproduction before
+  fixing: `is_fabricated_obligation("The ISSO maintains access logs.", "Maintain access logs.")`
+  incorrectly returned `True` — a faithful tense/person normalization would have been rejected as
+  fabricated in production. Fixed by matching each base verb against its small, closed set of
+  attested inflections (`ACTION_VERB_FORMS`) and keying results by base form regardless of which
+  surface inflection matched, so a quote's "maintains" and a description's "Maintain" compare equal.
+  Re-validated after the fix: still 3/3 `fabricated_modality` caught, 0/94 false positives — the fix
+  closes a real gap without needing new dataset examples to prove it (none of WP-35.1's 108 records
+  happened to contain an inflected action verb, which is exactly why this shipped uncaught by the
+  dataset validation and needed a reviewer to find it structurally instead).
+- **Codex-found (PR #168, two P2s) + Gemini-found (PR #168, one High): the purpose-clause exclusion
+  and the action-verb-only fabrication check were each too narrow, in ways only surfaced by reasoning
+  about the code's own logic against new sentence shapes, not by the dataset (none of WP-35.1's 108
+  records happened to exercise these shapes either).** All three verified by reproduction before
+  fixing:
+  - *Codex:* a description reframing a purely factual quote via a brand-new **modal marker** with no
+    action-verb change at all (`"Encryption transforms data."` → `"Encryption must transform data."`)
+    was missed entirely — `is_fabricated_obligation` only ever checked for a newly introduced
+    `ACTION_VERB`, never for a newly introduced `MODAL_MARKER`. Fixed by making the check symmetric:
+    it now fires whenever `source_quote` asserts no obligation at all (neither mechanism) but
+    `description` asserts one (either mechanism) — simpler than the original action-verb-only
+    formulation, not just more correct.
+  - *Codex:* `"Personnel have a responsibility to maintain records."` → `"Maintain records."` was
+    wrongly flagged as fabricated — the purpose-clause exclusion discarded the quote's own "maintain"
+    because it's a bare "to VERB", but "a responsibility **to** maintain" is the obligation itself
+    (an infinitive complement of an obligation-bearing noun), not a purpose/goal clause.
+  - *Gemini:* `"Agencies are required to implement X."` / `"...are to establish X."` had the identical
+    root problem from the opposite direction — `"required to"`/`"are to"` are themselves
+    `MODAL_MARKERS` phrases that end in a literal "to", so the verb they govern was being discarded
+    as a purpose clause by the same over-broad rule, missing real fabrications where this
+    construction appears in a description against a non-obligatory quote.
+  - **Fixed with one unified change, not two separate patches**, since both findings share the same
+    root cause: `_is_infinitive_purpose_clause` now checks what precedes the "to" — a `MODAL_MARKERS`
+    phrase ending in "to", or one of a short `OBLIGATION_COMPLEMENT_NOUNS` list
+    (`responsibility`/`duty`/`obligation`/`requirement`) — and only treats the infinitive as a
+    non-governing purpose clause when neither applies. The original miss this WP exists to catch
+    (`"...to ensure its availability..."`, preceded by neither) is unaffected and still caught.
+  - Re-validated after all three fixes: still 3/3 `fabricated_modality` caught, 0/94 false positives
+    against WP-35.1's dataset — none of these fixes were data-driven corrections of a wrong dataset
+    read; they were structural gaps a reviewer found by testing the code's logic against sentence
+    shapes the dataset simply didn't happen to contain.
+- **Gemini-found (PR #168, Medium): `None` `source_quote`/`description` crashed with `AttributeError`
+  inside `normalize_text()`** rather than passing through — reproduced before fixing
+  (`is_fabricated_obligation(None, "Implement X.")` crashed on `.strip()`). Not a live bug against
+  today's only caller (WP-35.1's gold dataset never has a null field), but a real risk for WP-35.4's
+  eventual production caller, where a missing field is a real possibility. Fixed with an early guard;
+  a missing field asserts nothing and fabricates nothing, so it passes through as not-fabricated.
+- **Gemini's next review round (PR #168) had two findings — one real, one checked and rejected.**
+  - *Claimed (rejected):* case-sensitive matching causes capitalized modal markers/action verbs
+    ("SHALL", "Implement") to be missed. Checked before acting: `normalize_text()` (imported from
+    `pipeline/parse_and_normalize.py`) already lowercases (`text.strip().lower()`) — confirmed by
+    direct reproduction with a capitalized quote, which classified correctly. This finding's premise
+    was factually wrong; no code change made. Recorded here rather than silently dropped, per this
+    project's "verify before applying" discipline applying in both directions — a reviewer being
+    wrong is itself worth a one-line note, not just a quiet no-op.
+  - *Real:* `MODAL_MARKERS` had plural `"are to"` but not singular `"is to"` — a real DoD/NIST
+    phrasing for a singular actor (`"The ISSO is to maintain access logs."`). Reproduced before
+    fixing: this faithful sentence's own quote wasn't recognized as asserting any obligation, so a
+    faithful `"Maintain access logs."` description was wrongly flagged as fabricated. Fixed by adding
+    `"is to"` to `MODAL_MARKERS`; picked up automatically by the existing modal-marker-ending-in-"to"
+    purpose-clause exemption with no other code change needed.
+- Output: `eval/modality_fabrication_check.py` (the check itself — `is_fabricated_obligation()` plus
+  a validation `main()`), `tests/unit/test_modality_fabrication_check.py` (32 tests: the known
+  WP-34.4/Codex miss, the 4 real paraphrase fixtures, the inflected-verb-form fix, the two purpose-
+  clause fixes, the new-modal-marker fix, the `None`-field guard, the singular "is to" fix, plus unit
+  coverage of the helper functions), and `eval/spike_results/wp_35_3/report.md`/`results.json` (full
+  validation output, mirroring the `eval/spike_results/wp_34_4/`, `eval/spike_results/wp_35_2/`
+  precedent).
+- Per this WP's own Scope, deliberately not wired into `pipeline/parse_and_normalize.py` yet — how
+  this combines with WP-35.2's entailment threshold (independent rejects vs. one combined decision)
+  is an explicit WP-35.4 design decision, not pre-decided here.
 
 ---
 

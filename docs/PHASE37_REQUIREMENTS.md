@@ -16,7 +16,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-37.1 — Retrieval-Quality Eval Harness (Baseline) | Not started |
+| WP-37.1 — Retrieval-Quality Eval Harness (Baseline) | Complete |
 | WP-37.2 — Contextual Chunk Embeddings | Not started |
 
 ---
@@ -170,6 +170,52 @@ future one's — is currently just a plausible-sounding guess.
 unmodified `reqbot ask` behavior and produces real recall@k/MRR numbers; the Qdrant/JSONL drift found
 above is fixed and confirmed fixed, not just attempted.
 
+**Findings (2026-07-31):**
+
+- **Index drift fixed and confirmed, not just attempted.** `reqbot reindex` run against the live
+  Qdrant instance; `grc_requirements` now has exactly 1,876 points, matching `reqbot docs`'s total
+  (13 documents) — checked via a direct `QdrantClient.scroll()` inspection, not just a successful
+  exit code.
+- **Labeled query set: 16 queries, 82 hand-verified relevant-`requirement_id` references, committed
+  at `eval/gold_retrieval_queries.jsonl`.** 7 narrow (14 relevant IDs total, every one individually
+  read against real source text), 5 broad/thematic (68 relevant IDs, each candidate pool built from
+  a `domain_tags` + keyword filter then hand-read in full — not sampled — with real exclusions made
+  where a hit matched the filter but wasn't actually a good answer: an acceptable-use-acknowledgment
+  record that matched "personnel security" keywords but isn't about clearance requirements, and three
+  incoherent docling table-extraction fragments that matched "incident report" keywords but aren't
+  answers a real user would want), 4 zero-truth (genuinely off-topic questions — food safety
+  inspections, workers' compensation, tax withholding, vehicle fuel efficiency — sanity-checked for
+  zero literal keyword overlap with the corpus before labeling). Honest caveat, same shape as
+  WP-35.1/35.2's own: 16 queries is a real, hand-verified baseline, not a large or statistically
+  confident one — expected to grow over time.
+- **The harness ran against the real, unmodified `reqbot ask` retrieval path** (production defaults:
+  HyDE on, query rewrite on, `top_k=20`, `min_score=0.02`) — full results in
+  `eval/spike_results/wp_37_1/results.json`/`report.md`.
+- **Narrow queries: strong.** Mean recall@5 across the 7 narrow queries is 0.9643 (6/7 exact at 1.0;
+  the 7th, the fragmented trusted-supplier procurement clause, reaches recall@10=1.0). Mean MRR is
+  1.0 across all 7 — every narrow query's best answer came back at rank 1.
+- **Broad queries: substantially weaker.** Mean recall@5 across the 5 broad queries is 0.2626,
+  recall@10 is 0.3735, recall@20 is 0.5509, mean MRR is 0.6667 — even at the CLI's full `top_k=20`,
+  the system finds barely half of the genuinely relevant requirements for a broad/thematic question
+  on average (per-query recall@20 range: 0.38–0.88). This is a real, now-quantified version of
+  exactly the concern that started this phase.
+- **Zero-truth queries: the system never reports "no relevant results."** All 4 deliberately
+  off-topic queries (food safety, workers' comp, tax withholding, vehicle fuel efficiency) returned
+  the full 20 results, with top scores of 0.55–0.64 for the food-safety query specifically — not
+  obviously distinguishable from a real match by score alone (the broad queries' own scores at their
+  correct answers' ranks are in a comparable range). Checked directly what came back for the
+  food-safety query: generic
+  "security education and training program" / "self-inspection reports" records, related only by
+  loose word overlap ("inspection," "program") that the query-rewrite step's LLM expansion actively
+  helped bridge. Confirms, with real numbers, the previously-only-suspected RRF-score-floor gap
+  documented in prior-session notes: nothing in the current pipeline can distinguish "a good match"
+  from "the least-bad thing available."
+- Overall aggregate across all non-zero queries: mean recall@5=0.6719, recall@10=0.739,
+  recall@20=0.8129, MRR=0.8611 — a healthy-looking blended number that **hides** the narrow/broad
+  split above. Reporting only the aggregate would have been misleading; both this project's own
+  "verify before applying" discipline and the raw per-query table in `report.md` are why the split
+  got caught and reported instead.
+
 ---
 
 ### WP-37.2 — Contextual Chunk Embeddings
@@ -200,6 +246,14 @@ Anthropic's research found this hurts most.
 - If the result is a regression on some query shapes and an improvement on others, report that
   honestly rather than only the net number — matches this project's own "verify before applying"
   discipline extended to a phase's own conclusion, not just its inputs.
+- **Control for HyDE sampling noise before trusting the delta (Codex review, PR #177, verified real):**
+  `core.ask.generate_hyde_hypothesis()` samples at `temperature=0.3` with no seed, so HyDE's third RRF
+  leg differs slightly between any two runs of the same query against the same index — a single-run
+  before/after delta could partly reflect this instead of the embedding change under test. Either run
+  the comparison with `--no-hyde` (isolates the change being measured, at the cost of not reflecting
+  real `hyde=True` production behavior) or run N≥3 repeats per side and compare distributions, not
+  single point estimates. Not fixed by caching/seeding HyDE in `core/ask.py` itself — that's a change
+  to production retrieval logic, out of both WP-37.1's and WP-37.2's own Non-Goals.
 
 **Non-goals:**
 - No LLM-generated per-chunk context (see Phase Non-Goals) — deterministic, metadata-based context

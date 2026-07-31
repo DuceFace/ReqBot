@@ -501,6 +501,20 @@ def test_is_orphaned_list_item_false_for_citation_with_obligation_verb_outside_n
     )
 
 
+def test_is_orphaned_list_item_false_for_citation_with_quoted_prose():
+    # Gemini review round 4, PR #181: the structural check strips a fixed
+    # punctuation set to find each word's real first character -- a lowercase
+    # prose word wrapped in quotes or brackets (e.g. "'applies'") wasn't in
+    # that set, so its leading quote mark was tested instead of the real
+    # first letter, misclassifying it as citation-shaped. Fixed by stripping
+    # *any* non-alphanumeric character from both ends instead of an
+    # enumerated set, closing the whole class of gap rather than the one
+    # example found this round.
+    assert not _is_orphaned_list_item(
+        "Some term, as defined in CNSSI 4009, 'applies within the DoD'."
+    )
+
+
 def test_is_orphaned_list_item_defined_in_citation_with_multiple_references():
     # Live-corpus generalization check (not in the original 12-example set):
     # a citation-only quote referencing two documents joined by "and" is

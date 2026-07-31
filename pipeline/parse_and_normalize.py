@@ -201,9 +201,18 @@ _CITATION_CONNECTOR_WORDS = {
     "and", "or", "the", "of", "for", "in", "a", "an", "at", "to", "within", "per",
 }
 
+# WP-38.2 (Gemini review round 4, PR #181): stripping a fixed, enumerated set
+# of punctuation characters (originally just ",.()")  keeps finding new gaps
+# -- quotes, brackets, smart quotes, dashes, whatever the next real example
+# happens to be wrapped in. Stripping every non-alphanumeric character from
+# both ends, regardless of which specific characters they are, closes that
+# whole class of gap at once instead of growing the enumerated set one
+# reviewer finding at a time.
+_NON_ALNUM_EDGE_RE = re.compile(r"^[^A-Za-z0-9]+|[^A-Za-z0-9]+$")
+
 
 def _looks_like_citation_reference(word: str) -> bool:
-    stripped = word.strip(",.()")
+    stripped = _NON_ALNUM_EDGE_RE.sub("", word)
     if not stripped:
         return True
     if stripped.lower() in _CITATION_CONNECTOR_WORDS:

@@ -63,23 +63,29 @@ is finding out.
 WP-39.1's job — but enough to scope the right questions, same discipline as Phase 38's own Phase
 Framing spot-check):
 
-- Docling *does* structurally distinguish list items from other body text — `pipeline/section_parser.py`
-  includes `"list_item"` / `"list-item"` in its own `_BODY_LABEL_SUBS`, confirming the label is
-  present and already used for something (body-text accumulation) in the current pipeline. The raw
-  structural signal exists.
+- Docling *does* structurally distinguish list items from other body text — confirmed by actually
+  running `DocumentConverter` against a real corpus document (`raw_pdfs/afpd_17-1.pdf`, first 8
+  pages), not just inferred from `pipeline/section_parser.py`'s own `_BODY_LABEL_SUBS` tuple
+  recognizing the label string (which only proves ReqBot's code is written to expect it, not that
+  Docling actually emits it — a real distinction, caught by Codex's review of this doc, PR #182,
+  before this claim shipped as fact rather than hypothesis). Real result: 30 of 118 parsed items
+  (25%) were labeled `list_item` on that sample. The raw structural signal is real and common in this
+  corpus, not theoretical.
 - But `section_parser.py`'s own ancestry builder (`_parse_ancestry()`, walking
   `doc.iterate_items()`) only threads **heading-level** parentage forward: every non-heading item —
   a list item exactly the same as an ordinary paragraph — gets `parent_header_text` (the enclosing
   heading) and `parent_context` (the *first* ~600 chars of body text under that heading, truncated,
   not specifically the sentence immediately preceding a given list). There is no code today that
-  links a list item to the specific stem sentence that introduces its list, only to the section
-  heading several levels up. Whatever docling's own internal document model can tell us about a list
-  item's immediate parent (its list-group, the paragraph before it), ReqBot's own parsing layer isn't
-  currently asking that question — confirmed by reading the actual traversal logic, not assumed.
-- Chunking (`pipeline/chunk_text.py`) delegates directly to Docling's own `HybridChunker`, not a
-  custom fixed-size splitter — genuinely unverified whether it already keeps a list stem together
-  with its items or splits on plain size/token limits regardless of structure. This is a real,
-  open question for the audit, not something to assume either way.
+  links a list item to the specific stem sentence that introduces its list via this ancestry map,
+  only to the section heading several levels up.
+- **This doesn't mean the stem is actually unrecoverable, though** (Codex's review, PR #182, caught
+  the Scope below assuming it could be) — `run_pipeline.py` passes the live `DoclingDocument`
+  straight from `section_parser.run()`'s `AncestryResult.doc` into `HybridChunker`
+  (`chunk_text.run_structure_aware()`), independent of whatever `item_ancestry` does or doesn't
+  capture. So even where the ancestry map has no stem-to-item link, the stem sentence and its list
+  items may still land in the same chunk's raw text simply by being adjacent in the source document —
+  a completely separate channel from the ancestry map, and one the audit has to check on its own
+  terms, not assume follows from the ancestry finding above.
 
 This is consistent with what WP-38.2's review process kept finding from the Step D side: the
 information needed to resolve these fragments doesn't obviously exist *in the extracted quote text*
@@ -94,10 +100,10 @@ parse, chunking) and gets dropped, or whether it needs to be reconstructed from 
   at embedding/indexing (which field actually gets embedded).
 - For each pipeline stage, produce a real, concrete example (not a hypothetical) showing whether the
   needed context is present or already gone by that point.
-- Recommend the cheapest fix that closes the gap at the stage where it's actually lost — a schema
-  change to carry `parent_stem`/`embedding_text` forward, a Step C prompt change, a chunking-boundary
-  fix, or (only if the structure is genuinely unrecoverable without it) a heavier fix at the embedding
-  layer.
+- Recommend the cheapest fix, at whichever stage still has (or can regain, e.g. via `chunk_id`) real
+  access to the parent stem — a schema change to carry `parent_stem`/`embedding_text` forward, a Step
+  C prompt change, a chunking-boundary fix, or (only if the structure is genuinely unrecoverable
+  through any channel) a heavier fix at the embedding layer.
 - Confirm whether one reconstruction shape (`parent_stem` + `child_item`) covers both known fragment
   patterns — enumerated list items missing a stem, and subordinate clauses missing a main clause — or
   whether they need distinct handling.
@@ -140,23 +146,31 @@ and reverting a Step D rule that was never going to solve this from that side.
   `REQ-c6aeb8df528b`, `"(3) Restrain competition."`, stem `"Classification shall not be used to:"`).
   Trace these ~18 real cases through the pipeline first; only broaden to a fresh sample if that's not
   enough signal to answer the Goals.
-- **For each traced example, answer in sequence, stopping at the first stage where context is
-  confirmed present but not carried forward** (that's the stage to fix):
+- **For each traced example, check every representation independently — do not stop at the first
+  stage where a specific field or record lacks the link** (Codex review, PR #182: a stem missing from
+  one representation doesn't mean it's gone — it may still be recoverable through a different channel
+  at a later stage, e.g. `chunk_id` pointing back to raw chunk text even after Step C's own output
+  record drops it; stopping early risks recommending a fix at the wrong stage entirely):
   1. Does Docling's raw parsed document contain the parent stem for this item at all, and does
      Docling's own document model (not ReqBot's ancestry code) expose a direct link between the list
      item and its stem/list-group — separately from whatever `section_parser.py` currently computes?
-  2. Is the parent stem in the *same chunk* as the child item after `HybridChunker` runs? (Directly
-     testable: for each example's `chunk_id`, check whether the stem text appears in that chunk's
-     `text`/`raw_text` field — same `build_chunk_text_map`-style lookup WP-32.1's grounding check
-     already uses.) If the stem isn't even in the same chunk, no prompt or schema fix downstream can
-     recover it without a chunking change.
-  3. If the stem is in the chunk: does Step C's extraction prompt/output ever see or preserve it
-     anywhere (even if not in `source_quote` itself)?
-  4. If Step C output has it: does Step D normalization drop it anywhere in the current record
-     schema?
-  5. Whatever survives to indexing: what exact text is what actually gets embedded today
-     (`pipeline/embed_and_index.py` / `embed_context_index.py`) — the `source_quote` alone, or
-     something already richer?
+  2. Does `section_parser.py`'s ancestry map (`parent_header_text`/`parent_context`) happen to carry
+     the stem for this example, even though it's only designed for heading-level parentage?
+  3. Is the parent stem in the *same chunk* as the child item after `HybridChunker` runs, checked
+     directly against the chunk's raw text (`build_chunk_text_map`-style lookup by `chunk_id`, same
+     pattern WP-32.1's grounding check uses) — **independently of what #1/#2 found**, since chunking
+     works from the live `DoclingDocument` directly, not from the ancestry map (confirmed in Phase
+     Framing above).
+  4. Does Step C's extraction output (`llm_extract_requirements.py`) see or preserve the stem
+     anywhere, even if not in `source_quote` itself?
+  5. Does Step D normalization drop it anywhere in the current record schema, for whichever of
+     #1-#4 it had going in?
+  6. What exact text actually gets embedded today (`pipeline/embed_and_index.py` /
+     `embed_context_index.py`) — the `source_quote` alone, or something already richer? And
+     separately: could `chunk_id` still be used to reconstruct `parent_stem` at embedding time even if
+     every earlier stage's own output record dropped it — i.e. is the *cheapest* fix actually the
+     latest stage that still has (or can regain, via `chunk_id`) access to the raw material, not
+     necessarily the earliest stage where a field first goes missing?
 - **Retrieval check, not just presence/absence.** For at least a handful of the traced examples,
   check directly whether prepending the recovered `parent_stem` to the embedding input would plausibly
   improve retrieval for a realistic query about that requirement — informed by, but not re-litigating,

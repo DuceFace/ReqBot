@@ -299,23 +299,34 @@ look sane, not just that the numbers moved.
   realistic-behavior cross-check: WP-37.1's original baseline (recall@5=0.6719, MRR=0.8611) vs. this
   WP's after-state (recall@5=0.58, MRR=0.8264) — same direction, same rough magnitude. The regression
   is consistent whether or not HyDE noise is controlled for, so it isn't an artifact of that risk.
-- **Per-query breakdown (`--no-hyde`, the controlled comparison): 11 of 12 non-zero queries got worse
-  or stayed flat; zero improved.** All 7 narrow queries held roughly steady (one dip: Q-N01's
-  recall@5 1.0→0.5, recovering to 1.0 by recall@20). All 5 broad queries regressed, two severely
-  (Q-B02: MRR 0.25→0.0769, its top-10 lost its only true positive entirely; Q-B05: MRR 1.0→0.3333).
-- **Root-caused, not just observed.** Read the actual new embedding text for Q-B02's ("firewalls and
-  boundary protection devices") missed true positive, `REQ-0b553500baf4`: its prefix is
-  `"DODI 8551.01 — SECTION 2: RESPONSIBILITIES > 3.2. DECLARATION."` plus a `parent_context` excerpt
-  about *"the PPSM program implements an automated declaration process..."* — the section is titled
-  and organized around a bureaucratic *process* (declaration), not the *substantive topic* (boundary
-  protection devices) the requirement clause is actually about. Prepending that prefix pulls the
-  embedding toward "declaration process" semantics and away from the "firewall/boundary protection"
-  signal the bare quote carried on its own. This isn't a one-off: DoD/AF regulatory documents are
-  broadly organized by procedural/administrative structure (`"SECTION 2: RESPONSIBILITIES"`,
-  `"3.2. DECLARATION"`, `"1.2. POLICY"`) rather than by topic, unlike more topically-organized prose
-  documents — section headings and surrounding paragraph text don't reliably correlate with a specific
-  requirement clause's actual subject matter in this corpus, the load-bearing assumption this WP's
-  deterministic technique depends on.
+- **Per-query breakdown (`--no-hyde`, the controlled comparison): 10 of 12 non-zero queries got worse
+  or stayed flat, 1 was genuinely mixed, 0 improved outright** (corrected after Codex review, PR #178
+  — the original draft of this Finding wrongly lumped Q-B04 in with the pure regressions). All 7
+  narrow queries held roughly steady (one dip: Q-N01's recall@5 1.0→0.5, recovering to 1.0 by
+  recall@20). 4 of 5 broad queries regressed outright, two severely (Q-B02: MRR 0.25→0.0769; Q-B05:
+  MRR 1.0→0.3333). **Q-B04 is mixed, not a regression**: recall@10 actually rose (0.3333→0.4) while
+  recall@20 fell (0.4667→0.4) and recall@5/MRR stayed flat (0.2/1.0 both runs) — reported honestly as
+  mixed rather than folded into "regressed," per this WP's own Scope commitment to report per-query
+  movement accurately.
+- **A verified, evidenced example consistent with the regression hypothesis — not an unretrieved
+  record, and not claimed as a proven causal mechanism (corrected after Codex review, PR #178: the
+  original draft cited `REQ-0b553500baf4`, which checking the actual `retrieved_ids` arrays directly
+  shows never appeared in either run's top-20 at all — a real error, caught and fixed, not silently
+  dropped).** Q-B02's ("firewalls and boundary protection devices") relevant record
+  `REQ-e41d286c83f4` (afi17-203) is confirmed present in the *before* run at rank 4
+  (`eval/spike_results/wp_37_2/before_no_hyde/results.json`) and confirmed *absent* from the *after*
+  run's full top-20 (direct set-membership check against both saved `retrieved_ids` arrays). Its
+  quote is genuinely on-topic ("modifying network access controls (e.g., firewall)..."); its new
+  prefix is `"afi17-203 — Actions > 3.7.2. Methodology."` plus a `parent_context` excerpt about
+  *"containment actions to regain control of or isolate the system..."* — describing incident-response
+  *methodology*, not the firewall/boundary-protection *topic* the quote itself is about. This is
+  consistent with the hypothesis that section-heading/parent_context metadata in this corpus often
+  describes procedural framing rather than topical content (DoD/AF documents are organized around
+  structure like `"SECTION 2: RESPONSIBILITIES"`, `"3.7.2. Methodology"`, `"1.2. POLICY"` rather than
+  topic) — but this single example, like any single example in a hybrid RRF system with many
+  simultaneously-changed candidates, cannot fully isolate causation on its own (Codex's point,
+  accepted as valid). Treat the mechanism as a well-evidenced hypothesis explaining the measured
+  aggregate regression, not a proven root cause.
 - **Reverted, not merged into production.** `pipeline/embed_and_index.py` restored to its pre-WP-37.2
   form (`git checkout main -- pipeline/embed_and_index.py`); its own unit tests removed with it (dead
   code otherwise); the live Qdrant index reindexed back to the bare-`source_quote` embeddings and

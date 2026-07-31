@@ -585,27 +585,40 @@ These are quality experiments, not guaranteed product work.
    - Clearly label grc_context results as lower-confidence than curated
      requirements.
 
-6. [TRIED AND REVERTED -- Phase 37, WP-37.2, 2026-07-31] LLM-generated
-   per-chunk contextual embeddings (Anthropic's full Contextual Retrieval
-   technique)
+6. [DETERMINISTIC VARIANT TRIED AND REVERTED -- Phase 37, WP-37.2,
+   2026-07-31; LLM-generated variant remains UNTESTED] Contextual
+   per-chunk embeddings (Anthropic's Contextual Retrieval technique)
+   (Corrected after Codex review, PR #178: the original header on this item
+   labeled the full LLM-generated technique itself as "tried and reverted,"
+   which is wrong and could mislead future triage into treating Anthropic's
+   actual published approach as experimentally rejected. Only the cheap
+   deterministic precursor below was ever built or measured.)
+
    WP-37.2 tried the free, deterministic version first (document title +
    section_title_path + a truncated parent_context excerpt, prepended before
-   embedding) and measured a real regression against WP-37.1's harness, not
-   an improvement: mean recall@5 0.6683->0.58, MRR 0.8542->0.7217 under a
-   controlled (--no-hyde) before/after comparison (docs/PHASE37_REQUIREMENTS.md
-   WP-37.2 Findings has the full per-query table and root-cause example).
-   Reverted -- not deployed.
+   embedding, no LLM call) and measured a real regression against WP-37.1's
+   harness, not an improvement: mean recall@5 0.6683->0.58, MRR 0.8542->0.7217
+   under a controlled (--no-hyde) before/after comparison
+   (docs/PHASE37_REQUIREMENTS.md WP-37.2 Findings has the full per-query
+   table -- 10 of 12 non-zero queries regressed or held flat, 1 was
+   genuinely mixed, none improved). Reverted -- not deployed.
 
-   Root cause, not just observed: this corpus's DoD/AF documents are
-   organized by procedural/administrative structure ("SECTION 2:
-   RESPONSIBILITIES", "3.2. DECLARATION", "1.2. POLICY") rather than by
-   topic, so section headings and surrounding paragraph text don't reliably
-   correlate with what a specific requirement clause is actually about --
-   the load-bearing assumption the deterministic technique depended on.
-   Confirmed concretely: a firewall/boundary-protection requirement filed
-   under a "DECLARATION" section (about an unrelated administrative
-   process) got its embedding pulled toward "declaration process" and away
-   from its own real topic once that section heading was prepended.
+   Hypothesis, evidenced but not proven as sole cause (corrected after Codex
+   review, PR #178 -- the original draft cited a record that, checking the
+   actual retrieved-results data directly, never appeared in either run's
+   top-20 at all): this corpus's DoD/AF documents are organized by
+   procedural/administrative structure ("SECTION 2: RESPONSIBILITIES",
+   "3.7.2. Methodology", "1.2. POLICY") rather than by topic, so section
+   headings and surrounding paragraph text don't reliably correlate with
+   what a specific requirement clause is actually about -- the load-bearing
+   assumption the deterministic technique depended on. A verified example
+   consistent with this: a firewall/boundary-protection requirement
+   (REQ-e41d286c83f4, afi17-203) confirmed present at rank 4 in the before
+   run and confirmed absent from the after run's full top-20 has a new
+   prefix describing incident-response "Methodology" -- procedural framing,
+   not its own topic. One example in a hybrid RRF system with many
+   simultaneously-changed candidates can't fully isolate causation on its
+   own; treat this as a well-evidenced hypothesis, not a proven mechanism.
 
    This means naively scaling straight to the LLM-generated version isn't a
    safe next step either -- an LLM given the same section-heading/

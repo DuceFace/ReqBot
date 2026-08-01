@@ -313,6 +313,13 @@ def format_evidence(results: list[dict]) -> str:
             f"    Requirement: {primary}\n"
             f"    Quote: {hit.get('source_quote', '')}"
         )
+        # WP-39.2: governing stem recovered by parent-stem reconstruction, for
+        # fragment-shaped quotes that don't stand on their own (e.g. "(3) Restrain
+        # competition." with no visible list-introducing clause) -- otherwise
+        # reconstruction only improves ranking, not what a query actually shows.
+        stem = hit.get("parent_stem")
+        if stem:
+            entry += f"\n    Governing clause: {stem}"
         ctx = hit.get("context_text")
         if ctx:
             entry += f"\n    Context: {ctx}"
@@ -355,6 +362,9 @@ def print_results_table(results: list[dict]) -> None:
             if len(quote) > 120:
                 quote = quote[:120] + "..."
             print(f"    Quote: \"{quote}\"")
+        stem = hit.get("parent_stem")
+        if stem:
+            print(f"    Governing clause: {stem}")
         ctx = hit.get("context_text")
         if ctx:
             print(f"    Context: {ctx}")

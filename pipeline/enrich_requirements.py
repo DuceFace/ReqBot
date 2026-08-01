@@ -26,6 +26,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core.profiles import default_profile
+from pipeline.parse_and_normalize import _is_dangling_clause
 
 logging.basicConfig(
     level=logging.INFO,
@@ -353,6 +354,323 @@ def _enrich_single(
     return _validate_enrichment(parsed, valid_domain_tags, valid_requirement_types)
 
 
+# WP-39.2: parent-stem reconstruction. Deterministic, no LLM/network calls -- kept as a
+# fully separate code path from the enrichment functions above so it can run (and must
+# run) independently of whether the LLM-calling enrichment below succeeds, fails, or is
+# skipped entirely (see apply_parent_stem_reconstruction()'s docstring and its call site
+# in run_pipeline.py).
+#
+# Candidacy and lookup signals below were calibrated directly against the 18 known
+# FRAGMENT examples from eval/audit_wp39_1/ (docs/PHASE39_REQUIREMENTS.md's WP-39.1
+# Findings), not assumed from the WP-39.2 scope doc's text alone -- implementation-time
+# calibration found three real gaps beyond what PR #184's review already caught:
+#   1. The scope doc's step-1 signal ("preceding same-chunk record contains a colon")
+#      misses 2 of the 10 cheap wins (REQ-c62e41aaf181, REQ-9700722b04cd) -- both
+#      dangling_clause fragments whose real antecedent record has no colon at all (one
+#      is an unfinished clause with no terminal punctuation; the other is a case where
+#      the fragment's own text is already a verbatim substring of the preceding record).
+#      Both are handled by _extract_stem_from_record_text()'s two conditions below.
+#   2. A blind "fall back to parent_header_text whenever steps 1-2 find nothing" (the
+#      scope doc's literal step 3) also fires for the 3 STEM_NEVER_EXTRACTED examples,
+#      which must get no parent_stem at all -- confirmed one of them
+#      (REQ-4aeeff50f15b) has a parent_header_text that doesn't even match its own
+#      chunk's actual section (an upstream ancestry-tracking mismatch, not something
+#      fixable here). Gated instead on _is_dangling_clause() -- the existing, narrowly
+#      calibrated WP-38.2 predicate that (per its own docstring) uniquely flags
+#      REQ-1b1071c8d317 among all 18 examples and zero false positives against 284 real
+#      corpus records.
+#   3. A naive cross-chunk (step 2) lookup using only Step C's own extracted records
+#      misses REQ-cf527f39c8d7: its true stem ("b. Oversee their respective Component's
+#      PPSM program to:") was never extracted as a Step C record at all -- present only
+#      in the previous chunk's raw_text. Fixed with a raw_text fallback -- but an
+#      unconstrained version of that fallback produces a real false positive: DODI
+#      5200.44 chunk 24 (unrelated to chunk 25's REQ-8105d9acb410) ends with its own,
+#      completely different section's colon-terminated header ("...the Director,
+#      DIA:"), which would get misattached without a gate. Gated on the target's own
+#      chunk visibly opening mid-enumeration (starts directly with a list marker) --
+#      true for both REQ-cf527f39c8d7's chunk and REQ-48f549669bb2's, false for
+#      REQ-8105d9acb410's (which opens with a fresh, self-contained governing sentence)
+#      -- but "opens with *some* marker" alone isn't enough either: DODI 5200.48
+#      chunk 64 opens with "a." (its own fresh list, item one), which matches a bare
+#      marker check just as well as "(7)" does. Narrowed further to exclude markers
+#      that are themselves a sequence's first value ("1"/"a"/"i") -- a real list
+#      continuing from the previous chunk never restarts at its own beginning.
+#   4. The raw_text colon fallback (gap 3 above) has its own false positive: a list
+#      item's own body text can contain a URL ("...registry at https://pnp.cert.
+#      smil.mil/pnp...") whose "https:" colon isn't a list-intro colon at all, and
+#      sits between the target and the real stem line in REQ-cf527f39c8d7's own
+#      chunk 12. _find_first_real_colon() below skips "://" specifically so the scan
+#      keeps walking back to the real stem.
+_LIST_MARKER_RE = re.compile(r"^\(?([a-zA-Z0-9]{1,3})[.)]\s")
+_FIRST_MARKER_VALUES = {"1", "a", "A", "i", "I"}
+_LEADING_DASH_RE = re.compile(r"^-\s*")
+_MAX_CANDIDATE_WORDS = 20
+
+
+def _find_first_real_colon(text: str) -> int:
+    """Index of the first ':' that isn't a URL scheme delimiter ("https://" etc.), or
+    -1 if none -- see gap 4 in the module-level note above."""
+    start = 0
+    while True:
+        idx = text.find(":", start)
+        if idx == -1 or text[idx:idx + 3] != "://":
+            return idx
+        start = idx + 1
+
+
+def _is_reconstruction_candidate(source_quote: str) -> bool:
+    """Candidacy heuristic for parent-stem reconstruction -- deliberately NOT a reuse of
+    Step D's rejection predicates (_is_orphaned_list_item()/_is_dangling_clause() were
+    checked directly against all 10 cheap-win examples during WP-39.1 and only flag 1 of
+    10; they're precision-first "safe to delete" checks, a different and narrower
+    question than "short enough to plausibly benefit from more context"). False
+    positives here just mean an unhelpful parent_stem gets attached to an
+    already-complete quote -- cheap, unlike Step D's rejection risk -- so this is
+    deliberately permissive.
+    """
+    stripped = (source_quote or "").strip()
+    if not stripped:
+        return False
+    if _LIST_MARKER_RE.match(stripped):
+        return True
+    if len(stripped.split()) <= _MAX_CANDIDATE_WORDS:
+        return True
+    return _is_dangling_clause(stripped)
+
+
+def _extract_stem_from_record_text(text: str) -> str | None:
+    """Given a candidate antecedent record's (or raw_text line's) full text, return the
+    usable stem substring, or None if it doesn't qualify as a stem at all.
+
+    Two conditions, both calibrated against real examples (see the module-level note
+    above): a colon anywhere -- not necessarily as the last character, since Step C
+    sometimes merges a stem with its first sibling item into one combined quote
+    (REQ-48f549669bb2) -- truncates to up-through-the-first-colon; no terminal sentence
+    punctuation at all (a comma-joined clause Step C split from its own continuation,
+    e.g. REQ-c62e41aaf181's antecedent) is used as-is.
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return None
+    colon_idx = _find_first_real_colon(stripped)
+    if colon_idx != -1:
+        return stripped[: colon_idx + 1].strip()
+    if stripped[-1] not in ".!?":
+        return stripped
+    return None
+
+
+def _stem_from_candidate(candidate_text: str, target: str) -> str | None:
+    """Check one candidate antecedent record's text against both stem-validity
+    conditions (see _extract_stem_from_record_text()'s docstring for the first; the
+    second is REQ-9700722b04cd's case -- Step C sometimes extracts an overlapping/
+    redundant pair where the fragment's text is already a verbatim tail of the
+    preceding record, which itself ends in ordinary terminal punctuation so the first
+    condition doesn't catch it -- the preceding record already carries full context)."""
+    candidate = (candidate_text or "").strip()
+    if not candidate:
+        return None
+    stem = _extract_stem_from_record_text(candidate)
+    if stem:
+        return stem
+    if target and target in candidate:
+        return candidate
+    return None
+
+
+def _find_same_chunk_stem(quote: str, chunk_id: int, step_c_by_chunk: dict[int, list[dict]]) -> str | None:
+    """Reconstruction lookup step 1: walk backward through this chunk's Step C records,
+    matched to the target by exact (stripped) quote text since Step D recomputes
+    requirement_id and doesn't preserve Step C's own IDs, for the nearest preceding one
+    that qualifies as a stem.
+
+    Walks past sibling list items, not just the immediate predecessor: a deep item like
+    "(4)" following "(1)-(3)" has 3 sibling items directly before it, each ending in
+    ordinary terminal punctuation (not a colon) -- only checking the immediate
+    predecessor missed 4 of the 10 cheap wins during calibration (REQ-626b98fef9aa,
+    REQ-3097aa5d306c, REQ-c6d23854cd0b, and their cross-chunk analog, before this fix).
+    """
+    records = step_c_by_chunk.get(chunk_id) or []
+    target = quote.strip()
+    idx = next(
+        (i for i, rec in enumerate(records) if (rec.get("source_quote") or "").strip() == target),
+        None,
+    )
+    if idx is None:
+        return None
+    for rec in reversed(records[:idx]):
+        stem = _stem_from_candidate(rec.get("source_quote"), target)
+        if stem:
+            return stem
+    return None
+
+
+def _find_cross_chunk_stem(
+    chunk_id: int,
+    step_c_by_chunk: dict[int, list[dict]],
+    chunks_by_id: dict[int, dict],
+) -> str | None:
+    """Reconstruction lookup step 2: the immediately preceding chunk (same document,
+    sequential chunk_id), for the confirmed CROSS_CHUNK_SPLIT cases.
+
+    Only attempted when this chunk's own raw_text visibly opens mid-enumeration -- starts
+    directly with a list marker that isn't itself a sequence's first value ("1"/"a"/"i")
+    -- see gap 3 in the module-level note above for the false positive this gate exists
+    to prevent (and why "opens with *some* marker" alone isn't a tight enough check).
+    """
+    chunk = chunks_by_id.get(chunk_id)
+    if not chunk:
+        return None
+    # raw_text lines are dash-prefixed ("- (7)  Communicate...") -- strip that before
+    # checking for a list marker, or every chunk's opening line fails this gate.
+    opening = _LEADING_DASH_RE.sub("", (chunk.get("raw_text") or "").lstrip())
+    match = _LIST_MARKER_RE.match(opening)
+    if not match or match.group(1) in _FIRST_MARKER_VALUES:
+        return None
+
+    prev_chunk_id = chunk_id - 1
+    prev_records = step_c_by_chunk.get(prev_chunk_id) or []
+    for rec in reversed(prev_records):
+        stem = _extract_stem_from_record_text(rec.get("source_quote"))
+        if stem:
+            return stem
+
+    # Fall back to the previous chunk's raw_text directly -- REQ-cf527f39c8d7's real
+    # stem ("b. Oversee their respective Component's PPSM program to:") was never
+    # extracted as its own Step C record at all, only present in raw_text.
+    prev_chunk = chunks_by_id.get(prev_chunk_id)
+    if not prev_chunk:
+        return None
+    for line in reversed((prev_chunk.get("raw_text") or "").split("\n")):
+        line = _LEADING_DASH_RE.sub("", line.strip())
+        if not line or ":" not in line:
+            continue
+        stem = _extract_stem_from_record_text(line)
+        if stem:
+            return re.sub(r"\s+", " ", stem)
+    return None
+
+
+def _find_heading_stem(quote: str, chunk_id: int, chunks_by_id: dict[int, dict]) -> str | None:
+    """Reconstruction lookup step 3: fall back to parent_header_text -- covers
+    HEADING_IS_SUBJECT at zero additional engineering cost, since that field already
+    exists on every chunk record today.
+
+    Gated on _is_dangling_clause() (the existing, narrowly-calibrated WP-38.2 bare-
+    copula predicate) rather than firing unconditionally whenever steps 1-2 fail: an
+    ungated fallback also fires for STEM_NEVER_EXTRACTED examples, which must get no
+    parent_stem at all (see module-level note above).
+    """
+    if not _is_dangling_clause(quote):
+        return None
+    chunk = chunks_by_id.get(chunk_id)
+    if not chunk:
+        return None
+    header = (chunk.get("parent_header_text") or "").strip()
+    return header or None
+
+
+def _load_reconstruction_sources(norm_path: Path) -> tuple[dict[int, list[dict]], dict[int, dict]]:
+    """Load this document's Step C output (grouped by chunk_id, preserving extraction
+    order) and chunk records (raw_text/parent_header_text keyed by chunk_id) -- the two
+    on-disk artifacts reconstruction needs beyond what's already in the normalized
+    records. Missing files degrade to empty dicts (reconstruction becomes a no-op for
+    that document, not a hard failure)."""
+    from core.artifact_resolver import doc_key_from_requirements_path
+    doc_key = doc_key_from_requirements_path(norm_path)
+    doc_dir = norm_path.parent
+
+    step_c_by_chunk: dict[int, list[dict]] = {}
+    step_c_path = doc_dir / f"{doc_key}_extracted_requirements.jsonl"
+    if step_c_path.exists():
+        with open(step_c_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                rec = json.loads(line)
+                cid = rec.get("chunk_id")
+                if cid is not None:
+                    step_c_by_chunk.setdefault(cid, []).append(rec)
+
+    chunks_by_id: dict[int, dict] = {}
+    chunks_path = doc_dir / f"{doc_key}_chunks.jsonl"
+    if chunks_path.exists():
+        with open(chunks_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                rec = json.loads(line)
+                cid = rec.get("chunk_id")
+                if cid is not None:
+                    chunks_by_id[cid] = rec
+
+    return step_c_by_chunk, chunks_by_id
+
+
+def reconstruct_parent_stem(
+    req: dict,
+    step_c_by_chunk: dict[int, list[dict]],
+    chunks_by_id: dict[int, dict],
+) -> str | None:
+    """Run the full 3-step reconstruction lookup for one normalized requirement record,
+    falling through to None (leave empty) rather than guessing."""
+    quote = (req.get("source_quote") or "").strip()
+    chunk_id = req.get("chunk_id")
+    if not quote or chunk_id is None:
+        return None
+    if not _is_reconstruction_candidate(quote):
+        return None
+    return (
+        _find_same_chunk_stem(quote, chunk_id, step_c_by_chunk)
+        or _find_cross_chunk_stem(chunk_id, step_c_by_chunk, chunks_by_id)
+        or _find_heading_stem(quote, chunk_id, chunks_by_id)
+    )
+
+
+def apply_parent_stem_reconstruction(norm_jsonl: str) -> None:
+    """WP-39.2: deterministically attach parent_stem/embedding_text to fragment-shaped
+    requirements, in place, on Step D's own normalized output file.
+
+    Writes directly into *_requirements_normalized.jsonl -- the artifact resolver's
+    lowest, always-present tier -- rather than only inside the enrichment (Step D.5)
+    output. That placement is what makes reconstruction survive both --skip-enrichment
+    and an Ollama/enrichment failure: *_requirements_enriched.jsonl is never created at
+    all in either case, so anything that only lived there would be lost exactly when
+    this most needs to survive. See this function's call site in run_pipeline.py (called
+    unconditionally, before the skip-enrichment check and outside the LLM call's
+    try/except) and run()'s own call below (for anyone invoking this module standalone).
+
+    Pure and offline -- no Ollama, no network. Idempotent: safe to call more than once
+    on the same file, since it always recomputes the same values from the same on-disk
+    Step C/chunk artifacts.
+    """
+    norm_path = Path(norm_jsonl).resolve()
+    reqs: list[dict] = []
+    with open(norm_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                reqs.append(json.loads(line))
+
+    step_c_by_chunk, chunks_by_id = _load_reconstruction_sources(norm_path)
+
+    changed = False
+    for req in reqs:
+        stem = reconstruct_parent_stem(req, step_c_by_chunk, chunks_by_id) or ""
+        embedding_text = f"{stem}\n{req.get('source_quote', '')}".strip() if stem else ""
+        if req.get("parent_stem") != stem or req.get("embedding_text") != embedding_text:
+            changed = True
+        req["parent_stem"] = stem
+        req["embedding_text"] = embedding_text
+
+    if changed:
+        with open(norm_path, "w", encoding="utf-8") as f:
+            for req in reqs:
+                f.write(json.dumps(req, ensure_ascii=False) + "\n")
+
+
 def run(
     norm_jsonl: str,
     output_dir: str,
@@ -387,6 +705,14 @@ def run(
     if profile is None:
         from core.profiles import default_profile as _default_profile
         profile = _default_profile()
+
+    # WP-39.2: deterministic, offline -- kept independent of the LLM-calling code
+    # below, not shared error handling. run_pipeline.py already calls this
+    # unconditionally before invoking run() at all (so it also survives
+    # --skip-enrichment, which skips this whole function); called again here so
+    # anyone invoking enrich_requirements.py standalone gets the same guarantee.
+    # Idempotent, so the redundant call on the run_pipeline.py path is harmless.
+    apply_parent_stem_reconstruction(norm_jsonl)
 
     valid_domain_tags: list[str] = profile["domain_tags"]
     valid_requirement_types: list[str] = profile["requirement_types"]

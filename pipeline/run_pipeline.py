@@ -223,6 +223,25 @@ def run(
         except Exception as e:
             raise RuntimeError(f"Step D failed: {e}") from e
 
+    # WP-39.2: parent-stem reconstruction. Deterministic and offline (no Ollama) --
+    # called here, unconditionally and before the --skip-enrichment check below, so it
+    # survives both --skip-enrichment and a Step D.5 LLM failure. It writes directly
+    # into norm_path (the *_requirements_normalized.jsonl file), the artifact
+    # resolver's lowest, always-present tier -- unlike *_requirements_enriched.jsonl,
+    # which is never created in either of those cases. This call has its own error
+    # handling, separate from Step D.5's try/except below -- a bug here must not be
+    # allowed to crash the whole pipeline run, but it also must not share fate with
+    # (or be skippable via the same flag as) the LLM-calling enrichment step.
+    if "D" in steps_to_run:
+        try:
+            from pipeline import enrich_requirements as _enrich_mod
+            _enrich_mod.apply_parent_stem_reconstruction(str(norm_path))
+        except Exception as e:
+            log.warning(
+                "Parent-stem reconstruction failed (%s) — proceeding without it",
+                e,
+            )
+
     # Step D.5: Enrich requirements with description, domain_tags, requirement_type.
     # Only runs when Step D ran in this invocation (ensures fresh norm_path exists
     # and prevents unexpected LLM work when skip_to skips past D, e.g. --skip-to E).

@@ -486,16 +486,22 @@ def test_apply_parent_stem_reconstruction_idempotent(tmp_path):
     assert first == second
 
 
-def test_dangling_clause_recovered_end_to_end_through_step_d_and_reconstruction(tmp_path):
-    """WP-41: chains parse_and_normalize.run() (Step D) and
-    apply_parent_stem_reconstruction() together exactly as run_pipeline.py's real
-    call sequence does, reproducing the real REQ-1b1071c8d317 (afi17-203) shape
-    found during WP-41 scoping. Before the fix, Step D rejected this record
-    outright (dangling_clause_quote) so reconstruction never got the chance to
-    run on it, even though _find_heading_stem() already correctly recovers this
+def test_dangling_clause_recovered_by_step_d_alone_no_separate_reconstruction_call(tmp_path):
+    """WP-41: parse_and_normalize.run() (Step D) alone -- no separate
+    apply_parent_stem_reconstruction() call -- reproducing the real
+    REQ-1b1071c8d317 (afi17-203) shape found during WP-41 scoping.
+
+    Before the ordering fix, Step D rejected this record outright
+    (dangling_clause_quote) so reconstruction never got the chance to run on
+    it, even though _find_heading_stem() already correctly recovers this
     exact shape when given the chance (test_regression_all_18_known_examples).
-    This test proves the full chain now works end-to-end, not just each half in
-    isolation."""
+    After the ordering fix alone (skip rejection when a header exists), the
+    record survived Step D but relied on a *separate* caller (run_pipeline.py)
+    to actually call reconstruction -- a real gap for parse_and_normalize.py's
+    own standalone CLI usage, which never calls it at all (Codex review, PR
+    #188). run() now calls reconstruction on its own output internally, so
+    this test calls ONLY normalize_run() -- proving every caller, not just
+    the in-process pipeline, gets a fully-reconstructed record."""
     doc_key = "test"
     out_dir = tmp_path / "out"
     out_dir.mkdir()
@@ -528,7 +534,12 @@ def test_dangling_clause_recovered_end_to_end_through_step_d_and_reconstruction(
     normalized = [json.loads(line) for line in norm_path.read_text(encoding="utf-8").splitlines()]
     assert len(normalized) == 1
     assert normalized[0]["source_quote"] == dangling_quote
+    # parent_stem already populated -- no separate apply_parent_stem_reconstruction()
+    # call was made above. This is what proves the standalone-CLI gap is closed.
+    assert normalized[0]["parent_stem"] == header
 
+    # A caller's own redundant call (matching run_pipeline.py's existing "belt and
+    # suspenders" pattern) must be a harmless no-op, not a double-reconstruction bug.
     apply_parent_stem_reconstruction(str(norm_path))
     reconstructed = [json.loads(line) for line in norm_path.read_text(encoding="utf-8").splitlines()]
     assert reconstructed[0]["parent_stem"] == header

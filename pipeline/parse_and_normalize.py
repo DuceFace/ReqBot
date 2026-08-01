@@ -884,6 +884,26 @@ def run(
             f.write(json.dumps(failure, ensure_ascii=False) + "\n")
     log.info("Wrote %s (%d failures)", fail_path, len(failures))
 
+    # WP-41: a nonempty parent_header_text only means the dangling-clause
+    # bypass above *could* recover a subject -- it doesn't mean reconstruction
+    # actually ran. run_pipeline.py's own call to this same function happens
+    # in a separate step (and is itself non-fatal on failure), and
+    # parse_and_normalize.py's own standalone CLI usage (main(), below) never
+    # called it at all -- either path could leave a bypassed dangling clause
+    # in the corpus with no subject and no parent_stem. Calling it here too
+    # (local import: pipeline.enrich_requirements imports back from this
+    # module, so a top-level import would be circular) guarantees every
+    # caller of this function gets reconstruction attempted on its own
+    # output, not just the in-process pipeline path. Idempotent and already
+    # designed for redundant calls (Codex review, PR #188; same "belt and
+    # suspenders" pattern enrich_requirements.run() already uses for its own
+    # standalone-invocation safety).
+    try:
+        from pipeline import enrich_requirements as _enrich_mod
+        _enrich_mod.apply_parent_stem_reconstruction(str(norm_path))
+    except Exception as e:
+        log.warning("Parent-stem reconstruction failed (%s) — proceeding without it", e)
+
     return str(norm_path)
 
 

@@ -164,17 +164,30 @@ clauses as non-obligation content.
 **Step D / reconstruction ordering fix.** `pipeline/parse_and_normalize.py`'s `_is_dangling_clause()`
 rejection branch now checks the chunk's `parent_header_text` (already loaded into `hierarchy` earlier
 in the same loop, no new I/O) before rejecting — skips rejection only when a real header exists,
-otherwise unchanged. Verified 3 ways: (1) new unit test confirms a dangling clause with a recoverable
-header survives Step D while the existing no-header case still rejects exactly as before; (2) new
-end-to-end test chains `parse_and_normalize.run()` and `apply_parent_stem_reconstruction()` together
-(matching `run_pipeline.py`'s real call order) and proves the full path now works, not just each half
-in isolation; (3) live verification against the real corpus — reprocessed all 13 documents through
-Step D again, confirmed **3 real records now survive** with `dangling_clause_quote` previously
-rejecting them (`REQ-1b1071c8d317` afi17-203, plus 2 more found live: `REQ-d26480316089` DODI 5200.48,
-`REQ-4ca0a0bc01d3` afi17-203), **all 3 with `parent_stem` correctly populated** — spot-checked
-directly in the live Qdrant payload after reindex. Corpus total moved 1,856→1,859 points, matching
-`reqbot docs` exactly. `unrepairable_fragment_quote` (31), `orphaned_list_item_quote` (4), and
-`heading_echo_quote` (28) rejection counts are unaffected, confirming the fix is precisely scoped to
+otherwise unchanged. **A nonempty header only means recovery is *possible*, not that it *happened*
+(Codex review, PR #188, verified real):** the original fix relied entirely on a later, separate call
+to `apply_parent_stem_reconstruction()` — `run_pipeline.py`'s own call is wrapped in a non-fatal
+try/except, and `parse_and_normalize.py`'s own standalone CLI (`main()`) never called reconstruction
+at all, so a bypassed dangling clause could survive Step D with no subject and no `parent_stem` under
+either path. Fixed by calling `apply_parent_stem_reconstruction()` on Step D's own output from inside
+`run()` itself (local import — `enrich_requirements.py` imports back from this module, so a top-level
+import would be circular), guaranteeing every caller gets a fully-reconstructed record, not just the
+in-process pipeline. `run_pipeline.py`'s own existing call remains as harmless, idempotent redundancy
+(same pattern `enrich_requirements.run()` already uses for its own standalone-invocation safety).
+Verified 4 ways: (1) new unit test confirms a dangling clause with a recoverable header survives Step
+D while the existing no-header case still rejects exactly as before; (2) end-to-end test proves
+`parse_and_normalize.run()` *alone* — no separate reconstruction call — already returns a record with
+`parent_stem` populated, directly proving the standalone-CLI gap is closed; (3) the same test confirms
+a redundant explicit `apply_parent_stem_reconstruction()` call afterward is a harmless no-op, not a
+double-reconstruction bug; (4) live verification against the real corpus — reprocessed all 13
+documents through Step D again (this time via `run()` alone doing double-duty), confirmed **3 real
+records survive** with `dangling_clause_quote` previously rejecting them (`REQ-1b1071c8d317` afi17-203,
+plus 2 more found live: `REQ-d26480316089` DODI 5200.48, `REQ-4ca0a0bc01d3` afi17-203), **all 3 with
+`parent_stem` correctly populated** — spot-checked directly in the live Qdrant payload after reindex,
+and confirmed identical (1,859 total, 204 with `parent_stem`) to the pre-Codex-fix state, proving the
+fix closes a real gap with zero side effects on already-verified data. `unrepairable_fragment_quote`
+(31), `orphaned_list_item_quote` (4), and `heading_echo_quote` (28) rejection counts are unaffected,
+confirming the fix is precisely scoped to
 the one rule it targets.
 
 **Zero-truth/confidence-floor calibration — conclusive negative result: a flat `min_score` threshold

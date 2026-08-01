@@ -59,12 +59,22 @@ directly before writing this doc rather than assumed:**
 - Phase 38 (extraction-precision rule extensions) and WP-39.2 (parent-stem reconstruction) both
   merged after WP-37.1's baseline was taken — that baseline is stale and needs refreshing before it's
   trusted for anything.
+- **`reqbot reindex` alone is not enough to reflect either change (Codex review, PR #186, verified
+  real).** `reindex` only re-embeds whatever's currently on disk in each document's
+  `_requirements_normalized.jsonl`/`_requirements_enriched.jsonl` — it does not re-run Step D. Both
+  Phase 38 and WP-39.2 explicitly deferred reprocessing the real production corpus as part of their
+  own scope (WP-39.2's Non-Goals: "not re-ingesting or reindexing the full production corpus... matching
+  WP-38.2's own precedent"). Checked directly: **0 of the 18 real processed `_requirements_normalized.jsonl`
+  files on disk today have a `parent_stem` field at all.** A baseline built from a plain `reqbot
+  reindex` would silently still be measuring pre-Phase-38/pre-WP-39.2 data while being reported as a
+  "post-WP-39.2" refresh — the pre-step below now reflects this.
 - Corpus/index state, checked live via `reqbot status`/`reqbot docs` while drafting this doc (not
   trusted from any written-down number, per `CLAUDE.md`): Qdrant's `grc_requirements` collection has
   1,876 points; `reqbot docs` (latest-run-wins) reports 1,872 requirements across 13 documents — a
   small (4-point) drift, likely from a document reprocessed today during WP-39.2's live pipeline
-  verification. Needs a fresh `reqbot reindex` and confirmed match before the baseline refresh, same
-  discipline WP-37.1 itself established.
+  verification (in a scratch copy, not the real corpus — confirmed above). Needs a fresh, *reprocessed*
+  `reqbot reindex` and confirmed match before the baseline refresh, same discipline WP-37.1 itself
+  established.
 
 **What's genuinely new in this phase, not covered by WP-37.1/37.2:**
 
@@ -143,9 +153,19 @@ broad-query and zero-truth weaknesses it measured.
 
 **Scope:**
 
-- **Pre-step: confirm index freshness.** Run `reqbot reindex`; confirm via direct Qdrant inspection
-  (not just exit code, same discipline as WP-37.1's own pre-step) that `grc_requirements`'s point
-  count matches `reqbot docs`'s total before trusting anything measured against it.
+- **Pre-step: reprocess the corpus through Step D, then confirm index freshness.** `reqbot reindex`
+  alone only re-embeds whatever's already on disk — it does not re-run Step D, so it cannot by itself
+  produce a baseline that reflects Phase 38's rejection-rule changes or WP-39.2's reconstruction
+  (Codex review, PR #186: confirmed 0/18 real processed documents currently have a `parent_stem`
+  field). Re-run Step D (`run_pipeline.run(pdf_path, output_dir, skip_to="D", skip_enrichment=True)`,
+  or the equivalent CLI path) for each of the 13 documents against their *existing*
+  `_extracted_requirements.jsonl`/`_chunks.jsonl` — no re-extraction, no Docling, no fresh LLM calls
+  needed for this specifically, since Step D is deterministic and WP-39.2's reconstruction is free
+  (runs unconditionally before the `--skip-enrichment` check per its own design) — then `reqbot
+  reindex`. Confirm via direct Qdrant inspection (not just exit code, same discipline as WP-37.1's own
+  pre-step) that `grc_requirements`'s point count matches `reqbot docs`'s total, *and* spot-check that
+  at least one reprocessed document's normalized JSONL now has non-empty `parent_stem` on a record
+  known to need it, before trusting anything measured against it as "post-WP-39.2."
 - **Re-run WP-37.1's exact harness, unmodified**, against current `main` — same 16 queries, same
   labels, same production `retrieve()` defaults (HyDE on, query rewrite on, `top_k=20`,
   `min_score=0.02`). Report the refreshed baseline plainly, including a direct before/after comparison
@@ -165,14 +185,30 @@ broad-query and zero-truth weaknesses it measured.
   - **Messy-PDF/over-grab** — queries where a known-problematic extraction (over-broad, duplicated, or
     otherwise imprecise per Phase 38's Over-Grab Precision backlog note) is likely to surface
     incorrectly.
+- **When hand-labeling each query, also check the raw source document/chunk text directly, not just
+  the existing requirement corpus, for content relevant to the query with no corresponding
+  `requirement_id` at all** (Codex review, PR #186, verified real: `requirement_id` is only assigned
+  after a record survives Step D's `valid_reqs.append()` — confirmed directly against
+  `pipeline/parse_and_normalize.py` — so a query set built only from `relevant_requirement_ids` can
+  detect an already-known record disappearing from top-k, but structurally cannot detect content Step
+  C never extracted at all; extraction-failure prevalence would otherwise be systematically
+  undercounted). Record any such find as a query-level `unextracted_relevant_content` note (document,
+  location/quote, brief description) alongside `relevant_requirement_ids` — this is a distinct signal
+  from a ranked-away ID and feeds extraction-failure prevalence directly, not through the recall
+  metric. Concentrate this check on the broad/thematic and table-derived buckets, where genuinely
+  unextracted content is most likely to hide.
 - **Define and apply the failure-classification layer.** Starting operational definitions below —
   calibrate against real misses during the audit, the same way every category boundary in this
   project's prior audits (WP-38.1, WP-39.1) was calibrated rather than assumed correct on the first
   pass:
-  1. **Extraction failure** — the expected `requirement_id`'s content was never captured as a Step
-     C/D record at all for the relevant chunk (checked directly against `*_extracted_requirements.jsonl`
-     and `*_normalization_failures.jsonl`, same artifacts WP-39.1's `trace_examples.py` already knows
-     how to read) — a retrieval miss that isn't retrieval's fault.
+  1. **Extraction failure** — either (a) an expected `requirement_id` whose content is confirmed
+     absent from a Step C/D record for the relevant chunk (checked directly against
+     `*_extracted_requirements.jsonl` and `*_normalization_failures.jsonl`, same artifacts WP-39.1's
+     `trace_examples.py` already knows how to read), or (b) a query's `unextracted_relevant_content`
+     note from the labeling step above — genuinely unextracted source content with no `requirement_id`
+     to even place in the gold set. Report the two sub-counts separately: (a) alone would understate
+     true prevalence (see the labeling-methodology note above), so the combined count, not just (a), is
+     what should drive the WP-41 recommendation.
   2. **Missing context** — the record exists but is a decontextualized fragment (WP-38.1/39.1's
      FRAGMENT shape) that either has no `parent_stem` despite looking like a WP-39.2 candidate, or is
      one of the categories WP-39.2 explicitly deferred (`STEM_NEVER_EXTRACTED`).
@@ -210,13 +246,17 @@ only.
   discipline as WP-37.1's original 16.
 - Full `pytest` suite and `ruff check .` clean throughout.
 
-**Gate:** Index freshness confirmed before measuring anything; WP-37.1's harness re-run unmodified
-against current `main` with a real refreshed baseline reported (including a direct before/after vs.
-WP-37.1's original numbers); gold query set expanded from 16 to ~50 with deliberate coverage across
-all 6 named buckets, every label hand-verified; every miss/over-grab across the expanded set
-classified into one of the 8 categories using the operational definitions above (calibrated against
-real examples, not applied blindly); category prevalence reported; a specific, evidenced WP-41
-recommendation stated; no retrieval code changed; full test suite and `ruff check .` clean.
+**Gate:** Corpus reprocessed through Step D (confirmed via a non-empty `parent_stem` spot-check, not
+just a matching point count) and reindexed before measuring anything; WP-37.1's harness re-run
+unmodified against current `main` with a real refreshed baseline reported (including a direct
+before/after vs. WP-37.1's original numbers); gold query set expanded from 16 to ~50 with deliberate
+coverage across all 6 named buckets, every label hand-verified against real source text including a
+check for unextracted-but-relevant content with no `requirement_id`; every miss/over-grab across the
+expanded set classified into one of the 8 categories using the operational definitions above
+(calibrated against real examples, not applied blindly), extraction-failure reported as both sub-counts
+(missing `requirement_id` vs. genuinely unextracted content); category prevalence reported; a specific,
+evidenced WP-41 recommendation stated; no retrieval code changed; full test suite and `ruff check .`
+clean.
 
 **Findings:** _(pending — filled in once WP-40 runs)_
 
@@ -243,13 +283,16 @@ eventual scope is traceable, not implicit:
 
 ## 6. Success Gate
 
-- [ ] Index freshness confirmed (`reqbot reindex` + direct point-count match) before any measurement.
+- [ ] Corpus reprocessed through Step D (not just `reindex`) and confirmed via a non-empty
+      `parent_stem` spot-check before any measurement is trusted as "post-WP-39.2."
 - [ ] WP-37.1's harness re-run unmodified against current `main`; a real, refreshed baseline reported
       with a direct before/after comparison against WP-37.1's original numbers.
 - [ ] Gold query set expanded from 16 to ~50, deliberately covering all 6 named buckets, every label
-      hand-verified against real corpus text.
+      hand-verified against real corpus text — including a check for relevant source content with no
+      `requirement_id` at all.
 - [ ] Every miss/over-grab across the expanded set classified into one of the 8 named categories,
-      using operational definitions calibrated against real examples during the audit.
+      using operational definitions calibrated against real examples during the audit; extraction
+      failure reported as both sub-counts (missing ID vs. genuinely unextracted content).
 - [ ] Category prevalence reported and a specific, evidenced WP-41 recommendation stated — not a
       menu of untested options.
 - [ ] No retrieval code changed in this phase.

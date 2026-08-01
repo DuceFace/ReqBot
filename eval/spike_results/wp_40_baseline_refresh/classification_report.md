@@ -1,10 +1,10 @@
 # WP-40 Failure Classification Report
 
 ## Harness aggregate (expanded ~50-query set)
-- mean_recall@5: 0.6109
-- mean_recall@10: 0.6659
-- mean_recall@20: 0.7096
-- mean_mrr: 0.681
+- mean_recall@5: 0.6049
+- mean_recall@10: 0.6701
+- mean_recall@20: 0.721
+- mean_mrr: 0.7381
 - non-zero queries scored: 37
 - zero-truth queries: 8, mean results returned: 20.0
 
@@ -13,12 +13,12 @@
 | Category | Count |
 |---|---|
 | extraction_failure | 9 |
-| missing_context | 8 |
+| missing_context | 9 |
 | table_serialization | 5 |
 | embedding_miss | 8 |
-| ranking_miss | 18 |
-| over_grab | 44 |
-| query_filter_issue | 7 |
+| ranking_miss | 17 |
+| over_grab | 42 |
+| query_filter_issue | 8 |
 | zero_truth_confidence_failure | 0 |
 
 - extraction_failure sub-counts: (a) absent_from_corpus=7, (b) never_extracted=2
@@ -31,41 +31,42 @@
 | Q-N03 | REQ-19f5e7133b96 | extraction_failure | REQ-19f5e7133b96: Step D rejected this content directly (error='unrepairable_fragment_quote'), confirmed via DODI 5200.44_normalization_failures.jsonl. |
 | Q-N04 | REQ-cbc6374a655f | extraction_failure | REQ-cbc6374a655f: Step D rejected this content directly (error='orphaned_list_item_quote'), confirmed via afi10-2402_normalization_failures.jsonl. |
 | Q-B01 | REQ-27998b57b68e | query_filter_issue | REQ-27998b57b68e appears in a raw-query (no rewrite/HyDE) top-20 but not production's -- the rewrite/HyDE transformation pushed it out. |
-| Q-B01 | REQ-6e318c38de37 | ranking_miss | REQ-6e318c38de37: present in the top_k=100/min_score=0 pool at rank 22 (score=0.1242 >= floor) but outside production top-20. |
-| Q-B01 | REQ-6fc878342d73 | ranking_miss | REQ-6fc878342d73: present in the top_k=100/min_score=0 pool at rank 70 (score=0.0432 >= floor) but outside production top-20. |
-| Q-B01 | REQ-71da6dfa4ff6 | ranking_miss | REQ-71da6dfa4ff6: present in the top_k=100/min_score=0 pool at rank 57 (score=0.0568 >= floor) but outside production top-20. |
-| Q-B01 | REQ-c9fb01a1de64 | ranking_miss | REQ-c9fb01a1de64: present in the top_k=100/min_score=0 pool at rank 32 (score=0.0890 >= floor) but outside production top-20. |
+| Q-B01 | REQ-6fc878342d73 | ranking_miss | REQ-6fc878342d73: present in the top_k=100/min_score=0 pool at rank 59 (score=0.0511 >= floor) but outside production top-20. |
+| Q-B01 | REQ-71da6dfa4ff6 | ranking_miss | REQ-71da6dfa4ff6: present in the top_k=100/min_score=0 pool at rank 67 (score=0.0455 >= floor) but outside production top-20. |
+| Q-B01 | REQ-c9fb01a1de64 | ranking_miss | REQ-c9fb01a1de64: present in the top_k=100/min_score=0 pool at rank 31 (score=0.0890 >= floor) but outside production top-20. |
 | Q-B01 | REQ-ceca6f11ee37 | query_filter_issue | REQ-ceca6f11ee37 appears in a raw-query (no rewrite/HyDE) top-20 but not production's -- the rewrite/HyDE transformation pushed it out. |
 | Q-B01 | REQ-dc24c38b9701 | embedding_miss | REQ-dc24c38b9701 absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
 | Q-B02 | REQ-6b00bb3cc8aa | embedding_miss | REQ-6b00bb3cc8aa absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
-| Q-B02 | REQ-6ede29bd318f | ranking_miss | REQ-6ede29bd318f: present in the top_k=100/min_score=0 pool at rank 49 (score=0.0678 >= floor) but outside production top-20. |
+| Q-B02 | REQ-6ede29bd318f | ranking_miss | REQ-6ede29bd318f: present in the top_k=100/min_score=0 pool at rank 30 (score=0.0992 >= floor) but outside production top-20. |
 | Q-B02 | REQ-75692d2c3b99 | missing_context | REQ-75692d2c3b99: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='If remote administration is enabled in a hypervisor, access to all remote administration interfaces ' |
-| Q-B03 | REQ-0a7205b45a34 | ranking_miss | REQ-0a7205b45a34: present in the top_k=100/min_score=0 pool at rank 21 (score=0.1200 >= floor) but outside production top-20. |
+| Q-B03 | REQ-0a7205b45a34 | ranking_miss | REQ-0a7205b45a34: present in the top_k=100/min_score=0 pool at rank 30 (score=0.0904 >= floor) but outside production top-20. |
+| Q-B03 | REQ-154c5aadf0a4 | query_filter_issue | REQ-154c5aadf0a4 appears in a raw-query (no rewrite/HyDE) top-20 but not production's -- the rewrite/HyDE transformation pushed it out. |
 | Q-B04 | REQ-32fd3744782c | embedding_miss | REQ-32fd3744782c absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
-| Q-B04 | REQ-34637afacfba | ranking_miss | REQ-34637afacfba: present in the top_k=100/min_score=0 pool at rank 38 (score=0.0834 >= floor) but outside production top-20. |
+| Q-B04 | REQ-34637afacfba | ranking_miss | REQ-34637afacfba: present in the top_k=100/min_score=0 pool at rank 43 (score=0.0762 >= floor) but outside production top-20. |
 | Q-B04 | REQ-8313e79684fd | query_filter_issue | REQ-8313e79684fd appears in a raw-query (no rewrite/HyDE) top-20 but not production's -- the rewrite/HyDE transformation pushed it out. |
 | Q-B04 | REQ-c3615152818c | missing_context | REQ-c3615152818c: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='Submit a final IR within 24 hours of the all action related to the incident being completed.' |
-| Q-B04 | REQ-ec4f782c42cc | ranking_miss | REQ-ec4f782c42cc: present in the top_k=100/min_score=0 pool at rank 31 (score=0.1078 >= floor) but outside production top-20. |
-| Q-B05 | REQ-040038ca5a22 | ranking_miss | REQ-040038ca5a22: present in the top_k=100/min_score=0 pool at rank 86 (score=0.0327 >= floor) but outside production top-20. |
-| Q-B05 | REQ-062332da9327 | ranking_miss | REQ-062332da9327: present in the top_k=100/min_score=0 pool at rank 75 (score=0.0372 >= floor) but outside production top-20. |
+| Q-B04 | REQ-e89da233db7e | missing_context | REQ-e89da233db7e: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='Personnel should continuously review, corroborate, and update (if applicable) the reported incident ' |
+| Q-B04 | REQ-ec4f782c42cc | ranking_miss | REQ-ec4f782c42cc: present in the top_k=100/min_score=0 pool at rank 36 (score=0.0881 >= floor) but outside production top-20. |
+| Q-B05 | REQ-040038ca5a22 | ranking_miss | REQ-040038ca5a22: present in the top_k=100/min_score=0 pool at rank 48 (score=0.0582 >= floor) but outside production top-20. |
+| Q-B05 | REQ-062332da9327 | ranking_miss | REQ-062332da9327: present in the top_k=100/min_score=0 pool at rank 80 (score=0.0345 >= floor) but outside production top-20. |
 | Q-B05 | REQ-10219b48059c | embedding_miss | REQ-10219b48059c absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
 | Q-B05 | REQ-24f365872807 | query_filter_issue | REQ-24f365872807 appears in a raw-query (no rewrite/HyDE) top-20 but not production's -- the rewrite/HyDE transformation pushed it out. |
-| Q-B05 | REQ-3a28755e1e4e | ranking_miss | REQ-3a28755e1e4e: present in the top_k=100/min_score=0 pool at rank 41 (score=0.0676 >= floor) but outside production top-20. |
+| Q-B05 | REQ-3a28755e1e4e | ranking_miss | REQ-3a28755e1e4e: present in the top_k=100/min_score=0 pool at rank 35 (score=0.0823 >= floor) but outside production top-20. |
 | Q-B05 | REQ-3ba1011588d0 | embedding_miss | REQ-3ba1011588d0 absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
 | Q-B05 | REQ-3d5d46029848 | embedding_miss | REQ-3d5d46029848 absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
-| Q-B05 | REQ-44d9dec82620 | ranking_miss | REQ-44d9dec82620: present in the top_k=100/min_score=0 pool at rank 63 (score=0.0420 >= floor) but outside production top-20. |
-| Q-B05 | REQ-611bb564a245 | ranking_miss | REQ-611bb564a245: present in the top_k=100/min_score=0 pool at rank 77 (score=0.0369 >= floor) but outside production top-20. |
-| Q-B05 | REQ-6c41a63b4601 | ranking_miss | REQ-6c41a63b4601: present in the top_k=100/min_score=0 pool at rank 67 (score=0.0391 >= floor) but outside production top-20. |
+| Q-B05 | REQ-44d9dec82620 | ranking_miss | REQ-44d9dec82620: present in the top_k=100/min_score=0 pool at rank 64 (score=0.0428 >= floor) but outside production top-20. |
+| Q-B05 | REQ-611bb564a245 | ranking_miss | REQ-611bb564a245: present in the top_k=100/min_score=0 pool at rank 84 (score=0.0319 >= floor) but outside production top-20. |
+| Q-B05 | REQ-6c41a63b4601 | ranking_miss | REQ-6c41a63b4601: present in the top_k=100/min_score=0 pool at rank 78 (score=0.0355 >= floor) but outside production top-20. |
 | Q-B05 | REQ-9c7e09003f88 | embedding_miss | REQ-9c7e09003f88 absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
 | Q-B05 | REQ-9d61639d1f89 | missing_context | REQ-9d61639d1f89: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='The CARM Program utilizes products from three separate assessments to determine risk to AF TCAs and ' |
 | Q-B05 | REQ-b307f533b9fa | missing_context | REQ-b307f533b9fa: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='(2) Assess risk, and plan and implement mitigations to ensure the confidentiality, integrity, availa' |
 | Q-B05 | REQ-d45401b1a7b1 | missing_context | REQ-d45401b1a7b1: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='Establish and maintain an operational TSN program to enable risk owners to identify, assess, and man' |
-| Q-B05 | REQ-e9e83b3ec2e5 | ranking_miss | REQ-e9e83b3ec2e5: present in the top_k=100/min_score=0 pool at rank 65 (score=0.0395 >= floor) but outside production top-20. |
+| Q-B05 | REQ-e9e83b3ec2e5 | ranking_miss | REQ-e9e83b3ec2e5: present in the top_k=100/min_score=0 pool at rank 77 (score=0.0356 >= floor) but outside production top-20. |
 | Q-B05 | REQ-edc0df1cb13c | embedding_miss | REQ-edc0df1cb13c absent even from top_k=100/min_score=0 pool (100 candidates) -- genuine semantic/vocabulary mismatch. |
 | Q-B05 | REQ-ee004d53c363 | query_filter_issue | REQ-ee004d53c363 appears in a raw-query (no rewrite/HyDE) top-20 but not production's -- the rewrite/HyDE transformation pushed it out. |
-| Q-B05 | REQ-f4ad3db3e934 | ranking_miss | REQ-f4ad3db3e934: present in the top_k=100/min_score=0 pool at rank 68 (score=0.0391 >= floor) but outside production top-20. |
-| Q-B05 | REQ-f78038d96493 | ranking_miss | REQ-f78038d96493: present in the top_k=100/min_score=0 pool at rank 54 (score=0.0504 >= floor) but outside production top-20. |
-| Q-C03 | REQ-0c36ee7705d6 | ranking_miss | REQ-0c36ee7705d6: present in the top_k=100/min_score=0 pool at rank 87 (score=0.0348 >= floor) but outside production top-20. |
+| Q-B05 | REQ-f4ad3db3e934 | ranking_miss | REQ-f4ad3db3e934: present in the top_k=100/min_score=0 pool at rank 58 (score=0.0474 >= floor) but outside production top-20. |
+| Q-B05 | REQ-f78038d96493 | ranking_miss | REQ-f78038d96493: present in the top_k=100/min_score=0 pool at rank 63 (score=0.0450 >= floor) but outside production top-20. |
+| Q-C03 | REQ-0c36ee7705d6 | ranking_miss | REQ-0c36ee7705d6: present in the top_k=100/min_score=0 pool at rank 80 (score=0.0381 >= floor) but outside production top-20. |
 | Q-C03 | REQ-1cc75ab1ae84 | missing_context | REQ-1cc75ab1ae84: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='There are no contract restrictions prohibiting access to such information.' |
 | Q-C03 | REQ-8b4912b3e342 | missing_context | REQ-8b4912b3e342: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='Access to such information is in accordance with DoDIs 8500.01 and 5200.02 and export control regula' |
 | Q-C03 | REQ-e82948a97dc5 | missing_context | REQ-e82948a97dc5: fragment-shaped (_is_reconstruction_candidate=True) but parent_stem is empty -- source_quote='Access to such information is within the scope of their assigned duties.' |
@@ -89,7 +90,7 @@
 | query_id | requirement_id | rank | evidence |
 |---|---|---|---|
 | Q-N01 | REQ-cdac2ad9724b | 3 | REQ-cdac2ad9724b shares chunk ('dafman17-1305', 105) with a relevant record for query Q-N01 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-N03 | REQ-a6ac20cd94f1 | 15 | REQ-a6ac20cd94f1 shares chunk ('DODI 5200.44', 6) with a relevant record for query Q-N03 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-N03 | REQ-a6ac20cd94f1 | 9 | REQ-a6ac20cd94f1 shares chunk ('DODI 5200.44', 6) with a relevant record for query Q-N03 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-N06 | REQ-dbaf782e8042 | 2 | REQ-dbaf782e8042 shares chunk ('DODI 8410.03', 29) with a relevant record for query Q-N06 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-N06 | REQ-354c9774c06d | 3 | REQ-354c9774c06d shares chunk ('DODI 8410.03', 29) with a relevant record for query Q-N06 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-N06 | REQ-b892fd30193d | 4 | REQ-b892fd30193d shares chunk ('DODI 8410.03', 29) with a relevant record for query Q-N06 -- likely duplicate/near-duplicate fragment of the same source clause. |
@@ -100,36 +101,34 @@
 | Q-N07 | REQ-b892fd30193d | 5 | REQ-b892fd30193d shares chunk ('DODI 8410.03', 29) with a relevant record for query Q-N07 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-N07 | REQ-e134a16c0607 | 7 | REQ-e134a16c0607 shares chunk ('DODI 8410.03', 29) with a relevant record for query Q-N07 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-N07 | REQ-a6253aa111da | 8 | REQ-a6253aa111da shares chunk ('DODI 8410.03', 29) with a relevant record for query Q-N07 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B03 | REQ-88820e2b8b08 | 6 | REQ-88820e2b8b08 shares chunk ('dafman17-1305', 45) with a relevant record for query Q-B03 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B03 | REQ-88820e2b8b08 | 9 | REQ-88820e2b8b08 shares chunk ('dafman17-1305', 45) with a relevant record for query Q-B03 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-B04 | REQ-775b96d1622a | 3 | REQ-775b96d1622a shares chunk ('afi17-203', 23) with a relevant record for query Q-B04 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B04 | REQ-8d80e105612d | 7 | REQ-8d80e105612d shares chunk ('afi17-203', 46) with a relevant record for query Q-B04 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B04 | REQ-5c87ff79b709 | 14 | REQ-5c87ff79b709 shares chunk ('afi17-203', 32) with a relevant record for query Q-B04 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B05 | REQ-9ece516563ab | 3 | REQ-9ece516563ab shares chunk ('DODI 5200.44', 6) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B05 | REQ-d40f19c7f4d5 | 13 | REQ-d40f19c7f4d5 shares chunk ('afi10-2402', 36) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B05 | REQ-d7d2600474ee | 16 | REQ-d7d2600474ee shares chunk ('afi10-2402', 36) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B05 | REQ-b7b5981f43d4 | 18 | REQ-b7b5981f43d4 shares chunk ('afi10-2402', 36) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B05 | REQ-7cdf0de77d36 | 19 | REQ-7cdf0de77d36 shares chunk ('DODI 5200.44', 6) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B04 | REQ-5c87ff79b709 | 6 | REQ-5c87ff79b709 shares chunk ('afi17-203', 32) with a relevant record for query Q-B04 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B04 | REQ-8d80e105612d | 12 | REQ-8d80e105612d shares chunk ('afi17-203', 46) with a relevant record for query Q-B04 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B05 | REQ-9ece516563ab | 2 | REQ-9ece516563ab shares chunk ('DODI 5200.44', 6) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B05 | REQ-d40f19c7f4d5 | 11 | REQ-d40f19c7f4d5 shares chunk ('afi10-2402', 36) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B05 | REQ-d7d2600474ee | 15 | REQ-d7d2600474ee shares chunk ('afi10-2402', 36) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B05 | REQ-b7b5981f43d4 | 17 | REQ-b7b5981f43d4 shares chunk ('afi10-2402', 36) with a relevant record for query Q-B05 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-N08 | REQ-f50c31b9e834 | 4 | REQ-f50c31b9e834 shares chunk ('DODI 5200.01', 5) with a relevant record for query Q-N08 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-N09 | REQ-54da52e71bb6 | 20 | REQ-54da52e71bb6 shares chunk ('DODI 5200.48', 81) with a relevant record for query Q-N09 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B06 | REQ-36f6fea6b7c0 | 8 | REQ-36f6fea6b7c0 shares chunk ('afi10-2402', 42) with a relevant record for query Q-B06 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-B07 | REQ-1b60859d54d1 | 17 | REQ-1b60859d54d1 shares chunk ('afi13-550', 53) with a relevant record for query Q-B07 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B06 | REQ-36f6fea6b7c0 | 5 | REQ-36f6fea6b7c0 shares chunk ('afi10-2402', 42) with a relevant record for query Q-B06 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-B07 | REQ-1b60859d54d1 | 16 | REQ-1b60859d54d1 shares chunk ('afi13-550', 53) with a relevant record for query Q-B07 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-B08 | REQ-851c6b9acdc0 | 8 | REQ-851c6b9acdc0 shares chunk ('DODI 5200.44', 5) with a relevant record for query Q-B08 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-B08 | REQ-edc0df1cb13c | 9 | REQ-edc0df1cb13c shares chunk ('DODI 5200.44', 9) with a relevant record for query Q-B08 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-B08 | REQ-406330fb770f | 15 | REQ-406330fb770f shares chunk ('DODI 5200.44', 14) with a relevant record for query Q-B08 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-B08 | REQ-10219b48059c | 20 | REQ-10219b48059c shares chunk ('DODI 5200.44', 31) with a relevant record for query Q-B08 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-C02 | REQ-4faadf03847b | 20 | REQ-4faadf03847b shares chunk ('DODI 8410.03', 34) with a relevant record for query Q-C02 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-C01 | REQ-1459678911ab | 19 | REQ-1459678911ab shares chunk ('DODI 5200.01', 2) with a relevant record for query Q-C01 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-C02 | REQ-4faadf03847b | 18 | REQ-4faadf03847b shares chunk ('DODI 8410.03', 34) with a relevant record for query Q-C02 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-C03 | REQ-b688ddb1fe9c | 2 | REQ-b688ddb1fe9c shares chunk ('DODI 5200.48', 64) with a relevant record for query Q-C03 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-T01 | REQ-34ee50fb9205 | 11 | REQ-34ee50fb9205 shares chunk ('afi17-203', 55) with a relevant record for query Q-T01 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-O01 | REQ-189d6285eaa2 | 4 | REQ-189d6285eaa2 hand-labeled as a known over-broad/duplicate extraction for query Q-O01. |
-| Q-O01 | REQ-7d8ee54e28e5 | 7 | REQ-7d8ee54e28e5 hand-labeled as a known over-broad/duplicate extraction for query Q-O01. |
-| Q-O01 | REQ-cf2bc6e8a365 | 9 | REQ-cf2bc6e8a365 hand-labeled as a known over-broad/duplicate extraction for query Q-O01. |
+| Q-T01 | REQ-34ee50fb9205 | 6 | REQ-34ee50fb9205 shares chunk ('afi17-203', 55) with a relevant record for query Q-T01 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-O01 | REQ-189d6285eaa2 | 1 | REQ-189d6285eaa2 hand-labeled as a known over-broad/duplicate extraction for query Q-O01. |
+| Q-O01 | REQ-7d8ee54e28e5 | 3 | REQ-7d8ee54e28e5 hand-labeled as a known over-broad/duplicate extraction for query Q-O01. |
+| Q-O01 | REQ-cf2bc6e8a365 | 5 | REQ-cf2bc6e8a365 hand-labeled as a known over-broad/duplicate extraction for query Q-O01. |
 | Q-O02 | REQ-cc458f334808 | 1 | REQ-cc458f334808 hand-labeled as a known over-broad/duplicate extraction for query Q-O02. |
 | Q-O02 | REQ-eeb283685157 | 3 | REQ-eeb283685157 shares chunk ('afi17-203', 57) with a relevant record for query Q-O02 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-O02 | REQ-10f00faf0eda | 6 | REQ-10f00faf0eda shares chunk ('afi17-203', 57) with a relevant record for query Q-O02 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-O02 | REQ-3e1eb55f96e3 | 7 | REQ-3e1eb55f96e3 shares chunk ('afi17-203', 57) with a relevant record for query Q-O02 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-O04 | REQ-9de207b16791 | 3 | REQ-9de207b16791 hand-labeled as a known over-broad/duplicate extraction for query Q-O04. |
-| Q-O04 | REQ-ee58af92484e | 4 | REQ-ee58af92484e shares chunk ('afi10-2402', 87) with a relevant record for query Q-O04 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-O04 | REQ-6905b387f5db | 12 | REQ-6905b387f5db shares chunk ('afi10-2402', 87) with a relevant record for query Q-O04 -- likely duplicate/near-duplicate fragment of the same source clause. |
-| Q-O05 | REQ-9f12eac0a73a | 4 | REQ-9f12eac0a73a shares chunk ('DODI 5200.48', 66) with a relevant record for query Q-O05 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-O02 | REQ-3e1eb55f96e3 | 6 | REQ-3e1eb55f96e3 shares chunk ('afi17-203', 57) with a relevant record for query Q-O02 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-O02 | REQ-10f00faf0eda | 8 | REQ-10f00faf0eda shares chunk ('afi17-203', 57) with a relevant record for query Q-O02 -- likely duplicate/near-duplicate fragment of the same source clause. |
+| Q-O04 | REQ-9de207b16791 | 2 | REQ-9de207b16791 hand-labeled as a known over-broad/duplicate extraction for query Q-O04. |
+| Q-O04 | REQ-ee58af92484e | 5 | REQ-ee58af92484e shares chunk ('afi10-2402', 87) with a relevant record for query Q-O04 -- likely duplicate/near-duplicate fragment of the same source clause. |
 | Q-O05 | REQ-ed8684f5020a | 5 | REQ-ed8684f5020a hand-labeled as a known over-broad/duplicate extraction for query Q-O05. |
+| Q-O05 | REQ-9f12eac0a73a | 6 | REQ-9f12eac0a73a shares chunk ('DODI 5200.48', 66) with a relevant record for query Q-O05 -- likely duplicate/near-duplicate fragment of the same source clause. |
 

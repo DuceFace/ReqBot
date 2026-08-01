@@ -462,13 +462,20 @@ def build_prevalence_report(
                 "evidence": note if isinstance(note, str) else json.dumps(note),
             })
 
-        # Pass the full pool (not just the top_k-truncated production_ids) so a
-        # hand-labeled expected_over_grab_id can be found and its real rank
-        # reported even when this particular draw pushed it past the evaluated
-        # window -- classify_over_grabs' own top_k still gates which findings
-        # count as "in the user-visible top-k" (Codex review, PR #187).
-        pool_ordered_ids = [r["requirement_id"] for r in pool_hits]
-        for og in classify_over_grabs(query, pool_ordered_ids, corpus):
+        # Pass the full min_score-filtered pool (not just the top_k-truncated
+        # production_ids) so a hand-labeled expected_over_grab_id can be found
+        # and its real rank reported even when this particular draw pushed it
+        # past the evaluated window -- classify_over_grabs' own top_k still
+        # gates which findings count as "in the user-visible top-k" (Codex
+        # review, PR #187). Filtering by min_score first (not just raising
+        # top_k) matters here too: without it, a query with fewer than 20
+        # above-floor hits would have sub-threshold noise from the unfiltered
+        # min_score=0 pool occupying "positions" 1-20, since core.ask.retrieve()
+        # filters min_score *before* trimming to top_k in real production
+        # (Gemini review, PR #187 -- the same class of bug Codex's PR #186
+        # review already caught once for classify_miss's own boundary).
+        production_ordered_ids = [r["requirement_id"] for r in pool_hits if r["score"] >= PRODUCTION_MIN_SCORE]
+        for og in classify_over_grabs(query, production_ordered_ids, corpus):
             og["query_id"] = query["query_id"]
             over_grab_classifications.append(og)
 

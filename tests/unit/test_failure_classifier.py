@@ -481,3 +481,41 @@ def test_build_prevalence_report_finds_expected_over_grab_beyond_production_topk
     over_grabs = [og for og in report["over_grab_classifications"] if og["requirement_id"] == "REQ-buried"]
     assert len(over_grabs) == 1
     assert over_grabs[0]["rank"] == 26
+
+
+def test_build_prevalence_report_excludes_sub_threshold_pool_hits_from_over_grab_window():
+    # Gemini review, PR #187: when a query has fewer than 20 above-floor pool
+    # hits, positions 1-20 of the *unfiltered* min_score=0 pool can include
+    # sub-threshold noise -- core.ask.retrieve() filters min_score BEFORE
+    # trimming to top_k in real production, so a record scoring below the
+    # floor would never actually appear in production's top-20 regardless of
+    # its raw positional rank in an unfiltered pool. Same class of bug Codex's
+    # PR #186 review already caught once for classify_miss's own boundary.
+    queries = [
+        {
+            "query_id": "Q-O1", "query": "narrow query", "shape": "messy_pdf_overgrab",
+            "relevant_requirement_ids": ["REQ-good"],
+        },
+    ]
+    harness_report = {
+        "per_query": [
+            {"query_id": "Q-O1", "query": "narrow query", "shape": "messy_pdf_overgrab", "relevant_count": 1,
+             "retrieved_ids": ["REQ-good"], "recall@5": 1.0, "recall@10": 1.0, "recall@20": 1.0, "mrr": 1.0},
+        ],
+        "aggregate": {},
+    }
+    corpus = _corpus({
+        "REQ-good": {"chunk_id": 5, "source_quote": "The correct clause.", "parent_stem": ""},
+        "REQ-subfloor": {"chunk_id": 5, "source_quote": "A same-chunk record scoring below the production floor.", "parent_stem": ""},
+    })
+    # Only 2 hits total, well under top_k=20 -- REQ-subfloor's score is below
+    # PRODUCTION_MIN_SCORE, so it would never surface in real production output.
+    pool_hits = [
+        {"requirement_id": "REQ-good", "score": 0.9},
+        {"requirement_id": "REQ-subfloor", "score": 0.005},
+    ]
+    with patch.object(fc, "retrieve", return_value={"results": pool_hits}):
+        report = fc.build_prevalence_report(
+            queries, corpus, qdrant_url="http://x", ollama_url="http://y", harness_report=harness_report,
+        )
+    assert report["over_grab_classifications"] == []

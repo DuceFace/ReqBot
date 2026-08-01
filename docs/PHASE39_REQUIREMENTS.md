@@ -22,7 +22,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-39.1 — Parent-Stem Context Loss Audit | Complete |
-| WP-39.2 — Parent-Stem Reconstruction | Not started |
+| WP-39.2 — Parent-Stem Reconstruction | Complete |
 
 ---
 
@@ -522,7 +522,124 @@ run; reconstruction confirmed to survive both `--skip-enrichment` and a simulate
 failure, not silently coupled to Ollama availability; retrieval improvement re-confirmed on a broader
 sample; Step D's existing rejection logic untouched; full test suite and `ruff check .` clean.
 
-**Findings:** _(pending — filled in once WP-39.2 runs)_
+**Findings:**
+
+*Implementation, per the Placement recommendation above:* `pipeline/enrich_requirements.py`
+gained a fully separate, deterministic code path (`apply_parent_stem_reconstruction()` and its
+helpers) that writes `parent_stem`/`embedding_text` directly onto `*_requirements_normalized.jsonl`
+— the resolver's lowest, always-present tier, not just the enriched one — and is called
+unconditionally from `run_pipeline.py` immediately after Step D, before the `--skip-enrichment`
+check and in its own `try`/`except`, separate from Step D.5's. `enrich_requirements.run()` also
+calls it at its own top for anyone invoking that module standalone. `pipeline/embed_and_index.py`'s
+`build_embedding_text()` now prefers a record's `embedding_text` field over bare `source_quote`, and
+`build_payload()` indexes both new fields. `core/ask.py`'s `format_evidence()`/`print_results_table()`
+now render a `Governing clause:` line when `parent_stem` is present.
+
+*Calibration against the 18 known examples surfaced 6 real gaps beyond what PR #184's review
+caught* — the scope above was written before any code existed against it; every one of these was
+found by actually running the lookup against real corpus text, not by re-reading the spec:
+
+1. **The scope's step-1 signal ("preceding record contains a colon") misses 2 of the 10 cheap
+   wins.** `REQ-c62e41aaf181` and `REQ-9700722b04cd`'s real antecedent records have no colon at
+   all — one is an unfinished clause Step C split from its own continuation
+   (`"establish, direct, and administer...SCI security programs"`, no terminal punctuation at
+   all); the other is a case where the fragment's text is already a verbatim tail of the
+   preceding record (`"...shall be coordinated with the customer."`). Fixed by adding two more
+   antecedent-validity conditions: no terminal sentence punctuation at all (used as-is), or the
+   target quote is a substring of the candidate (candidate used as-is).
+2. **A step-3 fallback that fires whenever steps 1-2 fail also fires for `STEM_NEVER_EXTRACTED`,**
+   which must get no `parent_stem` at all. Confirmed `REQ-4aeeff50f15b`'s own `parent_header_text`
+   doesn't even match its chunk's real section (an unrelated upstream ancestry-tracking mismatch,
+   not fixable here) — an ungated fallback would have attached it anyway. Fixed by gating step 3 on
+   `_is_dangling_clause()`, the existing WP-38.2 predicate already confirmed (by its own docstring)
+   to uniquely flag `REQ-1b1071c8d317` among all 18 with zero false positives against 284 real
+   corpus records — reused rather than reinvented.
+3. **Checking only the immediate preceding record misses deep list items.** `REQ-626b98fef9aa`
+   (`"(4) Prevent or delay..."`) sits 4 items after its real colon-terminated stem
+   (`R-2-3`); every sibling in between (`"(1)..."`, `"(2)..."`, `"(3)..."`) ends in an ordinary
+   period, not a colon, so checking only `records[idx-1]` finds nothing. Fixed by walking backward
+   through all preceding same-chunk (and, for step 2, previous-chunk) records until one qualifies,
+   not just the nearest one.
+4. **The step-2 gate didn't account for raw_text's dash-prefixed lines** (`"- (7)  Communicate..."`),
+   so the "does this chunk open mid-enumeration" marker check never matched anything and step 2
+   never fired at all until the dash was stripped first.
+5. **"Opens with *some* list marker" is too loose a step-2 gate.** `DODI 5200.48` chunk 64 opens
+   with `"a."` — its own fresh list, item one — which matches a bare marker check exactly as well
+   as a genuine continuation like `"(7)"` does. Without narrowing further, this produced a real
+   false positive: `REQ-1cc75ab1ae84` (a `STEM_NEVER_EXTRACTED` example that must stay excluded)
+   picked up an unrelated colon-terminated line (`"...the OCA will:"`) from three chunks back.
+   Fixed by excluding markers that are themselves a sequence's first value (`"1"`/`"a"`/`"i"`).
+6. **A URL's own colon isn't a list-intro colon.** `REQ-cf527f39c8d7`'s true stem
+   (`"b. Oversee their respective Component's PPSM program to:"`) was never extracted as a Step C
+   record at all — only present in the previous chunk's raw_text, reachable by the step-2 raw_text
+   fallback added for gap 4 above — but a sibling list item's own body text contains
+   `"https://pnp.cert.smil.mil/pnp"` and `"https://pnp.cert.mil/pnp"`, and the naive first-colon
+   scan matched those instead, landing on the wrong (and truncated) line. Fixed with a
+   URL-scheme-aware colon finder that skips `"://"`.
+
+*Validation:* all 18 known examples now produce the exact expected result (10 cheap wins recover
+the correct stem verbatim, including `REQ-48f549669bb2`'s merged-stem case; the 8 others correctly
+get no `parent_stem`) — codified as `tests/unit/test_parent_stem_reconstruction.py`, 25 tests,
+using the real text as literal fixtures rather than a live corpus dependency. Ran the actual pipeline
+(Step D onward, `run_pipeline.run(skip_to="D", ...)`) against a real document (`DODI 8551.01`, a
+WP-39.1 calibration source) three times against a scratch copy of its processed artifacts: normal
+run, `--skip-enrichment`, and enrichment pointed at an unreachable Ollama host (genuine
+`ConnectionRefusedError`, confirmed in the logs, not assumed) — `parent_stem` was correctly populated
+on 18/57 real requirements in all three cases, including `REQ-cf527f39c8d7`'s exact calibrated stem,
+confirming survival end to end rather than just at the unit level. `core.artifact_resolver.
+resolve_requirement_file()` picked up the gated tier with both new fields intact; `build_payload()`
+and `build_embedding_text()` confirmed against that real, reconstructed data.
+
+*Retrieval re-check, broadened to all 10 cheap wins (real `nomic-embed-text` embeddings, not
+simulated) — an honest, mixed result, not uniformly positive:* mean delta **+0.0745** (net
+improvement), but 3 of 10 individually regressed (`REQ-1b1071c8d317` −0.005, `REQ-3097aa5d306c`
+−0.015, `REQ-626b98fef9aa` −0.113). All three regressions share a pattern WP-39.1's own 3-example
+spot-check didn't surface: they start from an already-high bare-quote similarity (0.70–0.88) —
+long, self-contained quotes where the added stem text dilutes rather than sharpens the match against
+a query that already targets the fragment's own specific phrasing. This refines, rather than
+contradicts, WP-39.1's finding that gain scales with how context-starved the bare quote is: gain can
+go slightly *negative*, not just toward zero, when the bare quote is already information-dense. Net
+effect remains positive and the largest gains are still on the most context-starved fragments
+(`REQ-9700722b04cd` +0.260, `REQ-c62e41aaf181` +0.205) — consistent with WP-39.1's mechanism, not a
+different one.
+
+Full `pytest` (818 tests) and `ruff check .` clean throughout.
+
+*PR #185 review round found 4 more real issues, all fixed and verified before merge:*
+
+- **Semicolon/comma-terminated sibling list items misidentified as governing stems**
+  (Gemini): `_extract_stem_from_record_text()`'s "no terminal punctuation" branch only
+  excluded `.!?`, so a preceding sibling item ending in `;` or `,` (common in this
+  corpus's NIST SP 800-53-style control statements, not present in the 18-example
+  calibration set itself) was treated as a valid stem instead of the backward walk
+  continuing past it to the real list-introducing clause. Reproduced against a
+  synthetic NIST-style case before fixing; also excluded marker-prefixed candidates
+  with no colon (a malformed sibling shouldn't be mistaken for a stem either).
+- **Non-atomic in-place overwrite of the normalized file** (Gemini): a process kill
+  mid-write could truncate `*_requirements_normalized.jsonl`. Fixed with the same
+  write-to-`.tmp`-then-`replace()` pattern already established in
+  `pipeline/repair_ligatures.py`'s `write_jsonl()` — not the reviewer's suggested code
+  verbatim, which used `Path.with_suffix(".tmp")` and would collide two different
+  files' temp names by dropping the real extension; matched the existing convention
+  (`suffix + ".tmp"`) instead.
+- **Cached enrichment silently drops freshly reconstructed fields** (Codex, real and
+  the most consequential of the four): any requirement already present in Step D.5's
+  enrichment resume-cache from a prior run had its *entire* cached record used
+  verbatim, discarding this run's freshly recomputed `parent_stem`/`embedding_text`
+  wholesale — meaning reconstruction only ever "stuck" for a document's first-ever
+  enrichment pass, silently reverting on every subsequent one. Fixed with
+  `_merge_cached_enrichment()`: keep the cache's LLM-produced fields
+  (`description`/`domain_tags`/`requirement_type`/`enrichment_model`) but everything
+  else, including `parent_stem`/`embedding_text`, from the fresh record.
+- **`run()`'s own defensive reconstruction call had no independent error handling**
+  (Codex): unlike the `run_pipeline.py` call site, `run()`'s redundant call (added for
+  standalone invocation) shared fate with Step D.5's `try`/`except` one level up —
+  a reconstruction failure there would get misclassified as an *enrichment* failure,
+  discarding otherwise-successful LLM output over an unrelated problem. Wrapped in its
+  own `try`/`except`, matching the `run_pipeline.py` call site's isolation.
+
+All four covered by new regression tests (`tests/unit/test_parent_stem_reconstruction.py`,
+`tests/unit/test_enrich_requirements.py`); 825 tests total, `ruff check .` clean.
 
 ---
 
@@ -546,10 +663,13 @@ sample; Step D's existing rejection logic untouched; full test suite and `ruff c
       framing alone. (All 18 examples traced against real on-disk pipeline artifacts, hand-classified
       into 7 loss categories, committed at `eval/audit_wp39_1/`. Real retrieval-similarity check via
       `nomic-embed-text`, not simulated.)
-- [ ] The recommendation is either acted on as a properly-scoped follow-up WP, or, if the audit finds
+- [x] The recommendation is either acted on as a properly-scoped follow-up WP, or, if the audit finds
       the context is already unrecoverable or the fix doesn't move retrieval, a documented conclusion
       to that effect — an equally valid, equally evidenced outcome, not a failure to close the phase.
-- [x] Full `pytest` suite and `ruff check .` clean throughout. (792 tests passed; `ruff check .`
+      (WP-39.2 implemented parent-stem reconstruction per the recommendation; validated against all
+      18 known examples with correct results; retrieval improvement re-confirmed, net positive, on a
+      broadened 10-example sample.)
+- [x] Full `pytest` suite and `ruff check .` clean throughout. (818 tests passed; `ruff check .`
       clean.)
 
 ---

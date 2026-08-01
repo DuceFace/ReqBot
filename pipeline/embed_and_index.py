@@ -54,12 +54,18 @@ def build_embedding_text(req: dict) -> str | None:
     Returns None if source_quote is empty — callers must skip that record.
     source_quote is required at ingest; an empty value indicates a data
     integrity violation that should have been caught at Step C or Step D.
+
+    WP-39.2: prefers the precomputed embedding_text field (source_quote prefixed with
+    parent_stem, when reconstruction found one — see pipeline/enrich_requirements.py's
+    apply_parent_stem_reconstruction()) over bare source_quote when present. Backward
+    compatible: absent on older/unreconstructed records, which fall back to the
+    original behavior unchanged.
     """
     source_quote = (req.get("source_quote") or "").strip()
     if not source_quote:
         return None
+    text = (req.get("embedding_text") or "").strip() or source_quote
     source_ref = (req.get("source_ref") or "").strip()
-    text = source_quote
     if source_ref:
         text += f"\nRef: {source_ref}"
     return text
@@ -81,6 +87,8 @@ def build_payload(req: dict, embedding_model: str, embedding_dim: int) -> dict:
         "domain_tags": req.get("domain_tags", []),
         "requirement_type": req.get("requirement_type", ""),
         "source_quote": req.get("source_quote", ""),
+        "parent_stem": req.get("parent_stem", ""),
+        "embedding_text": req.get("embedding_text", ""),
         "description": req.get("description", ""),
         "page_start": req.get("page_start"),
         "page_end": req.get("page_end"),

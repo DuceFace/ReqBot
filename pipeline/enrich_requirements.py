@@ -455,7 +455,19 @@ def _extract_stem_from_record_text(text: str) -> str | None:
     colon_idx = _find_first_real_colon(stripped)
     if colon_idx != -1:
         return stripped[: colon_idx + 1].strip()
-    if stripped[-1] not in ".!?":
+    # A list-marker-prefixed candidate with no colon is itself a sibling list item,
+    # not a governing stem for one -- without this, a marker-prefixed record that
+    # happens to have no terminal punctuation of its own (a malformed/truncated
+    # sibling) could be mistaken for the stem (Gemini review, PR #185).
+    if _LIST_MARKER_RE.match(stripped) or _LEADING_DASH_RE.match(stripped):
+        return None
+    # ";"/"," terminate a list item in this corpus's regulatory-standard documents
+    # (NIST SP 800-53-style control statements) just as surely as "." does --
+    # excluded here too, or a semicolon/comma-terminated sibling item gets
+    # mistaken for the real stem instead of the backward walk continuing past it
+    # to the actual list-introducing clause (Gemini review, PR #185, confirmed
+    # against a synthetic NIST-style case: real corpus data used only periods).
+    if stripped[-1] not in ".!?,;":
         return stripped
     return None
 
@@ -666,9 +678,35 @@ def apply_parent_stem_reconstruction(norm_jsonl: str) -> None:
         req["embedding_text"] = embedding_text
 
     if changed:
-        with open(norm_path, "w", encoding="utf-8") as f:
+        # Atomic write-then-replace, matching pipeline/repair_ligatures.py's
+        # write_jsonl() convention -- an interrupted write here (SIGINT, disk full)
+        # must not leave *_requirements_normalized.jsonl truncated with no recovery
+        # short of re-running Step D (Gemini review, PR #185).
+        tmp_path = norm_path.with_suffix(norm_path.suffix + ".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
             for req in reqs:
                 f.write(json.dumps(req, ensure_ascii=False) + "\n")
+        tmp_path.replace(norm_path)
+
+
+_ENRICHMENT_ONLY_FIELDS = ("description", "domain_tags", "requirement_type", "enrichment_model")
+
+
+def _merge_cached_enrichment(req: dict, cached: dict | None) -> dict:
+    """Combine a fresh normalized/reconstructed record with a prior run's cached
+    enrichment result: keep the cache's LLM-produced fields, but everything else --
+    notably parent_stem/embedding_text -- from the fresh record.
+
+    Without this, a cached record (written before WP-39.2 existed, or simply from an
+    earlier run when the underlying chunk data or reconstruction logic differed) would
+    be used wholesale wherever the requirement_id was already in the enrichment
+    resume-cache, silently dropping this run's freshly reconstructed parent_stem/
+    embedding_text for every already-enriched requirement -- i.e. everywhere except a
+    brand-new document with nothing cached yet (Codex review, PR #185).
+    """
+    if not cached:
+        return req
+    return {**req, **{k: cached[k] for k in _ENRICHMENT_ONLY_FIELDS if k in cached}}
 
 
 def run(
@@ -707,12 +745,20 @@ def run(
         profile = _default_profile()
 
     # WP-39.2: deterministic, offline -- kept independent of the LLM-calling code
-    # below, not shared error handling. run_pipeline.py already calls this
-    # unconditionally before invoking run() at all (so it also survives
-    # --skip-enrichment, which skips this whole function); called again here so
-    # anyone invoking enrich_requirements.py standalone gets the same guarantee.
-    # Idempotent, so the redundant call on the run_pipeline.py path is harmless.
-    apply_parent_stem_reconstruction(norm_jsonl)
+    # below, in its own try/except rather than sharing run_pipeline.py's Step D.5
+    # try/except (Codex review, PR #185: this call had no error handling of its own,
+    # so a reconstruction failure here -- e.g. a malformed line in an auxiliary Step C
+    # or chunks JSONL -- would propagate up and get misclassified as an *enrichment*
+    # failure by run_pipeline.py's caller, discarding otherwise-successful LLM
+    # enrichment output over a problem that has nothing to do with it). run_pipeline.py
+    # already calls this unconditionally before invoking run() at all (so it also
+    # survives --skip-enrichment, which skips this whole function); called again here,
+    # idempotently, so anyone invoking enrich_requirements.py standalone gets the same
+    # guarantee without needing to know about the run_pipeline.py call site.
+    try:
+        apply_parent_stem_reconstruction(norm_jsonl)
+    except Exception as e:
+        log.warning("Parent-stem reconstruction failed (%s) — proceeding without it", e)
 
     valid_domain_tags: list[str] = profile["domain_tags"]
     valid_requirement_types: list[str] = profile["requirement_types"]
@@ -804,7 +850,7 @@ def run(
         # Still write/update the enriched file to reflect any newly normalized reqs
         with open(enriched_path, "w", encoding="utf-8") as f:
             for req in reqs:
-                record = enriched_by_id.get(req["requirement_id"], req)
+                record = _merge_cached_enrichment(req, enriched_by_id.get(req["requirement_id"]))
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         return str(enriched_path)
 
@@ -887,7 +933,7 @@ def run(
     # Write enriched JSONL preserving original ordering from norm_path
     with open(enriched_path, "w", encoding="utf-8") as f:
         for req in reqs:
-            record = enriched_by_id.get(req["requirement_id"], req)
+            record = _merge_cached_enrichment(req, enriched_by_id.get(req["requirement_id"]))
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     log.info("Wrote %s", enriched_path)
 

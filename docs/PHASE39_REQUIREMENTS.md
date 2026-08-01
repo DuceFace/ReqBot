@@ -605,6 +605,42 @@ different one.
 
 Full `pytest` (818 tests) and `ruff check .` clean throughout.
 
+*PR #185 review round found 4 more real issues, all fixed and verified before merge:*
+
+- **Semicolon/comma-terminated sibling list items misidentified as governing stems**
+  (Gemini): `_extract_stem_from_record_text()`'s "no terminal punctuation" branch only
+  excluded `.!?`, so a preceding sibling item ending in `;` or `,` (common in this
+  corpus's NIST SP 800-53-style control statements, not present in the 18-example
+  calibration set itself) was treated as a valid stem instead of the backward walk
+  continuing past it to the real list-introducing clause. Reproduced against a
+  synthetic NIST-style case before fixing; also excluded marker-prefixed candidates
+  with no colon (a malformed sibling shouldn't be mistaken for a stem either).
+- **Non-atomic in-place overwrite of the normalized file** (Gemini): a process kill
+  mid-write could truncate `*_requirements_normalized.jsonl`. Fixed with the same
+  write-to-`.tmp`-then-`replace()` pattern already established in
+  `pipeline/repair_ligatures.py`'s `write_jsonl()` — not the reviewer's suggested code
+  verbatim, which used `Path.with_suffix(".tmp")` and would collide two different
+  files' temp names by dropping the real extension; matched the existing convention
+  (`suffix + ".tmp"`) instead.
+- **Cached enrichment silently drops freshly reconstructed fields** (Codex, real and
+  the most consequential of the four): any requirement already present in Step D.5's
+  enrichment resume-cache from a prior run had its *entire* cached record used
+  verbatim, discarding this run's freshly recomputed `parent_stem`/`embedding_text`
+  wholesale — meaning reconstruction only ever "stuck" for a document's first-ever
+  enrichment pass, silently reverting on every subsequent one. Fixed with
+  `_merge_cached_enrichment()`: keep the cache's LLM-produced fields
+  (`description`/`domain_tags`/`requirement_type`/`enrichment_model`) but everything
+  else, including `parent_stem`/`embedding_text`, from the fresh record.
+- **`run()`'s own defensive reconstruction call had no independent error handling**
+  (Codex): unlike the `run_pipeline.py` call site, `run()`'s redundant call (added for
+  standalone invocation) shared fate with Step D.5's `try`/`except` one level up —
+  a reconstruction failure there would get misclassified as an *enrichment* failure,
+  discarding otherwise-successful LLM output over an unrelated problem. Wrapped in its
+  own `try`/`except`, matching the `run_pipeline.py` call site's isolation.
+
+All four covered by new regression tests (`tests/unit/test_parent_stem_reconstruction.py`,
+`tests/unit/test_enrich_requirements.py`); 825 tests total, `ruff check .` clean.
+
 ---
 
 ## 5. Backlog (deferred, not WP-39.1 or WP-39.2)

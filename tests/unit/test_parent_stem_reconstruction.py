@@ -106,6 +106,35 @@ def test_extract_stem_empty_text():
     assert _extract_stem_from_record_text(None) is None
 
 
+def test_extract_stem_semicolon_terminated_sibling_is_not_a_stem():
+    # NIST SP 800-53-style control statements commonly end list items with ";"
+    # rather than "." -- not present in the WP-39.1 calibration corpus itself,
+    # but a real shape elsewhere in this project's corpus (Gemini review, PR #185).
+    assert _extract_stem_from_record_text("(1) Implement access controls;") is None
+
+
+def test_extract_stem_comma_terminated_sibling_is_not_a_stem():
+    assert _extract_stem_from_record_text("(1) Implement access controls,") is None
+
+
+def test_extract_stem_marker_prefixed_no_terminal_punctuation_is_not_a_stem():
+    # A malformed/truncated marker-prefixed sibling shouldn't be mistaken for a
+    # governing stem just because it happens to lack terminal punctuation.
+    assert _extract_stem_from_record_text("(1) Implement access controls") is None
+
+
+def test_reconstruct_parent_stem_walks_past_semicolon_terminated_siblings():
+    step_c_by_chunk = {
+        5: [
+            {"source_quote": "The organization shall:"},
+            {"source_quote": "(1) Implement access controls;"},
+            {"source_quote": "(2) Audit system logs;"},
+        ],
+    }
+    req = {"source_quote": "(2) Audit system logs;", "chunk_id": 5}
+    assert reconstruct_parent_stem(req, step_c_by_chunk, {}) == "The organization shall:"
+
+
 # ---------------------------------------------------------------------------
 # _find_cross_chunk_stem: the "unrelated colon in the previous chunk" false
 # positive found during calibration (DODI 5200.44 chunk 24 -> chunk 25).
@@ -454,6 +483,19 @@ def test_apply_parent_stem_reconstruction_idempotent(tmp_path):
     apply_parent_stem_reconstruction(str(norm_file))
     second = norm_file.read_text(encoding="utf-8")
     assert first == second
+
+
+def test_apply_parent_stem_reconstruction_writes_via_tmp_file_and_replace(tmp_path):
+    # Atomic write-then-replace (Gemini review, PR #185) -- no stray .tmp file left
+    # behind after a successful run, and no direct in-place truncation window.
+    doc_key = "testdoc3"
+    norm_file = tmp_path / f"{doc_key}_requirements_normalized.jsonl"
+    norm_file.write_text(json.dumps({"requirement_id": "R-1", "source_quote": "(3) Restrain competition.", "chunk_id": 2}) + "\n", encoding="utf-8")
+
+    apply_parent_stem_reconstruction(str(norm_file))
+
+    assert not (tmp_path / f"{doc_key}_requirements_normalized.jsonl.tmp").exists()
+    assert json.loads(norm_file.read_text(encoding="utf-8").splitlines()[0])["parent_stem"] == ""
 
 
 def test_apply_parent_stem_reconstruction_missing_source_files_is_a_noop(tmp_path):

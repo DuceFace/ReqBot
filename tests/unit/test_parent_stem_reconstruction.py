@@ -17,6 +17,7 @@ from pipeline.enrich_requirements import (
     apply_parent_stem_reconstruction,
     reconstruct_parent_stem,
 )
+from pipeline.parse_and_normalize import run as normalize_run
 
 # ---------------------------------------------------------------------------
 # _is_reconstruction_candidate
@@ -483,6 +484,66 @@ def test_apply_parent_stem_reconstruction_idempotent(tmp_path):
     apply_parent_stem_reconstruction(str(norm_file))
     second = norm_file.read_text(encoding="utf-8")
     assert first == second
+
+
+def test_dangling_clause_recovered_by_step_d_alone_no_separate_reconstruction_call(tmp_path):
+    """WP-41: parse_and_normalize.run() (Step D) alone -- no separate
+    apply_parent_stem_reconstruction() call -- reproducing the real
+    REQ-1b1071c8d317 (afi17-203) shape found during WP-41 scoping.
+
+    Before the ordering fix, Step D rejected this record outright
+    (dangling_clause_quote) so reconstruction never got the chance to run on
+    it, even though _find_heading_stem() already correctly recovers this
+    exact shape when given the chance (test_regression_all_18_known_examples).
+    After the ordering fix alone (skip rejection when a header exists), the
+    record survived Step D but relied on a *separate* caller (run_pipeline.py)
+    to actually call reconstruction -- a real gap for parse_and_normalize.py's
+    own standalone CLI usage, which never calls it at all (Codex review, PR
+    #188). run() now calls reconstruction on its own output internally, so
+    this test calls ONLY normalize_run() -- proving every caller, not just
+    the in-process pipeline, gets a fully-reconstructed record."""
+    doc_key = "test"
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    dangling_quote = (
+        "Is designated Computer Network Defense Service Provider Certification "
+        "Authority for Special Access Program networks."
+    )
+    chunk_text = (
+        "2.2.1. Recommends security protection of new projects.\n"
+        f"2.2.2. {dangling_quote}"
+    )
+    header = "2.2. Directorate of Security, Special Access Program Oversight and Information Protection (SAF/AAZ)."
+
+    req_path = out_dir / f"{doc_key}_extracted_requirements.jsonl"
+    chunks_path = out_dir / f"{doc_key}_chunks.jsonl"
+    req_path.write_text(json.dumps({
+        "requirement_id": "R-1", "source_quote": dangling_quote, "source_ref": "2.2.2",
+        "description": "", "requirement_type": "", "domain_tags": [], "chunk_id": 1, "confidence": 0.9,
+    }) + "\n", encoding="utf-8")
+    chunks_path.write_text(json.dumps({
+        "chunk_id": 1, "page_start": 1, "page_end": 1, "text": chunk_text,
+        "section_ref_path": [], "section_title_path": [], "parent_header_text": header,
+        "parent_context": None, "document_id": "abc123", "source_pdf": "TEST.pdf",
+    }) + "\n", encoding="utf-8")
+
+    normalize_run(str(req_path), str(chunks_path), "", str(out_dir))
+
+    norm_path = out_dir / f"{doc_key}_requirements_normalized.jsonl"
+    normalized = [json.loads(line) for line in norm_path.read_text(encoding="utf-8").splitlines()]
+    assert len(normalized) == 1
+    assert normalized[0]["source_quote"] == dangling_quote
+    # parent_stem already populated -- no separate apply_parent_stem_reconstruction()
+    # call was made above. This is what proves the standalone-CLI gap is closed.
+    assert normalized[0]["parent_stem"] == header
+
+    # A caller's own redundant call (matching run_pipeline.py's existing "belt and
+    # suspenders" pattern) must be a harmless no-op, not a double-reconstruction bug.
+    apply_parent_stem_reconstruction(str(norm_path))
+    reconstructed = [json.loads(line) for line in norm_path.read_text(encoding="utf-8").splitlines()]
+    assert reconstructed[0]["parent_stem"] == header
+    assert reconstructed[0]["embedding_text"] == header + "\n" + dangling_quote
 
 
 def test_apply_parent_stem_reconstruction_writes_via_tmp_file_and_replace(tmp_path):

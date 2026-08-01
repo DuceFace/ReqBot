@@ -751,6 +751,8 @@ def test_dangling_clause_rejected_in_full_pipeline(tmp_path):
     req_path = tmp_path / "test_extracted_requirements.jsonl"
     chunks_path = tmp_path / "test_chunks.jsonl"
     _write_jsonl(req_path, [req])
+    # _chunk()'s default parent_header_text=None -- no recoverable subject, so this
+    # must still reject exactly as before WP-41's ordering fix.
     _write_jsonl(chunks_path, [_chunk(1, chunk_text)])
     out_dir = tmp_path / "out"
     run(str(req_path), str(chunks_path), "", str(out_dir))
@@ -758,3 +760,39 @@ def test_dangling_clause_rejected_in_full_pipeline(tmp_path):
     failures = _read_jsonl(out_dir / "test_normalization_failures.jsonl")
     assert len(failures) == 1
     assert failures[0]["error"] == "dangling_clause_quote"
+
+
+def test_dangling_clause_survives_when_chunk_has_recoverable_header(tmp_path):
+    """WP-41: a dangling clause is NOT rejected when its chunk's parent_header_text
+    can supply the missing subject -- pipeline/enrich_requirements.py's
+    _find_heading_stem() exists specifically to recover this shape via
+    apply_parent_stem_reconstruction() (which only runs on records that survive
+    Step D), but a bare rejection here previously removed the record before
+    reconstruction ever got the chance. Mirrors the real REQ-1b1071c8d317 case
+    (afi17-203) found during WP-41 scoping."""
+    chunk_text = (
+        "2.2.1. Recommends security protection of new projects.\n"
+        "2.2.2. Is designated Computer Network Defense Service Provider "
+        "Certification Authority for Special Access Program networks."
+    )
+    req = dict(
+        SAMPLE_EXTRACTED, chunk_id=1,
+        source_quote="Is designated Computer Network Defense Service Provider Certification Authority.",
+    )
+    req_path = tmp_path / "test_extracted_requirements.jsonl"
+    chunks_path = tmp_path / "test_chunks.jsonl"
+    _write_jsonl(req_path, [req])
+    chunk = _chunk(1, chunk_text)
+    chunk["parent_header_text"] = (
+        "2.2. Directorate of Security, Special Access Program Oversight and "
+        "Information Protection (SAF/AAZ)."
+    )
+    _write_jsonl(chunks_path, [chunk])
+    out_dir = tmp_path / "out"
+    run(str(req_path), str(chunks_path), "", str(out_dir))
+    normalized = _read_jsonl(out_dir / "test_requirements_normalized.jsonl")
+    assert len(normalized) == 1
+    assert normalized[0]["source_quote"] == (
+        "Is designated Computer Network Defense Service Provider Certification Authority."
+    )
+    assert _read_jsonl(out_dir / "test_normalization_failures.jsonl") == []

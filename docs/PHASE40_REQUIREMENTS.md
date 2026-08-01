@@ -20,7 +20,7 @@ in `CLAUDE.md` or anywhere else.
 
 | WP | Status |
 |---|---|
-| WP-40 — Retrieval Quality Baseline Refresh & Failure Classification | Not started |
+| WP-40 — Retrieval Quality Baseline Refresh & Failure Classification | Complete |
 
 ---
 
@@ -275,7 +275,132 @@ expanded set classified into one of the 8 categories using the operational defin
 evidenced WP-41 recommendation stated; no retrieval code changed; full test suite and `ruff check .`
 clean.
 
-**Findings:** _(pending — filled in once WP-40 runs)_
+**Findings:**
+
+**Pre-step (corpus reprocess + reindex).** Reprocessed all 13 real corpus documents through Step D
+only (`run_pipeline.run(pdf_path, out_dir, skip_to="D", skip_enrichment=True, skip_description_gate=True)`,
+against each doc's existing `_extracted_requirements.jsonl`/`_chunks.jsonl` — no Docling, no fresh LLM
+calls) directly into each document's already-winning run directory. `_freshest_acceptable_tier()`
+(Codex PR #169's own mtime-fallback logic) correctly fell through every doc's stale gated/enriched
+tier to the freshly-regenerated normalized tier once its mtime became newest — confirmed live for all
+13 docs via `resolve_latest_requirement_files()` before and after. `reqbot reindex` afterward: Qdrant
+`grc_requirements` went from 1,876 to **1,856** points, matching `reqbot docs`'s total exactly.
+`parent_stem` spot-checked directly in the live Qdrant payload (not just the JSONL) — 201/1,856
+records now carry a non-empty `parent_stem`. Point count moving 1872→1856 (16 fewer requirements) is
+itself a real finding, not noise — see below.
+
+**Baseline refresh (WP-37.1's original 16 queries, unmodified).** Re-ran `eval/retrieval_eval_harness.py`
+exactly as WP-37.1 left it, against current `main`, post-reprocess:
+
+| | narrow recall@5 | narrow MRR | broad recall@5 | broad MRR |
+|---|---|---|---|---|
+| WP-37.1 (2026-07-31) | 0.9643 | 1.0 | 0.2626 | 0.6667 |
+| WP-40 refresh (2026-08-01) | 0.8571 | 1.0 | 0.184 | 0.7667 |
+
+Aggregate (all 12 non-zero queries): mean recall@5 0.6719→0.5767, mean recall@10 0.739→0.663, mean
+recall@20 0.8129→0.7363, mean MRR 0.8611→0.9028. Zero-truth queries: still 4/4 return a full 20
+results at production `min_score` — the "never signals no match" finding WP-37.1 first made is
+**unchanged** by Phase 38 or WP-39.2.
+
+The narrow-query recall@5 drop (0.9643→0.8571) is a **real regression, not noise**: sanity-checking
+the 16 original queries' `relevant_requirement_ids` against the reprocessed corpus found 2 of them
+(`Q-N03`'s `REQ-19f5e7133b96`, `Q-N04`'s `REQ-cbc6374a655f`) no longer exist at all. Both are now
+rejected during Step D with new error reasons (`unrepairable_fragment_quote`,
+`orphaned_list_item_quote`) that didn't reject them before Phase 38's rule extensions merged — a
+previously-correct fragment (part of `Q-N03`'s deliberately-4-part fragmented answer) and a
+previously-correct orphaned list item (`Q-N04`'s Insider Threat Program citation) are now silently
+gone. Broad-query MRR *improved* (0.6667→0.7667) despite recall@5 dropping slightly, consistent with
+WP-39.2's reconstruction helping some already-found results rank better without pulling in new ones.
+
+**Failure classification (expanded ~50-query set, full results:
+`eval/spike_results/wp_40_baseline_refresh/classification_report.md`).** Gold set expanded from 16 to
+**45** queries across all 6 buckets (11 narrow, 8 broad, 8 zero-truth, 8 parent-child/context, 5
+table-derived, 5 messy-PDF/over-grab), every label hand-verified against real corpus text via live
+`retrieve()` calls before being trusted (same discipline as the original 16) — see
+`eval/gold_retrieval_queries.jsonl`'s per-query `notes` field for each one's verification method.
+Harness aggregate across the full 45: mean recall@5 0.6049, recall@10 0.6701, recall@20 0.721, mean
+MRR 0.7381 (37 non-zero queries; not directly comparable to the 16-query numbers above — a different,
+larger, and harder query set by design, and re-run separately so it reflects its own independent HyDE
+draw).
+
+**Methodology corrections (Codex + Gemini review, PR #187, all 5 findings verified real before
+fixing, classification re-run from scratch after each):** (1) miss detection and category assignment
+were driven by two *separately-drawn* HyDE calls (HyDE is unseeded/stochastic —
+`eval/retrieval_eval_harness.py`'s own docstring), so the same record could get contradictory verdicts
+across calls — fixed by making one retrieve() call per query the sole source of truth for that query's
+whole classification; (2) over-grab detection only scanned the top 5 results, silently missing
+hand-labeled over-grabs the gold set itself recorded at ranks 6-8 (`Q-O01`) — fixed to scan the full
+evaluated top-20, plus always check hand-labeled `expected_over_grab_ids` regardless of where they
+land; (3) a transient failure in the raw-query disambiguation call silently defaulted to `ranking_miss`
+instead of an explicit inconclusive result — fixed to report failures honestly; (4) an absent
+requirement_id was assumed lost without checking whether equivalent content simply survived under a
+different content-hash id — fixed by cross-checking `*_normalization_failures.jsonl`/the current corpus
+before confirming `extraction_failure`, gated on a new `expected_quotes` gold-file field recorded for
+the 5 affected queries (all 7 sub-case (a) records were independently reconfirmed as genuinely rejected,
+not relabeled — the original manual count held up); (5) fixing (2) introduced its own bug: the widened
+over-grab scan used the *unfiltered* min_score=0 pool's raw position as "rank", so a query with fewer
+than 20 above-floor hits could have sub-threshold noise occupying positions inside the "top-20" window
+even though `core.ask.retrieve()` filters `min_score` *before* trimming to top_k in real production —
+fixed by filtering the pool to the production floor before computing over-grab rank/window, the same
+class of bug already caught once for `classify_miss`'s own embedding/ranking boundary.
+
+55 misses + 42 over-grabs classified into the 8 categories (final, post-fix numbers):
+
+| Category | Count (all 45 queries) | Count (excl. Q-B05) |
+|---|---|---|
+| **over_grab** | **42** | — |
+| ranking_miss | 17 | 8 |
+| extraction_failure | 9 (7a absent-from-corpus, 2b never-extracted) | 9 |
+| missing_context | 9 | 6 |
+| embedding_miss | 8 | 3 |
+| query_filter_issue | 8 | 6 |
+| table_serialization | 5 | 5 |
+| zero_truth_confidence_failure (per-record) | 0 | 0 |
+
+`Q-B05` ("risk assessment and risk management process requirements", 29 relevant IDs — WP-37.1's own
+largest, weakest broad query) alone accounts for 19/56 misses (mostly `ranking_miss` and
+`embedding_miss`). Reporting both columns because a single heavy query shouldn't silently set the
+whole phase's conclusion — `ranking_miss` still ties for the largest *miss* category (8, with
+`extraction_failure` at 9) even with `Q-B05` excluded, so that finding holds independent of one query.
+`over_grab`'s count doesn't depend on `Q-B05` in the same way (over-grabs are found across 19 separate
+queries, not concentrated in a single outlier) and is, corrected, the single largest finding of any
+kind by a wide margin.
+
+Separately, **all 8 zero-truth queries** still return a full 20 results at production `min_score`
+(`zero_truth_never_reports_empty: true`) — the query-level symptom of category 8, unchanged since
+WP-37.1, and not reflected in the `0` per-record count above (that `0` means no *relevant* record was
+found only-below-floor in this run's misses, a different and narrower symptom).
+
+**WP-41 recommendation: reranker, with two smaller companion items.**
+
+1. **Primary: a reranker is the best-evidenced single lever, more strongly than the first (buggy)
+   pass suggested.** `over_grab` (42 findings, across 19 separate queries — dominated by same-chunk
+   duplicate/near-duplicate fragments, plus a smaller set of genuinely non-prescriptive "descriptive
+   background" text outranking the real answer) is now the single largest finding of any kind, and
+   `ranking_miss` is the largest or tied-largest *miss* category both including and excluding `Q-B05`.
+   Both are exactly what a reranker over a larger initial candidate pool addresses: pull
+   correctly-present-but-low-ranked results up, push duplicates/imprecise text down. `embedding_miss`
+   (8, 3 excl. `Q-B05`) is the *smallest* well-formed-record category — corroborating WP-37.2's own
+   finding that the embedding representation itself isn't the biggest lever right now, so
+   LLM-generated contextual embeddings should stay lower priority than reranking.
+2. **Companion (small, fix-shaped, not a new feature): investigate the Phase 38 fragment-rejection
+   regression found above** (`Q-N03`/`Q-N04`'s 2 dropped IDs, plus `Q-C04`/`Q-C05`/`Q-C06`'s 5
+   additional confirmed-gone WP-38.1 FRAGMENT examples — 7 total real, independently-reconfirmed
+   `extraction_failure` sub-case (a) instances, all previously-correct records now rejected by
+   `unrepairable_fragment_quote`/`orphaned_list_item_quote`/`dangling_clause_quote`). This is a
+   regression to fix, not a scope decision — not the same thing as the `STEM_NEVER_EXTRACTED`/
+   table-serialization *enhancement* work already on the Candidate WP-41 list.
+3. **Companion (small, targeted): the zero-truth/confidence-floor problem is unchanged and remains
+   serious for a compliance tool** — 8/8 zero-truth queries still return 20 results indistinguishable
+   in count from a real match. Independent of whatever WP-41 becomes for ranking, this deserves its
+   own explicit fix (recalibrated `min_score` and/or an explicit low-confidence signal), not further
+   deferral.
+
+`missing_context` (9, 6 excl. `Q-B05`) + `table_serialization` (5) together are real and sizable
+(WP-40 also found 3 *new* `GARBLED_TABLE` chunks beyond WP-39.1's original 2, and confirmed 21 garbled
+chunks total across 5 documents when scanning the whole corpus — a bigger problem than previously
+known) but individually smaller than `ranking_miss`/`over_grab` — `STEM_NEVER_EXTRACTED`/table-
+structure-aware serialization work is real and evidenced, just not the top-ranked lever this round.
 
 ---
 
@@ -295,25 +420,34 @@ eventual scope is traceable, not implicit:
   significant *and* the mechanism looks like WP-37.2's hypothesis rather than something else.
 - Anything else the classification surfaces that isn't on this list yet — the whole point of this
   phase is not pre-committing to one of the above before the evidence exists.
+- **New, found by WP-40: a Phase 38 fragment-rejection regression** — `unrepairable_fragment_quote`/
+  `orphaned_list_item_quote` now reject 7 confirmed real, previously-correct records (2 from the
+  original 16-query baseline alone). A bug-fix-shaped follow-up, not the `STEM_NEVER_EXTRACTED`
+  enhancement item above — see WP-40's Findings.
+
+**Recommendation (see WP-40 Findings for full evidence): reranker is the primary WP-41 direction**,
+with the Phase 38 regression fix and the zero-truth/confidence-floor fix as small, independent
+companion items.
 
 ---
 
 ## 6. Success Gate
 
-- [ ] Corpus reprocessed through Step D (not just `reindex`) and confirmed via a non-empty
-      `parent_stem` spot-check before any measurement is trusted as "post-WP-39.2."
-- [ ] WP-37.1's harness re-run unmodified against current `main`; a real, refreshed baseline reported
+- [x] Corpus reprocessed through Step D (not just `reindex`) and confirmed via a non-empty
+      `parent_stem` spot-check before any measurement is trusted as "post-WP-39.2." (201/1,856
+      records, confirmed live in Qdrant payload.)
+- [x] WP-37.1's harness re-run unmodified against current `main`; a real, refreshed baseline reported
       with a direct before/after comparison against WP-37.1's original numbers.
-- [ ] Gold query set expanded from 16 to ~50, deliberately covering all 6 named buckets, every label
-      hand-verified against real corpus text — including a check for relevant source content with no
-      `requirement_id` at all.
-- [ ] Every miss/over-grab across the expanded set classified into one of the 8 named categories,
+- [x] Gold query set expanded from 16 to 45 (~50), deliberately covering all 6 named buckets, every
+      label hand-verified against real corpus text — including a check for relevant source content
+      with no `requirement_id` at all (2 table-derived queries' `unextracted_relevant_content`).
+- [x] Every miss/over-grab across the expanded set classified into one of the 8 named categories,
       using operational definitions calibrated against real examples during the audit; extraction
-      failure reported as both sub-counts (missing ID vs. genuinely unextracted content).
-- [ ] Category prevalence reported and a specific, evidenced WP-41 recommendation stated — not a
-      menu of untested options.
-- [ ] No retrieval code changed in this phase.
-- [ ] Full `pytest` suite and `ruff check .` clean throughout.
+      failure reported as both sub-counts (7 missing-from-corpus, 2 genuinely unextracted).
+- [x] Category prevalence reported and a specific, evidenced WP-41 recommendation stated (reranker,
+      primary) — not a menu of untested options.
+- [x] No retrieval code changed in this phase (only `eval/`, `docs/`, and `tests/` touched).
+- [x] Full `pytest` suite and `ruff check .` clean throughout.
 
 ---
 

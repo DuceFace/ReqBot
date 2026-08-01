@@ -22,6 +22,7 @@ in `CLAUDE.md` or anywhere else.
 | WP | Status |
 |---|---|
 | WP-39.1 — Parent-Stem Context Loss Audit | Complete |
+| WP-39.2 — Parent-Stem Reconstruction | Not started |
 
 ---
 
@@ -367,12 +368,172 @@ implemented, no schema changed, no reindex run. This is audit output only.
 
 ---
 
-## 5. Backlog (deferred, not WP-39.1)
+### WP-39.2 — Parent-Stem Reconstruction
 
-- **The reconstruction fix itself** (WP-39.2 or later) — per WP-39.1's Findings above: a deterministic
-  `parent_stem`/`embedding_text` reconstruction step (same-chunk lookup → preceding-chunk lookup →
-  `parent_header_text` fallback), no Step C prompt change, scoped to the 10/18 traced examples with a
-  cheap, confident fix; the harder `STEM_NEVER_EXTRACTED` and `GARBLED_TABLE` shapes deferred further.
+**Source:** WP-39.1's Findings and Recommendation above (`docs/PHASE39_REQUIREMENTS.md`), scoped
+directly from its evidence rather than assumed — same relationship as WP-38.1 → WP-38.2.
+
+**Problem:** 10 of the 18 known real fragment examples (7 `SAME_CHUNK_STEM_EXTRACTED`, 2
+`CROSS_CHUNK_SPLIT`, 1 `HEADING_IS_SUBJECT`) have their governing context sitting one deterministic
+lookup away — already extracted as a separate Step C record in the same or an adjacent chunk, or
+already computed as `parent_header_text` — but nothing in the pipeline captures it or uses it today.
+`build_embedding_text()` embeds `source_quote` alone. A real (not simulated) embedding-similarity
+check confirmed this measurably hurts retrieval, worst exactly where the bare quote carries the least
+content on its own (+0.264 similarity recovered for `"shall be coordinated with the customer"`
+against a realistic query).
+
+**Scope:**
+- **Define the reconstruction-candidate selector — this is new work, not a reuse of Step D's rejection
+  predicates.** WP-39.1 confirmed directly that `_is_orphaned_list_item()`/`_is_dangling_clause()`
+  flag only 1 of the 10 cheap-win examples (WP-38.2 deliberately narrowed/removed those predicates so
+  fragile-but-real requirements would *survive*, not so they'd be identifiable later). Candidacy is a
+  different, likely broader question than rejection-safety — false positives here just mean an
+  unhelpful `parent_stem` gets attached to an already-complete quote (a minor embedding-quality cost),
+  not a silently deleted requirement, so the precision bar can reasonably be lower than Step D's.
+  Starting point per WP-39.1: reuse structural signals already proven safe in this codebase (a
+  list-marker prefix, the deleted `_LIST_MARKER_RE` pattern; a short word count; the record's own
+  preceding same-chunk neighbor ending in `:`) as a *candidacy* heuristic. Calibrate against the same
+  18 known examples WP-39.1 traced (validate the selector actually catches the 10 intended cheap wins
+  and doesn't fire on the 8 that shouldn't get a `parent_stem` — the 2 `CITATION_ONLY_NOT_A_TARGET`
+  examples especially, since those are correctly non-actionable already).
+- **Reconstruction lookup, in order, falling through to "leave empty" rather than guessing** (per
+  WP-39.1's Recommendation; step 1's exact matching signal corrected below after Codex's local review
+  of PR #184 found a real counter-example):
+  1. the nearest preceding same-chunk record (from Step C's raw output, matched by `chunk_id`) that
+     contains an introductory colon — **not necessarily as the record's last character.** Checked
+     directly: `REQ-48f549669bb2`'s actual preceding stem in `DODI 8410.03`'s chunk 32 is Step C's own
+     record `"This section will define for all parties: The characteristics of the NM information to
+     be exchanged..."` — Step C already merged the stem with its first sibling `(a)` item into one
+     combined quote ending in a period, not a colon. A strict "record *ends in* `:`" match (the
+     original draft here, and the same shape as `_is_unrepairable_fragment()`'s own trigger) misses
+     this case entirely. The reconstruction logic needs to extract the text *up to and including* the
+     first colon within a matching record, not require the colon to be the record's own ending —
+     calibrate this against all 18 known examples during implementation, the same way every text
+     signal in this file has been calibrated rather than assumed correct on the first pass;
+  2. if not found, the same check against the *immediately preceding chunk* (same `document_id`,
+     sequential `chunk_id`) — covers the confirmed `CROSS_CHUNK_SPLIT` cases;
+  3. if still not found, fall back to `parent_header_text` directly — covers `HEADING_IS_SUBJECT` at
+     zero additional engineering cost, since that field already exists on every chunk record today.
+- **Placement: extend the enrichment stage (Step D.5, `pipeline/enrich_requirements.py`), not a new
+  untracked output file** (corrected after Codex's local review of PR #184 — the original draft here
+  said "a new step after Step D, writing to its own output," but checked directly against
+  `core/artifact_resolver.py`: `resolve_latest_requirement_files()` only discovers the three
+  hardcoded suffixes `_requirements_gated`/`_requirements_enriched`/`_requirements_normalized`. A
+  reconstruction step writing to any other file name would be invisible to that resolver — `reindex`
+  and every other caller of it would keep silently selecting an existing tier without `parent_stem`/
+  `embedding_text`, and the fix would do nothing on any run after the one that happened to explicitly
+  target the new file). `enrich_requirements.py`'s own docstring already describes exactly the right
+  shape: `"Input: requirements_normalized.jsonl (from Step D). Output: requirements_enriched.jsonl —
+  same schema, with enrichment fields populated."` Adding `parent_stem`/`embedding_text` as two more
+  fields this stage populates keeps output landing in the `_requirements_enriched` tier the resolver
+  already recognizes and already prefers over `normalized` — no resolver changes needed, and still no
+  changes to `parse_and_normalize.py`'s Step D rejection logic (this is Step D.5, not Step D).
+  **One more constraint this placement needs, not yet handled by "just add fields to
+  `enrich_requirements.py`" alone** (Codex local review of PR #184, second pass — a real gap in the
+  fix above, not the same one already resolved): checked `run_pipeline.py` directly — Step D.5 is
+  wrapped in a single `try`/`except Exception` that catches *any* failure (including Ollama being
+  unreachable, per the LLM-dependent description/domain_tags/requirement_type generation
+  `enrich_requirements.py` already does) and silently falls back to `index_path = norm_path`, and the
+  whole step is skipped outright when `--skip-enrichment` is passed. Reconstruction is supposed to be
+  deterministic and model-independent — if it's simply folded into the same function body as the
+  LLM-calling enrichment logic, it inherits both failure modes for free: an Ollama outage or
+  `--skip-enrichment` would silently lose the free, no-model-call context recovery too, even though
+  neither has anything to do with it. **WP-39.2 must keep reconstruction structurally independent of
+  the LLM-dependent portion of Step D.5** — either as its own code path inside
+  `enrich_requirements.py` with its own (or no) error handling, not sharing the LLM call's
+  `try`/`except`, and running regardless of whether `--skip-enrichment` is set; or, if that coupling
+  turns out to be awkward in practice, as a distinct small step in `run_pipeline.py` that always runs
+  on whatever `index_path` is once Step D has run, independent of D.5's own success/skip state. Which
+  of these two shapes is used is an implementation decision for WP-39.2 itself — but the outcome must
+  be tested (see Tests/verification below): reconstruction survives both `--skip-enrichment` and a
+  simulated enrichment failure.
+- Add `parent_stem` and `embedding_text` fields to the schema (Tyler's original example: `source_quote`
+  + `parent_stem` + a combined `embedding_text`). Update `pipeline/embed_and_index.py`'s
+  `build_embedding_text()` to prefer `embedding_text` when present, falling back to `source_quote` when
+  absent — backward compatible, no forced reindex.
+- **Also add both new fields to the indexed Qdrant *payload*, not just the embedding computation**
+  (Codex local review of PR #184, real gap: `build_payload()` builds the stored payload from its own
+  explicit field literal — same pattern as `parse_and_normalize.py`'s `normalized` dict — and doesn't
+  include either new field today. Improving `build_embedding_text()` alone only makes a fragment
+  easier to *find*; the record a user actually gets back still renders bare `source_quote`/
+  `description`, since that's literally all `core/ask.py` has access to
+  (`hit.get("description") or hit.get("source_quote", "")` — confirmed by reading the code). Without
+  this, the phase's own stated goal — "the child item is retrieved *with* its governing context
+  rather than standing alone" — isn't actually met even after everything else in this WP ships;
+  ranking would improve but the displayed result would still be the same dangling fragment). Scope
+  includes updating whichever of `core/ask.py`/the API/the UI render results to actually surface
+  `parent_stem` when present, not just storing it unused in the payload.
+- Validate against the 10 known cheap-win examples specifically: did each recover the *correct* stem
+  (matching what WP-39.1 already hand-verified), not just *some* non-empty value.
+- Re-run WP-39.1's own retrieval-similarity methodology (real `nomic-embed-text` embeddings via
+  `core.config.load()`, not simulated) across a broader sample post-fix — WP-39.1 only spot-checked 3
+  examples; confirm the improvement generalizes before calling this done.
+
+**Non-goals:**
+- **Not touching Step C's LLM prompt.** Per WP-39.1's recommendation — this WP is a deterministic,
+  no-model-call fix.
+- **Not attempting `STEM_NEVER_EXTRACTED` (3 examples) or `GARBLED_TABLE` (2 examples).** The former
+  needs either a Step C fix or raw-chunk-text stitching (a different mechanism from the lookup above);
+  the latter needs table-structure-aware serialization in `chunk_text.py` (WP-39.1 confirmed the real
+  table structure exists via Docling's `export_to_dataframe()` — a genuinely different, separately
+  scoped fix, not this WP's job). Both explicitly deferred so this WP isn't blocked shipping the
+  well-evidenced 10/18.
+- **Not forcing a `parent_stem` guess onto `AMBIGUOUS_MAY_NOT_BE_REQ`** (1 example) — same "honest gap
+  over false confidence" discipline as `_is_orphaned_list_item()`'s bare-noun-phrase case in WP-38.2.
+- **Not re-ingesting or reindexing the full production corpus as part of this WP** — schema/code
+  changes only affect future runs, matching WP-38.2's own precedent; re-ingesting the rest of the
+  corpus is a separate, explicit decision. (Distinct from the `reindex` *sanity check* in
+  Tests/verification below, which only needs a small local run to confirm the resolver picks up the
+  new fields correctly — not a full corpus reindex.)
+- **Not building a general contextual-embedding system.** Targeted, per-record, only for records the
+  candidate selector actually flags — not the universal per-record approach WP-37.2 tried and reverted.
+
+**Tests/verification:**
+- New unit tests for the candidate-selector heuristic and each of the three lookup steps, using real
+  corpus examples (same discipline as WP-38.2's rule tests — cite real `requirement_id`s, not
+  hypotheticals).
+- Regression check against all 18 WP-39.1 examples: the 10 cheap wins recover the correct stem, the 8
+  others (`STEM_NEVER_EXTRACTED`, `GARBLED_TABLE`, `CITATION_ONLY_NOT_A_TARGET`, `AMBIGUOUS_MAY_NOT_BE_REQ`)
+  correctly get no `parent_stem` attached.
+- `build_embedding_text()` tests confirming `embedding_text` is preferred when present and the fallback
+  to `source_quote` still works when absent.
+- **`build_payload()` tests confirming `parent_stem`/`embedding_text` are actually indexed into
+  Qdrant, not just used at embedding time** — and an end-to-end check that `core/ask.py` (or whichever
+  consumer is updated) surfaces `parent_stem` in what a query actually returns for one of the 10 known
+  examples, not just that the field exists unused in the payload.
+- **`reindex` sanity check**: confirm `core.artifact_resolver.resolve_latest_requirement_files()`
+  picks up the enrichment-stage output with the new fields on a real run, not a different tier missing
+  them — the specific failure mode this WP's Placement section above was rewritten to avoid.
+- **`--skip-enrichment` / enrichment-failure survival check**: run the pipeline with
+  `--skip-enrichment` and separately with a simulated Step D.5 LLM failure (e.g. point
+  `enrichment_model`/`ollama_url` at something unreachable), and confirm `parent_stem`/
+  `embedding_text` are still populated in both cases — the specific coupling risk the Placement
+  section's second constraint above exists to prevent.
+- Retrieval-similarity re-check (real embeddings) across a broader sample, not just the 3 WP-39.1
+  spot-checked.
+- Full `pytest` suite and `ruff check .` clean throughout.
+
+**Gate:** `parent_stem`/`embedding_text` reconstruction implemented and placed per the recommendation
+above; validated against all 18 known examples with *correct* (not just non-empty) results —
+including `REQ-48f549669bb2`'s merged-stem case, not just the 9 that fit the simpler pattern; both
+fields present in the indexed Qdrant payload *and* actually surfaced by at least one result-rendering
+consumer, not just computed and left unused; `reindex` confirmed to pick up the new fields on a real
+run; reconstruction confirmed to survive both `--skip-enrichment` and a simulated Step D.5 LLM
+failure, not silently coupled to Ollama availability; retrieval improvement re-confirmed on a broader
+sample; Step D's existing rejection logic untouched; full test suite and `ruff check .` clean.
+
+**Findings:** _(pending — filled in once WP-39.2 runs)_
+
+---
+
+## 5. Backlog (deferred, not WP-39.1 or WP-39.2)
+
+- **`STEM_NEVER_EXTRACTED` (3 examples) and `GARBLED_TABLE` (2 examples)** — explicitly out of
+  WP-39.2's scope (see its Non-Goals above). The former needs either a Step C prompt fix or
+  raw-chunk-text stitching; the latter needs table-structure-aware serialization in `chunk_text.py`
+  (WP-39.1 confirmed real table structure exists via Docling's `export_to_dataframe()` — a separately
+  scoped fix, not a `parent_stem` field). Worth their own WP if the rate justifies it after WP-39.2
+  ships and the corpus is re-measured.
 - **Over-Grab Precision** — still open from Phase 38, unrelated to this phase's problem; see
   `docs/PHASE38_REQUIREMENTS.md`'s Backlog.
 

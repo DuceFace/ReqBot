@@ -428,6 +428,25 @@ against a realistic query).
   fields this stage populates keeps output landing in the `_requirements_enriched` tier the resolver
   already recognizes and already prefers over `normalized` — no resolver changes needed, and still no
   changes to `parse_and_normalize.py`'s Step D rejection logic (this is Step D.5, not Step D).
+  **One more constraint this placement needs, not yet handled by "just add fields to
+  `enrich_requirements.py`" alone** (Codex local review of PR #184, second pass — a real gap in the
+  fix above, not the same one already resolved): checked `run_pipeline.py` directly — Step D.5 is
+  wrapped in a single `try`/`except Exception` that catches *any* failure (including Ollama being
+  unreachable, per the LLM-dependent description/domain_tags/requirement_type generation
+  `enrich_requirements.py` already does) and silently falls back to `index_path = norm_path`, and the
+  whole step is skipped outright when `--skip-enrichment` is passed. Reconstruction is supposed to be
+  deterministic and model-independent — if it's simply folded into the same function body as the
+  LLM-calling enrichment logic, it inherits both failure modes for free: an Ollama outage or
+  `--skip-enrichment` would silently lose the free, no-model-call context recovery too, even though
+  neither has anything to do with it. **WP-39.2 must keep reconstruction structurally independent of
+  the LLM-dependent portion of Step D.5** — either as its own code path inside
+  `enrich_requirements.py` with its own (or no) error handling, not sharing the LLM call's
+  `try`/`except`, and running regardless of whether `--skip-enrichment` is set; or, if that coupling
+  turns out to be awkward in practice, as a distinct small step in `run_pipeline.py` that always runs
+  on whatever `index_path` is once Step D has run, independent of D.5's own success/skip state. Which
+  of these two shapes is used is an implementation decision for WP-39.2 itself — but the outcome must
+  be tested (see Tests/verification below): reconstruction survives both `--skip-enrichment` and a
+  simulated enrichment failure.
 - Add `parent_stem` and `embedding_text` fields to the schema (Tyler's original example: `source_quote`
   + `parent_stem` + a combined `embedding_text`). Update `pipeline/embed_and_index.py`'s
   `build_embedding_text()` to prefer `embedding_text` when present, falling back to `source_quote` when
@@ -485,6 +504,11 @@ against a realistic query).
 - **`reindex` sanity check**: confirm `core.artifact_resolver.resolve_latest_requirement_files()`
   picks up the enrichment-stage output with the new fields on a real run, not a different tier missing
   them — the specific failure mode this WP's Placement section above was rewritten to avoid.
+- **`--skip-enrichment` / enrichment-failure survival check**: run the pipeline with
+  `--skip-enrichment` and separately with a simulated Step D.5 LLM failure (e.g. point
+  `enrichment_model`/`ollama_url` at something unreachable), and confirm `parent_stem`/
+  `embedding_text` are still populated in both cases — the specific coupling risk the Placement
+  section's second constraint above exists to prevent.
 - Retrieval-similarity re-check (real embeddings) across a broader sample, not just the 3 WP-39.1
   spot-checked.
 - Full `pytest` suite and `ruff check .` clean throughout.
@@ -494,8 +518,9 @@ above; validated against all 18 known examples with *correct* (not just non-empt
 including `REQ-48f549669bb2`'s merged-stem case, not just the 9 that fit the simpler pattern; both
 fields present in the indexed Qdrant payload *and* actually surfaced by at least one result-rendering
 consumer, not just computed and left unused; `reindex` confirmed to pick up the new fields on a real
-run; retrieval improvement re-confirmed on a broader sample; Step D's existing rejection logic
-untouched; full test suite and `ruff check .` clean.
+run; reconstruction confirmed to survive both `--skip-enrichment` and a simulated Step D.5 LLM
+failure, not silently coupled to Ollama availability; retrieval improvement re-confirmed on a broader
+sample; Step D's existing rejection logic untouched; full test suite and `ruff check .` clean.
 
 **Findings:** _(pending — filled in once WP-39.2 runs)_
 

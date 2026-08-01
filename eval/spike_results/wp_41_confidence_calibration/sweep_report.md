@@ -14,9 +14,9 @@
 | 0.4 | 0/8 | 0.10344827586206896 | 0.3789 | 1.0 | 0.8939 | 0.5 | 0.3333 |
 | 0.5 | 0/8 | 0.06896551724137931 | 0.2951 | 1.0 | 0.8485 | 0.5 | 0.3333 |
 
-## recall@10 by bucket
+## recall@20 by bucket
 
-| threshold | broad_recall@10 | messy_pdf_overgrab_recall@10 | narrow_recall@10 | parent_child_context_recall@10 | table_derived_recall@10 |
+| threshold | broad_recall@20 | messy_pdf_overgrab_recall@20 | narrow_recall@20 | parent_child_context_recall@20 | table_derived_recall@20 |
 |---|---|---|---|---|---|
 | 0.02 | 0.6858 | 1.0 | 0.9545 | 0.625 | 0.3333 |
 | 0.05 | 0.6858 | 1.0 | 0.9545 | 0.625 | 0.3333 |

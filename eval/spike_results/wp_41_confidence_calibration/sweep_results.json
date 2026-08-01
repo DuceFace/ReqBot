@@ -9,11 +9,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.6858,
-    "mean_parent_child_context_recall@10": 0.625,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.6858,
+    "mean_parent_child_context_recall@20": 0.625,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.05,
@@ -25,11 +25,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.6858,
-    "mean_parent_child_context_recall@10": 0.625,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.6858,
+    "mean_parent_child_context_recall@20": 0.625,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.08,
@@ -41,11 +41,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.6858,
-    "mean_parent_child_context_recall@10": 0.625,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.6858,
+    "mean_parent_child_context_recall@20": 0.625,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.1,
@@ -57,11 +57,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.6858,
-    "mean_parent_child_context_recall@10": 0.625,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.6858,
+    "mean_parent_child_context_recall@20": 0.625,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.12,
@@ -73,11 +73,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.6858,
-    "mean_parent_child_context_recall@10": 0.625,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.6858,
+    "mean_parent_child_context_recall@20": 0.625,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.15,
@@ -89,11 +89,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.6702,
-    "mean_parent_child_context_recall@10": 0.625,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.6702,
+    "mean_parent_child_context_recall@20": 0.625,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.2,
@@ -105,11 +105,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.6086,
-    "mean_parent_child_context_recall@10": 0.5625,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.6086,
+    "mean_parent_child_context_recall@20": 0.5625,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.25,
@@ -121,11 +121,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.5707,
-    "mean_parent_child_context_recall@10": 0.5312,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.5707,
+    "mean_parent_child_context_recall@20": 0.5312,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.3,
@@ -137,11 +137,11 @@
     "mean_parent_child_context_recall@5": 0.5312,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.9545,
-    "mean_broad_recall@10": 0.4826,
-    "mean_parent_child_context_recall@10": 0.5312,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.9545,
+    "mean_broad_recall@20": 0.4826,
+    "mean_parent_child_context_recall@20": 0.5312,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.4,
@@ -153,11 +153,11 @@
     "mean_parent_child_context_recall@5": 0.5,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.8939,
-    "mean_broad_recall@10": 0.4011,
-    "mean_parent_child_context_recall@10": 0.5,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.8939,
+    "mean_broad_recall@20": 0.4011,
+    "mean_parent_child_context_recall@20": 0.5,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   },
   {
     "threshold": 0.5,
@@ -169,10 +169,10 @@
     "mean_parent_child_context_recall@5": 0.5,
     "mean_table_derived_recall@5": 0.3333,
     "mean_messy_pdf_overgrab_recall@5": 1.0,
-    "mean_narrow_recall@10": 0.8485,
-    "mean_broad_recall@10": 0.2951,
-    "mean_parent_child_context_recall@10": 0.5,
-    "mean_table_derived_recall@10": 0.3333,
-    "mean_messy_pdf_overgrab_recall@10": 1.0
+    "mean_narrow_recall@20": 0.8485,
+    "mean_broad_recall@20": 0.2951,
+    "mean_parent_child_context_recall@20": 0.5,
+    "mean_table_derived_recall@20": 0.3333,
+    "mean_messy_pdf_overgrab_recall@20": 1.0
   }
 ]

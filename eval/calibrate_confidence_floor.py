@@ -10,7 +10,7 @@ docstring; same lesson WP-40's Codex PR #187 review already established for
 eval/failure_classifier.py).
 
 Reports, for every candidate threshold: how many of the 8 zero-truth queries
-correctly return nothing, and the recall@5/10 impact on every other bucket
+correctly return nothing, and the recall@5/20 impact on every other bucket
 (especially Q-B05, whose real relevant results score as low as 0.033-0.09) --
 the real trade-off, not a single cherry-picked number.
 """
@@ -52,7 +52,7 @@ def sweep(queries: list, pools: dict) -> list:
         zero_correct = 0
         zero_total = 0
         per_shape_recall5: dict = {}
-        per_shape_recall10: dict = {}
+        per_shape_recall20: dict = {}
         qb05_recall5 = None
         failed = 0
         for q in queries:
@@ -72,9 +72,9 @@ def sweep(queries: list, pools: dict) -> list:
             if not relevant:
                 continue
             r5 = len(relevant & set(filtered_ids[:5])) / len(relevant)
-            r10 = len(relevant & set(filtered_ids[:PRODUCTION_TOP_K])) / len(relevant)
+            r20 = len(relevant & set(filtered_ids[:PRODUCTION_TOP_K])) / len(relevant)
             per_shape_recall5.setdefault(q["shape"], []).append(r5)
-            per_shape_recall10.setdefault(q["shape"], []).append(r10)
+            per_shape_recall20.setdefault(q["shape"], []).append(r20)
             if q["query_id"] == "Q-B05":
                 qb05_recall5 = r5
 
@@ -86,8 +86,8 @@ def sweep(queries: list, pools: dict) -> list:
         }
         for shape, vals in per_shape_recall5.items():
             row[f"mean_{shape}_recall@5"] = round(sum(vals) / len(vals), 4)
-        for shape, vals in per_shape_recall10.items():
-            row[f"mean_{shape}_recall@10"] = round(sum(vals) / len(vals), 4)
+        for shape, vals in per_shape_recall20.items():
+            row[f"mean_{shape}_recall@20"] = round(sum(vals) / len(vals), 4)
         rows.append(row)
     return rows
 
@@ -105,13 +105,13 @@ def format_report(rows: list) -> str:
         ] + [str(row.get(f"mean_{s}_recall@5", "—")) for s in shapes]
         lines.append("| " + " | ".join(cells) + " |")
     lines.append("")
-    lines.append("## recall@10 by bucket")
+    lines.append("## recall@20 by bucket")
     lines.append("")
-    header10 = ["threshold"] + [f"{s}_recall@10" for s in shapes]
-    lines.append("| " + " | ".join(header10) + " |")
-    lines.append("|" + "---|" * len(header10))
+    header20 = ["threshold"] + [f"{s}_recall@20" for s in shapes]
+    lines.append("| " + " | ".join(header20) + " |")
+    lines.append("|" + "---|" * len(header20))
     for row in rows:
-        cells = [str(row["threshold"])] + [str(row.get(f"mean_{s}_recall@10", "—")) for s in shapes]
+        cells = [str(row["threshold"])] + [str(row.get(f"mean_{s}_recall@20", "—")) for s in shapes]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 

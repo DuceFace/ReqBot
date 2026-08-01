@@ -318,28 +318,49 @@ WP-39.2's reconstruction helping some already-found results rank better without 
 table-derived, 5 messy-PDF/over-grab), every label hand-verified against real corpus text via live
 `retrieve()` calls before being trusted (same discipline as the original 16) — see
 `eval/gold_retrieval_queries.jsonl`'s per-query `notes` field for each one's verification method.
-Harness aggregate across the full 45: mean recall@5 0.582, recall@10 0.6538, recall@20 0.7106, mean
-MRR 0.7238 (37 non-zero queries; not directly comparable to the 16-query numbers above — a different,
-larger, and harder query set by design).
+Harness aggregate across the full 45: mean recall@5 0.6109, recall@10 0.6659, recall@20 0.7096, mean
+MRR 0.681 (37 non-zero queries; not directly comparable to the 16-query numbers above — a different,
+larger, and harder query set by design, and re-run separately so it reflects its own independent HyDE
+draw).
 
-55 misses + 19 over-grabs classified into the 8 categories:
+**Methodology correction (Codex review, PR #187, all 4 findings verified real before fixing):** the
+classifier's first pass had 4 real bugs, all fixed and the classification re-run from scratch after
+each: (1) miss detection and category assignment were driven by two *separately-drawn* HyDE calls
+(HyDE is unseeded/stochastic — `eval/retrieval_eval_harness.py`'s own docstring), so the same record
+could get contradictory verdicts across calls — fixed by making one retrieve() call per query the sole
+source of truth for that query's whole classification; (2) over-grab detection only scanned the top 5
+results, silently missing hand-labeled over-grabs the gold set itself recorded at ranks 6-8 (`Q-O01`)
+— fixed to scan the full evaluated top-20, plus always check hand-labeled `expected_over_grab_ids`
+regardless of where they land; (3) a transient failure in the raw-query disambiguation call silently
+defaulted to `ranking_miss` instead of an explicit inconclusive result, which could have silently
+inflated the reranker recommendation on the next run — fixed to report failures honestly; (4) an
+absent requirement_id was assumed lost without checking whether equivalent content simply survived
+under a different content-hash id — fixed by cross-checking `*_normalization_failures.jsonl`/the
+current corpus before confirming `extraction_failure`, gated on a new `expected_quotes` gold-file field
+recorded for the 5 affected queries. All 7 `extraction_failure` sub-case (a) records were independently
+reconfirmed as genuinely rejected (not relabeled) via this check — the original manual count held up.
+
+55 misses + 44 over-grabs classified into the 8 categories (final, post-fix numbers):
 
 | Category | Count (all 45 queries) | Count (excl. Q-B05) |
 |---|---|---|
+| **over_grab** | **44** | — |
 | ranking_miss | 18 | 9 |
-| missing_context | 10 | 7 |
 | extraction_failure | 9 (7a absent-from-corpus, 2b never-extracted) | 9 |
+| missing_context | 8 | 5 |
 | embedding_miss | 8 | 3 |
 | table_serialization | 5 | 5 |
-| query_filter_issue | 5 | 3 |
+| query_filter_issue | 7 | 5 |
 | zero_truth_confidence_failure (per-record) | 0 | 0 |
-| **over_grab** | **19** | — |
 
 `Q-B05` ("risk assessment and risk management process requirements", 29 relevant IDs — WP-37.1's own
 largest, weakest broad query) alone accounts for 19/55 misses (mostly `ranking_miss` and
 `embedding_miss`). Reporting both columns because a single heavy query shouldn't silently set the
-whole phase's conclusion — `ranking_miss` still ties for the largest category (9) even with `Q-B05`
-excluded, so the finding holds independent of that one query.
+whole phase's conclusion — `ranking_miss` still ties for the largest *miss* category (9, with
+`extraction_failure`) even with `Q-B05` excluded, so that finding holds independent of one query.
+`over_grab`'s count doesn't depend on `Q-B05` in the same way (over-grabs are found per-query across
+all 17 queries with at least one, not concentrated in a single outlier) and is now, corrected, the
+single largest finding of any kind by a wide margin.
 
 Separately, **all 8 zero-truth queries** still return a full 20 results at production `min_score`
 (`zero_truth_never_reports_empty: true`) — the query-level symptom of category 8, unchanged since
@@ -348,34 +369,34 @@ found only-below-floor in this run's misses, a different and narrower symptom).
 
 **WP-41 recommendation: reranker, with two smaller companion items.**
 
-1. **Primary: a reranker is the best-evidenced single lever.** `ranking_miss` is the largest or
-   tied-largest miss category both including and excluding `Q-B05`, and `over_grab` (19 findings) is
-   the single largest finding of any kind — both are exactly what a reranker over a larger initial
-   candidate pool addresses: pull correctly-present-but-low-ranked results up, push
-   duplicate/near-duplicate/descriptive-background results (the `over_grab` evidence is dominated by
-   same-chunk duplicate fragments, plus a handful of genuinely non-prescriptive "descriptive
-   background" text outranking the real answer) down. `embedding_miss` (8, 3 excl. `Q-B05`) is the
-   *smallest* well-formed-record category — corroborating WP-37.2's own finding that the embedding
+1. **Primary: a reranker is the best-evidenced single lever, more strongly than the first (buggy)
+   pass suggested.** `over_grab` (44 findings — dominated by same-chunk duplicate/near-duplicate
+   fragments, plus a smaller set of genuinely non-prescriptive "descriptive background" text
+   outranking the real answer) is now the single largest finding of any kind, and `ranking_miss` is
+   the largest or tied-largest *miss* category both including and excluding `Q-B05`. Both are exactly
+   what a reranker over a larger initial candidate pool addresses: pull correctly-present-but-low-
+   ranked results up, push duplicates/imprecise text down. `embedding_miss` (8, 3 excl. `Q-B05`) is
+   the *smallest* well-formed-record category — corroborating WP-37.2's own finding that the embedding
    representation itself isn't the biggest lever right now, so LLM-generated contextual embeddings
    should stay lower priority than reranking.
 2. **Companion (small, fix-shaped, not a new feature): investigate the Phase 38 fragment-rejection
    regression found above** (`Q-N03`/`Q-N04`'s 2 dropped IDs, plus `Q-C04`/`Q-C05`/`Q-C06`'s 5
-   additional confirmed-gone WP-38.1 FRAGMENT examples — 7 total real, evidenced extraction_failure
-   sub-case (a) instances, all previously-correct records now rejected by `unrepairable_fragment_quote`
-   or `orphaned_list_item_quote`). This is a regression to fix, not a scope decision — not the same
-   thing as the `STEM_NEVER_EXTRACTED`/table-serialization *enhancement* work already on the Candidate
-   WP-41 list.
+   additional confirmed-gone WP-38.1 FRAGMENT examples — 7 total real, independently-reconfirmed
+   `extraction_failure` sub-case (a) instances, all previously-correct records now rejected by
+   `unrepairable_fragment_quote`/`orphaned_list_item_quote`/`dangling_clause_quote`). This is a
+   regression to fix, not a scope decision — not the same thing as the `STEM_NEVER_EXTRACTED`/
+   table-serialization *enhancement* work already on the Candidate WP-41 list.
 3. **Companion (small, targeted): the zero-truth/confidence-floor problem is unchanged and remains
    serious for a compliance tool** — 8/8 zero-truth queries still return 20 results indistinguishable
    in count from a real match. Independent of whatever WP-41 becomes for ranking, this deserves its
    own explicit fix (recalibrated `min_score` and/or an explicit low-confidence signal), not further
    deferral.
 
-`missing_context` (10, 7 excl. `Q-B05`) + `table_serialization` (5) together are real and sizable
+`missing_context` (8, 5 excl. `Q-B05`) + `table_serialization` (5) together are real and sizable
 (WP-40 also found 3 *new* `GARBLED_TABLE` chunks beyond WP-39.1's original 2, and confirmed 21 garbled
 chunks total across 5 documents when scanning the whole corpus — a bigger problem than previously
-known) but individually smaller than `ranking_miss` — `STEM_NEVER_EXTRACTED`/table-structure-aware
-serialization work is real and evidenced, just not the top-ranked lever this round.
+known) but individually smaller than `ranking_miss`/`over_grab` — `STEM_NEVER_EXTRACTED`/table-
+structure-aware serialization work is real and evidenced, just not the top-ranked lever this round.
 
 ---
 

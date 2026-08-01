@@ -176,9 +176,13 @@ broad-query and zero-truth weaknesses it measured.
   - Narrow/exact (WP-37.1's existing shape).
   - Broad/thematic (WP-37.1's existing shape).
   - **Parent-child/context** — queries whose correct answer is (or, pre-WP-39.2, was) exactly the
-    kind of fragment WP-39.1 traced; a natural source is the 18-example fixture
-    (`eval/audit_wp39_1/labeled_failures.jsonl`) itself, reframed as retrieval queries rather than
-    extraction-precision examples.
+    kind of fragment WP-39.1 traced; a natural source is that same 18-example fixture
+    (Codex review, PR #186: corrected path — the FRAGMENT-labeled records live in
+    `eval/audit_wp38_1/labeled_failures.jsonl`, joined against `eval/audit_wp38_1/unbiased_sample.jsonl`
+    by `requirement_id` for chunk/document context, exactly as `eval/audit_wp39_1/trace_examples.py`'s
+    own `FIXTURE_DIR` does; `eval/audit_wp39_1/` itself holds only the tracing/classification scripts,
+    no `labeled_failures.jsonl` of its own — confirmed directly, the original path here was wrong),
+    reframed as retrieval queries rather than extraction-precision examples.
   - **Table-derived** — queries whose correct answer sits in or near a `GARBLED_TABLE`-pattern chunk
     (WP-39.1's 2 known examples plus new ones found while building this bucket).
   - Zero-truth/off-topic (WP-37.1's existing shape, expanded).
@@ -215,10 +219,20 @@ broad-query and zero-truth weaknesses it measured.
   3. **Table serialization** — the record's `source_quote`/chunk `raw_text` matches WP-39.1's
      confirmed `GARBLED_TABLE` signature (flattened `"Column = Value"` run-on text).
   4. **Embedding miss** — the record is well-formed (none of 1-3 apply) and absent even from a
-     generously-sized candidate pool (re-run retrieval at a much larger limit, e.g. top-100, not just
-     the evaluated top-k) — a genuine semantic/vocabulary mismatch between query and indexed text.
-  5. **Ranking miss** — the record *is* present in that larger candidate pool but outside the
-     evaluated top-k — retrievable, just not well-ranked. The category that would justify a reranker.
+     generously-sized candidate pool, re-checked with **`top_k` raised (e.g. to 100) *and*
+     `min_score=0`, not `top_k` alone** (Codex review, PR #186, verified real: `core.ask.retrieve()`
+     applies `min_score` filtering *before* the `top_k` trim — confirmed directly at
+     `core/ask.py`'s `hits = [r for r in hits if r.score >= min_score]` running ahead of
+     `hits = hits[:top_k]` — so a relevant record scoring just under the production `0.02` floor
+     would still be silently absent from a "top-100" pool call that didn't also disable the floor,
+     and get mislabeled as an embedding miss when it's actually a threshold/confidence-calibration
+     problem, category 8) — a genuine semantic/vocabulary mismatch between query and indexed text.
+  5. **Ranking miss** — the record *is* present in that larger, floor-disabled candidate pool but
+     outside the evaluated top-k *at the production `min_score`* — retrievable, just not well-ranked.
+     The category that would justify a reranker. **If a record is only found once `min_score=0` is
+     set** (i.e. its production-default score is below the `0.02` floor), classify it under category 8
+     instead — its absence is a threshold-calibration symptom, not an ordering one, even though it's
+     technically "present in the larger pool."
   6. **Over-grab** — a wrong/irrelevant result ranks in top-k, possibly displacing a correct one;
      diagnosed per surfaced result, not per missing ID (ties to Phase 38's Over-Grab Precision
      backlog).
@@ -226,8 +240,11 @@ broad-query and zero-truth weaknesses it measured.
      query intent, or an active `domain_tags`/`requirement_type` filter wrongly excludes a valid
      result — checked by comparing raw-query retrieval against production `retrieve()` for the
      specific miss.
-  8. **Zero-truth/confidence failure** — evaluated at the query level for the zero-truth bucket:
-     does the system fail to signal "no good match" the way WP-37.1 already found it does universally.
+  8. **Zero-truth/confidence failure** — two symptoms of the same underlying miscalibration, both
+     counted here: (a) query-level, for the zero-truth bucket — does the system fail to signal "no
+     good match" the way WP-37.1 already found it does universally; (b) per-record, from category 5
+     above — a relevant record whose fused score falls below the production `min_score=0.02` floor
+     and is dropped rather than surfaced, even though it's a real match.
 - **Report category prevalence** (counts and which query buckets each concentrates in) and state a
   specific, evidenced WP-41 recommendation — not a menu of equally-weighted options.
 

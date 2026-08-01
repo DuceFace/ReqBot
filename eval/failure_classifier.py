@@ -365,9 +365,14 @@ def classify_over_grabs(query: dict, retrieved_ids: list, corpus: CorpusIndex, *
     """
     relevant = set(query.get("relevant_requirement_ids", []))
     expected_over_grabs = set(query.get("expected_over_grab_ids", []))
+    # chunk_id is excluded when None/missing -- a (doc_key, None) key would
+    # otherwise match ANY other record in the same doc that also lacks a
+    # chunk_id, misclassifying two unrelated missing-metadata records as
+    # same-chunk duplicates (Gemini review, PR #187).
     relevant_chunks = {
         (corpus.doc_key_by_id.get(rid, ""), corpus.records_by_id[rid].get("chunk_id"))
-        for rid in relevant if rid in corpus.records_by_id
+        for rid in relevant
+        if rid in corpus.records_by_id and corpus.records_by_id[rid].get("chunk_id") is not None
     }
     findings = []
     seen_ids = set()
@@ -378,7 +383,8 @@ def classify_over_grabs(query: dict, retrieved_ids: list, corpus: CorpusIndex, *
         if rec is None:
             continue
         within_window = rank <= top_k
-        key = (corpus.doc_key_by_id.get(rid, ""), rec.get("chunk_id"))
+        chunk_id = rec.get("chunk_id")
+        key = (corpus.doc_key_by_id.get(rid, ""), chunk_id)
         if rid in expected_over_grabs:
             seen_ids.add(rid)
             suffix = "" if within_window else f" (outside evaluated top-{top_k}, reported for completeness)"
@@ -387,7 +393,7 @@ def classify_over_grabs(query: dict, retrieved_ids: list, corpus: CorpusIndex, *
                 "evidence": f"{rid} hand-labeled as a known over-broad/duplicate extraction for "
                             f"query {query['query_id']}{suffix}.",
             })
-        elif within_window and key in relevant_chunks:
+        elif within_window and chunk_id is not None and key in relevant_chunks:
             seen_ids.add(rid)
             findings.append({
                 "requirement_id": rid, "rank": rank, "category": "over_grab",

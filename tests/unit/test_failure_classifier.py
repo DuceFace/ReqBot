@@ -295,6 +295,21 @@ def test_classify_over_grabs_does_not_flag_unrelated_irrelevant_results():
     assert findings == []
 
 
+def test_classify_over_grabs_does_not_match_two_records_both_missing_chunk_id():
+    # (Gemini review, PR #187): a relevant record and an irrelevant candidate
+    # both lacking chunk_id would otherwise share the key (doc_key, None),
+    # falsely matching as "same chunk" duplicates. chunk_id=None must be
+    # excluded from the same-chunk-co-location check entirely.
+    records = {
+        "REQ-good": {"chunk_id": None, "source_quote": "The correct clause."},
+        "REQ-unrelated": {"chunk_id": None, "source_quote": "Something else entirely, same missing metadata."},
+    }
+    corpus = _corpus(records)
+    query = {"query_id": "Q-og6", "query": "x", "relevant_requirement_ids": ["REQ-good"]}
+    findings = fc.classify_over_grabs(query, ["REQ-unrelated", "REQ-good"], corpus, top_k=5)
+    assert findings == []
+
+
 def test_classify_over_grabs_same_chunk_respects_top_k_cutoff():
     records = {
         "REQ-good": {"chunk_id": 5, "source_quote": "The correct clause."},

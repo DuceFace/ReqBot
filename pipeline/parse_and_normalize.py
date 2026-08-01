@@ -760,10 +760,24 @@ def run(
 
         # WP-38.2: reject a subordinate clause or predicate extracted without
         # its main clause or subject (e.g. "shall be coordinated with the
-        # customer" -- a dangling predicate with no subject at all).
+        # customer" -- a dangling predicate with no subject at all). WP-41:
+        # NOT rejected when the chunk's own parent_header_text supplies the
+        # missing subject -- pipeline/enrich_requirements.py's
+        # _find_heading_stem() exists specifically to recover this exact
+        # shape (already gated on this same _is_dangling_clause() check, and
+        # already proven correct by
+        # tests/unit/test_parent_stem_reconstruction.py's own regression
+        # test), but apply_parent_stem_reconstruction() only ever processes
+        # records that survive Step D -- so a recoverable dangling clause
+        # was rejected here before reconstruction ever got the chance to run
+        # on it. Only skips rejection when a real header exists; an
+        # unrecoverable dangling clause (no parent_header_text for its
+        # chunk) is rejected exactly as before.
         if _is_dangling_clause(source_quote):
-            failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "dangling_clause_quote", "raw": req})
-            continue
+            recoverable_header = ((hierarchy or {}).get("parent_header_text") or "").strip()
+            if not recoverable_header:
+                failures.append({"requirement_id": req.get("requirement_id", "UNKNOWN"), "chunk_id": chunk_id, "error": "dangling_clause_quote", "raw": req})
+                continue
 
         if description:
             desc_lower = description.lower()

@@ -422,12 +422,17 @@ eventual scope is traceable, not implicit:
   phase is not pre-committing to one of the above before the evidence exists.
 - **New, found by WP-40: a Phase 38 fragment-rejection regression** — `unrepairable_fragment_quote`/
   `orphaned_list_item_quote` now reject 7 confirmed real, previously-correct records (2 from the
-  original 16-query baseline alone). A bug-fix-shaped follow-up, not the `STEM_NEVER_EXTRACTED`
-  enhancement item above — see WP-40's Findings.
+  original 16-query baseline alone). **Correction (WP-41 scoping, see §8 Backlog):** deeper
+  investigation found 2 of the 7 are false alarms (content already preserved via WP-39.2's own
+  `parent_stem` on a surviving sibling — a gold-label bug, not a pipeline bug), 4 are a genuine,
+  by-design rejection of purely-definitional content (see §8's Backlog item on this), and 1 is a
+  genuine small reconstruction gap. This entire line item turned out smaller and more nuanced than
+  first framed here — see §8 for the full, corrected picture and WP-41's actual scope.
 
-**Recommendation (see WP-40 Findings for full evidence): reranker is the primary WP-41 direction**,
-with the Phase 38 regression fix and the zero-truth/confidence-floor fix as small, independent
-companion items.
+**Decided: WP-41 became a bundled small-fixes WP** (Tyler's direction, 2026-08-01) — gold-label
+corrections, a `section_title_path` fallback for parent-stem reconstruction, and zero-truth/
+confidence-floor calibration. **The reranker and the definitional-content-retrievability question
+(§8) are both deferred, not decided here** — see `docs/PHASE41_REQUIREMENTS.md`.
 
 ---
 
@@ -463,3 +468,65 @@ companion items.
 - One phase, one measurement — this phase produces evidence and a recommendation; it does not also
   start implementing whatever that recommendation turns out to be. WP-41 is a separate, explicitly
   scoped WP.
+
+---
+
+## 8. Backlog (things learned that shouldn't get lost)
+
+Added during WP-41 scoping (2026-08-01) so the deeper investigation that WP-41 required doesn't
+evaporate once WP-41 itself ships something narrower. None of these are decided — they're recorded so
+a future WP can pick them up with full context instead of re-discovering it.
+
+- **Reranker** (WP-40's own primary recommendation, §4/§5 above) — still not built. `over_grab` (42)
+  and `ranking_miss` (17/8 excl. `Q-B05`) remain the largest evidenced findings; a cross-encoder
+  reranker over a larger initial candidate pool is the best-evidenced next lever. Needs its own
+  scoping conversation before implementation — almost certainly a new dependency (a local
+  cross-encoder model, e.g. via `sentence-transformers`, or an external reranking API), which is a
+  stop-and-ask item per `~/reqbot-agent-docs/reqbot/REQBOT_SKILL.md`, not something to decide
+  unilaterally mid-WP. **Strengthened by WP-41's zero-truth calibration finding (below):** the
+  fix for zero-truth confidence isn't a threshold, it's a calibrated absolute-relevance score —
+  something a reranker naturally provides and RRF fusion structurally cannot. Whenever the reranker
+  gets scoped, its confidence output should be evaluated against `eval/gold_retrieval_queries.jsonl`'s
+  8 zero-truth queries specifically, not just recall/MRR on the narrow/broad buckets.
+
+- **Definitional (non-obligation) content isn't retrievable, and that's a real product question, not
+  a bug.** Investigating WP-40's "7 confirmed real regressions" for WP-41 found that 4 of them (all
+  from one afi10-2402 chunk: Suspicious Activity Reporting / Force Health Protection / Readiness
+  Reporting / Insider Threat — each phrased as `"<Term>, as defined in <citation>."`) are rejected by
+  WP-38.2's `orphaned_list_item_quote` rule *exactly as designed* — they're genuinely pure definitional
+  cross-references with no independent obligation, and WP-38.2's rule was calibrated through multiple
+  review rounds specifically to reject this shape (`pipeline/parse_and_normalize.py`'s
+  `_is_orphaned_list_item()` docstring has the full history). The tension: a definitional answer
+  ("what is the DoD Insider Threat Program and what policy defines it?" — literally WP-37.1's own
+  `Q-N04`) can be exactly the right retrieval result even though it's correctly *not* an actionable
+  compliance requirement. Loosening the rejection rule to let this back in would undo real,
+  hard-won extraction-precision work and risk exactly the kind of imprecise content WP-38 was built to
+  filter out of the *requirements* corpus. Options worth a real conversation before any code: (a)
+  leave as-is (accept the gap — a definitional query without an exact-phrase corpus match will need to
+  rely on `context` chunks, not the requirements index); (b) a separate index/field for
+  rejected-but-real definitional content, kept out of the main requirements corpus but still
+  retrievable for this shape of query; (c) something else. Not decided here.
+
+- **`REQ-1b1071c8d317`-shaped dangling-clause records: fixed in WP-41.** Turned out to be a genuine
+  ordering bug, not a missing fallback — `pipeline/enrich_requirements.py`'s `_find_heading_stem()`
+  already existed and was already unit-tested to correctly reconstruct this exact shape, but Step D's
+  `_is_dangling_clause()` rejection removed the record before reconstruction ever ran on it. Fixed by
+  gating the rejection on whether the chunk's `parent_header_text` can recover the subject. Live
+  reprocess found 3 real records recovered (not just the 1 originally found), all now with a
+  populated `parent_stem`. See `docs/PHASE41_REQUIREMENTS.md`'s Findings for full detail.
+
+- **Zero-truth/confidence-floor calibration: done in WP-41, conclusive negative result.** Swept 11
+  `min_score` thresholds (0.02–0.5) against the real 45-query gold set: **0/8 zero-truth queries
+  correctly return empty at any tested threshold.** Off-topic queries' top scores range up to 1.07 —
+  routinely *higher* than genuinely-relevant weak matches (`Q-B05`'s real scores as low as 0.033–0.09)
+  — the score distributions aren't just overlapping, they're inverted in places. No `min_score`
+  default was changed (every tested value above ~0.3 costs real recall for zero zero-truth benefit).
+  Full sweep: `eval/spike_results/wp_41_confidence_calibration/sweep_report.md`. The real fix needs a
+  calibrated absolute-relevance signal, not a threshold on RRF's rank-based fusion score — folded into
+  the reranker bullet above.
+
+- **21 `GARBLED_TABLE` chunks confirmed across 5 documents** (afi17-203, afi10-2402, DODI 5200.48,
+  DODI 8551.01) when WP-40 scanned the whole corpus with `is_garbled_table_text()` — WP-39.1 only ever
+  knew about 2 (both in afi17-203). This is folded into the existing `STEM_NEVER_EXTRACTED`/
+  table-structure-aware serialization candidate direction above, not a new one, but the real scale
+  (11x WP-39.1's original count) is worth keeping visible for whenever that WP gets scoped.

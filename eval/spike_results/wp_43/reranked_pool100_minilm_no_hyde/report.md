@@ -8,10 +8,10 @@
 - Queries scored (non-zero ground truth): 35
 - Mean precision@5: 0.2514
 - Mean recall@5: 0.5456
-- Mean recall@10: 0.601
-- Mean recall@20: 0.6782
-- Mean MRR: 0.678
-- Retrieval latency: mean 6553.4ms, p95 7930.6ms
+- Mean recall@10: 0.5988
+- Mean recall@20: 0.6653
+- Mean MRR: 0.6778
+- Retrieval latency: mean 6734.0ms, p95 7979.4ms
 - Zero-truth queries: 8, mean results returned: 20.0
 - **2 quer(y/ies) with no scorable ground truth** (non-zero shape, but no known-relevant id — e.g. unextracted content, not a rankable miss): Q-T04, Q-T05
 
@@ -30,7 +30,7 @@
 | Q-B02 | broad | 6 | 0.4 | 0.3333 | 0.3333 | 0.5 | 1.0 | |
 | Q-B03 | broad | 8 | 0.2 | 0.125 | 0.375 | 0.75 | 1.0 | |
 | Q-B04 | broad | 15 | 0.4 | 0.1333 | 0.3333 | 0.5333 | 1.0 | |
-| Q-B05 | broad | 29 | 0.6 | 0.1034 | 0.1724 | 0.2759 | 1.0 | |
+| Q-B05 | broad | 29 | 0.6 | 0.1034 | 0.2069 | 0.2759 | 1.0 | |
 | Q-Z01 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z02 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z03 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
@@ -40,13 +40,13 @@
 | Q-N10 | narrow | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-N11 | narrow | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-B06 | broad | 3 | 0.4 | 0.6667 | 0.6667 | 1.0 | 1.0 | |
-| Q-B07 | broad | 5 | 0.2 | 0.2 | 0.6 | 0.8 | 0.3333 | |
-| Q-B08 | broad | 9 | 0.6 | 0.3333 | 0.5556 | 0.7778 | 0.5 | |
+| Q-B07 | broad | 5 | 0.2 | 0.2 | 0.6 | 0.6 | 0.3333 | |
+| Q-B08 | broad | 9 | 0.6 | 0.3333 | 0.4444 | 0.7778 | 0.5 | |
 | Q-Z05 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z06 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z07 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z08 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
-| Q-C01 | parent_child_context | 4 | 0.0 | 0.0 | 0.0 | 0.5 | 0.0625 | |
+| Q-C01 | parent_child_context | 4 | 0.0 | 0.0 | 0.0 | 0.25 | 0.05 | |
 | Q-C02 | parent_child_context | 3 | 0.6 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-C03 | parent_child_context | 4 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | |
 | Q-C04 | parent_child_context | 3 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | |
@@ -62,5 +62,5 @@
 | Q-O01 | messy_pdf_overgrab | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-O02 | messy_pdf_overgrab | 1 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | |
 | Q-O03 | messy_pdf_overgrab | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 0.25 | |
-| Q-O04 | messy_pdf_overgrab | 2 | 0.0 | 0.0 | 0.0 | 0.5 | 0.0833 | |
+| Q-O04 | messy_pdf_overgrab | 2 | 0.0 | 0.0 | 0.0 | 0.5 | 0.0909 | |
 | Q-O05 | messy_pdf_overgrab | 2 | 0.4 | 1.0 | 1.0 | 1.0 | 1.0 | |

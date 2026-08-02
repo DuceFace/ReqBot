@@ -50,11 +50,29 @@ def _scoring_text(candidate: dict) -> str:
     fragment-shaped quote (e.g. "(3) Restrain competition." with no visible
     list-introducing clause) reaches the reranker with no governing context
     and can be wrongly demoted.
+
+    Also includes source_ref when present (Codex review, PR #191), for the
+    same reason build_embedding_text() appends it at index time: for a
+    control-catalog-style corpus (e.g. NIST 800-53), source_ref can itself be
+    the control ID (e.g. "AC-3") -- an exact-match signal on the candidate
+    side that would otherwise only exist in the query (dense_query/
+    expanded_query already retains control ID text as verified live against
+    the rewrite model; sparse/BM25 already gets it explicitly). No document
+    currently indexed has a control-ID-shaped source_ref (verified live
+    against the corpus), but source_ref itself (section/paragraph numbers
+    for this corpus's actual documents) is present on virtually every
+    record, so this changes the scoring text for every candidate today, not
+    just a hypothetical future one -- §11's committed artifacts were
+    regenerated after this change for that reason.
     """
     description = (candidate.get("description") or "").strip()
     body = (candidate.get("embedding_text") or "").strip() or (candidate.get("source_quote") or "").strip()
+    source_ref = (candidate.get("source_ref") or "").strip()
     parts = [p for p in (description, body) if p]
-    return "\n".join(parts)
+    text = "\n".join(parts)
+    if source_ref:
+        text += f"\nRef: {source_ref}"
+    return text
 
 
 def rerank(

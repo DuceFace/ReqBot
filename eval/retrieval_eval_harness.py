@@ -40,13 +40,17 @@ docs/PHASE37_REQUIREMENTS.md's WP-37.2 Scope.
 CAUTION #2 (WP-43, docs/PHASE43_REQUIREMENTS.md §11.1): even with hyde=False and
 rewrite_query()'s deterministic temperature=0.0, re-running the identical query
 against the identical, unchanged corpus is not guaranteed to reproduce every
-metric exactly. Observed directly: two runs of the same --no-hyde baseline
-command reproduced Precision@5/Recall@5/10/20 bit-for-bit but MRR differed
-(0.6267 vs. 0.6124) -- most likely Qdrant's HNSW dense-vector search breaking a
-near-tie differently between runs without changing which documents clear a
-given top-k threshold. Small-magnitude comparisons between two runs (e.g. two
-rerank_model options that differ by a few hundredths) should be treated with
-this in mind; large, robust deltas are unaffected.
+metric exactly -- and the spread is larger than a first look suggests. Observed
+across three runs of the same --no-hyde configs: one pair reproduced
+Precision@5/Recall@5/10/20 bit-for-bit with only MRR differing; another pair
+saw Recall@20 flip sign entirely (improving over baseline in one run,
+regressing in another) and Precision@5 move a full regression-vs-tie range.
+Most likely Qdrant's HNSW dense-vector search breaking near-ties differently
+between runs, compounded by any change to reranker input text also having a
+real effect. Single-run point estimates on a 45-query set are not precise
+enough for fine-grained comparisons (e.g. two rerank_model or pool_size
+options a few hundredths apart) -- run N>=3 repeats and compare distributions
+for anything but a large, robust delta.
 """
 import argparse
 import json

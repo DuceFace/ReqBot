@@ -6,12 +6,12 @@
 
 ## Aggregate
 - Queries scored (non-zero ground truth): 35
-- Mean precision@5: 0.2514
-- Mean recall@5: 0.5187
-- Mean recall@10: 0.609
-- Mean recall@20: 0.6683
-- Mean MRR: 0.6358
-- Retrieval latency: mean 2008.0ms, p95 2624.8ms
+- Mean precision@5: 0.2629
+- Mean recall@5: 0.5314
+- Mean recall@10: 0.5995
+- Mean recall@20: 0.6613
+- Mean MRR: 0.6297
+- Retrieval latency: mean 2033.5ms, p95 2596.0ms
 - Zero-truth queries: 8, mean results returned: 20.0
 - **2 quer(y/ies) with no scorable ground truth** (non-zero shape, but no known-relevant id — e.g. unextracted content, not a rankable miss): Q-T04, Q-T05
 
@@ -21,27 +21,27 @@
 |---|---|---|---|---|---|---|---|---|
 | Q-N01 | narrow | 2 | 0.4 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-N02 | narrow | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
-| Q-N03 | narrow | 3 | 0.4 | 0.6667 | 1.0 | 1.0 | 1.0 | |
+| Q-N03 | narrow | 3 | 0.6 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-N04 | narrow | 2 | 0.2 | 0.5 | 0.5 | 0.5 | 1.0 | |
 | Q-N05 | narrow | 3 | 0.6 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-N06 | narrow | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 0.5 | |
 | Q-N07 | narrow | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
-| Q-B01 | broad | 10 | 0.6 | 0.3 | 0.3 | 0.4 | 1.0 | |
+| Q-B01 | broad | 10 | 0.6 | 0.3 | 0.3 | 0.3 | 1.0 | |
 | Q-B02 | broad | 6 | 0.4 | 0.3333 | 0.5 | 0.5 | 1.0 | |
 | Q-B03 | broad | 8 | 0.4 | 0.25 | 0.5 | 0.875 | 1.0 | |
 | Q-B04 | broad | 15 | 0.4 | 0.1333 | 0.3333 | 0.6 | 0.25 | |
-| Q-B05 | broad | 29 | 0.6 | 0.1034 | 0.1379 | 0.2759 | 1.0 | |
+| Q-B05 | broad | 29 | 0.6 | 0.1034 | 0.1379 | 0.2414 | 1.0 | |
 | Q-Z01 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z02 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z03 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z04 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-N08 | narrow | 2 | 0.4 | 1.0 | 1.0 | 1.0 | 1.0 | |
-| Q-N09 | narrow | 2 | 0.4 | 1.0 | 1.0 | 1.0 | 0.5 | |
+| Q-N09 | narrow | 2 | 0.4 | 1.0 | 1.0 | 1.0 | 0.3333 | |
 | Q-N10 | narrow | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 0.5 | |
 | Q-N11 | narrow | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
-| Q-B06 | broad | 3 | 0.2 | 0.3333 | 0.6667 | 1.0 | 1.0 | |
-| Q-B07 | broad | 5 | 0.2 | 0.2 | 0.6 | 0.6 | 0.25 | |
-| Q-B08 | broad | 9 | 0.6 | 0.3333 | 0.7778 | 0.8889 | 1.0 | |
+| Q-B06 | broad | 3 | 0.2 | 0.3333 | 0.3333 | 1.0 | 1.0 | |
+| Q-B07 | broad | 5 | 0.2 | 0.2 | 0.6 | 0.6 | 0.2 | |
+| Q-B08 | broad | 9 | 0.8 | 0.4444 | 0.7778 | 0.7778 | 1.0 | |
 | Q-Z05 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z06 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z07 | zero | 0 | — | — | — | — | — | returned 20 result(s) |

@@ -288,77 +288,97 @@ gold set and live Qdrant/Ollama (`grc_requirements` at 1848 points), `--no-hyde`
 
 ### 11.1 Aggregate results
 
+These artifacts were regenerated three times over the course of this PR's review (§6.3's
+config-recording fix, then again after §6's `source_ref` fix), each time against the same,
+unchanged corpus (confirmed via `reqbot status` — same collection names, same 1848/839 point
+counts throughout). The committed files reflect the final (third) run, current as of the latest
+code. All three runs are reported here because the spread between them turned out to be a finding
+in its own right — see the variance discussion below the table.
+
 | Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
 |---|---|---|---|---|---|---|---|
-| Baseline (no rerank) | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6124 | 1785ms | 2358ms |
-| Reranked, pool=50 | 0.2514 | 0.5171 | 0.5985 | 0.6926 | 0.6264 | 1919ms | 2552ms |
-| Reranked, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2008ms | 2625ms |
+| Baseline (no rerank) | 0.2629 (stable across all 3 runs) | 0.5402 (stable) | 0.6208 (stable) | 0.6693 (stable) | 0.6124–0.6267 | ~1750–1800ms | ~2350–2400ms |
+| Reranked, pool=50 | 0.2514 (stable) | 0.5171–0.5237 | 0.5985 (stable) | 0.6537–0.6926 | 0.6264–0.6407 | ~1860–1920ms | ~2440–2550ms |
+| Reranked, pool=100 | 0.2514–**0.2629** | 0.5187–0.5314 | 0.5995–0.6090 | 0.6613–0.6683 | 0.6297–0.6358 | ~2010–2030ms | ~2600–2625ms |
 
-**Precision@5 — the primary gate metric — regressed at both pool sizes** (0.2629 → 0.2514, about
--4.4% relative) rather than improving. Recall@5 and Recall@10 also regressed slightly at both pool
-sizes. Recall@20 improved modestly, more so at pool=50 than pool=100 (widening the pool further did
-not help — see §11.3). Latency increased by roughly 7-13% at pool=100 (1785ms → 2008ms mean) — not
-itself gating (WP-15.5's "measure, don't hard-gate" criterion), but consistent with the added ONNX
-inference cost buying no net accuracy improvement here.
+(MiniLM-L-12 is a separate model/config — see §11.6, not folded into this table.)
 
-**Run-to-run variance, discovered while regenerating these artifacts for §6.3's config-recording
-fix (Codex review, PR #191):** re-running the identical baseline command a second time against the
-same, unchanged corpus (confirmed via `reqbot status` — same collection names, same 1848/839 point
-counts) reproduced Precision@5/Recall@5/10/20 exactly, but MRR differed (0.6267 in the first pass
-→ 0.6124 here). `--no-hyde` and `rewrite_query()`'s `temperature=0.0` rule out the two previously-
-known noise sources (HyDE sampling, per this file's own header caution; non-deterministic rewrite).
-The most likely remaining source is Qdrant's HNSW dense-vector search, which is approximate and can
-break near-ties differently between runs without changing which documents clear a given top-k
-threshold — consistent with the pattern observed: recall/precision at fixed thresholds were stable
-across 3 of 4 reruns, while MRR (sensitive to exact rank) and, in one case (MiniLM, §11.6),
-Precision@5/Recall@5 shifted by a small amount. This doesn't change any conclusion in this document
-— every regression and every "still unfixed" finding reproduced identically — but the exact 4th
-decimal place of any of these numbers shouldn't be treated as perfectly reproducible on a future
-rerun. Added as a second caution in `eval/retrieval_eval_harness.py`'s own module docstring for
-future WPs' benefit, alongside the existing HyDE-noise one.
+**Precision@5 — the primary gate metric — never exceeds baseline in any of the 9 (3 runs × 3
+non-baseline configs) measurements taken**, and regresses in all but one (pool=100's third run tied
+baseline exactly at 0.2629). Recall@5 and Recall@10 regress in every single measurement, every run,
+both pool sizes — the most consistent finding in this entire spike. Recall@20 is the most volatile:
+it improved over baseline in the first measurement cycle, then regressed in the third, for both
+pool sizes. Latency increased consistently by roughly 5-15% at pool=100 across all three runs — not
+itself gating (WP-15.5's "measure, don't hard-gate" criterion) but a real, repeatable cost for zero
+repeatable benefit on the gate's primary metric.
 
-### 11.2 Zero-truth score separation — real, but far thinner than first measured
+**Run-to-run variance is larger than initially characterized, and is itself a real finding.** The
+first regeneration (for §6.3's config-recording fix) showed only MRR shifting meaningfully run to
+run, with Precision@5/Recall@5/10/20 stable — the note originally here characterized the variance
+as narrow (MRR-only, small magnitude). The **second** regeneration (for §6's `source_ref` fix,
+which does change reranker input text and so isn't purely a noise-isolation control) showed a much
+larger spread: Recall@20 flipped sign entirely (from improving over baseline to regressing over
+baseline, at both pool sizes), and pool=100's Precision@5 moved a full regression-vs-tie range.
+`--no-hyde` and `rewrite_query()`'s `temperature=0.0` still rule out the two previously-known noise
+sources (HyDE sampling, per this file's own header caution; non-deterministic rewrite) — the
+remaining source is most likely Qdrant's HNSW dense-vector search, which is approximate and can
+break near-ties differently between runs, compounded here by the `source_ref` text change itself
+having some real (if apparently small) effect on reranker scoring. The two are not cleanly
+separable from three data points.
+
+**This does not change the qualitative conclusion** — Precision@5 and Recall@5/10 regressed in
+*every* measurement across all three cycles, with no exceptions on Recall@5/10 and only one
+tie (not an improvement) on Precision@5 — but it does mean single-run point estimates on this
+45-query set are not precise enough to support fine-grained comparisons (e.g. "pool=50 vs.
+pool=100" or the zero-truth separation analysis in §11.2, which flipped between runs — see below).
+A rigorous future comparison should run N≥3 repeats per configuration and compare distributions,
+the same discipline WP-37.2's original HyDE caution already recommended for a different reason.
+Documented as a second caution in `eval/retrieval_eval_harness.py`'s own module docstring.
+
+### 11.2 Zero-truth score separation — genuinely inconclusive on a single run
 
 Directly answering Phase 40/41's backlog note (evaluate the reranker's confidence output against
-the 8 zero-truth queries specifically). **Corrected after Codex review (PR #191)**: the first pass
-here pooled all 20 returned results per zero-truth query against only the top-5 per real query —
-an apples-to-oranges comparison at different depths, and not the statistic a corrective gate would
-actually threshold (a gate decides per-query, off that query's own top candidate, not off a
-pooled/averaged sample). Redone as **per-query maximum `rerank_score`** from the pool=100 run:
+the 8 zero-truth queries specifically). This section changed twice during review, and the second
+change is the more important one:
+
+**Round 1** pooled all 20 returned results per zero-truth query against only the top-5 per real
+query — an apples-to-oranges comparison at different depths, and not the statistic a corrective
+gate would actually threshold. **Codex review (PR #191) caught this**; redone as **per-query
+maximum `rerank_score`**, which on that run showed the two ranges not overlapping, by a margin of
+0.0007 (zero-truth ceiling 0.0246 vs. the weakest real query's own ceiling, `Q-N10`, at 0.0253) —
+explicitly flagged at the time as "razor-thin... would very plausibly flip on a different query."
+
+**Round 2**: regenerating the artifacts again for the `source_ref` fix (§6) reran the identical
+measurement, and it *did* flip. In the current, final artifact:
 
 | Bucket | n queries | min of per-query max | max of per-query max | mean of per-query max |
 |---|---|---|---|---|
-| Zero-truth | 8 | 0.0004 | **0.0246** | 0.0093 |
-| Non-zero-truth (narrow/broad/parent_child_context/table_derived/messy_pdf_overgrab) | 37 | **0.0253** | 0.9998 | 0.9245 |
+| Zero-truth | 8 | 0.0004 | **0.0256** (`Q-Z07`) | 0.0091 |
+| Non-zero-truth (n=37 — every non-`zero`-shape query gets a `rerank_score`, including `Q-T04`/`Q-T05`, real on-topic content with no `requirement_id` to score recall against) | 37 | **0.0129** (`Q-N10`) | 0.9998 | 0.9224 |
 
-n=37, not 35, for the non-zero-truth bucket — every query that isn't `shape == "zero"` gets a
-`rerank_score` when `rerank=True` (§6.3's fix), including `Q-T04`/`Q-T05` (`table_derived`, real
-on-topic content, just no `requirement_id` to score recall/precision against — see §1's note on
-`unextracted_relevant_content`). **Codex review (PR #191) caught that the mean reported here was
-wrong (0.83) — corrected to 0.9245**, recomputed directly against the committed
-`reranked_pool100_no_hyde/results.json`.
+`Q-N10` — a genuinely correct query (`recall@5=1.0`, its answer at rank 2) — now scores *below* the
+zero-truth ceiling (0.0129 vs. 0.0256). The exact same query that sat 0.0007 *above* the zero-truth
+ceiling in round 1 sits 0.0127 *below* it in round 2. Two runs of the identical experiment produced
+opposite answers to "do the ranges overlap." Given §11.1's run-to-run variance finding, this isn't
+surprising in hindsight, but it directly falsifies round 1's own "razor-thin but real" framing —
+razor-thin margins on a single 45-query run aren't real margins at all, they're noise.
 
-The two ranges **do not overlap** in this sample — every zero-truth query's best candidate scores
-below every real query's best candidate. But the margin at the boundary is razor-thin: zero-truth's
-ceiling (`Q-Z07`, 0.0246) sits just 0.0007 below the weakest real query's own ceiling (`Q-N10`,
-"vulnerability scanning and patch management," 0.0253 — despite `Q-N10` finding its correct answer
-at rank 2, `recall@5=1.0`). A threshold gate set in that 0.0007-wide gap would perfectly separate
-this exact 45-query sample, but that's not the same as a *robust* margin — it would very plausibly
-flip on a different query or a re-indexed corpus. Two more real queries also scored surprisingly
-low (`Q-T03`: max 0.35, `Q-C04`: max 0.36) despite being genuinely on-topic, while the majority of
-real queries (32 of 37) scored 0.94+. This bimodal pattern — most real queries near-maximum
-confidence, a few correct ones oddly low — means FlashRank's absolute score isn't reliably
-calibrated across queries; a future corrective gate would need something more robust than a single
-global threshold (e.g. a margin between rank-1 and rank-2, or per-query score normalization), not
-assumed solved by this measurement.
+What *is* stable across both rounds: the **mean** (0.9245 round 1 [after Codex's separate
+arithmetic-error fix] vs. 0.9224 round 2 — consistent), and the general **bimodal shape** (most real
+queries score near-maximum confidence — 32 of 37 at 0.94+ in round 1, comparably in round 2 — while
+a handful of genuinely correct queries score surprisingly low: `Q-T03`, `Q-C04`, and now `Q-N10`
+too). The mean-level gap between zero-truth (~0.01) and real queries (~0.92) is large and appears
+robust; the *boundary* behavior — whether the single worst real query beats the single best
+zero-truth query — is not, at this sample size and run count.
 
-Net: this still directly supports Phase 41's underlying hypothesis — a calibrated per-candidate
-score is a fundamentally different (and here, more separable) signal than RRF's fused score, which
-Phase 41 found gives off-topic queries *higher* scores than genuine weak matches outright (up to
-1.07 vs. 0.033-0.09) — no threshold there could work at all, whereas here at least a threshold
-technically exists. But "a threshold exists in this one sample" is meaningfully weaker than the
-original "clean, reusable separation" framing — it's suggestive evidence worth carrying into a
-future WP-15.9 scoping conversation, not a solved problem.
+**Revised conclusion: genuinely inconclusive on the specific question of whether a fixed threshold
+would work**, though the underlying signal (mean-level separation) is real and still supports Phase
+41's hypothesis that a calibrated per-candidate score is a fundamentally different kind of signal
+than RRF's fused score (which Phase 41 found gives off-topic queries *higher* scores than genuine
+weak matches outright, 1.07 vs. 0.033-0.09 — a problem no threshold could ever fix; here at least
+the *typical* case separates cleanly). A future WP-15.9 scoping conversation needs its own N≥3-repeat
+measurement before treating either "a threshold exists" or "the boundary case is thin" as settled —
+neither is, on the evidence collected here.
 
 ### 11.3 Flagship case (Q-T02) — still not fixed, and why
 
@@ -389,13 +409,17 @@ third is a precision problem the default model doesn't solve.
 ### 11.4 Go/No-Go decision
 
 Against §9's gate:
-- ❌ Precision@5 improves — **failed** (regressed ~4.4% relative at both pool sizes).
-- ❌ No regression on Recall@5/10/20/MRR — **failed** (Recall@5 and Recall@10 both regressed;
-  Recall@20/MRR improved, but the gate requires no regression on the full set, not a net average).
-- ✅ Zero-truth score-separation evidence reported — **met**: a real, non-overlapping-in-this-sample
-  separation, but with a razor-thin margin at the boundary (§11.2) — suggestive, not conclusive.
-- ✅ Latency measured and reported, not hard-gated — **met** (~13-16% increase, judged acceptable
-  on its own, moot given the precision/recall gate failure).
+- ❌ Precision@5 improves — **failed** (never exceeded baseline in 9 measurements across 3
+  configs × 3 runs; one tie, everything else a regression — §11.1).
+- ❌ No regression on Recall@5/10/20/MRR — **failed** (Recall@5 and Recall@10 regressed in every
+  single measurement, all runs, both pool sizes — the most consistent finding in this WP).
+- ✅ Zero-truth score-separation evidence reported — **met** (the gate only requires reporting the
+  evidence, not a clean result): the evidence itself turned out **genuinely inconclusive** on
+  whether a fixed threshold would separate zero-truth from real queries (§11.2 — a "razor-thin"
+  non-overlap in one run flipped to actual overlap on a rerun), though the underlying mean-level
+  signal is real and stable across runs.
+- ✅ Latency measured and reported, not hard-gated — **met** (a real, repeatable ~5-15% increase at
+  pool=100 across all three runs, moot given the precision/recall gate failure).
 
 **Decision: No-Go.** FlashRank's default `ms-marco-TinyBERT-L-2-v2` model, over either candidate
 pool size tested, does not clear the bar this WP set before implementation started. Per §9 and
@@ -413,22 +437,23 @@ which model `core/reranker.py`'s `Ranker()` construction points at.
 ### 11.5 Backlog (concrete next steps, not decided)
 
 - ~~Try a stronger bundled FlashRank model before concluding reranking itself is not viable.~~
-  **Done — see §11.6.** Tested `ms-marco-MiniLM-L-12-v2`: moved several metrics in the right
-  direction but didn't clear the gate either, at a much higher latency cost, and with worse
-  (overlapping, not just thin-margin) zero-truth separation than the smaller model. Not worth
-  testing FlashRank's other remaining bundled models (`ms-marco-MultiBERT-L-12`, `rank-T5-flan`) on
-  the strength of this trend without a specific reason to expect a different outcome from them.
+  **Done — see §11.6.** Tested `ms-marco-MiniLM-L-12-v2`: moved Recall@5/MRR in the right direction
+  but didn't clear the gate either, at a much higher and consistent latency cost, and with a wide,
+  stable zero-truth overlap (worse than TinyBERT's own flip-prone boundary case). Not worth testing
+  FlashRank's other remaining bundled models (`ms-marco-MultiBERT-L-12`, `rank-T5-flan`) on the
+  strength of this trend without a specific reason to expect a different outcome from them.
 - **Escalate to a full cross-encoder** (e.g. via `sentence-transformers`) per the original WP-15.5/
   `docs/TODO_future_improvements.txt` guidance's explicit fallback path — a new, heavier dependency,
-  its own stop-and-ask conversation.
+  its own stop-and-ask conversation. Any such follow-up should budget for N≥3-repeat measurement
+  runs from the start, given §11.1's variance finding, rather than trusting single-run numbers.
 - **Evidence/Compare reranking** — unchanged from §3/§7: still blocked on giving those paths
   candidate-pool headroom past `top_k`, and now additionally motivated less urgently given this
-  spike's own model didn't clear its gate on the one path it was tried against.
-- **WP-15.9 corrective retrieval gate** — §11.2's zero-truth separation result is suggestive but not
-  conclusive (razor-thin margin, and the score isn't consistently calibrated across queries even
-  among real ones). Worth carrying into a future scoping conversation, but that conversation should
-  test per-query maxima and a larger query sample before assuming a global threshold works, rather
-  than treating this spike's result as settled.
+  spike's own models didn't clear the gate on the one path they were tried against.
+- **WP-15.9 corrective retrieval gate** — §11.2's zero-truth separation result is genuinely
+  inconclusive on the specific boundary question (it flipped between two runs of the identical
+  measurement), though the mean-level signal is real and stable. A future scoping conversation
+  needs its own N≥3-repeat measurement across a larger query sample before treating either "a
+  threshold exists" or "the boundary is thin" as settled — neither is, on the evidence here.
 
 ### 11.6 Stronger model check: ms-marco-MiniLM-L-12-v2
 
@@ -439,36 +464,42 @@ same 45-query gold set, same live corpus.
 
 | Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
 |---|---|---|---|---|---|---|---|
-| Baseline | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6124 | 1785ms | 2358ms |
-| TinyBERT, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2008ms | 2625ms |
-| MiniLM-L-12, pool=100 | 0.2514 | **0.5456** | 0.6010 | 0.6782 | **0.6780** | **6553ms** | **7931ms** |
+| Baseline | 0.2629 | 0.5402 | 0.6208 | 0.6693 | 0.6124–0.6267 | ~1750–1800ms | ~2350–2400ms |
+| TinyBERT, pool=100 | 0.2514–0.2629 | 0.5187–0.5314 | 0.5995–0.6090 | 0.6613–0.6683 | 0.6297–0.6358 | ~2010–2030ms | ~2600–2625ms |
+| MiniLM-L-12, pool=100 | 0.2514 | **0.5456** | 0.5988 | 0.6653 | **0.6778** | **~6550–6730ms** | **~7930–7980ms** |
 
-MiniLM-L-12 is the best-performing configuration tested on Recall@5, Recall@20, and MRR — MRR
-improves meaningfully (0.6780 vs. baseline's 0.6124) and Recall@5 clears baseline (0.5456 vs.
-0.5402, a real but modest margin — see §11.1's run-to-run variance note; this is the metric most
-affected by it). Precision@5 lands exactly level with TinyBERT's result (0.2514, both below
-baseline's 0.2629) rather than being an improvement over it, and Recall@10 still regresses slightly
-— so this still does not clear §9's gate as written (a regression on any one of Recall@5/10/20/MRR
-disqualifies, not a net average).
+(Ranges reflect the three measurement cycles described in §11.1; MiniLM was only run once per
+change, at the final/current code, so it has single values, not ranges.) MiniLM-L-12 is the
+best-performing configuration on Recall@5 and MRR — Recall@5 clears baseline (0.5456 vs. 0.5402,
+still a modest margin given §11.1's variance) and MRR improves meaningfully. Precision@5 (0.2514)
+sits at the low end of TinyBERT's own observed range rather than beating it, and Recall@10/20 both
+regress versus baseline — so this still does not clear §9's gate as written (a regression on any
+one of Recall@5/10/20/MRR disqualifies, not a net average).
 
-**Latency is the more serious problem**: mean retrieval time more than tripled (1785ms → 6553ms,
-~3.7x), p95 similarly (2358ms → 7931ms) — the larger model's ONNX inference cost dominates.
-TinyBERT's ~13% increase was arguably tolerable; this isn't, for interactive CLI/GUI use.
+**Latency is the more serious, and more consistent, problem**: mean retrieval time roughly
+quadrupled versus baseline (~1780ms → ~6550-6730ms across runs), p95 similarly (~2380ms →
+~7930-7980ms) — the larger model's ONNX inference cost dominates and this delta held steady across
+every measurement, unlike the accuracy metrics. TinyBERT's much smaller latency increase was
+arguably tolerable; this isn't, for interactive CLI/GUI use.
 
-**Q-T02 is still unfixed** with MiniLM too, the same shape of failure as TinyBERT: its top picks are
-the same plausible-but-generic CARM-program candidates seen under TinyBERT (`REQ-9a1f01a2d295`,
-`REQ-f78038d96493`, `REQ-95cbb901f073`, `REQ-70f62fcdd0cf` — reordered among themselves, but the
-same small set), and the one reachable target (`REQ-2d5b8006ec40`, rank 40 in the RRF pool) still
-doesn't crack the reranked top 20 under either model. Confirms the failure is more about which
-candidates reach the reranker at all (pool depth) and this specific query/corpus content than about
-either model's precision ceiling.
+**Q-T02 is still unfixed** with MiniLM too, the same shape of failure as TinyBERT, stable across
+every run: its top picks are the same plausible-but-generic CARM-program candidates seen under
+TinyBERT (`REQ-9a1f01a2d295`, `REQ-f78038d96493`, `REQ-95cbb901f073`, `REQ-70f62fcdd0cf` — reordered
+among themselves, but the same small set), and the one reachable target (`REQ-2d5b8006ec40`, rank 40
+in the RRF pool) never cracks the reranked top 20 under either model, in any run. Confirms the
+failure is about which candidates reach the reranker at all (pool depth) and this specific
+query/corpus content, not about either model's precision ceiling — the one finding in this entire
+document that showed zero variance across all measurement cycles.
 
-**Zero-truth separation is actually worse with MiniLM, not better**: `Q-Z06` ("parking and traffic
-enforcement on a military installation" — deliberately off-topic, keyword-overlapping on "military
-installation") scores 0.2646 at its best candidate — higher than two genuinely on-topic queries' own
-per-query maxima (`Q-C04`: 0.0953, `Q-T03`: 0.1417). Where TinyBERT's per-query maxima didn't overlap
-at all (§11.2, by a thin 0.0007 margin), MiniLM's do, and by a wide margin. A larger,
-generally-stronger model is not automatically better calibrated for this specific purpose.
+**Zero-truth separation**: on the final run, MiniLM's zero-truth ceiling is `Q-Z06` ("parking and
+traffic enforcement on a military installation" — deliberately off-topic, keyword-overlapping on
+"military installation") at 0.2629 — higher than several genuinely on-topic queries' own per-query
+maxima (`Q-T03`: 0.1134, `Q-C04`: 0.1523), a wide, consistent overlap across every run measured for
+this model. §11.2's revised conclusion (genuinely inconclusive for TinyBERT, given its own boundary
+case flipped between runs) still holds a real distinction here: MiniLM's overlap is large and stable
+across runs, not razor-thin and flip-prone the way TinyBERT's was. If anything's true about
+model-size effects on this specific dimension, it's that MiniLM is consistently worse, not that
+either model is reliably "clean."
 
 **Conclusion: still No-Go**, and this specific stronger model isn't the answer either. It moves MRR
 and Recall@5 in the right direction but trades away both latency and zero-truth calibration to get

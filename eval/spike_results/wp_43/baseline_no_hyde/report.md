@@ -10,8 +10,8 @@
 - Mean recall@5: 0.5402
 - Mean recall@10: 0.6208
 - Mean recall@20: 0.6693
-- Mean MRR: 0.6124
-- Retrieval latency: mean 1785.1ms, p95 2358.2ms
+- Mean MRR: 0.6267
+- Retrieval latency: mean 1736.5ms, p95 2365.6ms
 - Zero-truth queries: 8, mean results returned: 20.0
 - **2 quer(y/ies) with no scorable ground truth** (non-zero shape, but no known-relevant id — e.g. unextracted content, not a rankable miss): Q-T04, Q-T05
 
@@ -51,7 +51,7 @@
 | Q-C03 | parent_child_context | 4 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | |
 | Q-C04 | parent_child_context | 3 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | |
 | Q-C05 | parent_child_context | 2 | 0.4 | 1.0 | 1.0 | 1.0 | 1.0 | |
-| Q-C06 | parent_child_context | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 0.5 | |
+| Q-C06 | parent_child_context | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-C07 | parent_child_context | 2 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | |
 | Q-C08 | parent_child_context | 1 | 0.2 | 1.0 | 1.0 | 1.0 | 1.0 | |
 | Q-T01 | table_derived | 2 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | |

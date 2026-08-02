@@ -178,6 +178,24 @@ def test_scoring_text_includes_description():
     assert "Must be 15 characters." in text
 
 
+def test_scoring_text_includes_source_ref_when_present():
+    # Codex review, PR #191: for a control-catalog-style corpus, source_ref
+    # can itself be the control ID (e.g. "AC-3") -- an exact-match signal
+    # that should reach the reranker on the candidate side too.
+    candidate = {
+        "description": "", "source_quote": "Enforce access control policy.",
+        "embedding_text": "", "source_ref": "AC-3",
+    }
+    text = reranker._scoring_text(candidate)
+    assert "AC-3" in text
+
+
+def test_scoring_text_omits_ref_line_when_source_ref_absent():
+    candidate = {"description": "", "source_quote": "Enforce access control policy.", "embedding_text": ""}
+    text = reranker._scoring_text(candidate)
+    assert "Ref:" not in text
+
+
 def test_parent_child_context_fragment_scores_using_governing_clause(monkeypatch):
     """Codex review (PR #190): a fragment-shaped quote with no visible
     antecedent must be scored using its parent-stem-reconstructed

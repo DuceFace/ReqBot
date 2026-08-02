@@ -288,13 +288,33 @@ already-reindexed corpus (verified: the seen-after-success fix only fires on exp
 didn't occur for any of the 4 documents' tables; `num_ctx=8192` matches the already-active server
 default) — confirmed no third re-ingest was needed.
 
-**Final full-corpus retrieval eval** (not a clean pre/post-WP-42 baseline — the gold set and the
-underlying documents both changed mid-WP across two fix rounds):
-`eval/spike_results/wp_42_table_fix_eval/report.md`. With the corrected gold labels (`Q-T01`/`Q-T03`
-scored as real 0.0 misses, not silently excluded) against the final, deduplicated, quarantined corpus:
-mean recall@5 0.638, recall@10 0.672, recall@20 0.714, MRR 0.762, across 37 honestly-scored queries,
-8/8 zero-truth queries still returning results (unchanged — zero-truth calibration is WP-41's
-already-closed, conclusive-negative finding, not reopened here). No other bucket regressed.
+**A fourth round (Tyler ran Codex locally) found the same hidden-miss shape one more time, in
+`retrieval_eval_harness.py` itself, not just this WP's gold-label edits.** `Q-T04`/`Q-T05` are WP-40's
+own `unextracted_relevant_content` sub-case (b) queries — no `requirement_id` ever existed for their
+content, unlike `Q-T01`/`Q-T03` where a real id existed and was later lost, so restoring an id wasn't
+an option here; inventing a placeholder one would be dishonest. The real bug was structural: any query
+with `shape != "zero"` and empty `relevant_requirement_ids` — for *any* reason — was silently excluded
+from `compute_metrics()`'s aggregate while still counting toward `non_zero_query_count`, understating
+"how many queries are actually being scored" for every such case, present and future, not just
+`Q-T01`/`Q-T03`. Fixed at the source: `run_harness()` now splits a third, explicitly-reported
+`unscored` bucket (`shape != "zero"`, `relevant_count == 0`) out of `non_zero`, and `format_report()`
+prints exactly which query ids fall in it. This is a real fix to a shared, general-purpose eval tool
+(used by every WP since WP-37.1), not scoped narrowly to this WP's own queries — verified via a new
+`test_run_harness_unscored_query_excluded_from_scored_count_and_mean` unit test, and confirmed
+`failure_classifier.py` (the only other consumer) only reads the unchanged `per_query` list, not the
+aggregate counts touched here.
+
+**Final full-corpus retrieval eval** (not a clean pre/post-WP-42 baseline — the gold set, the
+underlying documents, and the harness itself all changed mid-WP across four fix rounds):
+`eval/spike_results/wp_42_table_fix_eval/report.md`. Against the final, deduplicated, quarantined
+corpus, with `Q-T01`/`Q-T03` scored as real 0.0 misses and `Q-T04`/`Q-T05` now explicitly reported as
+unscored rather than either hidden or miscounted: mean recall@5 0.616, recall@10 0.661, recall@20
+0.708, MRR 0.733, across 35 truly-scored queries (2 explicitly unscored: `Q-T04`, `Q-T05`), 8/8
+zero-truth queries still returning results (unchanged — zero-truth calibration is WP-41's
+already-closed, conclusive-negative finding, not reopened here). The small numeric shift from the
+previous round's 0.638/0.672/0.714/0.762 is expected HyDE sampling noise between separate runs
+(`core.ask.generate_hyde_hypothesis()` is unseeded — documented in the harness's own module
+docstring), not a further regression. No other bucket regressed.
 
 ---
 
@@ -332,7 +352,12 @@ already-closed, conclusive-negative finding, not reopened here). No other bucket
       Ollama server confirmed at `context_length=8192`; the corpus's largest table uses ~43% of that
       budget; `num_ctx` now pinned explicitly; a size-guard warning log added for future oversized
       tables (Codex review, PR #189, third round).
-- [x] Full `pytest` suite and `ruff check .` clean throughout (871 tests after three fix rounds).
+- [x] `retrieval_eval_harness.py`'s `non_zero_query_count` no longer silently includes queries with
+      no scorable ground truth (any `shape != "zero"` with empty `relevant_requirement_ids`) — a new
+      `unscored_query_count`/`unscored_query_ids` bucket reports them explicitly instead (Tyler's local
+      Codex re-review, fourth round; a structural fix to the shared harness, not just this WP's own
+      `Q-T04`/`Q-T05`).
+- [x] Full `pytest` suite and `ruff check .` clean throughout (872 tests after four fix rounds).
 
 ---
 

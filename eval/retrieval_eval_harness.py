@@ -130,8 +130,27 @@ def run_harness(
                 "error": str(e),
             })
 
-    non_zero = [r for r in per_query if r["shape"] != "zero" and "error" not in r]
+    # A query can have relevant_count == 0 without shape == "zero": WP-40's
+    # eval/gold_retrieval_queries.jsonl uses this for known-unextracted
+    # content (unextracted_relevant_content, sub-case (b) -- no
+    # requirement_id ever existed to score against, unlike a "zero" query,
+    # which is deliberately off-topic and correctly expected to return
+    # nothing). compute_metrics() returns no recall/mrr keys for these
+    # (Codex review, PR #189, on a local re-review of the WP-42 fix):
+    # counting them in non_zero_query_count while they contribute nothing to
+    # the mean silently overstated how many queries were actually scored --
+    # the same shape of bug already fixed for Q-T01/Q-T03 there, just for
+    # queries where restoring a real id isn't possible because none ever
+    # existed. Split into a third, explicitly-reported bucket instead.
+    non_zero = [
+        r for r in per_query
+        if r["shape"] != "zero" and "error" not in r and r["relevant_count"] > 0
+    ]
     zero = [r for r in per_query if r["shape"] == "zero" and "error" not in r]
+    unscored = [
+        r for r in per_query
+        if r["shape"] != "zero" and "error" not in r and r["relevant_count"] == 0
+    ]
 
     aggregate = {}
     for k in K_VALUES:
@@ -145,6 +164,8 @@ def run_harness(
     aggregate["zero_query_mean_returned_count"] = (
         round(sum(r["returned_count"] for r in zero) / len(zero), 2) if zero else None
     )
+    aggregate["unscored_query_count"] = len(unscored)
+    aggregate["unscored_query_ids"] = [r["query_id"] for r in unscored]
     aggregate["failed_query_count"] = sum(1 for r in per_query if "error" in r)
 
     return {"per_query": per_query, "aggregate": aggregate}
@@ -160,6 +181,12 @@ def format_report(report: dict) -> str:
     lines.append(f"- Mean MRR: {agg['mean_mrr']}")
     lines.append(f"- Zero-truth queries: {agg['zero_query_count']}, "
                   f"mean results returned: {agg['zero_query_mean_returned_count']}")
+    if agg["unscored_query_count"]:
+        lines.append(
+            f"- **{agg['unscored_query_count']} quer(y/ies) with no scorable ground truth** "
+            f"(non-zero shape, but no known-relevant id — e.g. unextracted content, not a "
+            f"rankable miss): {', '.join(agg['unscored_query_ids'])}"
+        )
     if agg["failed_query_count"]:
         lines.append(f"- **{agg['failed_query_count']} quer(y/ies) failed to run** — see per-query detail")
     lines.append("")

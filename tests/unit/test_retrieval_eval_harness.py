@@ -89,6 +89,29 @@ def test_run_harness_zero_query_excluded_from_recall_aggregate(monkeypatch):
     assert report["aggregate"]["zero_query_mean_returned_count"] == 2.0
 
 
+def test_run_harness_unscored_query_excluded_from_scored_count_and_mean(monkeypatch):
+    # Codex review, PR #189 (local re-review): a query with relevant_count == 0
+    # but shape != "zero" (e.g. WP-40's unextracted_relevant_content sub-case
+    # (b) -- no requirement_id ever existed to score against) must not be
+    # silently counted as "scored" while contributing nothing to the mean.
+    def fake_retrieve(query, **kwargs):
+        return _fake_result(["REQ-1", "REQ-2"])
+
+    monkeypatch.setattr(harness, "retrieve", fake_retrieve)
+    queries = [
+        {"query_id": "Q-real", "query": "a real query", "shape": "narrow",
+         "relevant_requirement_ids": ["REQ-1"]},
+        {"query_id": "Q-unextracted", "query": "table content never extracted",
+         "shape": "table_derived", "relevant_requirement_ids": []},
+    ]
+    report = harness.run_harness(queries, qdrant_url="http://x", ollama_url="http://y")
+    assert report["aggregate"]["non_zero_query_count"] == 1
+    assert report["aggregate"]["unscored_query_count"] == 1
+    assert report["aggregate"]["unscored_query_ids"] == ["Q-unextracted"]
+    assert report["aggregate"]["mean_recall@5"] == 1.0  # only Q-real's perfect recall
+    assert "recall@5" not in report["per_query"][1]
+
+
 def test_run_harness_query_failure_does_not_crash_the_run(monkeypatch):
     def fake_retrieve(query, **kwargs):
         if query == "bad query":

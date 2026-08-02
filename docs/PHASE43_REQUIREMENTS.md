@@ -329,7 +329,14 @@ pooled/averaged sample). Redone as **per-query maximum `rerank_score`** from the
 | Bucket | n queries | min of per-query max | max of per-query max | mean of per-query max |
 |---|---|---|---|---|
 | Zero-truth | 8 | 0.0004 | **0.0246** | 0.0093 |
-| Non-zero-truth (narrow/broad/parent_child_context/table_derived/messy_pdf_overgrab) | 35 | **0.0253** | 0.9998 | 0.83 |
+| Non-zero-truth (narrow/broad/parent_child_context/table_derived/messy_pdf_overgrab) | 37 | **0.0253** | 0.9998 | 0.9245 |
+
+n=37, not 35, for the non-zero-truth bucket — every query that isn't `shape == "zero"` gets a
+`rerank_score` when `rerank=True` (§6.3's fix), including `Q-T04`/`Q-T05` (`table_derived`, real
+on-topic content, just no `requirement_id` to score recall/precision against — see §1's note on
+`unextracted_relevant_content`). **Codex review (PR #191) caught that the mean reported here was
+wrong (0.83) — corrected to 0.9245**, recomputed directly against the committed
+`reranked_pool100_no_hyde/results.json`.
 
 The two ranges **do not overlap** in this sample — every zero-truth query's best candidate scores
 below every real query's best candidate. But the margin at the boundary is razor-thin: zero-truth's
@@ -339,7 +346,7 @@ at rank 2, `recall@5=1.0`). A threshold gate set in that 0.0007-wide gap would p
 this exact 45-query sample, but that's not the same as a *robust* margin — it would very plausibly
 flip on a different query or a re-indexed corpus. Two more real queries also scored surprisingly
 low (`Q-T03`: max 0.35, `Q-C04`: max 0.36) despite being genuinely on-topic, while the majority of
-real queries (31 of 35) scored 0.94+. This bimodal pattern — most real queries near-maximum
+real queries (32 of 37) scored 0.94+. This bimodal pattern — most real queries near-maximum
 confidence, a few correct ones oddly low — means FlashRank's absolute score isn't reliably
 calibrated across queries; a future corrective gate would need something more robust than a single
 global threshold (e.g. a margin between rank-1 and rank-2, or per-query score normalization), not

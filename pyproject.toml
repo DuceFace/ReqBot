@@ -48,6 +48,13 @@ mcp = ["mcp>=1.0.0"]  # WP-26.1-approved: official Python MCP SDK (mcp.server.fa
 grounding-check = [
     "minicheck @ git+https://github.com/Liyan06/MiniCheck.git@b58b9fa69acbd1015ec970fa65dd752413a053d2",
 ]
+# WP-43: local cross-encoder reranker (core/reranker.py), opt-in via retrieve(rerank=True).
+# Gated out of base while this stays a measurement-gated spike, not a default-on feature --
+# see docs/PHASE43_REQUIREMENTS.md §5. Lightweight, ONNX-based (no torch requirement),
+# downloads a small model to a local cache on first use, same shape as fastembed's existing
+# BM25 model. If reranking later graduates to default-on, moving this into base dependencies
+# is a separate follow-up call.
+rerank = ["flashrank==0.2.10"]
 dev = ["pytest==9.1.1", "ruff==0.15.22", "pytest-cov==7.1.0"]
 
 [project.scripts]

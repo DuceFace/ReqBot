@@ -27,7 +27,7 @@ from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient, models
 
 from core.profiles import default_profile
-from core.reranker import rerank as rerank_candidates
+from core.reranker import DEFAULT_RERANK_MODEL, rerank as rerank_candidates
 
 logging.basicConfig(
     level=logging.INFO,
@@ -537,6 +537,7 @@ def retrieve(
     min_score: float = 0.02,
     rerank: bool = False,
     rerank_pool_size: int = 100,
+    rerank_model: str = DEFAULT_RERANK_MODEL,
     synthesize: bool = False,
     model: str = "",
     synthesis_model: str = DEFAULT_SYNTHESIS_MODEL,
@@ -594,6 +595,10 @@ def retrieve(
       - core.reranker.rerank() scores the full fused pool against the expanded query and
         trims to top_k by its own rerank_score, which is what "results" reflects instead of
         the plain min_score+trim path.
+      - rerank_model selects which FlashRank model does the scoring (default
+        core.reranker.DEFAULT_RERANK_MODEL). WP-43's own spike only measured the default;
+        this parameter exists so a stronger bundled FlashRank model can be measured without
+        changing core.reranker.py's shape (Phase 43 §11.5 Backlog).
 
     Raises ValueError if document_ids contains a value not indexed in the
     grc_requirements collection (Phase 27, WP-27.1) — a stale or typo'd document
@@ -739,7 +744,7 @@ def retrieve(
         # WP-43: skip the min_score filter entirely (see retrieve()'s docstring) --
         # reorder/trim the fused pool by the reranker's own score instead.
         candidates = [{"score": h.score, **h.payload} for h in hits]
-        reranked = rerank_candidates(dense_query, candidates, top_k)
+        reranked = rerank_candidates(dense_query, candidates, top_k, model_name=rerank_model)
         hits_by_id = {h.payload.get("requirement_id"): h for h in hits}
         new_hits = []
         for r in reranked:

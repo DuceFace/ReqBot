@@ -1,14 +1,16 @@
 # ReqBot Phase 43 — Reranker Spike
 
-**Status:** Complete — measured, **No-Go** on shipping FlashRank's default model as configured.
-No default changed; see §11 Findings.
+**Status:** Complete — measured, **No-Go** on shipping FlashRank as configured. Tested both the
+default `ms-marco-TinyBERT-L-2-v2` and the larger `ms-marco-MiniLM-L-12-v2`; neither clears the
+gate. No default changed; see §11 Findings.
 **Date:** 2026-08-02
 **Preceded by:** Phase 42 (Table-Structure-Aware Serialization) — `docs/PHASE42_REQUIREMENTS.md`,
 complete. This phase picks up the reranker recommendation carried forward from Phase 40's §8
 Backlog and reaffirmed in Phase 41 and Phase 42's own backlog notes — see §1 below.
-**Followed by:** Not decided. §11's Backlog names two concrete next steps (try a stronger bundled
-FlashRank model; escalate to a full cross-encoder) plus the pre-existing Evidence/Compare and
-WP-15.9 items from §3/§7 — none started, no decision made on which (if any) to pick up next.
+**Followed by:** Not decided. §11's Backlog names one remaining concrete next step (escalate to a
+full cross-encoder — a new dependency, its own stop-and-ask conversation) plus the pre-existing
+Evidence/Compare and WP-15.9 items from §3/§7 — none started, no decision made on which (if any)
+to pick up next.
 
 ---
 
@@ -377,7 +379,7 @@ pool size tested, does not clear the bar this WP set before implementation start
 Tyler's explicit framing throughout this WP, **no default changes** — `rerank` stays `False`
 everywhere; production Ask/Search behavior is exactly what it was before this WP, byte-for-byte
 (confirmed by `test_rerank_false_default_never_calls_reranker` and this run's own baseline column
-above).
+above). **Still No-Go after also testing a stronger model — see §11.6.**
 
 This is not a failed WP — it is exactly the answer a measurement-gated spike exists to produce.
 The infrastructure built here (the standalone `core/reranker.py` module, decoupled candidate-pool
@@ -387,11 +389,12 @@ which model `core/reranker.py`'s `Ranker()` construction points at.
 
 ### 11.5 Backlog (concrete next steps, not decided)
 
-- **Try a stronger bundled FlashRank model before concluding reranking itself is not viable.** This
-  spike only tested FlashRank's smallest/fastest default (`ms-marco-TinyBERT-L-2-v2`). FlashRank
-  ships larger models in the same package — e.g. `ms-marco-MiniLM-L-12-v2` — at zero new dependency
-  cost (already installed, just a different `model_name` argument to the existing `Ranker()` call
-  in `core/reranker.py`). Cheapest possible next experiment.
+- ~~Try a stronger bundled FlashRank model before concluding reranking itself is not viable.~~
+  **Done — see §11.6.** Tested `ms-marco-MiniLM-L-12-v2`: moved several metrics in the right
+  direction but didn't clear the gate either, at a much higher latency cost, and with worse
+  (overlapping, not just thin-margin) zero-truth separation than the smaller model. Not worth
+  testing FlashRank's other remaining bundled models (`ms-marco-MultiBERT-L-12`, `rank-T5-flan`) on
+  the strength of this trend without a specific reason to expect a different outcome from them.
 - **Escalate to a full cross-encoder** (e.g. via `sentence-transformers`) per the original WP-15.5/
   `docs/TODO_future_improvements.txt` guidance's explicit fallback path — a new, heavier dependency,
   its own stop-and-ask conversation.
@@ -403,3 +406,44 @@ which model `core/reranker.py`'s `Ranker()` construction points at.
   among real ones). Worth carrying into a future scoping conversation, but that conversation should
   test per-query maxima and a larger query sample before assuming a global threshold works, rather
   than treating this spike's result as settled.
+
+### 11.6 Stronger model check: ms-marco-MiniLM-L-12-v2
+
+Per §11.5's backlog, tested FlashRank's larger `ms-marco-MiniLM-L-12-v2` model (21.6MB vs.
+TinyBERT's 3.26MB) — zero new dependency, `core/reranker.py`'s `model_name` parameter (added for
+exactly this) is all that changed. Same methodology otherwise: `rerank_pool_size=100`, `--no-hyde`,
+same 45-query gold set, same live corpus.
+
+| Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
+|---|---|---|---|---|---|---|---|
+| Baseline | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1792ms | 2354ms |
+| TinyBERT, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2029ms | 2620ms |
+| MiniLM-L-12, pool=100 | 0.2571 | **0.5599** | 0.6010 | 0.6782 | **0.6780** | **6506ms** | **7973ms** |
+
+MiniLM-L-12 is the best-performing configuration tested on Recall@5, Recall@20, and MRR — Recall@5
+clears baseline for the first time (0.5599 vs. 0.5402) and MRR improves meaningfully (0.678 vs.
+0.6267). Precision@5 is closer to baseline than TinyBERT's result but still below it, and Recall@10
+still regresses slightly — so this still does not clear §9's gate as written (a regression on any
+one of Recall@5/10/20/MRR disqualifies, not a net average).
+
+**Latency is the more serious problem**: mean retrieval time more than tripled (1792ms → 6506ms,
+~3.6x), p95 similarly (2354ms → 7973ms) — the larger model's ONNX inference cost dominates. TinyBERT's
+~13% increase was arguably tolerable; this isn't, for interactive CLI/GUI use.
+
+**Q-T02 is still unfixed** with MiniLM too, the same shape of failure as TinyBERT: its top picks are
+the same plausible-but-generic CARM-program candidates (`REQ-9a1f01a2d295`, `REQ-f78038d96493`), and
+the one reachable target (`REQ-2d5b8006ec40`, rank 40 in the RRF pool) still doesn't crack the
+reranked top 20. Confirms the failure is more about which candidates reach the reranker at all
+(pool depth) and this specific query/corpus content than about either model's precision ceiling.
+
+**Zero-truth separation is actually worse with MiniLM, not better**: `Q-Z06` ("parking and traffic
+enforcement on a military installation" — deliberately off-topic, keyword-overlapping on "military
+installation") scores 0.2646 at its best candidate — higher than two genuinely on-topic queries' own
+per-query maxima (`Q-C04`: 0.0953, `Q-T03`: 0.1449). Where TinyBERT's per-query maxima didn't overlap
+at all (§11.2, by a thin 0.0007 margin), MiniLM's do. A larger, generally-stronger model is not
+automatically better calibrated for this specific purpose.
+
+**Conclusion: still No-Go**, and this specific stronger model isn't the answer either. It moves
+several metrics in the right direction (notably MRR and Recall@5) but trades away both latency and
+zero-truth calibration to get there, and still doesn't fix the motivating case. This backlog
+question now has a real, measured answer rather than remaining open speculation.

@@ -41,7 +41,7 @@ def _install_fake_flashrank(monkeypatch, score_fn):
     fake_module.Ranker = lambda *a, **kw: _FakeRanker(score_fn)
     fake_module.RerankRequest = _FakeRerankRequest
     monkeypatch.setitem(sys.modules, "flashrank", fake_module)
-    monkeypatch.setattr(reranker, "_ranker", None)
+    monkeypatch.setattr(reranker, "_rankers", {})
 
 
 def _by_length(text: str) -> float:
@@ -91,7 +91,7 @@ def test_rerank_raises_clear_error_when_flashrank_not_installed(monkeypatch):
     # The standard technique for forcing `import X` to fail without actually
     # uninstalling X: a None entry in sys.modules.
     monkeypatch.setitem(sys.modules, "flashrank", None)
-    monkeypatch.setattr(reranker, "_ranker", None)
+    monkeypatch.setattr(reranker, "_rankers", {})
     candidates = [{"requirement_id": "REQ-1", "description": "", "source_quote": "abc"}]
     with pytest.raises(ImportError, match="rerank"):
         reranker.rerank("query", candidates, top_k=5)
@@ -103,11 +103,55 @@ def test_get_ranker_constructs_once(monkeypatch):
     fake_module.Ranker = lambda *a, **kw: calls.append(1) or _FakeRanker(_by_length)
     fake_module.RerankRequest = _FakeRerankRequest
     monkeypatch.setitem(sys.modules, "flashrank", fake_module)
-    monkeypatch.setattr(reranker, "_ranker", None)
+    monkeypatch.setattr(reranker, "_rankers", {})
 
     reranker._get_ranker()
     reranker._get_ranker()
     assert len(calls) == 1
+
+
+def test_get_ranker_uses_default_model_name(monkeypatch):
+    calls = []
+    fake_module = types.ModuleType("flashrank")
+    fake_module.Ranker = lambda *a, **kw: calls.append(kw.get("model_name")) or _FakeRanker(_by_length)
+    fake_module.RerankRequest = _FakeRerankRequest
+    monkeypatch.setitem(sys.modules, "flashrank", fake_module)
+    monkeypatch.setattr(reranker, "_rankers", {})
+
+    reranker._get_ranker()
+    assert calls == [reranker.DEFAULT_RERANK_MODEL]
+
+
+def test_get_ranker_caches_separately_per_model(monkeypatch):
+    calls = []
+    fake_module = types.ModuleType("flashrank")
+    fake_module.Ranker = lambda *a, **kw: calls.append(kw.get("model_name")) or _FakeRanker(_by_length)
+    fake_module.RerankRequest = _FakeRerankRequest
+    monkeypatch.setitem(sys.modules, "flashrank", fake_module)
+    monkeypatch.setattr(reranker, "_rankers", {})
+
+    reranker._get_ranker("model-a")
+    reranker._get_ranker("model-b")
+    reranker._get_ranker("model-a")  # already cached -- must not construct again
+    assert calls == ["model-a", "model-b"]
+
+
+def test_rerank_passes_model_name_through(monkeypatch):
+    fake_module = types.ModuleType("flashrank")
+    captured = {}
+
+    def _fake_ranker_ctor(*a, **kw):
+        captured["model_name"] = kw.get("model_name")
+        return _FakeRanker(_by_length)
+
+    fake_module.Ranker = _fake_ranker_ctor
+    fake_module.RerankRequest = _FakeRerankRequest
+    monkeypatch.setitem(sys.modules, "flashrank", fake_module)
+    monkeypatch.setattr(reranker, "_rankers", {})
+
+    candidates = [{"requirement_id": "REQ-1", "description": "", "source_quote": "abc"}]
+    reranker.rerank("query", candidates, top_k=5, model_name="ms-marco-MiniLM-L-12-v2")
+    assert captured["model_name"] == "ms-marco-MiniLM-L-12-v2"
 
 
 def test_scoring_text_prefers_embedding_text_over_source_quote():

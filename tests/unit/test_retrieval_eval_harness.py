@@ -175,9 +175,10 @@ def test_run_harness_passes_rerank_params_through_to_retrieve(monkeypatch):
     queries = [{"query_id": "Q-1", "query": "test", "shape": "narrow", "relevant_requirement_ids": ["REQ-1"]}]
     harness.run_harness(
         queries, qdrant_url="http://x", ollama_url="http://y",
-        rerank=True, rerank_pool_size=75,
+        rerank=True, rerank_pool_size=75, rerank_model="ms-marco-MiniLM-L-12-v2",
     )
     assert captured_kwargs["rerank"] is True
+    assert captured_kwargs["rerank_model"] == "ms-marco-MiniLM-L-12-v2"
     assert captured_kwargs["rerank_pool_size"] == 75
 
 
@@ -324,11 +325,12 @@ def test_main_passes_rerank_flags_to_run_harness(tmp_path, monkeypatch):
         ["retrieval_eval_harness.py", "--gold", str(gold),
          "--qdrant-url", "http://x", "--ollama-url", "http://y",
          "--output-dir", str(tmp_path / "out"),
-         "--rerank", "--rerank-pool-size", "150"],
+         "--rerank", "--rerank-pool-size", "150", "--rerank-model", "ms-marco-MiniLM-L-12-v2"],
     )
     harness.main()
     assert captured["rerank"] is True
     assert captured["rerank_pool_size"] == 150
+    assert captured["rerank_model"] == "ms-marco-MiniLM-L-12-v2"
 
 
 def test_main_exits_zero_when_all_queries_succeed(tmp_path, monkeypatch):

@@ -103,6 +103,16 @@ def test_rerank_true_calls_reranker_with_fused_candidates():
     assert isinstance(query, str)
     assert {c["requirement_id"] for c in candidates} == {"REQ-1", "REQ-2"}
     assert top_k == 5
+    assert call_args.kwargs["model_name"] == core_ask.DEFAULT_RERANK_MODEL
+
+
+def test_rerank_model_override_passed_through():
+    hits = [_fake_hit("REQ-1", score=0.5)]
+    with patch("core.ask.rerank_candidates", return_value=[
+        {"requirement_id": "REQ-1", "rerank_score": 0.9},
+    ]) as mock_rerank:
+        _run_retrieve(hits, rerank=True, rerank_model="ms-marco-MiniLM-L-12-v2")
+    assert mock_rerank.call_args.kwargs["model_name"] == "ms-marco-MiniLM-L-12-v2"
 
 
 def test_rerank_score_flows_through_to_result_dict():

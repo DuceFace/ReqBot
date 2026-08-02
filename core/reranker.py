@@ -14,15 +14,22 @@ import logging
 
 log = logging.getLogger(__name__)
 
-_ranker = None
+# FlashRank's own default. Named explicitly here (not left implicit in a bare
+# Ranker() call) because WP-43's spike measured this exact model and found it
+# doesn't clear the Precision@5 gate -- see docs/PHASE43_REQUIREMENTS.md §11.
+# model_name is a parameter specifically so a stronger bundled FlashRank model
+# (e.g. "ms-marco-MiniLM-L-12-v2") can be swapped in and measured without
+# touching this module's shape -- see §11.5's Backlog.
+DEFAULT_RERANK_MODEL = "ms-marco-TinyBERT-L-2-v2"
+
+_rankers: dict = {}
 
 
-def _get_ranker():
-    """Lazily construct and cache a single FlashRank Ranker for the process
-    lifetime -- loading the ONNX model/tokenizer on every call would dominate
-    latency and contaminate any latency measurement."""
-    global _ranker
-    if _ranker is None:
+def _get_ranker(model_name: str = DEFAULT_RERANK_MODEL):
+    """Lazily construct and cache one FlashRank Ranker per model_name for the
+    process lifetime -- loading the ONNX model/tokenizer on every call would
+    dominate latency and contaminate any latency measurement."""
+    if model_name not in _rankers:
         try:
             from flashrank import Ranker
         except ImportError as exc:
@@ -30,8 +37,8 @@ def _get_ranker():
                 "Reranking requires the 'rerank' extra: pip install '.[rerank]' "
                 "(or `pip install flashrank`)."
             ) from exc
-        _ranker = Ranker()
-    return _ranker
+        _rankers[model_name] = Ranker(model_name=model_name)
+    return _rankers[model_name]
 
 
 def _scoring_text(candidate: dict) -> str:
@@ -50,7 +57,9 @@ def _scoring_text(candidate: dict) -> str:
     return "\n".join(parts)
 
 
-def rerank(query: str, candidates: list[dict], top_k: int) -> list[dict]:
+def rerank(
+    query: str, candidates: list[dict], top_k: int, model_name: str = DEFAULT_RERANK_MODEL,
+) -> list[dict]:
     """Reorder candidates by relevance to query, trim to top_k.
 
     Each returned dict is the same object passed in, with a new
@@ -64,7 +73,7 @@ def rerank(query: str, candidates: list[dict], top_k: int) -> list[dict]:
     # 'rerank' extra" error. Importing RerankRequest before it would instead
     # surface flashrank's own bare ModuleNotFoundError when the extra isn't
     # installed.
-    ranker = _get_ranker()
+    ranker = _get_ranker(model_name)
     from flashrank import RerankRequest
 
     passages = [

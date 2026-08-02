@@ -48,6 +48,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core.ask import retrieve  # noqa: E402
+from core.reranker import DEFAULT_RERANK_MODEL  # noqa: E402
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -123,18 +124,21 @@ def run_harness(
     no_rewrite: bool = False,
     rerank: bool = False,
     rerank_pool_size: int = 100,
+    rerank_model: str = DEFAULT_RERANK_MODEL,
 ) -> dict:
     """Run every labeled query through the real, unmodified retrieve() path
     and score it. Real production defaults unless a caller explicitly
     overrides them (e.g. for a future WP-37.2 before/after comparison run
     with the same overrides on both sides).
 
-    rerank/rerank_pool_size (WP-43, docs/PHASE43_REQUIREMENTS.md): passed
-    straight through to retrieve(). When rerank=True, each result carries a
-    rerank_score -- captured here for every query's results, not only
-    zero-truth ones, so the Findings write-up can compare rerank_score
+    rerank/rerank_pool_size/rerank_model (WP-43, docs/PHASE43_REQUIREMENTS.md):
+    passed straight through to retrieve(). When rerank=True, each result
+    carries a rerank_score -- captured here for every query's results, not
+    only zero-truth ones, so the Findings write-up can compare rerank_score
     distributions across zero-truth vs. weak-match vs. strong-match queries
-    (Codex review, PR #190: separation is a two-sided comparison)."""
+    (Codex review, PR #190: separation is a two-sided comparison).
+    rerank_model lets a caller measure a different FlashRank model (§11.5
+    Backlog) without changing anything else about the run."""
     per_query = []
     for q in queries:
         relevant_ids = set(q["relevant_requirement_ids"])
@@ -145,6 +149,7 @@ def run_harness(
                 min_score=min_score,
                 rerank=rerank,
                 rerank_pool_size=rerank_pool_size,
+                rerank_model=rerank_model,
                 hyde=hyde,
                 no_rewrite=no_rewrite,
                 qdrant_url=qdrant_url,
@@ -324,6 +329,8 @@ def main() -> None:
                          help="WP-43: enable reranking (opt-in, production default is off)")
     parser.add_argument("--rerank-pool-size", type=_positive_int, default=100,
                          help="WP-43: candidate pool size before reranking (default 100)")
+    parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL,
+                         help=f"WP-43: FlashRank model to rerank with (default {DEFAULT_RERANK_MODEL})")
     parser.add_argument("--output-dir", default=str(_ROOT / "eval" / "spike_results" / "wp_37_1"))
     args = parser.parse_args()
 
@@ -346,6 +353,7 @@ def main() -> None:
         no_rewrite=args.no_rewrite,
         rerank=args.rerank,
         rerank_pool_size=args.rerank_pool_size,
+        rerank_model=args.rerank_model,
     )
 
     out_dir = Path(args.output_dir)

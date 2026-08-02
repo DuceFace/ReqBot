@@ -39,6 +39,20 @@ _HEADING_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+# WP-42: a single table's full markdown is now emitted once regardless of how
+# many chunks HybridChunker split it across (see _chunk_raw_text's
+# seen_table_refs). Step C's Ollama call (pipeline/llm_extract_requirements.py)
+# runs against a live-confirmed 8192-token context (2026-08-02: no explicit
+# num_ctx was set, so this depended on Ollama's server default -- pinned
+# explicitly there now). The largest table in the 4 documents this WP
+# processed was 10746 chars (~2686 tokens, ~43% of that budget with the rest
+# of the prompt template). Not currently a real risk, but not bounded either
+# -- log loudly if a future document's table approaches the budget, so a
+# human notices before it silently degrades extraction, rather than
+# rewriting chunk_text.py to token-bounded-rechunk table markdown on
+# spec (Codex review, PR #189).
+_TABLE_MARKDOWN_WARN_CHARS = 20000
+
 
 def _normalize_heading(text: str) -> str:
     """Lowercase, collapse whitespace, and strip common numbering prefixes."""
@@ -174,26 +188,91 @@ def _format_breadcrumb(section_title_path: list[str], parent_header_text: str | 
     return ""
 
 
-def _chunk_raw_text(chunk: object) -> str:
+def _chunk_raw_text(chunk: object, doc: object = None, *, seen_table_refs: set | None = None) -> str:
     """Extract body text from a DocChunk, excluding heading items.
 
     HybridChunker includes heading text in chunk.text as a prefix.  For
     raw_text we want only the non-heading body so that source_quote
     verification works against the original document text.
 
-    Falls back to chunk.text when doc_items cannot be inspected.
+    TableItem has neither a `.text` attribute nor `export_to_text()` (WP-42
+    investigation, docs/PHASE42_REQUIREMENTS.md) — it fell through both
+    lookups to "", and when a chunk's only body item was a table, the whole
+    function then fell back to chunk.text, which is HybridChunker's own
+    default table serializer: a flat "Header = Value" triplet repeated once
+    per cell, restating the table's full caption on every cell. Handled here
+    via export_to_markdown() instead, which renders the table once as a
+    normal grid. Passing `doc` lets Docling resolve the table's caption item;
+    if that resolution itself raises (Gemini review, PR #189: a caption/
+    cross-reference failure specific to one table must not sacrifice the
+    whole grid), retry export_to_markdown() without `doc` before giving up —
+    still a valid, clean table, just missing the caption line.
+
+    `seen_table_refs` (Codex review, PR #189): when HybridChunker splits an
+    oversized table across N chunks, every one of those N chunks references
+    the *same* TableItem object in its doc_items — confirmed empirically
+    against all 4 WP-42 documents, every table in every one of them is split
+    this way (afi10-2402's largest table alone spans 11 chunks). Calling
+    export_to_markdown() unconditionally on each would re-export the whole
+    table N times, multiplying Step C's LLM cost by N and creating a latent
+    non-determinism risk (temperature-sampled extraction could disagree
+    across the N redundant calls). The caller threads one shared set across
+    the whole per-document chunking loop; a table's self_ref is emitted in
+    full exactly once, on the first chunk that references it, and skipped
+    (contributes nothing, not even a fallback) on every subsequent chunk —
+    the full table already reached Step C once, intact.
+
+    Falls back to chunk.text when doc_items cannot be inspected, but NOT for
+    a chunk whose only content was an already-emitted table: that chunk
+    correctly ends up empty and is dropped by the caller's empty-chunk
+    filter, rather than resurrecting the old per-chunk garbled duplicate.
     """
     try:
-        from docling_core.types.doc import TitleItem, SectionHeaderItem
+        from docling_core.types.doc import TableItem, TitleItem, SectionHeaderItem
     except ImportError:
         return chunk.text or ""
 
     parts: list[str] = []
+    suppressed_duplicate_table = False
     for item in chunk.meta.doc_items:
         if isinstance(item, (TitleItem, SectionHeaderItem)):
             continue
-        text = getattr(item, "text", "") or ""
-        if not text:
+        text = ""
+        if isinstance(item, TableItem):
+            self_ref = getattr(item, "self_ref", None)
+            already_emitted = (
+                seen_table_refs is not None and self_ref is not None and self_ref in seen_table_refs
+            )
+            if already_emitted:
+                suppressed_duplicate_table = True
+                continue
+            if doc is not None:
+                try:
+                    text = item.export_to_markdown(doc)
+                except Exception:
+                    text = ""
+            if not text:
+                try:
+                    text = item.export_to_markdown()
+                except Exception:
+                    text = ""
+            # Codex review, PR #189: only mark this table "seen" once we actually
+            # have usable markdown. Marking it beforehand meant a table whose
+            # export genuinely fails would suppress every later chunk that also
+            # references it, silently discarding their own chunk.text fallback
+            # for content that was never actually emitted anywhere.
+            if text and seen_table_refs is not None and self_ref is not None:
+                seen_table_refs.add(self_ref)
+            if len(text) > _TABLE_MARKDOWN_WARN_CHARS:
+                log.warning(
+                    "Table markdown for %s is %d chars (~%d tokens) -- approaching "
+                    "Step C's context budget. Extraction quality for this table "
+                    "should be spot-checked.",
+                    self_ref, len(text), len(text) // 4,
+                )
+        if not text and not isinstance(item, TableItem):
+            text = getattr(item, "text", "") or ""
+        if not text and not isinstance(item, TableItem):
             try:
                 text = item.export_to_text() or ""
             except Exception:
@@ -202,7 +281,11 @@ def _chunk_raw_text(chunk: object) -> str:
         if text:
             parts.append(text)
 
-    return "\n".join(parts) if parts else (chunk.text or "")
+    if parts:
+        return "\n".join(parts)
+    if suppressed_duplicate_table:
+        return ""
+    return chunk.text or ""
 
 
 def _chunk_body_items(chunk: object) -> list:
@@ -315,9 +398,10 @@ def run_structure_aware(
     skip_filtered = 0
     skip_examples: list[list[str]] = []
     chunk_id = 0
+    seen_table_refs: set = set()
 
     for chunk in all_chunks:
-        raw_text = _chunk_raw_text(chunk)
+        raw_text = _chunk_raw_text(chunk, doc, seen_table_refs=seen_table_refs)
 
         # Filter 1: drop ToC chunks (>40% dotted-leader lines)
         if _is_toc_chunk(chunk.text or ""):

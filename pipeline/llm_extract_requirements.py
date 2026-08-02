@@ -120,6 +120,16 @@ _SOURCE_REF_PATTERNS = [
 ]
 _MAX_HINT_REFS = 20  # cap to avoid bloating the prompt
 
+# WP-42 (Codex review, PR #189): pinned explicitly rather than left to Ollama's
+# server default. Previously unset here, so the effective context window
+# depended entirely on however the Ollama server happened to be configured --
+# confirmed live via /api/ps that this server currently runs the model at
+# 8192, but nothing in this codebase guaranteed that. Since chunk_text.py's
+# table-structure-aware serialization can now put a whole table's markdown in
+# a single chunk (previously bounded by HybridChunker's own token-based
+# splitting), an explicit, known floor matters more than it used to.
+OLLAMA_NUM_CTX = 8192
+
 # Ollama object-wrapped JSON Schema for Pass 1 structured output.
 # Constrains the model at the tokenizer level — eliminates parse failures
 # caused by preamble text, markdown fences, or malformed bare arrays.
@@ -221,6 +231,7 @@ def call_ollama(
         "options": {
             "temperature": 0.1,
             "num_predict": 4096,
+            "num_ctx": OLLAMA_NUM_CTX,
         },
     }
     if json_schema is not None:

@@ -148,11 +148,19 @@ If it later graduates to default-on, moving it into base dependencies is a separ
    hard-fail without the `rerank` extra installed; a clear error is raised only when `rerank=True`
    is actually requested without it.
 
-2. **`core/ask.py`'s `retrieve()`**: add `rerank: bool = False`. When `True`:
-   - Widen `fusion_limit` unconditionally. Today (`core/ask.py:676`) it's
-     `max(top_k * 3, 50) if min_score > 0 else top_k` — only widened when `min_score` is set, which
-     a reranker can't rely on. Decouple: always use `max(top_k * 3, 50)` when `rerank=True`,
-     independent of `min_score` (matches WP-15.5's "N > k, e.g. 40-50" candidate-pool design).
+2. **`core/ask.py`'s `retrieve()`**: add `rerank: bool = False` and `rerank_pool_size: int = 100`.
+   When `rerank=True`:
+   - Widen `fusion_limit` unconditionally to `max(rerank_pool_size, top_k)`, decoupled from
+     `min_score` entirely (today, `core/ask.py:676`'s `max(top_k * 3, 50) if min_score > 0 else
+     top_k` only widens when `min_score` is set, which a reranker can't rely on). **Codex review
+     (PR #190) caught that the original `max(top_k * 3, 50)` proposal — 60 at the harness's
+     `top_k=20` default — is too shallow for this very doc's own motivating example**: Q-T02's
+     known-relevant records sit at ranks 33/51/69/87 (§1); a pool of 60 would never let the
+     reranker see two of the four. `rerank_pool_size` is a first-class, independently configurable
+     spike parameter (not derived from `top_k`) defaulting to 100 — enough margin over Q-T02's
+     worst known case — and the harness (§6.3) sweeps it rather than treating 100 as
+     self-evidently correct. This supersedes the archived WP-15.5 writeup's "N > k, e.g. 40-50"
+     guidance, which predates Q-T02's concrete evidence (Phase 42).
    - Skip the existing pre-rerank `min_score` filter (`core/ask.py:714-720`) — Phase 41 already
      showed the RRF score threshold isn't a reliable relevance signal; filtering on it before
      reranking would reintroduce the problem the reranker exists to fix. Call `rerank()` on the
@@ -160,16 +168,24 @@ If it later graduates to default-on, moving it into base dependencies is a separ
    - `rerank_score` flows through into each result dict alongside the existing `score` field.
 
 3. **`eval/retrieval_eval_harness.py`**:
-   - Add `--rerank` CLI flag / `rerank: bool = False` param on `run_harness()`, passed to
-     `retrieve()`.
+   - Add `--rerank` CLI flag / `rerank: bool = False` param, plus `--rerank-pool-size` /
+     `rerank_pool_size: int = 100` param on `run_harness()`, passed to `retrieve()`. The
+     measurement run (§10) sweeps at least two pool sizes (e.g. 50 and 100) rather than trusting
+     the default in isolation — Codex review (PR #190) flagged that a single untested pool size
+     could silently produce a "no improvement" result that's actually just a too-shallow pool, not
+     evidence against reranking itself.
    - Add **Precision@5** to `compute_metrics()` — not currently computed (only recall@k and MRR
      exist today), but the primary gate metric per both Tyler's ask and
      `docs/TODO_future_improvements.txt`'s existing gate criteria:
      `precision@5 = |relevant ∩ top_5| / 5`.
-   - Zero-truth reporting: for the 8 `shape == "zero"` queries, report `rerank_score` range of
-     whatever's returned (today only `returned_count` is tracked) — directly answers Phase 40's
-     backlog note that the reranker's confidence output should be evaluated against those 8 queries
-     specifically.
+   - `rerank_score` reporting: record each returned result's `rerank_score` in `per_query` output
+     for **every** query, not only the 8 `shape == "zero"` ones. Codex review (PR #190) caught that
+     the original zero-truth-only reporting couldn't actually support the plan's own §9 claim of
+     checking whether `rerank_score` "separates off-topic from genuine-weak-match" — separation is
+     a two-sided comparison, and weak-match evidence (e.g. `Q-B05`'s real matches, RRF-scored
+     0.033–0.09 per Phase 41) requires the same score capture on the positive side. The Findings
+     write-up (item 5 below) compares zero-truth vs. weak-match vs. strong-match `rerank_score`
+     distributions directly, not zero-truth in isolation.
    - Latency: record wall-clock ms per query (`retrieve()` already returns `retrieval_ms`), report
      mean/p95 for baseline vs. reranked runs.
 
@@ -236,6 +252,14 @@ any implementation code is written:
   and this phase makes no ingestion/indexing/Qdrant/JSONL changes at all — a pure query-time
   addition. There is nothing to revert beyond not passing `rerank=True`.
 - Live measurement run against the real 45-query gold set and live Qdrant/Ollama: baseline
-  (`--rerank` omitted) vs. reranked, comparing Precision@5, Recall@5/10/20, MRR, zero-truth score
-  behavior, and latency. This is the deliverable Tyler asked for — the go/no-go decision is made
-  from this data, not assumed.
+  (`--rerank` omitted) vs. reranked, comparing Precision@5, Recall@5/10/20, MRR, `rerank_score`
+  behavior across zero-truth/weak-match/strong-match queries, and latency. This is the deliverable
+  Tyler asked for — the go/no-go decision is made from this data, not assumed.
+- **Both arms run with `--no-hyde`.** Codex review (PR #190) caught that the harness's own file
+  header (`eval/retrieval_eval_harness.py:21-32`) already documents `generate_hyde_hypothesis()`
+  sampling at `temperature=0.3` with no seed, so HyDE's third RRF leg differs between separate runs
+  of the same query — a single-run baseline-vs-reranked delta could partly reflect HyDE sampling
+  noise rather than the reranker's actual effect. `--no-hyde` for both arms isolates the variable
+  under test (at the cost of not reflecting default `hyde=True` production behavior). If time
+  allows, a secondary `hyde=True` run repeated N≥3 times per arm (comparing distributions, not
+  single points) can corroborate the `--no-hyde` result, but isn't required to reach a decision.

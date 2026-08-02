@@ -434,6 +434,11 @@ corrections, a `section_title_path` fallback for parent-stem reconstruction, and
 confidence-floor calibration. **The reranker and the definitional-content-retrievability question
 (§8) are both deferred, not decided here** — see `docs/PHASE41_REQUIREMENTS.md`.
 
+**Decided: WP-42 took the `STEM_NEVER_EXTRACTED`/table-structure-aware serialization direction**
+(Tyler's direction, 2026-08-02, choosing among this section's 3 candidates) — scoped down to the
+`GARBLED_TABLE` half only (`STEM_NEVER_EXTRACTED` remains separately deferred). See
+`docs/PHASE42_REQUIREMENTS.md`.
+
 ---
 
 ## 6. Success Gate
@@ -525,8 +530,14 @@ a future WP can pick them up with full context instead of re-discovering it.
   calibrated absolute-relevance signal, not a threshold on RRF's rank-based fusion score — folded into
   the reranker bullet above.
 
-- **21 `GARBLED_TABLE` chunks confirmed across 5 documents** (afi17-203, afi10-2402, DODI 5200.48,
-  DODI 8551.01) when WP-40 scanned the whole corpus with `is_garbled_table_text()` — WP-39.1 only ever
-  knew about 2 (both in afi17-203). This is folded into the existing `STEM_NEVER_EXTRACTED`/
-  table-structure-aware serialization candidate direction above, not a new one, but the real scale
-  (11x WP-39.1's original count) is worth keeping visible for whenever that WP gets scoped.
+- **21 `GARBLED_TABLE` chunks confirmed across 4 documents** (afi17-203, afi10-2402, DODI 5200.48,
+  DODI 8551.01 — corrected from "5 documents" during WP-42 scoping) when WP-40 scanned the whole
+  corpus with `is_garbled_table_text()` — WP-39.1 only ever knew about 2 (both in afi17-203). This is
+  folded into the existing `STEM_NEVER_EXTRACTED`/table-structure-aware serialization candidate
+  direction above, not a new one, but the real scale (11x WP-39.1's original count) is worth keeping
+  visible for whenever that WP gets scoped. **Picked up as WP-42 (2026-08-02):** tracing examples back
+  to source found the 21 aren't uniform — 16 are a pure `chunk_text.py` serialization gap (real,
+  distinct row data, just flattened), but 5 (all in one afi17-203 table) have an *additional* defect
+  in Docling's own table-structure model itself (the table's caption is merged into every header
+  cell) that WP-39.1's own check script never caught since it only verified row values, not headers.
+  See `docs/PHASE42_REQUIREMENTS.md` for the corrected diagnosis and fix.

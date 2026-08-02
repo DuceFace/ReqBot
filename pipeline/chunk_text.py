@@ -174,17 +174,28 @@ def _format_breadcrumb(section_title_path: list[str], parent_header_text: str | 
     return ""
 
 
-def _chunk_raw_text(chunk: object) -> str:
+def _chunk_raw_text(chunk: object, doc: object = None) -> str:
     """Extract body text from a DocChunk, excluding heading items.
 
     HybridChunker includes heading text in chunk.text as a prefix.  For
     raw_text we want only the non-heading body so that source_quote
     verification works against the original document text.
 
+    TableItem has neither a `.text` attribute nor `export_to_text()` (WP-42
+    investigation, docs/PHASE42_REQUIREMENTS.md) — it fell through both
+    lookups to "", and when a chunk's only body item was a table, the whole
+    function then fell back to chunk.text, which is HybridChunker's own
+    default table serializer: a flat "Header = Value" triplet repeated once
+    per cell, restating the table's full caption on every cell. Handled here
+    via export_to_markdown() instead, which renders the table once as a
+    normal grid. Passing `doc` lets Docling resolve the table's caption item;
+    without it the caption line is silently omitted (still a valid, clean
+    table — degraded, not broken).
+
     Falls back to chunk.text when doc_items cannot be inspected.
     """
     try:
-        from docling_core.types.doc import TitleItem, SectionHeaderItem
+        from docling_core.types.doc import TableItem, TitleItem, SectionHeaderItem
     except ImportError:
         return chunk.text or ""
 
@@ -192,7 +203,14 @@ def _chunk_raw_text(chunk: object) -> str:
     for item in chunk.meta.doc_items:
         if isinstance(item, (TitleItem, SectionHeaderItem)):
             continue
-        text = getattr(item, "text", "") or ""
+        text = ""
+        if isinstance(item, TableItem):
+            try:
+                text = item.export_to_markdown(doc) if doc is not None else item.export_to_markdown()
+            except Exception:
+                text = ""
+        if not text:
+            text = getattr(item, "text", "") or ""
         if not text:
             try:
                 text = item.export_to_text() or ""
@@ -317,7 +335,7 @@ def run_structure_aware(
     chunk_id = 0
 
     for chunk in all_chunks:
-        raw_text = _chunk_raw_text(chunk)
+        raw_text = _chunk_raw_text(chunk, doc)
 
         # Filter 1: drop ToC chunks (>40% dotted-leader lines)
         if _is_toc_chunk(chunk.text or ""):

@@ -142,9 +142,19 @@ If it later graduates to default-on, moving it into base dependencies is a separ
 ## 6. Implementation Plan (not started — see §8 Process)
 
 1. **`core/reranker.py`** (new): `rerank(query: str, candidates: list[dict], top_k: int) ->
-   list[dict]`. Takes result dicts shaped like `retrieve()`'s existing `results` entries (scored
-   against `description` + `source_quote`), returns the top_k reordered with a new `rerank_score`
-   field attached. FlashRank imported lazily inside the function so importing this module doesn't
+   list[dict]`. Takes result dicts shaped like `retrieve()`'s existing `results` entries, scored
+   against `description` + (`embedding_text` if present, else `source_quote`) — **not** bare
+   `source_quote` unconditionally. Codex review (PR #190) caught that scoring only
+   `description + source_quote` would discard the governing context WP-39.2's parent-stem
+   reconstruction deliberately prefixes onto `embedding_text` for fragment-shaped quotes (e.g. a
+   dangling `"(3) Restrain competition."` with no visible list-introducing clause). Without it, the
+   8 `parent_child_context` gold-set queries could have their correct hits reach FlashRank as
+   context-free fragments and get demoted, producing a false no-go result — `parent_stem`/
+   `embedding_text` are already carried on `retrieve()`'s result dicts (`core/ask.py` already reads
+   `hit.get("parent_stem")` for display, `pipeline/embed_and_index.py:build_embedding_text()`
+   establishes the same `embedding_text`-over-`source_quote` precedence at index time; this mirrors
+   it at rerank time for consistency). Returns the top_k reordered with a new `rerank_score` field
+   attached. FlashRank imported lazily inside the function so importing this module doesn't
    hard-fail without the `rerank` extra installed; a clear error is raised only when `rerank=True`
    is actually requested without it.
 
@@ -198,7 +208,9 @@ If it later graduates to default-on, moving it into base dependencies is a separ
 
 - `tests/unit/test_reranker.py` (new): `rerank()` reorders a synthetic candidate list by relevance,
   attaches `rerank_score`, respects `top_k`, and raises a clear error (not a bare import traceback)
-  when FlashRank isn't installed.
+  when FlashRank isn't installed. Includes a `parent_child_context` case (Codex review, PR #190):
+  a candidate with a dangling-fragment `source_quote` and a governing-clause-prefixed
+  `embedding_text` scores using `embedding_text`, not the bare fragment.
 - `tests/unit/test_ask_reranker.py` (new, or folded into `test_ask_run.py`): `retrieve(rerank=True)`
   widens the pool regardless of `min_score`, skips pre-rerank `min_score` filtering, calls the
   reranker module (mocked — no FlashRank install needed to run these), and `rerank=False` (default)

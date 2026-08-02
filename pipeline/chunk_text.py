@@ -39,6 +39,20 @@ _HEADING_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+# WP-42: a single table's full markdown is now emitted once regardless of how
+# many chunks HybridChunker split it across (see _chunk_raw_text's
+# seen_table_refs). Step C's Ollama call (pipeline/llm_extract_requirements.py)
+# runs against a live-confirmed 8192-token context (2026-08-02: no explicit
+# num_ctx was set, so this depended on Ollama's server default -- pinned
+# explicitly there now). The largest table in the 4 documents this WP
+# processed was 10746 chars (~2686 tokens, ~43% of that budget with the rest
+# of the prompt template). Not currently a real risk, but not bounded either
+# -- log loudly if a future document's table approaches the budget, so a
+# human notices before it silently degrades extraction, rather than
+# rewriting chunk_text.py to token-bounded-rechunk table markdown on
+# spec (Codex review, PR #189).
+_TABLE_MARKDOWN_WARN_CHARS = 20000
+
 
 def _normalize_heading(text: str) -> str:
     """Lowercase, collapse whitespace, and strip common numbering prefixes."""
@@ -232,8 +246,6 @@ def _chunk_raw_text(chunk: object, doc: object = None, *, seen_table_refs: set |
             if already_emitted:
                 suppressed_duplicate_table = True
                 continue
-            if seen_table_refs is not None and self_ref is not None:
-                seen_table_refs.add(self_ref)
             if doc is not None:
                 try:
                     text = item.export_to_markdown(doc)
@@ -244,6 +256,20 @@ def _chunk_raw_text(chunk: object, doc: object = None, *, seen_table_refs: set |
                     text = item.export_to_markdown()
                 except Exception:
                     text = ""
+            # Codex review, PR #189: only mark this table "seen" once we actually
+            # have usable markdown. Marking it beforehand meant a table whose
+            # export genuinely fails would suppress every later chunk that also
+            # references it, silently discarding their own chunk.text fallback
+            # for content that was never actually emitted anywhere.
+            if text and seen_table_refs is not None and self_ref is not None:
+                seen_table_refs.add(self_ref)
+            if len(text) > _TABLE_MARKDOWN_WARN_CHARS:
+                log.warning(
+                    "Table markdown for %s is %d chars (~%d tokens) -- approaching "
+                    "Step C's context budget. Extraction quality for this table "
+                    "should be spot-checked.",
+                    self_ref, len(text), len(text) // 4,
+                )
         if not text and not isinstance(item, TableItem):
             text = getattr(item, "text", "") or ""
         if not text and not isinstance(item, TableItem):

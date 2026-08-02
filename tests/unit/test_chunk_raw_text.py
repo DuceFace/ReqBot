@@ -11,7 +11,7 @@ inside _chunk_raw_text is genuinely exercised, not silently bypassed.
 """
 from docling_core.types.doc import DocItemLabel, TableCell, TableData, TableItem
 
-from pipeline.chunk_text import _chunk_raw_text
+from pipeline.chunk_text import _TABLE_MARKDOWN_WARN_CHARS, _chunk_raw_text
 
 
 class _MockTextItem:
@@ -175,3 +175,49 @@ def test_doc_resolution_failure_falls_back_to_markdown_without_doc():
     result = _chunk_raw_text(chunk, object())
     assert "| Col A" in result
     assert result != "fallback chunk text should not be used"
+
+
+def test_table_export_failure_does_not_suppress_later_chunks_own_content():
+    # Codex review, PR #189: seen_table_refs must only be marked after a
+    # successful export. Previously it was marked unconditionally, so a
+    # table whose export genuinely fails would wrongly suppress every later
+    # chunk referencing the same table too -- discarding their own
+    # chunk.text fallback for content that was never actually emitted
+    # anywhere.
+    class _AlwaysBrokenTable(TableItem):
+        def export_to_markdown(self, *args, **kwargs):
+            raise RuntimeError("boom")
+
+    table = _AlwaysBrokenTable(self_ref="#/tables/4", label=DocItemLabel.TABLE,
+                                data=TableData(table_cells=[], num_rows=0, num_cols=0))
+    seen: set = set()
+    chunk_a = _MockChunk([table], text="first slice fallback")
+    chunk_b = _MockChunk([table], text="second slice fallback")
+    result_a = _chunk_raw_text(chunk_a, None, seen_table_refs=seen)
+    result_b = _chunk_raw_text(chunk_b, None, seen_table_refs=seen)
+    assert result_a == "first slice fallback"
+    assert result_b == "second slice fallback"
+    assert seen == set()
+
+
+def test_oversized_table_markdown_logs_warning(caplog):
+    # Codex review, PR #189: a table's full markdown is now emitted in a
+    # single chunk rather than bounded by HybridChunker's own splitting.
+    # Not a real risk yet (docs/PHASE42_REQUIREMENTS.md: the corpus's
+    # largest known table uses ~43% of Step C's context budget), but nothing
+    # bounds it either -- a future oversized table should at least be
+    # visible in logs, not silently degrade extraction.
+    big_row = "| " + "x" * 200 + " |"
+    huge_markdown = "| Col A |\n|---|\n" + "\n".join([big_row] * 150)
+    assert len(huge_markdown) > _TABLE_MARKDOWN_WARN_CHARS
+
+    class _HugeTable(TableItem):
+        def export_to_markdown(self, *args, **kwargs):
+            return huge_markdown
+
+    table = _HugeTable(self_ref="#/tables/5", label=DocItemLabel.TABLE,
+                        data=TableData(table_cells=[], num_rows=0, num_cols=0))
+    with caplog.at_level("WARNING"):
+        result = _chunk_raw_text(_MockChunk([table]), None)
+    assert result == huge_markdown
+    assert any("approaching" in rec.message for rec in caplog.records)

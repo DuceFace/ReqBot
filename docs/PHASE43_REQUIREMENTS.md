@@ -1,14 +1,14 @@
 # ReqBot Phase 43 — Reranker Spike
 
-**Status:** Proposed — plan under review (drafted 2026-08-02; source: direct conversation with
-Tyler after WP-42 merged)
+**Status:** Complete — measured, **No-Go** on shipping FlashRank's default model as configured.
+No default changed; see §11 Findings.
 **Date:** 2026-08-02
 **Preceded by:** Phase 42 (Table-Structure-Aware Serialization) — `docs/PHASE42_REQUIREMENTS.md`,
 complete. This phase picks up the reranker recommendation carried forward from Phase 40's §8
 Backlog and reaffirmed in Phase 41 and Phase 42's own backlog notes — see §1 below.
-**Followed by:** Not decided. A follow-up WP to extend reranking to Evidence/Compare, and
-WP-15.9's corrective-retrieval-gate (reranker score as the zero-truth confidence signal), are both
-explicitly out of scope here — see §3 Non-Goals.
+**Followed by:** Not decided. §11's Backlog names two concrete next steps (try a stronger bundled
+FlashRank model; escalate to a full cross-encoder) plus the pre-existing Evidence/Compare and
+WP-15.9 items from §3/§7 — none started, no decision made on which (if any) to pick up next.
 
 ---
 
@@ -16,7 +16,7 @@ explicitly out of scope here — see §3 Non-Goals.
 
 | WP | Status |
 |---|---|
-| WP-43 — Reranker Spike | Proposed — plan review in progress, no implementation yet |
+| WP-43 — Reranker Spike | Complete — measured No-Go, no default changed |
 
 ---
 
@@ -275,3 +275,116 @@ any implementation code is written:
   under test (at the cost of not reflecting default `hyde=True` production behavior). If time
   allows, a secondary `hyde=True` run repeated N≥3 times per arm (comparing distributions, not
   single points) can corroborate the `--no-hyde` result, but isn't required to reach a decision.
+
+## 11. Findings
+
+Implemented per §6 exactly as planned (`core/reranker.py`, `retrieve(rerank=..., rerank_pool_size=...)`,
+harness `--rerank`/`--rerank-pool-size`/Precision@5/latency/per-query `rerank_score`), all unit
+tests green (`pytest`, `ruff check .` both clean), then measured live against the real 45-query
+gold set and live Qdrant/Ollama (`grc_requirements` at 1848 points), `--no-hyde` on both arms per
+§10, FlashRank's default `ms-marco-TinyBERT-L-2-v2` model, swept `rerank_pool_size` at 50 and 100.
+
+### 11.1 Aggregate results
+
+| Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
+|---|---|---|---|---|---|---|---|
+| Baseline (no rerank) | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1792ms | 2354ms |
+| Reranked, pool=50 | 0.2514 | 0.5171 | 0.5985 | 0.6926 | 0.6407 | 1863ms | 2448ms |
+| Reranked, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2029ms | 2620ms |
+
+**Precision@5 — the primary gate metric — regressed at both pool sizes** (0.2629 → 0.2514, about
+-4.4% relative) rather than improving. Recall@5 and Recall@10 also regressed slightly at both pool
+sizes. Recall@20 and MRR improved modestly, more so at pool=50 than pool=100 (widening the pool
+further did not help — see §11.3). Latency increased by roughly 13-16% at pool=100 (1792ms →
+2029ms mean) — not itself gating (WP-15.5's "measure, don't hard-gate" criterion), but consistent
+with the added ONNX inference cost buying no net accuracy improvement here.
+
+### 11.2 Zero-truth score separation — a clear, real win
+
+Directly answering Phase 40/41's backlog note (evaluate the reranker's confidence output against
+the 8 zero-truth queries specifically): computed `rerank_score` distributions across every query
+shape from the pool=100 run's per-query `rerank_scores` (now captured for every query, not only
+zero-truth ones — §6.3's fix).
+
+| Bucket | n | min | max | mean | median |
+|---|---|---|---|---|---|
+| Zero-truth (all 20 returned results, 8 queries) | 160 | 0.0000 | 0.0246 | 0.0012 | 0.0002 |
+| Weak-match queries' top-5 (`recall@5 == 0`) | 50 | 0.0195 | 0.9997 | 0.6895 | 0.9771 |
+| Strong-match queries' top-5 (`recall@5 > 0`) | 125 | 0.0002 | 0.9998 | 0.6924 | 0.9747 |
+
+This is unambiguous: `rerank_score` cleanly separates zero-truth from anything topically real — the
+extreme tails brush against each other (zero-truth's max of 0.0246 edges just past weak-match's min
+of 0.0195), but the central tendency isn't close: zero-truth's mean/median (0.0012/0.0002) sit
+roughly three orders of magnitude below both on-topic buckets' (~0.69/~0.98). This directly
+validates Phase 41's hypothesis: "the real fix needs a calibrated
+absolute-relevance signal... not a threshold on an already-fused ranking score." Where RRF's fused
+score routinely gave off-topic queries *higher* scores than genuine weak matches (Phase 41: up to
+1.07 vs. 0.033-0.09), FlashRank's rerank_score gets this right by a wide margin. This finding
+stands independent of the Precision@5 regression above — it's evidence for a future WP-15.9
+corrective-retrieval-gate, not for shipping reranking as the default ordering today.
+
+### 11.3 Flagship case (Q-T02) — still not fixed, and why
+
+Phase 42's motivating example was checked directly rather than assumed. Live, fresh check today
+(not relying on Phase 42's original numbers, since the corpus has re-indexed since):
+`core.ask.retrieve(query, top_k=200, min_score=0, hyde=False)` with the same query rewrite the
+harness itself applies (`"AF critical asset identification process task critical assets
+nomination approval"`) places Q-T02's three gold-labelled records at:
+
+- `REQ-2d5b8006ec40` — rank 40 (RRF score 0.0487)
+- `REQ-7758064f03f2` — rank 116 (RRF score 0.0170)
+- `REQ-8864b3fc4a01` — **not present in the top 200 at all**
+
+At `rerank_pool_size=100`, only the first of the three ever enters the candidate pool — the other
+two are unreachable at any pool size in the range this spike tested. Inspecting the pool=100 run's
+actual output for Q-T02: the reachable one (`REQ-2d5b8006ec40`, "HAF, MAJCOM/DRUs, FOAs... review/
+validate nominated TCAs" — squarely on-topic for the query's "approving" half) still didn't crack
+the reranked top 20. FlashRank instead gave near-maximum confidence (0.99, 0.99, 0.99, 0.98, 0.98,
+0.98) to six candidates describing the CARM Program's general purpose and asset-prioritization
+role — topically adjacent, plausible-sounding, but not the specific process-step content the query
+actually asks for. This is a precise, concrete instance of the aggregate Precision@5 regression:
+the reranker is confidently promoting near-miss generalities over an on-topic specific.
+
+**Conclusion: reranking with FlashRank's default model does not fix the case that motivated this
+WP.** Two-thirds of the failure is a pool-depth problem no tested pool size reaches; the reachable
+third is a precision problem the default model doesn't solve.
+
+### 11.4 Go/No-Go decision
+
+Against §9's gate:
+- ❌ Precision@5 improves — **failed** (regressed ~4.4% relative at both pool sizes).
+- ❌ No regression on Recall@5/10/20/MRR — **failed** (Recall@5 and Recall@10 both regressed;
+  Recall@20/MRR improved, but the gate requires no regression on the full set, not a net average).
+- ✅ Zero-truth score-separation evidence reported — **met**, and a genuinely strong result (§11.2).
+- ✅ Latency measured and reported, not hard-gated — **met** (~13-16% increase, judged acceptable
+  on its own, moot given the precision/recall gate failure).
+
+**Decision: No-Go.** FlashRank's default `ms-marco-TinyBERT-L-2-v2` model, over either candidate
+pool size tested, does not clear the bar this WP set before implementation started. Per §9 and
+Tyler's explicit framing throughout this WP, **no default changes** — `rerank` stays `False`
+everywhere; production Ask/Search behavior is exactly what it was before this WP, byte-for-byte
+(confirmed by `test_rerank_false_default_never_calls_reranker` and this run's own baseline column
+above).
+
+This is not a failed WP — it is exactly the answer a measurement-gated spike exists to produce.
+The infrastructure built here (the standalone `core/reranker.py` module, decoupled candidate-pool
+sizing, the harness's Precision@5/latency/rerank_score instrumentation) is real, reusable, and not
+wasted: a future attempt with a stronger model can reuse all of it and would only need to swap
+which model `core/reranker.py`'s `Ranker()` construction points at.
+
+### 11.5 Backlog (concrete next steps, not decided)
+
+- **Try a stronger bundled FlashRank model before concluding reranking itself is not viable.** This
+  spike only tested FlashRank's smallest/fastest default (`ms-marco-TinyBERT-L-2-v2`). FlashRank
+  ships larger models in the same package — e.g. `ms-marco-MiniLM-L-12-v2` — at zero new dependency
+  cost (already installed, just a different `model_name` argument to the existing `Ranker()` call
+  in `core/reranker.py`). Cheapest possible next experiment.
+- **Escalate to a full cross-encoder** (e.g. via `sentence-transformers`) per the original WP-15.5/
+  `docs/TODO_future_improvements.txt` guidance's explicit fallback path — a new, heavier dependency,
+  its own stop-and-ask conversation.
+- **Evidence/Compare reranking** — unchanged from §3/§7: still blocked on giving those paths
+  candidate-pool headroom past `top_k`, and now additionally motivated less urgently given this
+  spike's own model didn't clear its gate on the one path it was tried against.
+- **WP-15.9 corrective retrieval gate** — §11.2's zero-truth separation result is a genuinely
+  strong, reusable input for this once it's scoped, independent of whether reranked ordering itself
+  ships.

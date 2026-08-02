@@ -27,6 +27,7 @@ from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient, models
 
 from core.profiles import default_profile
+from core.reranker import rerank as rerank_candidates
 
 logging.basicConfig(
     level=logging.INFO,
@@ -534,6 +535,8 @@ def retrieve(
     *,
     top_k: int = 20,
     min_score: float = 0.02,
+    rerank: bool = False,
+    rerank_pool_size: int = 100,
     synthesize: bool = False,
     model: str = "",
     synthesis_model: str = DEFAULT_SYNTHESIS_MODEL,
@@ -571,12 +574,26 @@ def retrieve(
     display and rendering stay in the callers.
 
     Returns a dict:
-        results:        list[dict]  score + payload fields; context_text included when context=True
+        results:        list[dict]  score + payload fields; context_text included when context=True;
+                                     rerank_score included when rerank=True
         synthesis_text: str         empty string if synthesize=False or synthesis failed
         expanded_query: str         rewritten query; equals question when no_rewrite=True
         total:          int         number of results after min_score filtering and top_k trim
         retrieval_ms:   int         wall-clock ms from entry to just before synthesis (pure retrieval)
         warnings:       list[str]   e.g. embedding-model mismatch between config and indexed results
+
+    rerank (WP-43, docs/PHASE43_REQUIREMENTS.md): opt-in, defaults to False -- production
+    behavior is unchanged unless a caller explicitly asks for it. Internal/eval-only for
+    now, not exposed via CLI/API/GUI (see Phase 43 §3 Non-Goals). When True:
+      - fusion_limit is widened to max(rerank_pool_size, top_k), decoupled entirely from
+        min_score (the existing widening below only fires when min_score > 0, which a
+        reranker can't rely on).
+      - the min_score filter below is skipped -- Phase 41 found the RRF-fused score isn't a
+        reliable relevance signal, so filtering on it before reranking would reintroduce the
+        problem reranking exists to fix.
+      - core.reranker.rerank() scores the full fused pool against the expanded query and
+        trims to top_k by its own rerank_score, which is what "results" reflects instead of
+        the plain min_score+trim path.
 
     Raises ValueError if document_ids contains a value not indexed in the
     grc_requirements collection (Phase 27, WP-27.1) — a stale or typo'd document
@@ -672,8 +689,17 @@ def retrieve(
     # before fusing — shallow prefetch starves RRF of good matches.
     # Fetch more fused results than top_k so min_score filtering has overflow candidates
     # to draw from — otherwise low-score hits can consume top_k slots before filtering.
-    prefetch_limit = max(100, top_k * 5)
-    fusion_limit = max(top_k * 3, 50) if min_score > 0 else top_k
+    if rerank:
+        # WP-43: decoupled from min_score entirely -- a reranker can't rely on
+        # min_score being set to get pool headroom. rerank_pool_size is an
+        # independently configurable spike parameter, not derived from top_k.
+        fusion_limit = max(rerank_pool_size, top_k)
+    else:
+        fusion_limit = max(top_k * 3, 50) if min_score > 0 else top_k
+    # Each leg must prefetch at least as many candidates as the final fusion
+    # pool needs, or a wide fusion_limit (e.g. a large rerank_pool_size) would
+    # starve RRF of enough candidates to actually fill it.
+    prefetch_limit = max(100, top_k * 5, fusion_limit)
     # qdrant_client already created above (needed early for document_ids validation)
 
     prefetch_legs = [
@@ -709,15 +735,29 @@ def retrieve(
         with_payload=True,
     ).points
 
-    # Score threshold — drop results below min_score, then trim to top_k.
-    # Filtering after fusion (not before) ensures the threshold acts on final RRF scores.
-    if min_score > 0:
-        before = len(hits)
-        hits = [r for r in hits if r.score >= min_score]
-        dropped = before - len(hits)
-        if dropped:
-            log.info("Dropped %d result(s) below min_score=%.3f", dropped, min_score)
-    hits = hits[:top_k]
+    if rerank:
+        # WP-43: skip the min_score filter entirely (see retrieve()'s docstring) --
+        # reorder/trim the fused pool by the reranker's own score instead.
+        candidates = [{"score": h.score, **h.payload} for h in hits]
+        reranked = rerank_candidates(dense_query, candidates, top_k)
+        hits_by_id = {h.payload.get("requirement_id"): h for h in hits}
+        new_hits = []
+        for r in reranked:
+            h = hits_by_id[r["requirement_id"]]
+            h.payload["rerank_score"] = r["rerank_score"]
+            new_hits.append(h)
+        hits = new_hits
+        log.info("Reranked %d candidate(s), kept top %d", len(candidates), len(hits))
+    else:
+        # Score threshold — drop results below min_score, then trim to top_k.
+        # Filtering after fusion (not before) ensures the threshold acts on final RRF scores.
+        if min_score > 0:
+            before = len(hits)
+            hits = [r for r in hits if r.score >= min_score]
+            dropped = before - len(hits)
+            if dropped:
+                log.info("Dropped %d result(s) below min_score=%.3f", dropped, min_score)
+        hits = hits[:top_k]
 
     if not hits:
         return {

@@ -12,9 +12,15 @@ Input:  eval/gold_retrieval_queries.jsonl -- hand-labeled queries, each with
         a hand-verified set of relevant requirement_ids (or an empty set for
         a deliberately off-topic "zero" query). See that file's own `notes`
         field per record for how each label was verified.
-Output: recall@k (k=5,10,20) and MRR per query and in aggregate, plus a
-        separate report for zero-truth queries (how many results they
-        returned, since recall/MRR are undefined when nothing is relevant).
+Output: recall@k (k=5,10,20), precision@5, and MRR per query and in
+        aggregate, plus a separate report for zero-truth queries (how many
+        results they returned, since recall/precision/MRR are undefined
+        when nothing is relevant), and retrieval latency (mean/p95).
+
+WP-43 (docs/PHASE43_REQUIREMENTS.md) added --rerank/--rerank-pool-size,
+passed through to retrieve() unchanged -- still measurement only, this
+harness makes no retrieval decisions itself; it opts a full run into
+retrieve()'s existing rerank=True path and scores what comes back.
 
 No retrieval code changes happen here -- measurement only (WP-37.1 Non-Goals).
 
@@ -59,12 +65,19 @@ def load_gold_queries(path: str) -> list[dict]:
 
 
 def compute_metrics(relevant_ids: set[str], retrieved_ids: list[str]) -> dict:
-    """recall@k for each K_VALUES entry, plus MRR (reciprocal rank of the
-    first relevant hit). For a query with no relevant_ids (a deliberate
-    "zero" query -- nothing in the corpus should match), recall/MRR are
-    undefined by definition (0/0); report returned_count instead so the
-    caller can judge whether the system correctly returned little/nothing
-    rather than confidently surfacing irrelevant results."""
+    """recall@k for each K_VALUES entry, precision@5, plus MRR (reciprocal
+    rank of the first relevant hit). For a query with no relevant_ids (a
+    deliberate "zero" query -- nothing in the corpus should match),
+    recall/precision/MRR are undefined by definition (0/0); report
+    returned_count instead so the caller can judge whether the system
+    correctly returned little/nothing rather than confidently surfacing
+    irrelevant results.
+
+    precision@5 (WP-43, docs/PHASE43_REQUIREMENTS.md): the primary reranker
+    gate metric -- |relevant ∩ top_5| / 5, the standard precision@k
+    definition (divides by k, not by however many were actually returned,
+    so a query that returns fewer than 5 results is scored as if the
+    missing slots were non-relevant rather than excluded)."""
     if not relevant_ids:
         return {"returned_count": len(retrieved_ids)}
 
@@ -74,6 +87,9 @@ def compute_metrics(relevant_ids: set[str], retrieved_ids: list[str]) -> dict:
         hits = relevant_ids & top_k_ids
         metrics[f"recall@{k}"] = round(len(hits) / len(relevant_ids), 4)
 
+    top_5_ids = set(retrieved_ids[:5])
+    metrics["precision@5"] = round(len(relevant_ids & top_5_ids) / 5, 4)
+
     mrr = 0.0
     for rank, rid in enumerate(retrieved_ids, start=1):
         if rid in relevant_ids:
@@ -81,6 +97,19 @@ def compute_metrics(relevant_ids: set[str], retrieved_ids: list[str]) -> dict:
             break
     metrics["mrr"] = mrr
     return metrics
+
+
+def _percentile(values: list[float], pct: float) -> float:
+    """Linear-interpolation percentile (no numpy dependency)."""
+    if not values:
+        return 0.0
+    s = sorted(values)
+    k = (len(s) - 1) * pct
+    f = int(k)
+    c = min(f + 1, len(s) - 1)
+    if f == c:
+        return s[f]
+    return s[f] + (s[c] - s[f]) * (k - f)
 
 
 def run_harness(
@@ -92,11 +121,20 @@ def run_harness(
     min_score: float = 0.02,
     hyde: bool = True,
     no_rewrite: bool = False,
+    rerank: bool = False,
+    rerank_pool_size: int = 100,
 ) -> dict:
     """Run every labeled query through the real, unmodified retrieve() path
     and score it. Real production defaults unless a caller explicitly
     overrides them (e.g. for a future WP-37.2 before/after comparison run
-    with the same overrides on both sides)."""
+    with the same overrides on both sides).
+
+    rerank/rerank_pool_size (WP-43, docs/PHASE43_REQUIREMENTS.md): passed
+    straight through to retrieve(). When rerank=True, each result carries a
+    rerank_score -- captured here for every query's results, not only
+    zero-truth ones, so the Findings write-up can compare rerank_score
+    distributions across zero-truth vs. weak-match vs. strong-match queries
+    (Codex review, PR #190: separation is a two-sided comparison)."""
     per_query = []
     for q in queries:
         relevant_ids = set(q["relevant_requirement_ids"])
@@ -105,6 +143,8 @@ def run_harness(
                 q["query"],
                 top_k=top_k,
                 min_score=min_score,
+                rerank=rerank,
+                rerank_pool_size=rerank_pool_size,
                 hyde=hyde,
                 no_rewrite=no_rewrite,
                 qdrant_url=qdrant_url,
@@ -112,14 +152,18 @@ def run_harness(
             )
             retrieved_ids = [r["requirement_id"] for r in result["results"]]
             metrics = compute_metrics(relevant_ids, retrieved_ids)
-            per_query.append({
+            entry = {
                 "query_id": q["query_id"],
                 "query": q["query"],
                 "shape": q["shape"],
                 "relevant_count": len(relevant_ids),
                 "retrieved_ids": retrieved_ids,
+                "retrieval_ms": result["retrieval_ms"],
                 **metrics,
-            })
+            }
+            if rerank:
+                entry["rerank_scores"] = [r.get("rerank_score") for r in result["results"]]
+            per_query.append(entry)
         except Exception as e:
             log.error("Query %s failed: %s", q["query_id"], e)
             per_query.append({
@@ -157,6 +201,10 @@ def run_harness(
         key = f"recall@{k}"
         vals = [r[key] for r in non_zero if key in r]
         aggregate[f"mean_{key}"] = round(sum(vals) / len(vals), 4) if vals else None
+    precision5_vals = [r["precision@5"] for r in non_zero if "precision@5" in r]
+    aggregate["mean_precision@5"] = (
+        round(sum(precision5_vals) / len(precision5_vals), 4) if precision5_vals else None
+    )
     mrr_vals = [r["mrr"] for r in non_zero if "mrr" in r]
     aggregate["mean_mrr"] = round(sum(mrr_vals) / len(mrr_vals), 4) if mrr_vals else None
     aggregate["non_zero_query_count"] = len(non_zero)
@@ -168,6 +216,16 @@ def run_harness(
     aggregate["unscored_query_ids"] = [r["query_id"] for r in unscored]
     aggregate["failed_query_count"] = sum(1 for r in per_query if "error" in r)
 
+    # Latency (WP-43): across every query that actually ran, regardless of
+    # shape -- this is a system-performance measure, not a scoring-shape one.
+    latency_vals = [r["retrieval_ms"] for r in per_query if "retrieval_ms" in r]
+    aggregate["mean_retrieval_ms"] = (
+        round(sum(latency_vals) / len(latency_vals), 1) if latency_vals else None
+    )
+    aggregate["p95_retrieval_ms"] = (
+        round(_percentile(latency_vals, 0.95), 1) if latency_vals else None
+    )
+
     return {"per_query": per_query, "aggregate": aggregate}
 
 
@@ -176,9 +234,12 @@ def format_report(report: dict) -> str:
     lines = ["# Retrieval Eval Harness Report (WP-37.1)", ""]
     lines.append("## Aggregate")
     lines.append(f"- Queries scored (non-zero ground truth): {agg['non_zero_query_count']}")
+    lines.append(f"- Mean precision@5: {agg['mean_precision@5']}")
     for k in K_VALUES:
         lines.append(f"- Mean recall@{k}: {agg[f'mean_recall@{k}']}")
     lines.append(f"- Mean MRR: {agg['mean_mrr']}")
+    lines.append(f"- Retrieval latency: mean {agg['mean_retrieval_ms']}ms, "
+                  f"p95 {agg['p95_retrieval_ms']}ms")
     lines.append(f"- Zero-truth queries: {agg['zero_query_count']}, "
                   f"mean results returned: {agg['zero_query_mean_returned_count']}")
     if agg["unscored_query_count"]:
@@ -192,17 +253,18 @@ def format_report(report: dict) -> str:
     lines.append("")
     lines.append("## Per-query")
     lines.append("")
-    lines.append("| ID | Shape | Relevant | recall@5 | recall@10 | recall@20 | MRR | Notes |")
-    lines.append("|---|---|---|---|---|---|---|---|")
+    lines.append("| ID | Shape | Relevant | precision@5 | recall@5 | recall@10 | recall@20 | MRR | Notes |")
+    lines.append("|---|---|---|---|---|---|---|---|---|")
     for r in report["per_query"]:
         if "error" in r:
-            lines.append(f"| {r['query_id']} | {r['shape']} | {r['relevant_count']} | — | — | — | — | ERROR: {r['error']} |")
+            lines.append(f"| {r['query_id']} | {r['shape']} | {r['relevant_count']} | — | — | — | — | — | ERROR: {r['error']} |")
             continue
         if r["shape"] == "zero":
-            lines.append(f"| {r['query_id']} | zero | 0 | — | — | — | — | returned {r['returned_count']} result(s) |")
+            lines.append(f"| {r['query_id']} | zero | 0 | — | — | — | — | — | returned {r['returned_count']} result(s) |")
         else:
             lines.append(
                 f"| {r['query_id']} | {r['shape']} | {r['relevant_count']} | "
+                f"{r.get('precision@5', '—')} | "
                 f"{r.get('recall@5', '—')} | {r.get('recall@10', '—')} | {r.get('recall@20', '—')} | "
                 f"{r.get('mrr', '—')} | |"
             )
@@ -258,6 +320,10 @@ def main() -> None:
     parser.add_argument("--min-score", type=_non_negative_float, default=_default_min_score)
     parser.add_argument("--no-hyde", action="store_true", help="Disable HyDE (production default is on)")
     parser.add_argument("--no-rewrite", action="store_true", help="Disable query rewrite (production default is on)")
+    parser.add_argument("--rerank", action="store_true",
+                         help="WP-43: enable reranking (opt-in, production default is off)")
+    parser.add_argument("--rerank-pool-size", type=_positive_int, default=100,
+                         help="WP-43: candidate pool size before reranking (default 100)")
     parser.add_argument("--output-dir", default=str(_ROOT / "eval" / "spike_results" / "wp_37_1"))
     args = parser.parse_args()
 
@@ -278,6 +344,8 @@ def main() -> None:
         min_score=args.min_score,
         hyde=not args.no_hyde,
         no_rewrite=args.no_rewrite,
+        rerank=args.rerank,
+        rerank_pool_size=args.rerank_pool_size,
     )
 
     out_dir = Path(args.output_dir)

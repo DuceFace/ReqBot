@@ -36,6 +36,17 @@ per side and comparing distributions rather than single point estimates --
 not fixed here, since caching/seeding HyDE would mean changing core/ask.py's
 retrieval logic itself, out of this WP's own Non-Goals. See
 docs/PHASE37_REQUIREMENTS.md's WP-37.2 Scope.
+
+CAUTION #2 (WP-43, docs/PHASE43_REQUIREMENTS.md §11.1): even with hyde=False and
+rewrite_query()'s deterministic temperature=0.0, re-running the identical query
+against the identical, unchanged corpus is not guaranteed to reproduce every
+metric exactly. Observed directly: two runs of the same --no-hyde baseline
+command reproduced Precision@5/Recall@5/10/20 bit-for-bit but MRR differed
+(0.6267 vs. 0.6124) -- most likely Qdrant's HNSW dense-vector search breaking a
+near-tie differently between runs without changing which documents clear a
+given top-k threshold. Small-magnitude comparisons between two runs (e.g. two
+rerank_model options that differ by a few hundredths) should be treated with
+this in mind; large, robust deltas are unaffected.
 """
 import argparse
 import json
@@ -231,12 +242,37 @@ def run_harness(
         round(_percentile(latency_vals, 0.95), 1) if latency_vals else None
     )
 
-    return {"per_query": per_query, "aggregate": aggregate}
+    # Codex review, PR #191: without this, a results.json/report.md is only
+    # identifiable by whatever directory name the caller happened to choose
+    # -- not self-describing or reproducible on its own, and specifically a
+    # problem once rerank_model became a real variable (WP-43's own
+    # MiniLM-L-12 vs. TinyBERT comparison).
+    config = {
+        "top_k": top_k,
+        "min_score": min_score,
+        "hyde": hyde,
+        "no_rewrite": no_rewrite,
+        "rerank": rerank,
+        "rerank_pool_size": rerank_pool_size if rerank else None,
+        "rerank_model": rerank_model if rerank else None,
+    }
+
+    return {"per_query": per_query, "aggregate": aggregate, "config": config}
 
 
 def format_report(report: dict) -> str:
     agg = report["aggregate"]
+    cfg = report["config"]
     lines = ["# Retrieval Eval Harness Report (WP-37.1)", ""]
+    lines.append("## Config")
+    lines.append(f"- top_k={cfg['top_k']} min_score={cfg['min_score']} hyde={cfg['hyde']} "
+                  f"no_rewrite={cfg['no_rewrite']}")
+    if cfg["rerank"]:
+        lines.append(f"- rerank=True rerank_pool_size={cfg['rerank_pool_size']} "
+                      f"rerank_model={cfg['rerank_model']}")
+    else:
+        lines.append("- rerank=False")
+    lines.append("")
     lines.append("## Aggregate")
     lines.append(f"- Queries scored (non-zero ground truth): {agg['non_zero_query_count']}")
     lines.append(f"- Mean precision@5: {agg['mean_precision@5']}")

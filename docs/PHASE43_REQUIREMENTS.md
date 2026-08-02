@@ -290,16 +290,32 @@ gold set and live Qdrant/Ollama (`grc_requirements` at 1848 points), `--no-hyde`
 
 | Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
 |---|---|---|---|---|---|---|---|
-| Baseline (no rerank) | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1792ms | 2354ms |
-| Reranked, pool=50 | 0.2514 | 0.5171 | 0.5985 | 0.6926 | 0.6407 | 1863ms | 2448ms |
-| Reranked, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2029ms | 2620ms |
+| Baseline (no rerank) | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6124 | 1785ms | 2358ms |
+| Reranked, pool=50 | 0.2514 | 0.5171 | 0.5985 | 0.6926 | 0.6264 | 1919ms | 2552ms |
+| Reranked, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2008ms | 2625ms |
 
 **Precision@5 — the primary gate metric — regressed at both pool sizes** (0.2629 → 0.2514, about
 -4.4% relative) rather than improving. Recall@5 and Recall@10 also regressed slightly at both pool
-sizes. Recall@20 and MRR improved modestly, more so at pool=50 than pool=100 (widening the pool
-further did not help — see §11.3). Latency increased by roughly 13-16% at pool=100 (1792ms →
-2029ms mean) — not itself gating (WP-15.5's "measure, don't hard-gate" criterion), but consistent
-with the added ONNX inference cost buying no net accuracy improvement here.
+sizes. Recall@20 improved modestly, more so at pool=50 than pool=100 (widening the pool further did
+not help — see §11.3). Latency increased by roughly 7-13% at pool=100 (1785ms → 2008ms mean) — not
+itself gating (WP-15.5's "measure, don't hard-gate" criterion), but consistent with the added ONNX
+inference cost buying no net accuracy improvement here.
+
+**Run-to-run variance, discovered while regenerating these artifacts for §6.3's config-recording
+fix (Codex review, PR #191):** re-running the identical baseline command a second time against the
+same, unchanged corpus (confirmed via `reqbot status` — same collection names, same 1848/839 point
+counts) reproduced Precision@5/Recall@5/10/20 exactly, but MRR differed (0.6267 in the first pass
+→ 0.6124 here). `--no-hyde` and `rewrite_query()`'s `temperature=0.0` rule out the two previously-
+known noise sources (HyDE sampling, per this file's own header caution; non-deterministic rewrite).
+The most likely remaining source is Qdrant's HNSW dense-vector search, which is approximate and can
+break near-ties differently between runs without changing which documents clear a given top-k
+threshold — consistent with the pattern observed: recall/precision at fixed thresholds were stable
+across 3 of 4 reruns, while MRR (sensitive to exact rank) and, in one case (MiniLM, §11.6),
+Precision@5/Recall@5 shifted by a small amount. This doesn't change any conclusion in this document
+— every regression and every "still unfixed" finding reproduced identically — but the exact 4th
+decimal place of any of these numbers shouldn't be treated as perfectly reproducible on a future
+rerun. Added as a second caution in `eval/retrieval_eval_harness.py`'s own module docstring for
+future WPs' benefit, alongside the existing HyDE-noise one.
 
 ### 11.2 Zero-truth score separation — real, but far thinner than first measured
 
@@ -416,34 +432,38 @@ same 45-query gold set, same live corpus.
 
 | Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
 |---|---|---|---|---|---|---|---|
-| Baseline | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1792ms | 2354ms |
-| TinyBERT, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2029ms | 2620ms |
-| MiniLM-L-12, pool=100 | 0.2571 | **0.5599** | 0.6010 | 0.6782 | **0.6780** | **6506ms** | **7973ms** |
+| Baseline | **0.2629** | 0.5402 | 0.6208 | 0.6693 | 0.6124 | 1785ms | 2358ms |
+| TinyBERT, pool=100 | 0.2514 | 0.5187 | 0.6090 | 0.6683 | 0.6358 | 2008ms | 2625ms |
+| MiniLM-L-12, pool=100 | 0.2514 | **0.5456** | 0.6010 | 0.6782 | **0.6780** | **6553ms** | **7931ms** |
 
-MiniLM-L-12 is the best-performing configuration tested on Recall@5, Recall@20, and MRR — Recall@5
-clears baseline for the first time (0.5599 vs. 0.5402) and MRR improves meaningfully (0.678 vs.
-0.6267). Precision@5 is closer to baseline than TinyBERT's result but still below it, and Recall@10
-still regresses slightly — so this still does not clear §9's gate as written (a regression on any
-one of Recall@5/10/20/MRR disqualifies, not a net average).
+MiniLM-L-12 is the best-performing configuration tested on Recall@5, Recall@20, and MRR — MRR
+improves meaningfully (0.6780 vs. baseline's 0.6124) and Recall@5 clears baseline (0.5456 vs.
+0.5402, a real but modest margin — see §11.1's run-to-run variance note; this is the metric most
+affected by it). Precision@5 lands exactly level with TinyBERT's result (0.2514, both below
+baseline's 0.2629) rather than being an improvement over it, and Recall@10 still regresses slightly
+— so this still does not clear §9's gate as written (a regression on any one of Recall@5/10/20/MRR
+disqualifies, not a net average).
 
-**Latency is the more serious problem**: mean retrieval time more than tripled (1792ms → 6506ms,
-~3.6x), p95 similarly (2354ms → 7973ms) — the larger model's ONNX inference cost dominates. TinyBERT's
-~13% increase was arguably tolerable; this isn't, for interactive CLI/GUI use.
+**Latency is the more serious problem**: mean retrieval time more than tripled (1785ms → 6553ms,
+~3.7x), p95 similarly (2358ms → 7931ms) — the larger model's ONNX inference cost dominates.
+TinyBERT's ~13% increase was arguably tolerable; this isn't, for interactive CLI/GUI use.
 
 **Q-T02 is still unfixed** with MiniLM too, the same shape of failure as TinyBERT: its top picks are
-the same plausible-but-generic CARM-program candidates (`REQ-9a1f01a2d295`, `REQ-f78038d96493`), and
-the one reachable target (`REQ-2d5b8006ec40`, rank 40 in the RRF pool) still doesn't crack the
-reranked top 20. Confirms the failure is more about which candidates reach the reranker at all
-(pool depth) and this specific query/corpus content than about either model's precision ceiling.
+the same plausible-but-generic CARM-program candidates seen under TinyBERT (`REQ-9a1f01a2d295`,
+`REQ-f78038d96493`, `REQ-95cbb901f073`, `REQ-70f62fcdd0cf` — reordered among themselves, but the
+same small set), and the one reachable target (`REQ-2d5b8006ec40`, rank 40 in the RRF pool) still
+doesn't crack the reranked top 20 under either model. Confirms the failure is more about which
+candidates reach the reranker at all (pool depth) and this specific query/corpus content than about
+either model's precision ceiling.
 
 **Zero-truth separation is actually worse with MiniLM, not better**: `Q-Z06` ("parking and traffic
 enforcement on a military installation" — deliberately off-topic, keyword-overlapping on "military
 installation") scores 0.2646 at its best candidate — higher than two genuinely on-topic queries' own
-per-query maxima (`Q-C04`: 0.0953, `Q-T03`: 0.1449). Where TinyBERT's per-query maxima didn't overlap
-at all (§11.2, by a thin 0.0007 margin), MiniLM's do. A larger, generally-stronger model is not
-automatically better calibrated for this specific purpose.
+per-query maxima (`Q-C04`: 0.0953, `Q-T03`: 0.1417). Where TinyBERT's per-query maxima didn't overlap
+at all (§11.2, by a thin 0.0007 margin), MiniLM's do, and by a wide margin. A larger,
+generally-stronger model is not automatically better calibrated for this specific purpose.
 
-**Conclusion: still No-Go**, and this specific stronger model isn't the answer either. It moves
-several metrics in the right direction (notably MRR and Recall@5) but trades away both latency and
-zero-truth calibration to get there, and still doesn't fix the motivating case. This backlog
-question now has a real, measured answer rather than remaining open speculation.
+**Conclusion: still No-Go**, and this specific stronger model isn't the answer either. It moves MRR
+and Recall@5 in the right direction but trades away both latency and zero-truth calibration to get
+there, doesn't actually beat TinyBERT on Precision@5, and still doesn't fix the motivating case.
+This backlog question now has a real, measured answer rather than remaining open speculation.

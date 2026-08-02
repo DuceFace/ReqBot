@@ -1,13 +1,17 @@
 # Retrieval Eval Harness Report (WP-37.1)
 
+## Config
+- top_k=20 min_score=0.02 hyde=False no_rewrite=False
+- rerank=True rerank_pool_size=50 rerank_model=ms-marco-TinyBERT-L-2-v2
+
 ## Aggregate
 - Queries scored (non-zero ground truth): 35
 - Mean precision@5: 0.2514
 - Mean recall@5: 0.5171
 - Mean recall@10: 0.5985
 - Mean recall@20: 0.6926
-- Mean MRR: 0.6407
-- Retrieval latency: mean 1862.9ms, p95 2447.6ms
+- Mean MRR: 0.6264
+- Retrieval latency: mean 1919.3ms, p95 2551.8ms
 - Zero-truth queries: 8, mean results returned: 20.0
 - **2 quer(y/ies) with no scorable ground truth** (non-zero shape, but no known-relevant id — e.g. unextracted content, not a rankable miss): Q-T04, Q-T05
 
@@ -26,7 +30,7 @@
 | Q-B02 | broad | 6 | 0.2 | 0.1667 | 0.1667 | 0.1667 | 1.0 | |
 | Q-B03 | broad | 8 | 0.4 | 0.25 | 0.5 | 0.875 | 1.0 | |
 | Q-B04 | broad | 15 | 0.4 | 0.1333 | 0.3333 | 0.6 | 0.25 | |
-| Q-B05 | broad | 29 | 0.6 | 0.1034 | 0.1034 | 0.3103 | 1.0 | |
+| Q-B05 | broad | 29 | 0.6 | 0.1034 | 0.1034 | 0.3103 | 0.5 | |
 | Q-Z01 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z02 | zero | 0 | — | — | — | — | — | returned 20 result(s) |
 | Q-Z03 | zero | 0 | — | — | — | — | — | returned 20 result(s) |

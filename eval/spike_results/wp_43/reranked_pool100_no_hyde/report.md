@@ -1,5 +1,9 @@
 # Retrieval Eval Harness Report (WP-37.1)
 
+## Config
+- top_k=20 min_score=0.02 hyde=False no_rewrite=False
+- rerank=True rerank_pool_size=100 rerank_model=ms-marco-TinyBERT-L-2-v2
+
 ## Aggregate
 - Queries scored (non-zero ground truth): 35
 - Mean precision@5: 0.2514
@@ -7,7 +11,7 @@
 - Mean recall@10: 0.609
 - Mean recall@20: 0.6683
 - Mean MRR: 0.6358
-- Retrieval latency: mean 2029.4ms, p95 2619.6ms
+- Retrieval latency: mean 2008.0ms, p95 2624.8ms
 - Zero-truth queries: 8, mean results returned: 20.0
 - **2 quer(y/ies) with no scorable ground truth** (non-zero shape, but no known-relevant id — e.g. unextracted content, not a rankable miss): Q-T04, Q-T05
 

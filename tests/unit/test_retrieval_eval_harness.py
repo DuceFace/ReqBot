@@ -164,6 +164,52 @@ def test_run_harness_query_failure_does_not_crash_the_run(monkeypatch):
     assert report["aggregate"]["non_zero_query_count"] == 1  # only the good one counted
 
 
+def test_run_harness_config_records_run_parameters(monkeypatch):
+    # Codex review, PR #191: a results.json must be self-describing -- which
+    # model/pool size produced it shouldn't depend on the caller having
+    # chosen a descriptive --output-dir.
+    def fake_retrieve(query, **kwargs):
+        return _fake_result(["REQ-1"])
+
+    monkeypatch.setattr(harness, "retrieve", fake_retrieve)
+    queries = [{"query_id": "Q-1", "query": "test", "shape": "narrow", "relevant_requirement_ids": ["REQ-1"]}]
+    report = harness.run_harness(
+        queries, qdrant_url="http://x", ollama_url="http://y", top_k=20, min_score=0.05,
+        hyde=False, no_rewrite=True, rerank=True, rerank_pool_size=75,
+        rerank_model="ms-marco-MiniLM-L-12-v2",
+    )
+    assert report["config"] == {
+        "top_k": 20, "min_score": 0.05, "hyde": False, "no_rewrite": True,
+        "rerank": True, "rerank_pool_size": 75, "rerank_model": "ms-marco-MiniLM-L-12-v2",
+    }
+
+
+def test_run_harness_config_omits_rerank_details_when_disabled(monkeypatch):
+    def fake_retrieve(query, **kwargs):
+        return _fake_result(["REQ-1"])
+
+    monkeypatch.setattr(harness, "retrieve", fake_retrieve)
+    queries = [{"query_id": "Q-1", "query": "test", "shape": "narrow", "relevant_requirement_ids": ["REQ-1"]}]
+    report = harness.run_harness(queries, qdrant_url="http://x", ollama_url="http://y")
+    assert report["config"]["rerank"] is False
+    assert report["config"]["rerank_pool_size"] is None
+    assert report["config"]["rerank_model"] is None
+
+
+def test_format_report_includes_rerank_model_in_config_section(monkeypatch):
+    def fake_retrieve(query, **kwargs):
+        return _fake_result(["REQ-1"])
+
+    monkeypatch.setattr(harness, "retrieve", fake_retrieve)
+    queries = [{"query_id": "Q-1", "query": "test", "shape": "narrow", "relevant_requirement_ids": ["REQ-1"]}]
+    report = harness.run_harness(
+        queries, qdrant_url="http://x", ollama_url="http://y",
+        rerank=True, rerank_model="ms-marco-MiniLM-L-12-v2",
+    )
+    rendered = harness.format_report(report)
+    assert "ms-marco-MiniLM-L-12-v2" in rendered
+
+
 def test_run_harness_passes_rerank_params_through_to_retrieve(monkeypatch):
     captured_kwargs = {}
 
@@ -311,13 +357,22 @@ def test_main_passes_rerank_flags_to_run_harness(tmp_path, monkeypatch):
 
     def fake_run_harness(queries, **kwargs):
         captured.update(kwargs)
-        return {"per_query": [], "aggregate": {
-            "non_zero_query_count": 0, "mean_precision@5": None,
-            **{f"mean_recall@{k}": None for k in harness.K_VALUES},
-            "mean_mrr": None, "mean_retrieval_ms": None, "p95_retrieval_ms": None,
-            "zero_query_count": 0, "zero_query_mean_returned_count": None,
-            "unscored_query_count": 0, "unscored_query_ids": [], "failed_query_count": 0,
-        }}
+        return {
+            "per_query": [],
+            "aggregate": {
+                "non_zero_query_count": 0, "mean_precision@5": None,
+                **{f"mean_recall@{k}": None for k in harness.K_VALUES},
+                "mean_mrr": None, "mean_retrieval_ms": None, "p95_retrieval_ms": None,
+                "zero_query_count": 0, "zero_query_mean_returned_count": None,
+                "unscored_query_count": 0, "unscored_query_ids": [], "failed_query_count": 0,
+            },
+            "config": {
+                "top_k": 20, "min_score": 0.02, "hyde": True, "no_rewrite": False,
+                "rerank": kwargs.get("rerank", False),
+                "rerank_pool_size": kwargs.get("rerank_pool_size"),
+                "rerank_model": kwargs.get("rerank_model"),
+            },
+        }
 
     monkeypatch.setattr(harness, "run_harness", fake_run_harness)
     monkeypatch.setattr(

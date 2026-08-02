@@ -109,3 +109,21 @@ def test_doc_passed_through_to_export_to_markdown():
     chunk = _MockChunk([table])
     _chunk_raw_text(chunk, sentinel_doc)
     assert calls == [sentinel_doc]
+
+
+def test_doc_resolution_failure_falls_back_to_markdown_without_doc():
+    # Gemini review, PR #189: a caption/cross-reference resolution failure
+    # specific to one table (raised only when `doc` is passed) must not
+    # sacrifice the whole grid -- retry without `doc` before giving up.
+    class _FlakyWithDocTable(TableItem):
+        def export_to_markdown(self, doc=None, *args, **kwargs):
+            if doc is not None:
+                raise RuntimeError("caption resolution boom")
+            return "| Col A   | Col B   |\n|---------|---------|\n| val1    | val2    |"
+
+    table = _FlakyWithDocTable(self_ref="#/tables/3", label=DocItemLabel.TABLE,
+                                data=TableData(table_cells=[], num_rows=0, num_cols=0))
+    chunk = _MockChunk([table], text="fallback chunk text should not be used")
+    result = _chunk_raw_text(chunk, object())
+    assert "| Col A" in result
+    assert result != "fallback chunk text should not be used"

@@ -189,8 +189,10 @@ def _chunk_raw_text(chunk: object, doc: object = None) -> str:
     per cell, restating the table's full caption on every cell. Handled here
     via export_to_markdown() instead, which renders the table once as a
     normal grid. Passing `doc` lets Docling resolve the table's caption item;
-    without it the caption line is silently omitted (still a valid, clean
-    table — degraded, not broken).
+    if that resolution itself raises (Gemini review, PR #189: a caption/
+    cross-reference failure specific to one table must not sacrifice the
+    whole grid), retry export_to_markdown() without `doc` before giving up —
+    still a valid, clean table, just missing the caption line.
 
     Falls back to chunk.text when doc_items cannot be inspected.
     """
@@ -205,10 +207,16 @@ def _chunk_raw_text(chunk: object, doc: object = None) -> str:
             continue
         text = ""
         if isinstance(item, TableItem):
-            try:
-                text = item.export_to_markdown(doc) if doc is not None else item.export_to_markdown()
-            except Exception:
-                text = ""
+            if doc is not None:
+                try:
+                    text = item.export_to_markdown(doc)
+                except Exception:
+                    text = ""
+            if not text:
+                try:
+                    text = item.export_to_markdown()
+                except Exception:
+                    text = ""
         if not text:
             text = getattr(item, "text", "") or ""
         if not text:

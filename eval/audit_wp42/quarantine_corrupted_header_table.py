@@ -49,7 +49,7 @@ def main() -> None:
 
     with open(GATED_PATH, "w", encoding="utf-8") as f:
         for r in kept:
-            f.write(json.dumps(r) + "\n")
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
     print(f"\nWrote {len(kept)} records (was {len(records)}) to {GATED_PATH}")
 

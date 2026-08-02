@@ -299,29 +299,41 @@ further did not help — see §11.3). Latency increased by roughly 13-16% at poo
 2029ms mean) — not itself gating (WP-15.5's "measure, don't hard-gate" criterion), but consistent
 with the added ONNX inference cost buying no net accuracy improvement here.
 
-### 11.2 Zero-truth score separation — a clear, real win
+### 11.2 Zero-truth score separation — real, but far thinner than first measured
 
 Directly answering Phase 40/41's backlog note (evaluate the reranker's confidence output against
-the 8 zero-truth queries specifically): computed `rerank_score` distributions across every query
-shape from the pool=100 run's per-query `rerank_scores` (now captured for every query, not only
-zero-truth ones — §6.3's fix).
+the 8 zero-truth queries specifically). **Corrected after Codex review (PR #191)**: the first pass
+here pooled all 20 returned results per zero-truth query against only the top-5 per real query —
+an apples-to-oranges comparison at different depths, and not the statistic a corrective gate would
+actually threshold (a gate decides per-query, off that query's own top candidate, not off a
+pooled/averaged sample). Redone as **per-query maximum `rerank_score`** from the pool=100 run:
 
-| Bucket | n | min | max | mean | median |
-|---|---|---|---|---|---|
-| Zero-truth (all 20 returned results, 8 queries) | 160 | 0.0000 | 0.0246 | 0.0012 | 0.0002 |
-| Weak-match queries' top-5 (`recall@5 == 0`) | 50 | 0.0195 | 0.9997 | 0.6895 | 0.9771 |
-| Strong-match queries' top-5 (`recall@5 > 0`) | 125 | 0.0002 | 0.9998 | 0.6924 | 0.9747 |
+| Bucket | n queries | min of per-query max | max of per-query max | mean of per-query max |
+|---|---|---|---|---|
+| Zero-truth | 8 | 0.0004 | **0.0246** | 0.0093 |
+| Non-zero-truth (narrow/broad/parent_child_context/table_derived/messy_pdf_overgrab) | 35 | **0.0253** | 0.9998 | 0.83 |
 
-This is unambiguous: `rerank_score` cleanly separates zero-truth from anything topically real — the
-extreme tails brush against each other (zero-truth's max of 0.0246 edges just past weak-match's min
-of 0.0195), but the central tendency isn't close: zero-truth's mean/median (0.0012/0.0002) sit
-roughly three orders of magnitude below both on-topic buckets' (~0.69/~0.98). This directly
-validates Phase 41's hypothesis: "the real fix needs a calibrated
-absolute-relevance signal... not a threshold on an already-fused ranking score." Where RRF's fused
-score routinely gave off-topic queries *higher* scores than genuine weak matches (Phase 41: up to
-1.07 vs. 0.033-0.09), FlashRank's rerank_score gets this right by a wide margin. This finding
-stands independent of the Precision@5 regression above — it's evidence for a future WP-15.9
-corrective-retrieval-gate, not for shipping reranking as the default ordering today.
+The two ranges **do not overlap** in this sample — every zero-truth query's best candidate scores
+below every real query's best candidate. But the margin at the boundary is razor-thin: zero-truth's
+ceiling (`Q-Z07`, 0.0246) sits just 0.0007 below the weakest real query's own ceiling (`Q-N10`,
+"vulnerability scanning and patch management," 0.0253 — despite `Q-N10` finding its correct answer
+at rank 2, `recall@5=1.0`). A threshold gate set in that 0.0007-wide gap would perfectly separate
+this exact 45-query sample, but that's not the same as a *robust* margin — it would very plausibly
+flip on a different query or a re-indexed corpus. Two more real queries also scored surprisingly
+low (`Q-T03`: max 0.35, `Q-C04`: max 0.36) despite being genuinely on-topic, while the majority of
+real queries (31 of 35) scored 0.94+. This bimodal pattern — most real queries near-maximum
+confidence, a few correct ones oddly low — means FlashRank's absolute score isn't reliably
+calibrated across queries; a future corrective gate would need something more robust than a single
+global threshold (e.g. a margin between rank-1 and rank-2, or per-query score normalization), not
+assumed solved by this measurement.
+
+Net: this still directly supports Phase 41's underlying hypothesis — a calibrated per-candidate
+score is a fundamentally different (and here, more separable) signal than RRF's fused score, which
+Phase 41 found gives off-topic queries *higher* scores than genuine weak matches outright (up to
+1.07 vs. 0.033-0.09) — no threshold there could work at all, whereas here at least a threshold
+technically exists. But "a threshold exists in this one sample" is meaningfully weaker than the
+original "clean, reusable separation" framing — it's suggestive evidence worth carrying into a
+future WP-15.9 scoping conversation, not a solved problem.
 
 ### 11.3 Flagship case (Q-T02) — still not fixed, and why
 
@@ -355,7 +367,8 @@ Against §9's gate:
 - ❌ Precision@5 improves — **failed** (regressed ~4.4% relative at both pool sizes).
 - ❌ No regression on Recall@5/10/20/MRR — **failed** (Recall@5 and Recall@10 both regressed;
   Recall@20/MRR improved, but the gate requires no regression on the full set, not a net average).
-- ✅ Zero-truth score-separation evidence reported — **met**, and a genuinely strong result (§11.2).
+- ✅ Zero-truth score-separation evidence reported — **met**: a real, non-overlapping-in-this-sample
+  separation, but with a razor-thin margin at the boundary (§11.2) — suggestive, not conclusive.
 - ✅ Latency measured and reported, not hard-gated — **met** (~13-16% increase, judged acceptable
   on its own, moot given the precision/recall gate failure).
 
@@ -385,6 +398,8 @@ which model `core/reranker.py`'s `Ranker()` construction points at.
 - **Evidence/Compare reranking** — unchanged from §3/§7: still blocked on giving those paths
   candidate-pool headroom past `top_k`, and now additionally motivated less urgently given this
   spike's own model didn't clear its gate on the one path it was tried against.
-- **WP-15.9 corrective retrieval gate** — §11.2's zero-truth separation result is a genuinely
-  strong, reusable input for this once it's scoped, independent of whether reranked ordering itself
-  ships.
+- **WP-15.9 corrective retrieval gate** — §11.2's zero-truth separation result is suggestive but not
+  conclusive (razor-thin margin, and the score isn't consistently calibrated across queries even
+  among real ones). Worth carrying into a future scoping conversation, but that conversation should
+  test per-query maxima and a larger query sample before assuming a global threshold works, rather
+  than treating this spike's result as settled.

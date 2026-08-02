@@ -265,6 +265,29 @@ surfacing again on a query this WP's fix made *possible* to answer correctly for
 (before the fix, chunk 111 had almost nothing worth ranking) — real, but explicitly out of scope here
 (Non-Goals: no reranker work in this WP).
 
+**A third Codex review round found two more real issues in the dedup fix itself, both fixed without
+requiring another re-ingest.** (1) `seen_table_refs` was being marked *before* attempting the table's
+export, not after — if a table's export genuinely failed both ways, every later chunk referencing that
+same table would be wrongly suppressed as a "duplicate" even though nothing had actually been emitted,
+silently discarding their own `chunk.text` fallback. Fixed by only marking a table "seen" on a
+successful, non-empty export. (2) A table's full markdown is now emitted in a single chunk rather than
+bounded by `HybridChunker`'s own token-based splitting — raising a real question of whether an
+oversized table could overflow Step C's context window. Investigated empirically rather than assumed:
+`curl .../api/ps` confirmed Ollama is currently running the model at `context_length=8192` as its own
+server default (nothing in this codebase had ever set it explicitly). Reproduced the actual Step C
+prompt for the corpus's largest known table (afi10-2402 chunk 119, 10746 chars) and confirmed an
+explicit `num_ctx=8192` produces byte-identical output to the unset default — ruling out context
+truncation for that specific case. (Its own extraction output — the same instructional template
+sentence repeated 3 times — turned out to be a separate, pre-existing LLM repetition-loop issue on a
+mostly-blank instructional table, unrelated to size.) Current largest table uses ~43% of that budget.
+Not a live risk today, but pinning `num_ctx=8192` explicitly (`pipeline/llm_extract_requirements.py`)
+rather than depending on whatever the Ollama server happens to default to, plus a size-guard warning
+log for any future table approaching the budget, is a proportionate response — building full
+token-bounded table rechunking isn't justified by current evidence. Neither fix changes output for the
+already-reindexed corpus (verified: the seen-after-success fix only fires on export failure, which
+didn't occur for any of the 4 documents' tables; `num_ctx=8192` matches the already-active server
+default) — confirmed no third re-ingest was needed.
+
 **Final full-corpus retrieval eval** (not a clean pre/post-WP-42 baseline — the gold set and the
 underlying documents both changed mid-WP across two fix rounds):
 `eval/spike_results/wp_42_table_fix_eval/report.md`. With the corrected gold labels (`Q-T01`/`Q-T03`
@@ -302,7 +325,14 @@ already-closed, conclusive-negative finding, not reopened here). No other bucket
       silently excluding them from every aggregate (Codex review, PR #189, P1); `Q-T02` → corrected
       ids.
 - [x] Revert path documented; not needed (no step required reverting).
-- [x] Full `pytest` suite and `ruff check .` clean throughout (868 tests after both fix rounds).
+- [x] `seen_table_refs` only marks a table after a successful export, not before — a table whose
+      export genuinely fails no longer wrongly suppresses later chunks' own fallback content (Codex
+      review, PR #189, third round).
+- [x] Context-window risk for single-chunk table markdown investigated empirically (not assumed): live
+      Ollama server confirmed at `context_length=8192`; the corpus's largest table uses ~43% of that
+      budget; `num_ctx` now pinned explicitly; a size-guard warning log added for future oversized
+      tables (Codex review, PR #189, third round).
+- [x] Full `pytest` suite and `ruff check .` clean throughout (871 tests after three fix rounds).
 
 ---
 

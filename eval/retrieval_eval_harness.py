@@ -38,19 +38,24 @@ retrieval logic itself, out of this WP's own Non-Goals. See
 docs/PHASE37_REQUIREMENTS.md's WP-37.2 Scope.
 
 CAUTION #2 (WP-43, docs/PHASE43_REQUIREMENTS.md §11.1): even with hyde=False and
-rewrite_query()'s deterministic temperature=0.0, re-running the identical query
-against the identical, unchanged corpus is not guaranteed to reproduce every
-metric exactly -- and the spread is larger than a first look suggests. Observed
-across three runs of the same --no-hyde configs: one pair reproduced
-Precision@5/Recall@5/10/20 bit-for-bit with only MRR differing; another pair
-saw Recall@20 flip sign entirely (improving over baseline in one run,
-regressing in another) and Precision@5 move a full regression-vs-tie range.
-Most likely Qdrant's HNSW dense-vector search breaking near-ties differently
-between runs, compounded by any change to reranker input text also having a
-real effect. Single-run point estimates on a 45-query set are not precise
-enough for fine-grained comparisons (e.g. two rerank_model or pool_size
-options a few hundredths apart) -- run N>=3 repeats and compare distributions
-for anything but a large, robust delta.
+rewrite_query()'s deterministic temperature=0.0, re-running the identical
+QUERY against the identical, unchanged corpus and CODE is not guaranteed to
+reproduce every metric exactly. Confirmed directly with same-code reruns (no
+retrieval/reranking code changed between runs): recall/precision at fixed
+thresholds were bit-for-bit stable in one comparison with only MRR differing;
+in another, aggregate metrics reproduced exactly but 5/45 queries showed small
+rerank_score/ranking differences that happened not to cross a recall/precision
+threshold that time. Do not, however, attribute a delta to this noise if the
+compared runs also differ in retrieval/reranking CODE (e.g. before/after a
+change to what text gets scored) -- an earlier draft of docs/PHASE43_
+REQUIREMENTS.md §11.1 did exactly that (caught by Codex review, PR #191) and
+had to walk it back: a real code change's effect is not noise, even if it's
+also not perfectly reproducible in magnitude run to run. Isolate the two by
+re-running the SAME code before concluding something is "just noise."
+Single-run point estimates on a 45-query set are still not precise enough for
+fine-grained same-code comparisons (e.g. two pool_size options a few
+hundredths apart) -- run N>=3 repeats of identical code and compare
+distributions for anything but a large, robust delta.
 """
 import argparse
 import json

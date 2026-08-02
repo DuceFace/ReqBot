@@ -111,6 +111,54 @@ def test_doc_passed_through_to_export_to_markdown():
     assert calls == [sentinel_doc]
 
 
+def test_same_table_across_chunks_emitted_once_not_duplicated():
+    # Codex review, PR #189: HybridChunker splits an oversized table across
+    # N chunks, all referencing the *same* TableItem (confirmed empirically
+    # against all 4 WP-42 documents). The full table must reach Step C
+    # exactly once, not once per split chunk.
+    table = _table_item()
+    seen: set = set()
+    chunk_a = _MockChunk([table])
+    chunk_b = _MockChunk([table])  # same self_ref, simulating the second split chunk
+    result_a = _chunk_raw_text(chunk_a, None, seen_table_refs=seen)
+    result_b = _chunk_raw_text(chunk_b, None, seen_table_refs=seen)
+    assert "| Col A" in result_a
+    assert result_b == ""
+
+
+def test_duplicate_table_chunk_does_not_fall_back_to_chunk_text():
+    # A chunk whose only content is an already-emitted table must end up
+    # truly empty (so the caller's empty-chunk filter drops it) -- not
+    # resurrect the old per-chunk garbled chunk.text duplicate.
+    table = _table_item()
+    seen: set = {table.self_ref}
+    chunk = _MockChunk([table], text="old garbled duplicate should not reappear")
+    result = _chunk_raw_text(chunk, None, seen_table_refs=seen)
+    assert result == ""
+
+
+def test_different_tables_each_emitted_independently():
+    seen: set = set()
+    table_1 = _table_item()
+    table_2 = _table_item()
+    table_2.self_ref = "#/tables/1"
+    result_1 = _chunk_raw_text(_MockChunk([table_1]), None, seen_table_refs=seen)
+    result_2 = _chunk_raw_text(_MockChunk([table_2]), None, seen_table_refs=seen)
+    assert "| Col A" in result_1
+    assert "| Col A" in result_2
+    assert seen == {"#/tables/0", "#/tables/1"}
+
+
+def test_no_seen_table_refs_arg_still_works_without_dedup():
+    # seen_table_refs is optional -- callers that don't pass it (or unit
+    # tests exercising the function directly) get the pre-dedup behavior.
+    table = _table_item()
+    result_a = _chunk_raw_text(_MockChunk([table]), None)
+    result_b = _chunk_raw_text(_MockChunk([table]), None)
+    assert "| Col A" in result_a
+    assert "| Col A" in result_b
+
+
 def test_doc_resolution_failure_falls_back_to_markdown_without_doc():
     # Gemini review, PR #189: a caption/cross-reference resolution failure
     # specific to one table (raised only when `doc` is passed) must not

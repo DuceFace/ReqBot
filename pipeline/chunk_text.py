@@ -174,7 +174,7 @@ def _format_breadcrumb(section_title_path: list[str], parent_header_text: str | 
     return ""
 
 
-def _chunk_raw_text(chunk: object, doc: object = None) -> str:
+def _chunk_raw_text(chunk: object, doc: object = None, *, seen_table_refs: set | None = None) -> str:
     """Extract body text from a DocChunk, excluding heading items.
 
     HybridChunker includes heading text in chunk.text as a prefix.  For
@@ -194,7 +194,24 @@ def _chunk_raw_text(chunk: object, doc: object = None) -> str:
     whole grid), retry export_to_markdown() without `doc` before giving up —
     still a valid, clean table, just missing the caption line.
 
-    Falls back to chunk.text when doc_items cannot be inspected.
+    `seen_table_refs` (Codex review, PR #189): when HybridChunker splits an
+    oversized table across N chunks, every one of those N chunks references
+    the *same* TableItem object in its doc_items — confirmed empirically
+    against all 4 WP-42 documents, every table in every one of them is split
+    this way (afi10-2402's largest table alone spans 11 chunks). Calling
+    export_to_markdown() unconditionally on each would re-export the whole
+    table N times, multiplying Step C's LLM cost by N and creating a latent
+    non-determinism risk (temperature-sampled extraction could disagree
+    across the N redundant calls). The caller threads one shared set across
+    the whole per-document chunking loop; a table's self_ref is emitted in
+    full exactly once, on the first chunk that references it, and skipped
+    (contributes nothing, not even a fallback) on every subsequent chunk —
+    the full table already reached Step C once, intact.
+
+    Falls back to chunk.text when doc_items cannot be inspected, but NOT for
+    a chunk whose only content was an already-emitted table: that chunk
+    correctly ends up empty and is dropped by the caller's empty-chunk
+    filter, rather than resurrecting the old per-chunk garbled duplicate.
     """
     try:
         from docling_core.types.doc import TableItem, TitleItem, SectionHeaderItem
@@ -202,11 +219,21 @@ def _chunk_raw_text(chunk: object, doc: object = None) -> str:
         return chunk.text or ""
 
     parts: list[str] = []
+    suppressed_duplicate_table = False
     for item in chunk.meta.doc_items:
         if isinstance(item, (TitleItem, SectionHeaderItem)):
             continue
         text = ""
         if isinstance(item, TableItem):
+            self_ref = getattr(item, "self_ref", None)
+            already_emitted = (
+                seen_table_refs is not None and self_ref is not None and self_ref in seen_table_refs
+            )
+            if already_emitted:
+                suppressed_duplicate_table = True
+                continue
+            if seen_table_refs is not None and self_ref is not None:
+                seen_table_refs.add(self_ref)
             if doc is not None:
                 try:
                     text = item.export_to_markdown(doc)
@@ -217,9 +244,9 @@ def _chunk_raw_text(chunk: object, doc: object = None) -> str:
                     text = item.export_to_markdown()
                 except Exception:
                     text = ""
-        if not text:
+        if not text and not isinstance(item, TableItem):
             text = getattr(item, "text", "") or ""
-        if not text:
+        if not text and not isinstance(item, TableItem):
             try:
                 text = item.export_to_text() or ""
             except Exception:
@@ -228,7 +255,11 @@ def _chunk_raw_text(chunk: object, doc: object = None) -> str:
         if text:
             parts.append(text)
 
-    return "\n".join(parts) if parts else (chunk.text or "")
+    if parts:
+        return "\n".join(parts)
+    if suppressed_duplicate_table:
+        return ""
+    return chunk.text or ""
 
 
 def _chunk_body_items(chunk: object) -> list:
@@ -341,9 +372,10 @@ def run_structure_aware(
     skip_filtered = 0
     skip_examples: list[list[str]] = []
     chunk_id = 0
+    seen_table_refs: set = set()
 
     for chunk in all_chunks:
-        raw_text = _chunk_raw_text(chunk, doc)
+        raw_text = _chunk_raw_text(chunk, doc, seen_table_refs=seen_table_refs)
 
         # Filter 1: drop ToC chunks (>40% dotted-leader lines)
         if _is_toc_chunk(chunk.text or ""):

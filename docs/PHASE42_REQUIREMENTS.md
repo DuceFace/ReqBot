@@ -216,11 +216,45 @@ both tables' real content is currently unretrievable via the requirements index.
 cost of enforcing verbatim-only `source_quote`, not a bug to chase further in this WP. Reflected in
 gold-set corrections below.
 
-**Gold-set corrections** (`eval/gold_retrieval_queries.jsonl`, same documented-correction discipline
-as WP-41's `Q-N03`/`Q-C05`): `Q-T01` and `Q-T03`'s old ids no longer exist post-reingest (they were
-WP-39.1/WP-40's own pre-fix garbled-content examples); both now have `relevant_requirement_ids: []`
-with a note explaining the zero-answer state is real, not a labeling gap. `Q-T02`'s old ids were
-replaced with 3 of the 9 new clean CAIP records.
+**Gold-set corrections** (`eval/gold_retrieval_queries.jsonl`): `Q-T01` and `Q-T03`'s old ids no
+longer exist post-reingest (they were WP-39.1/WP-40's own pre-fix garbled-content examples).
+**First attempt blanked `relevant_requirement_ids` to `[]` — Codex review, PR #189 (P1), caught that
+this was wrong**: `retrieval_eval_harness.py`'s `compute_metrics()` returns no `recall@k`/`mrr` keys
+for empty ground truth, and since these queries' `shape` is `table_derived` (not `zero`), they're
+counted in `non_zero_query_count` but contribute nothing to the mean — silently vanishing from every
+aggregate instead of registering as the real misses they are, while `"Queries scored: 37"` implied
+otherwise. Fixed by restoring the original (still-nonexistent) ids and adding `expected_quotes`,
+matching the existing `Q-N04`/`Q-C04`/`Q-C06` convention exactly — this correction should have
+followed that precedent the first time. `Q-T02`'s old ids were replaced with 3 of the 9 new clean
+CAIP records.
+
+**A second, more serious bug found by the same Codex review round: `_chunk_raw_text()`'s
+`export_to_markdown()` call ignored chunk boundaries entirely.** Verified directly: `HybridChunker`
+splits every oversized table across multiple chunks that all reference the *same* `TableItem` object
+(checked all 4 documents by re-parsing and tracking `TableItem.self_ref` across chunks — every table
+in every document is split this way; afi10-2402's largest spans 11 chunks). The first fix called
+`export_to_markdown()` unconditionally per chunk, re-exporting the *entire* table on each one — live
+Qdrant confirmed exact byte-identical duplicate chunk text (afi10-2402 chunk_ids 111/112/113, all
+4739 chars) and Step C's raw output showed the same 9 quotes extracted 3 times (27 raw records,
+collapsing to 9 only via `compute_stable_id()` producing the same id for identical content — so the
+live index itself wasn't left with duplicate garbage, but Step C's LLM cost was being multiplied by
+however many chunks a table spanned, up to 11x for the largest table, with a latent correctness risk
+too: nothing guaranteed N non-deterministic extraction calls over identical input would agree).
+Confirmed this was a genuine regression from this fix, not pre-existing: the old `chunk.text`
+fallback was already correctly chunk-bounded (old afi10-2402 chunks 111/112/113 were 1005/973/469
+chars — all different), since it never had cross-chunk table logic to break.
+
+Fixed by threading a `seen_table_refs` set through the whole per-document chunking loop
+(`pipeline/chunk_text.py`'s `run_structure_aware()`): a table's full markdown is emitted exactly once,
+on the first chunk referencing it; later chunks referencing the same table contribute nothing and
+correctly end up empty (dropped by the existing empty-chunk filter, not resurrected via the old
+garbled `chunk.text` fallback). 4 new unit tests. Re-ingested and reindexed all 4 documents a second
+time; re-ran the `is_garbled_table_text()` scan (still 4/21 residual, same known cases, confirming the
+core fix is unaffected) and the full non-verbatim scan (37/672 = 5.5% — consistent with the
+already-established ~5% baseline). The corrupted-header table (`Table 3.2`) now appears in exactly one
+chunk (was 3 duplicates) and still produces 2 non-verbatim records from the same known defect (was 3
+before dedup — normal LLM-call variance, same underlying cause) — quarantined again with updated ids,
+verified absent from live Qdrant post-reindex.
 
 **One more real finding while re-verifying `Q-T02` post-correction: it still scores 0 recall@20, but
 this is a pre-existing, already-tracked `ranking_miss`, not something this WP caused or should fix.**
@@ -231,12 +265,13 @@ surfacing again on a query this WP's fix made *possible* to answer correctly for
 (before the fix, chunk 111 had almost nothing worth ranking) — real, but explicitly out of scope here
 (Non-Goals: no reranker work in this WP).
 
-**Full-corpus retrieval eval, before/after the gold-label correction** (not a clean pre/post-WP-42
-baseline — the gold set itself changed mid-WP): `eval/spike_results/wp_42_table_fix_eval/report.md`.
-After correcting `Q-T01`–`Q-T03`: mean recall@5 0.674, recall@10 0.726, recall@20 0.766, MRR 0.75,
-across 37 non-zero-truth queries, 8/8 zero-truth queries still returning results (unchanged —
-zero-truth calibration is WP-41's already-closed, conclusive-negative finding, not reopened here). No
-other bucket regressed.
+**Final full-corpus retrieval eval** (not a clean pre/post-WP-42 baseline — the gold set and the
+underlying documents both changed mid-WP across two fix rounds):
+`eval/spike_results/wp_42_table_fix_eval/report.md`. With the corrected gold labels (`Q-T01`/`Q-T03`
+scored as real 0.0 misses, not silently excluded) against the final, deduplicated, quarantined corpus:
+mean recall@5 0.638, recall@10 0.672, recall@20 0.714, MRR 0.762, across 37 honestly-scored queries,
+8/8 zero-truth queries still returning results (unchanged — zero-truth calibration is WP-41's
+already-closed, conclusive-negative finding, not reopened here). No other bucket regressed.
 
 ---
 
@@ -244,22 +279,30 @@ other bucket regressed.
 
 - [x] `TableItem`s serialized via structured markdown instead of falling through to `chunk.text`'s
       triplet-style flatten; unit-tested against a real `TableItem`, not a bare mock.
-- [x] 4 affected documents re-ingested (`--no-index`) and compared against prior artifacts before any
-      live index change.
-- [x] `is_garbled_table_text()` re-scan shows a material reduction in flagged chunks (21→4, 81%);
-      residual cases documented (Docling structure-recognition failure, not a serialization gap).
+- [x] A table split by `HybridChunker` across multiple chunks (confirmed: every table in all 4
+      documents) is emitted exactly once, not re-exported in full on every chunk that references it
+      (Codex review, PR #189, P1 — a real regression from the first version of this fix, verified live
+      via byte-identical duplicate chunk text before the correction).
+- [x] 4 affected documents re-ingested twice (`--no-index`) — once for the core fix, once more after
+      the duplication fix — and compared against prior artifacts before any live index change each
+      time.
+- [x] `is_garbled_table_text()` re-scan shows a material reduction in flagged chunks (21→4, 81%),
+      stable across both re-ingests; residual cases documented (Docling structure-recognition failure,
+      not a serialization gap).
 - [x] Non-verbatim `source_quote` risk investigated corpus-wide (not just the sampled table chunks),
-      correcting an initial overstated claim; the 3 records genuinely attributable to this fix
-      quarantined per Tyler's explicit verbatim-only principle before reindexing; verified absent from
-      live Qdrant post-reindex.
-- [x] Live `reqbot reindex` performed only after the comparison above was satisfactory.
+      correcting an initial overstated claim; the records genuinely attributable to this fix
+      quarantined per Tyler's explicit verbatim-only principle before each reindex; verified absent
+      from live Qdrant post-reindex both times.
+- [x] Live `reqbot reindex` performed only after each comparison was satisfactory (twice).
 - [x] Retrieval eval (table-derived + full aggregate) shows no regression post-reindex; the one
       remaining `Q-T02` shortfall identified as a pre-existing, already-tracked `ranking_miss`
       (content present, correctly grounded, ranked outside top-20), not caused by this WP.
-- [x] Gold-set corrections documented (`Q-T01`/`Q-T03` → zero valid answers, a real and accepted
-      consequence of the quarantine; `Q-T02` → corrected ids).
+- [x] Gold-set corrections documented and self-corrected: `Q-T01`/`Q-T03`'s stale ids kept (not
+      blanked to `[]`) with `expected_quotes`, so the harness scores them as real misses instead of
+      silently excluding them from every aggregate (Codex review, PR #189, P1); `Q-T02` → corrected
+      ids.
 - [x] Revert path documented; not needed (no step required reverting).
-- [x] Full `pytest` suite and `ruff check .` clean throughout.
+- [x] Full `pytest` suite and `ruff check .` clean throughout (868 tests after both fix rounds).
 
 ---
 

@@ -296,7 +296,7 @@ against the same, unchanged corpus (confirmed via `reqbot status` — same colle
 
 | Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
 |---|---|---|---|---|---|---|---|
-| Baseline (no rerank) | 0.2629 | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1785ms | 2358ms |
+| Baseline (no rerank) | 0.2629 | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1737ms | 2366ms |
 | Reranked, pool=50 | 0.2514 | 0.5237 | 0.5985 | 0.6537 | 0.6390 | 1878ms | 2436ms |
 | Reranked, pool=100 | 0.2629 | 0.5314 | 0.5995 | 0.6613 | 0.6297 | 2034ms | 2596ms |
 
@@ -306,9 +306,9 @@ against the same, unchanged corpus (confirmed via `reqbot status` — same colle
 exactly (0.2629 both). **Recall@5 and Recall@10 regress at both pool sizes** — the single most
 consistent finding in this spike, reproduced identically on the confirmatory rerun described below.
 Recall@20 also regresses at both pool sizes in the current code (this reverses what an earlier draft
-of this document reported — see the correction immediately below). Latency increased by roughly
-5-14% at pool=100 — not itself gating (WP-15.5's "measure, don't hard-gate" criterion) but a real
-cost for zero benefit on the gate's primary metric.
+of this document reported — see the correction immediately below). Latency increased by roughly 17%
+at pool=100 (1737ms → 2034ms mean) — not itself gating (WP-15.5's "measure, don't hard-gate"
+criterion) but a real cost for zero benefit on the gate's primary metric.
 
 **Correction (Codex review, PR #191): an earlier draft of this section conflated a real code change
 with measurement noise.** The regeneration for the config-recording fix (metadata only, no scoring
@@ -424,7 +424,7 @@ Against §9's gate (final code, confirmed reproducible via a same-code rerun —
   boundary-case claim (does the worst real query beat the best zero-truth query) is demonstrably
   sensitive to small, reasonable implementation choices — §11.2 found `source_ref`'s inclusion
   alone flipped it, reproducibly, not through noise.
-- ✅ Latency measured and reported, not hard-gated — **met** (a real, repeatable 5-14% increase at
+- ✅ Latency measured and reported, not hard-gated — **met** (a real, repeatable ~17% increase at
   pool=100, moot given the precision/recall gate failure).
 
 **Decision: No-Go.** FlashRank's default `ms-marco-TinyBERT-L-2-v2` model, over either candidate
@@ -471,9 +471,9 @@ same 45-query gold set, same live corpus.
 
 | Run | Precision@5 | Recall@5 | Recall@10 | Recall@20 | MRR | Mean latency | p95 latency |
 |---|---|---|---|---|---|---|---|
-| Baseline | 0.2629 | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1785ms | 2358ms |
+| Baseline | 0.2629 | 0.5402 | 0.6208 | 0.6693 | 0.6267 | 1737ms | 2366ms |
 | TinyBERT, pool=100 | 0.2629 | 0.5314 | 0.5995 | 0.6613 | 0.6297 | 2034ms | 2596ms |
-| MiniLM-L-12, pool=100 | 0.2514 | **0.5456** | 0.5988 | 0.6653 | **0.6778** | **6553ms** | **7931ms** |
+| MiniLM-L-12, pool=100 | 0.2514 | **0.5456** | 0.5988 | 0.6653 | **0.6778** | **6734ms** | **7979ms** |
 
 (All figures are from the final, current code — §11.1's confirmatory rerun found the current
 TinyBERT numbers reproducible; MiniLM was measured once at the same final code, not separately
@@ -485,7 +485,7 @@ clear §9's gate as written (a regression on any one of Recall@5/10/20/MRR disqu
 average).
 
 **Latency is the more serious, and more consistent, problem**: mean retrieval time roughly
-quadrupled versus baseline (1785ms → 6553ms, ~3.7x), p95 similarly (2358ms → 7931ms) — the larger
+quadrupled versus baseline (1737ms → 6734ms, ~3.9x), p95 similarly (2366ms → 7979ms, ~3.4x) — the larger
 model's ONNX inference cost dominates. TinyBERT's much smaller latency increase was arguably
 tolerable; this isn't, for interactive CLI/GUI use.
 
